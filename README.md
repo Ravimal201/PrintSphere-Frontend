@@ -1,0 +1,2 @@
+# PrintSphere-Frontend
+PrintSphere is a web-based 3D T-shirt customization and e-commerce management system developed to simplify personalized T-shirt designing, online ordering, production workflow, inventory management, and business analytics. The platform allows customers to customize T-shirts in real-time using an interactive 3D environment, while employees, managers, and owners can efficiently manage orders, stock, production progress, notifications, and sales operations through role-based dashboards.
