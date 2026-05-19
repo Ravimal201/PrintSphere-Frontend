@@ -134,3 +134,26 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Vite
+vite.svg
+
+# Mac system files
+.DS_Store
+
+# Windows system files
+Thumbs.db
+
+# IDE settings
+.vscode/
+.idea/
+
+# Local uploads
+uploads/
+
+# React build
+dist/
+
+# Temporary files
+tmp/
+temp/
