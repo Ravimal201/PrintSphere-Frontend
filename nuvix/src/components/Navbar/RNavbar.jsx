@@ -1,16 +1,17 @@
 import { useState } from "react";
+import { ShoppingCart, UserRound } from "lucide-react";
 
-export default function Navbar() {
+export default function RNavbar() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="w-full bg-white shadow-sm border-b sticky top-0 z-30">
+    <nav className="w-full bg-white shadow-sm sticky top-0 z-30">
       <div className="flex items-center justify-between px-4 md:px-8 py-1">
         
         {/* Logo */}
         <div className="flex items-center">
-          <a href="/" className="flex-shrink-0 p-0 m-0 leading-none">
-            <img src="/images/Logo.png" alt="Logo" className="p-0 m-0 w-12 h-12 md:w-16 md:h-16 lg:w-60 lg:h-25" />
+          <a href="/" className="shrink-0 p-0 m-0 leading-none">
+            <img src="/images/Logo.png" alt="Logo" className="p-0 m-0 w-20 h-9 md:w-25 md:h-12 lg:w-40 lg:h-15" />
           </a>
         </div>
 
@@ -18,17 +19,25 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
           <a href="/" className="hover:text-indigo-600 transition">Home</a>
           <a href="#" className="hover:text-indigo-600 transition">Store</a>
-          <a href="#" className="hover:text-indigo-600 transition">Designer</a>
-          <a href="#" className="hover:text-indigo-600 transition">Orders</a>
+          <a href="#" className="hover:text-indigo-600 transition">Track Order</a>
+          <a href="#" className="hover:text-indigo-600 transition">Help</a>
         </div>
 
-        {/* Desktop Buttons */}
+        {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
-          <button className="px-5 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
-            Login
+          <button
+            type="button"
+            aria-label="Cart"
+            className="inline-flex items-center justify-center rounded-xl border border-indigo-600 p-2 text-indigo-600 transition hover:bg-indigo-50"
+          >
+            <ShoppingCart className="h-5 w-5" />
           </button>
-          <button className="px-5 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition">
-            Register
+          <button
+            type="button"
+            aria-label="Account"
+            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 p-2 text-white transition hover:bg-indigo-700"
+          >
+            <UserRound className="h-5 w-5" />
           </button>
         </div>
 
@@ -48,14 +57,15 @@ export default function Navbar() {
         <div className="md:hidden bg-white border-t px-4 py-4 space-y-3">
           <a href="/" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Home</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Store</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Designer</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Orders</a>
+          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">3D Designer</a>
+          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">My Designs</a>
+          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">My Orders</a>
+          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Cart</a>
+          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Account</a>
+          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Help</a>
           <div className="flex gap-2 pt-2">
             <button className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm">
-              Login
-            </button>
-            <button className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition text-sm">
-              Register
+              Log out
             </button>
           </div>
         </div>
