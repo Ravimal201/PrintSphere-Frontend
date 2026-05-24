@@ -1,6 +1,6 @@
 export default function Sidebar() {
   return (
-    <aside className="w-72 bg-white border-r shadow-sm hidden lg:flex flex-col p-6 gap-4">
+    <aside className="w-72 bg-white shadow-sm hidden lg:flex flex-col p-6 gap-4">
 
       <h2 className="text-lg font-semibold text-gray-800 mb-4">
         Dashboard
