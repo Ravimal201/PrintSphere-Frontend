@@ -1,8 +1,7 @@
-import Navbar from "../components/Navbar/Navbar";
+import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import DashboardCard from "../components/DashboardCard/DashboardCard";
-import ToolButton from "../components/ToolButton/ToolButton";
 
 export default function HomePage() {
   return (
@@ -54,49 +53,53 @@ export default function HomePage() {
 
           </div>
 
-          {/* Designer Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
 
-            {/* Tools */}
-            <div className="bg-white rounded-3xl p-6 border">
+            <DashboardCard
+              title="Orders"
+              value="1,240"
+            />
 
-              <h2 className="text-xl font-semibold mb-6">
-                Design Tools
-              </h2>
+            <DashboardCard
+              title="Revenue"
+              value="$12,430"
+            />
 
-              <div className="space-y-4">
-                <ToolButton text="Upload Image" />
-                <ToolButton text="Add Text" />
-                <ToolButton text="Choose Color" />
-                <ToolButton text="Templates" />
-              </div>
+            <DashboardCard
+              title="Designs"
+              value="846"
+            />
 
-            </div>
+            <DashboardCard
+              title="Products"
+              value="120"
+            />
 
-            {/* Preview */}
-            <div className="xl:col-span-2 bg-white rounded-3xl p-6 border">
+          </div>
 
-              <h2 className="text-2xl font-semibold mb-6">
-                3D Preview
-              </h2>
+          {/* Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
 
-              <div className="h-[500px] rounded-3xl bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300">
+            <DashboardCard
+              title="Orders"
+              value="1,240"
+            />
 
-                <div className="text-center">
+            <DashboardCard
+              title="Revenue"
+              value="$12,430"
+            />
 
-                  <div className="w-48 h-56 bg-white rounded-3xl shadow-lg mx-auto mb-6 flex items-center justify-center">
-                    3D T-Shirt
-                  </div>
+            <DashboardCard
+              title="Designs"
+              value="846"
+            />
 
-                  <p className="text-gray-500">
-                    React Three Fiber Preview Area
-                  </p>
-
-                </div>
-
-              </div>
-
-            </div>
+            <DashboardCard
+              title="Products"
+              value="120"
+            />
 
           </div>
 
