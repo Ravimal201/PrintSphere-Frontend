@@ -36,12 +36,10 @@ const products = [
 ];
 
 function ProductCard({ product }) {
-  const slug = product.name.replace(/\s+/g, "-").toLowerCase();
-
   return (
-    <article className="group rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+    <article className="group rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
       <div className="flex items-center justify-between px-1 pt-1 text-slate-500">
-        <span className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-400">New</span>
+        <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">New</span>
         <button
           type="button"
           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-indigo-200 hover:text-indigo-600"
@@ -51,25 +49,25 @@ function ProductCard({ product }) {
         </button>
       </div>
 
-      <div className={`mt-2 flex h-68 items-center justify-center overflow-hidden rounded-[1.75rem] bg-linear-to-b ${product.accent}`}>
-        <svg viewBox="0 0 220 220" className="h-56 w-56 drop-shadow-[0_18px_24px_rgba(15,23,42,0.12)]" aria-hidden="true">
+      <div className={`mt-2 flex h-56 items-center justify-center overflow-hidden rounded-2xl bg-linear-to-b ${product.accent}`}>
+        <svg viewBox="0 0 220 220" className="h-48 w-48 drop-shadow-[0_18px_24px_rgba(15,23,42,0.12)]" aria-hidden="true">
           <defs>
-            <linearGradient id={`shirt-${slug}`} x1="0" y1="0" x2="1" y2="1">
+            <linearGradient id={`shirt-${product.name.replace(/\s+/g, "-").toLowerCase()}`} x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor={product.name.includes("Classic") || product.name.includes("Neon") ? "#111827" : "#ffffff"} />
               <stop offset="100%" stopColor={product.name.includes("Classic") || product.name.includes("Neon") ? "#050816" : "#f3f4f6"} />
             </linearGradient>
-            <radialGradient id={`glow-${slug}`} cx="50%" cy="30%" r="65%">
+            <radialGradient id={`glow-${product.name.replace(/\s+/g, "-").toLowerCase()}`} cx="50%" cy="30%" r="65%">
               <stop offset="0%" stopColor={product.name.includes("Neon") ? "#a855f7" : "#6b7280"} stopOpacity="0.95" />
               <stop offset="55%" stopColor={product.name.includes("Neon") ? "#7c3aed" : "#d1d5db"} stopOpacity="0.8" />
               <stop offset="100%" stopColor="transparent" />
             </radialGradient>
           </defs>
 
-          <ellipse cx="110" cy="104" rx="62" ry="72" fill={`url(#glow-${slug})`} opacity="0.7" />
+          <ellipse cx="110" cy="104" rx="62" ry="72" fill="url(#glow-Wolf-Graphic-Tee)" opacity="0.7" />
 
           <path
             d="M84 34c6 11 16 17 26 17s20-6 26-17l28 12-15 34-18-7v99H89V73l-18 7-15-34 28-12z"
-            fill={`url(#shirt-${slug})`}
+            fill={product.name.includes("NOWIX") || product.name.includes("Neon") ? "url(#shirt-nowix-classic-tee)" : product.name.includes("Splash") ? "#fafafa" : "url(#shirt-wolf-graphic-tee)"}
             stroke={product.name.includes("NOWIX") || product.name.includes("Neon") ? "#0f172a" : "#e5e7eb"}
             strokeWidth="2"
             strokeLinejoin="round"
@@ -103,7 +101,7 @@ function ProductCard({ product }) {
         </svg>
       </div>
 
-      <div className="mt-4 px-1 pb-1">
+      <div className="mt-3 px-1 pb-1">
         <h3 className="text-sm font-medium text-slate-900">{product.name}</h3>
         <div className="mt-2 flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-slate-900">{product.price}</p>
