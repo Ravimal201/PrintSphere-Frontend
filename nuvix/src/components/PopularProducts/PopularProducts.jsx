@@ -1,4 +1,5 @@
-import { ChevronDown, Heart, Star } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Heart, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 const products = [
   {
@@ -117,6 +118,50 @@ function ProductCard({ product }) {
 }
 
 export default function PopularProducts() {
+  const [activeDot, setActiveDot] = useState(0);
+  const scrollRef = useRef(null);
+
+  const dotCount = Math.max(1, products.length);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const card = container.querySelector("[data-product-card]");
+      if (!card) return;
+
+      const cardWidth = card.getBoundingClientRect().width;
+      const pageWidth = cardWidth + 20;
+      const nextIndex = Math.min(dotCount - 1, Math.round(container.scrollLeft / pageWidth));
+      setActiveDot(nextIndex);
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [dotCount]);
+
+  function scrollToDot(dotIndex) {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const card = container.querySelector("[data-product-card]");
+    if (!card) return;
+
+    const cardWidth = card.getBoundingClientRect().width;
+    const pageWidth = cardWidth + 20;
+    container.scrollTo({ left: dotIndex * pageWidth, behavior: "smooth" });
+    setActiveDot(dotIndex);
+  }
+
+  function goPrev() {
+    scrollToDot(Math.max(0, activeDot - 1));
+  }
+
+  function goNext() {
+    scrollToDot(Math.min(dotCount - 1, activeDot + 1));
+  }
+
   return (
     <section className="mb-8 rounded-4xl border border-slate-200/70 bg-white px-4 py-6 shadow-sm sm:px-6 lg:px-8">
       <div className="text-center">
@@ -153,10 +198,66 @@ export default function PopularProducts() {
         </a>
       </div>
 
-      <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {products.map((product) => (
-          <ProductCard key={product.name} product={product} />
+      <div className="mt-5 relative">
+        <button
+          type="button"
+          onClick={goPrev}
+          aria-label="Previous products"
+          className="absolute left-1 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600 md:inline-flex"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label="Next products"
+          className="absolute right-1 top-1/2 z-10 hidden -translate-y-1/2 rounded-full border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600 md:inline-flex"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+
+        <div
+          ref={scrollRef}
+          className="flex gap-5 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-2 xl:grid-cols-4 md:overflow-visible md:pb-0"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {products.map((product) => (
+            <div key={product.name} data-product-card className="w-72 shrink-0 snap-start md:w-auto md:shrink">
+              <ProductCard product={product} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-center gap-3 md:hidden">
+        <button
+          type="button"
+          onClick={goPrev}
+          aria-label="Previous products"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        {Array.from({ length: dotCount }).map((_, index) => (
+          <button
+            key={index}
+            type="button"
+            onClick={() => scrollToDot(index)}
+            aria-label={`Go to product group ${index + 1}`}
+            className={`h-2 rounded-full transition-all ${index === activeDot ? "w-6 bg-indigo-600" : "w-2 bg-slate-300"}`}
+          />
         ))}
+
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label="Next products"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
     </section>
   );
