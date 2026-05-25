@@ -17,9 +17,10 @@ export default function GNavbar() {
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
           <a href="/" className="hover:text-indigo-600 transition">Home</a>
+          <a href="#" className="hover:text-indigo-600 transition">About</a>
           <a href="#" className="hover:text-indigo-600 transition">Store</a>
           <a href="#" className="hover:text-indigo-600 transition">3D Designer</a>
-          <a href="#" className="hover:text-indigo-600 transition">My Designs</a>
+          <a href="#" className="hover:text-indigo-600 transition">Contact Us</a>
         </div>
 
         {/* Desktop Buttons */}
@@ -47,9 +48,10 @@ export default function GNavbar() {
       {isOpen && (
         <div className="md:hidden bg-white border-t px-4 py-4 space-y-3">
           <a href="/" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Home</a>
+          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">About</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Store</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">3D Designer</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">My Designs</a>
+          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Contact Us</a>     
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Help</a>
           <div className="flex gap-2 pt-2">
             <a href="/customer-home" className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm text-center">
