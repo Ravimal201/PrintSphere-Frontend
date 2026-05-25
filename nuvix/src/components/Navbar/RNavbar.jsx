@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { ShoppingCart, UserRound } from "lucide-react";
+import { ChevronDown, ShoppingCart, UserRound } from "lucide-react";
 
 export default function RNavbar() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <nav className="w-full bg-white shadow-sm sticky top-0 z-30">
-      <div className="flex items-center justify-between px-4 md:px-8 py-1">
+      <div className="flex items-center justify-between px-4 md:px-8 py-2">
         
         {/* Logo */}
         <div className="flex items-center">
@@ -17,10 +17,10 @@ export default function RNavbar() {
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
-          <a href="/" className="hover:text-indigo-600 transition">Home</a>
+          <a href="#" className="hover:text-indigo-600 transition">About</a>
           <a href="#" className="hover:text-indigo-600 transition">Store</a>
           <a href="#" className="hover:text-indigo-600 transition">Track Order</a>
-          <a href="#" className="hover:text-indigo-600 transition">Help</a>
+          <a href="#" className="hover:text-indigo-600 transition">Contact Us</a>
         </div>
 
         {/* Desktop Actions */}
@@ -34,10 +34,19 @@ export default function RNavbar() {
           </button>
           <button
             type="button"
-            aria-label="Account"
-            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 p-2 text-white transition hover:bg-indigo-700"
+            aria-label="Account menu"
+            className="inline-flex items-center gap-3 px-3 py-2 text-left"
           >
-            <UserRound className="h-5 w-5" />
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+              <UserRound className="h-5 w-5" />
+            </span>
+
+            <span className="flex flex-col items-start leading-tight">
+              <span className="text-sm font-semibold text-gray-900">Nuwan</span>
+              <span className="text-xs text-gray-500">Customer</span>
+            </span>
+
+            <ChevronDown className="h-4 w-4 text-gray-400" />
           </button>
         </div>
 
