@@ -2,7 +2,7 @@ import { Home, ShoppingCart, List, Image, UserRound, Layers, LifeBuoy, LogOut } 
 
 export default function Sidebar() {
   return (
-    <aside className="w-72 bg-white shadow-sm hidden lg:flex flex-col p-6 gap-4">
+    <aside className="flex-none w-72 bg-white shadow-sm hidden lg:flex lg:fixed lg:top-16 lg:left-0 lg:h-[calc(100vh-4rem)] overflow-y-auto flex-col p-6 gap-4">
 
       <button className="w-full text-left px-5 py-3 rounded-2xl bg-indigo-600 text-white inline-flex items-center gap-3">
         <Home className="h-5 w-5" />
