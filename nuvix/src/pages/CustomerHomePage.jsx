@@ -1,10 +1,13 @@
 import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
-import DashboardCard from "../components/DashboardCard/DashboardCard";
+import CardsSection from "../components/CardsSection/CardsSection";
 import PopularProducts from "../components/PopularProducts/PopularProducts";
+import Testimonials from "../components/Testimonials/Testimonials";
 import heroImage from "../assets/hero.png";
-import { Layers, Sparkles, Truck, Shirt, PenLine, Package, ArrowRight } from "lucide-react";
+import { Layers, Sparkles, Truck } from "lucide-react";
+import HowItWorks from "../components/HowItWorks/HowItWorks";
+import BannerSection from "../components/BannerSection/BannerSection";
 
 export default function HomePage() {
   return (
@@ -39,7 +42,7 @@ export default function HomePage() {
                 <div className="mt-8 flex flex-wrap gap-4 justify-center lg:justify-start">
                   <a
                     href="#"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:bg-indigo-700"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:from-indigo-500 hover:via-violet-500 hover:to-fuchsia-500"
                   >
                     Start Designing
                     <span aria-hidden="true">→</span>
@@ -131,95 +134,16 @@ export default function HomePage() {
           </section>
 
           {/* Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-
-            <DashboardCard
-              title="Orders Completed"
-              value="1,240"
-            />
-
-            <DashboardCard
-              title="Unique Designs"
-              value="846"
-            />
-
-            <DashboardCard
-              title="Premium Products"
-              value="120"
-            />
-
-            <DashboardCard
-              title="Customer Rating"
-              value="4.8/5"
-            />
-
-          </div>
+          <CardsSection />
 
           {/* How It Works */}
-          <section className="mb-8 rounded-[2rem] border border-white/70 bg-white px-5 py-8 shadow-sm sm:px-6 lg:px-8">
-            <div className="text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">
-                How It Works
-              </p>
-              <div className="mx-auto mt-3 h-1 w-16 rounded-full bg-indigo-600" />
-            </div>
-
-            <div className="mt-8 grid gap-6 lg:grid-cols-3 lg:gap-4">
-              <div className="relative flex items-start gap-4 rounded-[1.5rem] border border-slate-100 bg-slate-50/70 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-                <div className="relative flex h-16 w-16 flex-none items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900">
-                  <Shirt className="h-7 w-7" />
-                  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white shadow-md shadow-indigo-200">
-                    1
-                  </span>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg font-semibold text-slate-900">Choose Product</h3>
-                  <p className="mt-1 max-w-sm text-sm leading-6 text-slate-600">
-                    Select your favorite T-shirt style, color and size.
-                  </p>
-                </div>
-
-                <ArrowRight className="mt-4 hidden h-5 w-5 flex-none text-slate-400 lg:block" />
-              </div>
-
-              <div className="relative flex items-start gap-4 rounded-[1.5rem] border border-slate-100 bg-slate-50/70 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-                <div className="relative flex h-16 w-16 flex-none items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900">
-                  <PenLine className="h-7 w-7" />
-                  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white shadow-md shadow-indigo-200">
-                    2
-                  </span>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg font-semibold text-slate-900">Customize Design</h3>
-                  <p className="mt-1 max-w-sm text-sm leading-6 text-slate-600">
-                    Use our 3D designer to add text, images and more.
-                  </p>
-                </div>
-
-                <ArrowRight className="mt-4 hidden h-5 w-5 flex-none text-slate-400 lg:block" />
-              </div>
-
-              <div className="relative flex items-start gap-4 rounded-[1.5rem] border border-slate-100 bg-slate-50/70 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-                <div className="relative flex h-16 w-16 flex-none items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900">
-                  <Package className="h-7 w-7" />
-                  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white shadow-md shadow-indigo-200">
-                    3
-                  </span>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg font-semibold text-slate-900">Place Order</h3>
-                  <p className="mt-1 max-w-sm text-sm leading-6 text-slate-600">
-                    Review your design and place your order.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
+          <HowItWorks />
 
           <PopularProducts />
+
+          <Testimonials />
+
+          <BannerSection />
 
         </main>
 
