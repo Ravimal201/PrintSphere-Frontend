@@ -24,9 +24,9 @@ export default function GNavbar() {
 
         {/* Desktop Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          <button className="px-5 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
+          <a href="/customer-home" className="px-5 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
             Login
-          </button>
+          </a>
           <button className="px-5 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition">
             Register
           </button>
@@ -52,9 +52,9 @@ export default function GNavbar() {
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">My Designs</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Help</a>
           <div className="flex gap-2 pt-2">
-            <button className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm">
+            <a href="/customer-home" className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm text-center">
               Login
-            </button>
+            </a>
             <button className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition text-sm">
               Register
             </button>
