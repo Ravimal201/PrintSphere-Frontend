@@ -1,7 +1,10 @@
-import heroImage from "../../assets/hero.png";
 import { Layers, Sparkles, Truck } from "lucide-react";
+import { useRef, useState } from "react";
+import Hero3DPreview from "./Hero3DPreview";
 
 export default function HeroSection() {
+  const heroRef = useRef(null);
+  const [scale, setScale] = useState(1.6);
   return (
     <section className="relative mb-8 overflow-hidden rounded-4xl border border-indigo-100 bg-linear-to-br from-white via-indigo-50 to-indigo-100/80 p-6 shadow-[0_24px_80px_rgba(99,102,241,0.12)] lg:p-8">
       <div className="absolute inset-x-6 top-5 h-px bg-linear-to-r from-transparent via-indigo-200 to-transparent" />
@@ -75,22 +78,63 @@ export default function HeroSection() {
           </div>
 
           <div className="hidden lg:flex relative z-10 w-full max-w-130 flex-col items-center justify-center rounded-4xl border border-white/70 bg-white/60 px-6 py-8 shadow-[0_20px_60px_rgba(99,102,241,0.12)] backdrop-blur-md sm:px-8">
-            <img
-              src={heroImage}
-              alt="3D product preview"
-              className="w-full max-w-[320px] select-none drop-shadow-[0_20px_25px_rgba(79,70,229,0.18)]"
-            />
+            <Hero3DPreview ref={heroRef} onScaleChange={setScale} />
 
-            <div className="mt-8 flex w-full items-center gap-3 rounded-2xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200">
-              <button className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100" type="button">
+            <div className="mt-8 flex w-full items-center gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100"
+                type="button"
+                onClick={() => {
+                  heroRef.current?.reset();
+                  setScale(1.6);
+                }}
+              >
                 ↻
               </button>
-              <div className="flex-1 rounded-full bg-slate-100 px-3 py-2">
-                <div className="relative h-1.5 rounded-full bg-indigo-200">
-                  <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-600 shadow" />
+
+              <div className="flex-1 px-3">
+                <div className="relative h-4 rounded-full bg-indigo-200/60">
+                  <div className="absolute inset-0 rounded-full bg-indigo-200/40" />
+
+                  {/* decorative secondary dot */}
+                  <div
+                    className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-indigo-300 opacity-60"
+                    style={{ left: `calc(${((scale - 0.5) / (2.5 - 0.5)) * 100}% - 6px)` }}
+                  />
+
+                  {/* visible thumb (follows state) */}
+                  <div
+                    className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-indigo-600 shadow pointer-events-none"
+                    style={{ left: `${((scale - 0.5) / (2.5 - 0.5)) * 100}%`, transform: 'translate(-50%, -50%)' }}
+                  />
+
+                  {/* invisible input overlay for native dragging */}
+                  <input
+                    aria-label="Scale"
+                    type="range"
+                    min="0.5"
+                    max="2.5"
+                    step="0.01"
+                    value={scale}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      setScale(v);
+                      heroRef.current?.setScale(v);
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
                 </div>
               </div>
-              <button className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100" type="button">
+
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100"
+                type="button"
+                onClick={() => {
+                  const v = 2.2;
+                  setScale(v);
+                  heroRef.current?.setScale(v);
+                }}
+              >
                 ⤢
               </button>
             </div>
