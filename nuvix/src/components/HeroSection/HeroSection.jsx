@@ -1,10 +1,11 @@
-import { Layers, Sparkles, Truck } from "lucide-react";
+import { Layers, Maximize2, MoveDown, MoveUp, RotateCcw, RotateCw, Sparkles, Truck, Undo2 } from "lucide-react";
 import { useRef, useState } from "react";
 import Hero3DPreview from "./Hero3DPreview";
 
 export default function HeroSection() {
   const heroRef = useRef(null);
   const [scale, setScale] = useState(1.6);
+  const [shirtColor, setShirtColor] = useState("#ffffff");
   return (
     <section className="relative mb-8 overflow-hidden rounded-4xl border border-indigo-100 bg-linear-to-br from-white via-indigo-50 to-indigo-100/80 p-6 shadow-[0_24px_80px_rgba(99,102,241,0.12)] lg:p-8">
       <div className="absolute inset-x-6 top-5 h-px bg-linear-to-r from-transparent via-indigo-200 to-transparent" />
@@ -69,16 +70,77 @@ export default function HeroSection() {
 
           <div className="hidden lg:absolute lg:left-0 lg:top-1/2 lg:flex lg:-translate-y-1/2 z-20">
             <div className="flex flex-col gap-3 rounded-3xl bg-white/90 p-4 shadow-xl shadow-indigo-100 ring-1 ring-white/70 backdrop-blur">
-              {['↖', 'T', '▣', '◌', '⟲', '⌫'].map((item) => (
-                <div key={item} className="flex h-10 w-10 items-center justify-center rounded-2xl text-xl text-slate-700 shadow-sm hover:bg-indigo-50">
-                  {item}
-                </div>
-              ))}
+              <button
+                type="button"
+                title="Rotate left"
+                aria-label="Rotate left"
+                onClick={() => heroRef.current?.rotateBy(0, -0.3, 0)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-slate-700 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                <RotateCcw className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                title="Tilt up"
+                aria-label="Tilt up"
+                onClick={() => heroRef.current?.rotateBy(-0.2, 0, 0)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-slate-700 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                <MoveUp className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                title="Fit model"
+                aria-label="Fit model"
+                onClick={() => {
+                  heroRef.current?.fit();
+                  setScale(2.2);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-slate-700 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                <Maximize2 className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                title="Tilt down"
+                aria-label="Tilt down"
+                onClick={() => heroRef.current?.rotateBy(0.2, 0, 0)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-slate-700 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                <MoveDown className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                title="Rotate right"
+                aria-label="Rotate right"
+                onClick={() => heroRef.current?.rotateBy(0, 0.3, 0)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-slate-700 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                <RotateCw className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                title="Reset view"
+                aria-label="Reset view"
+                onClick={() => {
+                  heroRef.current?.reset();
+                  setScale(1.6);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-slate-700 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                <Undo2 className="h-5 w-5" />
+              </button>
             </div>
           </div>
 
           <div className="hidden lg:flex relative z-10 w-full max-w-130 flex-col items-center justify-center rounded-4xl border border-white/70 bg-white/60 px-6 py-8 shadow-[0_20px_60px_rgba(99,102,241,0.12)] backdrop-blur-md sm:px-8">
-            <Hero3DPreview ref={heroRef} onScaleChange={setScale} />
+            <Hero3DPreview
+              ref={heroRef}
+              scale={scale}
+              onScaleChange={setScale}
+              color={shirtColor}
+              onColorChange={setShirtColor}
+            />
 
             <div className="mt-8 flex w-full items-center gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
               <button
@@ -147,9 +209,13 @@ export default function HeroSection() {
                 <button
                   key={color}
                   type="button"
-                  className={`h-9 w-9 rounded-full border-2 ${index === 0 ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-transparent'}`}
+                  className={`h-9 w-9 rounded-full border-2 transition ${shirtColor === color ? 'border-indigo-500 ring-2 ring-indigo-200 scale-110' : 'border-transparent hover:scale-105'}`}
                   style={{ backgroundColor: color }}
                   aria-label={`Color ${index + 1}`}
+                  onClick={() => {
+                    setShirtColor(color);
+                    heroRef.current?.setColor(color);
+                  }}
                 />
               ))}
             </div>
