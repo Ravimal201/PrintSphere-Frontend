@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar/GNavbar";
 import Hero3DPreview from "../components/HeroSection/Hero3DPreview";
 
@@ -16,6 +16,28 @@ const colorChoices = [
 export default function EtiterPage() {
 	const [scale, setScale] = useState(0.5);
 	const [shirtColor, setShirtColor] = useState("#ffffff");
+	const [importedImage, setImportedImage] = useState(null);
+	const importedImageUrl = importedImage?.url ?? null;
+
+	function handleImageImport(event) {
+		const file = event.target.files?.[0];
+		if (!file) return;
+
+		if (importedImage?.url) {
+			URL.revokeObjectURL(importedImage.url);
+		}
+
+		const previewUrl = URL.createObjectURL(file);
+		setImportedImage({ name: file.name, url: previewUrl });
+	}
+
+	useEffect(() => {
+		return () => {
+			if (importedImage?.url) {
+				URL.revokeObjectURL(importedImage.url);
+			}
+		};
+	}, [importedImage]);
 
 	return (
 		<div className="min-h-screen bg-[radial-gradient(circle_at_top,_#eef2ff,_#f8fafc_48%,_#e2e8f0_100%)]">
@@ -39,6 +61,41 @@ export default function EtiterPage() {
 							</p>
 
 							<div className="mt-8 space-y-3">
+								<div className="rounded-3xl bg-white/5 p-4 ring-1 ring-white/10">
+									<p className="text-sm font-medium text-slate-200">Import image</p>
+									<p className="mt-2 text-xs leading-5 text-slate-400">
+										Upload a logo or design image to prepare it for the shirt.
+									</p>
+
+									<label className="mt-4 flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-white/20 bg-white/5 px-4 py-4 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+										<input
+											type="file"
+											accept="image/*"
+											className="hidden"
+											onChange={handleImageImport}
+										/>
+										Choose image
+									</label>
+
+									{importedImage ? (
+										<div className="mt-4 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+											<div className="flex items-center gap-3">
+												<img
+													src={importedImage.url}
+													alt={importedImage.name}
+													className="h-14 w-14 rounded-xl object-cover ring-1 ring-white/10"
+												/>
+												<div>
+													<p className="text-sm font-semibold text-white">Image imported</p>
+													<p className="mt-1 text-xs text-slate-400">{importedImage.name}</p>
+												</div>
+											</div>
+										</div>
+									) : (
+										<p className="mt-4 text-xs text-slate-400">No image selected yet.</p>
+									)}
+								</div>
+
 								<div className="rounded-3xl bg-white/5 p-4 ring-1 ring-white/10">
 									<p className="text-sm font-medium text-slate-200">Zoom controls</p>
 									<div className="mt-3 flex flex-wrap gap-2">
@@ -107,6 +164,7 @@ export default function EtiterPage() {
 									onScaleChange={setScale}
 									color={shirtColor}
 									onColorChange={setShirtColor}
+									imageUrl={importedImageUrl}
 								/>
 
 								<div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200">
