@@ -1,9 +1,11 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Center, Float, OrbitControls, useGLTF } from "@react-three/drei";
 import { Suspense, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import { RepeatWrapping, TextureLoader, SRGBColorSpace } from "three";
 
-function ShirtModel({ modelRef, color, onPointerDown }) {
+function ShirtModel({ modelRef, color, imageUrl, onPointerDown }) {
   const { scene } = useGLTF("/images/models/t_shirt.glb");
+  const imageTextureRef = useRef(null);
 
   useFrame((state) => {
     if (!modelRef.current) return;
@@ -30,6 +32,52 @@ function ShirtModel({ modelRef, color, onPointerDown }) {
     });
   }, [scene, color]);
 
+  useEffect(() => {
+    if (imageTextureRef.current) {
+      imageTextureRef.current.dispose();
+      imageTextureRef.current = null;
+    }
+
+    if (!imageUrl) {
+      scene.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((material) => {
+          if (material.map) {
+            material.map.dispose();
+            material.map = null;
+          }
+          material.needsUpdate = true;
+        });
+      });
+      return;
+    }
+
+    const loader = new TextureLoader();
+    const texture = loader.load(imageUrl, () => {
+      scene.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((material) => {
+          material.map = texture;
+          material.color.set(color);
+          material.needsUpdate = true;
+        });
+      });
+    });
+
+    texture.colorSpace = SRGBColorSpace;
+    texture.wrapS = RepeatWrapping;
+    texture.wrapT = RepeatWrapping;
+    texture.repeat.set(1, 1);
+    imageTextureRef.current = texture;
+
+    return () => {
+      texture.dispose();
+      imageTextureRef.current = null;
+    };
+  }, [scene, imageUrl, color]);
+
 
 
   return (
@@ -43,7 +91,7 @@ function ShirtModel({ modelRef, color, onPointerDown }) {
 
 useGLTF.preload("/images/models/t_shirt.glb");
 
-const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, color, onColorChange }, ref) {
+const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, color, onColorChange, imageUrl }, ref) {
   const modelRef = useRef();
   const defaultScale = 0.8;
   const scaleRef = useRef(defaultScale);
@@ -138,7 +186,7 @@ const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, 
         <directionalLight position={[-3, 1, 2]} intensity={0.9} />
         <Suspense fallback={null}>
           <Float speed={1.5} rotationIntensity={0.6} floatIntensity={0.8}>
-            <ShirtModel modelRef={modelRef} color={color} onPointerDown={handleClick} />
+            <ShirtModel modelRef={modelRef} color={color} imageUrl={imageUrl} onPointerDown={handleClick} />
           </Float>
         </Suspense>
         <OrbitControls enablePan={false} enableZoom={false} minPolarAngle={Math.PI / 2.8} maxPolarAngle={Math.PI / 2.2} />
