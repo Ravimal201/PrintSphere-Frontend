@@ -17,18 +17,47 @@ export default function EtiterPage() {
 	const [scale, setScale] = useState(0.5);
 	const [shirtColor, setShirtColor] = useState("#ffffff");
 	const [importedImage, setImportedImage] = useState(null);
+	const [isDraggingImage, setIsDraggingImage] = useState(false);
 	const importedImageUrl = importedImage?.url ?? null;
+
+	function setImageFromFile(file) {
+		if (!file) return;
+
+		setImportedImage((previousImage) => {
+			if (previousImage?.url) {
+				URL.revokeObjectURL(previousImage.url);
+			}
+
+			return {
+				name: file.name,
+				url: URL.createObjectURL(file),
+			};
+		});
+	}
 
 	function handleImageImport(event) {
 		const file = event.target.files?.[0];
-		if (!file) return;
+		setImageFromFile(file);
+		event.target.value = "";
+	}
 
-		if (importedImage?.url) {
-			URL.revokeObjectURL(importedImage.url);
-		}
+	function handlePreviewDrop(event) {
+		event.preventDefault();
+		setIsDraggingImage(false);
 
-		const previewUrl = URL.createObjectURL(file);
-		setImportedImage({ name: file.name, url: previewUrl });
+		const file = event.dataTransfer.files?.[0];
+		if (!file || !file.type.startsWith("image/")) return;
+
+		setImageFromFile(file);
+	}
+
+	function handlePreviewDragOver(event) {
+		event.preventDefault();
+		setIsDraggingImage(true);
+	}
+
+	function handlePreviewDragLeave() {
+		setIsDraggingImage(false);
 	}
 
 	useEffect(() => {
@@ -159,17 +188,32 @@ export default function EtiterPage() {
 							</div>
 
 							<div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-inner shadow-slate-200/50 sm:p-6">
-								<Hero3DPreview
-									scale={scale}
-									onScaleChange={setScale}
-									color={shirtColor}
-									onColorChange={setShirtColor}
-									imageUrl={importedImageUrl}
-								/>
+								<div
+									onDrop={handlePreviewDrop}
+									onDragOver={handlePreviewDragOver}
+									onDragLeave={handlePreviewDragLeave}
+									className="relative rounded-[2rem]"
+								>
+									<Hero3DPreview
+										scale={scale}
+										onScaleChange={setScale}
+										color={shirtColor}
+										onColorChange={setShirtColor}
+										imageUrl={importedImageUrl}
+									/>
+
+									{isDraggingImage && (
+										<div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[2rem] border-2 border-dashed border-indigo-500 bg-indigo-500/10">
+											<div className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow-lg">
+												Drop image to apply it to the shirt
+											</div>
+										</div>
+									)}
+								</div>
 
 								<div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200">
 									<span>Zoom starts at 50% on page load.</span>
-									<span>Use mouse wheel, click, or buttons to adjust the model.</span>
+									<span>Drag an image onto the shirt to texture it.</span>
 								</div>
 							</div>
 						</div>
