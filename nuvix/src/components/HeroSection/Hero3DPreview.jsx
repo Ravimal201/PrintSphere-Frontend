@@ -18,6 +18,9 @@ function ShirtModel({ modelRef, color, imageUrl, onPointerDown }) {
   });
 
   useEffect(() => {
+    // If an image texture is applied, don't overwrite material color (would tint the texture).
+    if (imageUrl) return;
+
     scene.traverse((child) => {
       if (!child.isMesh || !child.material) return;
       if (Array.isArray(child.material)) {
@@ -30,7 +33,7 @@ function ShirtModel({ modelRef, color, imageUrl, onPointerDown }) {
         child.material.needsUpdate = true;
       }
     });
-  }, [scene, color]);
+  }, [scene, color, imageUrl]);
 
   useEffect(() => {
     if (imageTextureRef.current) {
@@ -60,7 +63,8 @@ function ShirtModel({ modelRef, color, imageUrl, onPointerDown }) {
         const materials = Array.isArray(child.material) ? child.material : [child.material];
         materials.forEach((material) => {
           material.map = texture;
-          material.color.set(color);
+          // Ensure the texture is not tinted by the material base color.
+          if (material.color) material.color.set('#ffffff');
           material.needsUpdate = true;
         });
       });
