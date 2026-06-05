@@ -223,3 +223,8 @@ export default function EtiterPage() {
 		</div>
 	);
 }
+cd nuvix
+npm install
+npm run devcd nuvix
+npm install
+npm run dev
