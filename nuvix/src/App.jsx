@@ -1,6 +1,8 @@
 import GUserPage from "./pages/GUserPage";
 import CustomerHomePage from "./pages/CustomerHomePage";
+
 import EtiterPage from "./pages/editer.jsx";
+
 
 function App() {
   const path = window.location.pathname;
