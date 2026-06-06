@@ -1,11 +1,11 @@
 import GUserPage from "./pages/GUserPage";
 import CustomerHomePage from "./pages/CustomerHomePage";
-import EtiterPage from "./pages/etiter";
+import EtiterPage from "./pages/editer";
 
 function App() {
   const path = window.location.pathname;
 
-  if (path === "/etiter" || path.startsWith("/etiter/")) {
+  if (path === "/editer" || path.startsWith("/editer/")) {
     return <EtiterPage />;
   }
 
