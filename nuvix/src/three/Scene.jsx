@@ -1,9 +1,17 @@
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Environment } from "@react-three/drei";
+import {
+  OrbitControls,
+  Environment,
+} from "@react-three/drei";
 
 import ShirtModel from "./ShirtModel";
+import LogoPlane from "./LogoPlane";
 
-export default function Scene() {
+export default function Scene({
+  shirtColor,
+  logoTexture,
+  logoScale,
+}) {
   return (
     <Canvas
       camera={{
@@ -18,9 +26,20 @@ export default function Scene() {
         intensity={3}
       />
 
+      {/* Debug Helpers */}
+      <gridHelper args={[10, 10]} />
+      <axesHelper args={[5]} />
+
       <Environment preset="city" />
 
-      <ShirtModel />
+      <ShirtModel
+        shirtColor={shirtColor}
+      />
+
+      <LogoPlane
+        logoTexture={logoTexture}
+        logoScale={logoScale}
+      />
 
       <OrbitControls />
     </Canvas>
