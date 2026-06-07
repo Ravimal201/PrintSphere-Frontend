@@ -1,14 +1,11 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Center, Float, OrbitControls, useGLTF } from "@react-three/drei";
-import { Suspense, useRef, useEffect, forwardRef, useImperativeHandle, useState } from "react";
-import { DoubleSide, TextureLoader, SRGBColorSpace } from "three";
+import { Suspense, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import { RepeatWrapping, TextureLoader, SRGBColorSpace } from "three";
 
-function ShirtModel({ modelRef, color, designImageUrl, designScale, designPlacement, onDesignPlacementChange }) {
+function ShirtModel({ modelRef, color, imageUrl, onPointerDown }) {
   const { scene } = useGLTF("/images/models/t_shirt.glb");
-  const textureRef = useRef(null);
-  const dragStateRef = useRef({ pointerId: null, active: false });
-  const [designTexture, setDesignTexture] = useState(null);
-  const [designAspectRatio, setDesignAspectRatio] = useState(1);
+  const imageTextureRef = useRef(null);
 
   useFrame((state) => {
     if (!modelRef.current) return;
@@ -36,96 +33,57 @@ function ShirtModel({ modelRef, color, designImageUrl, designScale, designPlacem
   }, [scene, color]);
 
   useEffect(() => {
-    if (textureRef.current) {
-      textureRef.current.dispose();
-      textureRef.current = null;
+    if (imageTextureRef.current) {
+      imageTextureRef.current.dispose();
+      imageTextureRef.current = null;
     }
 
-    if (!designImageUrl) {
-      setDesignTexture(null);
+    if (!imageUrl) {
+      scene.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((material) => {
+          if (material.map) {
+            material.map.dispose();
+            material.map = null;
+          }
+          material.needsUpdate = true;
+        });
+      });
       return;
     }
 
     const loader = new TextureLoader();
-    const texture = loader.load(designImageUrl, () => {
-      const imageWidth = texture.image?.width || 1;
-      const imageHeight = texture.image?.height || 1;
-      setDesignAspectRatio(imageWidth / imageHeight);
-      setDesignTexture(texture);
+    const texture = loader.load(imageUrl, () => {
+      scene.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((material) => {
+          material.map = texture;
+          material.color.set(color);
+          material.needsUpdate = true;
+        });
+      });
     });
+
     texture.colorSpace = SRGBColorSpace;
-    texture.needsUpdate = true;
-    textureRef.current = texture;
+    texture.wrapS = RepeatWrapping;
+    texture.wrapT = RepeatWrapping;
+    texture.repeat.set(1, 1);
+    imageTextureRef.current = texture;
 
     return () => {
       texture.dispose();
-      textureRef.current = null;
+      imageTextureRef.current = null;
     };
-  }, [designImageUrl]);
-
-  function getPlacementFromEvent(event) {
-    if (!modelRef.current || !event.point) return null;
-
-    const localPoint = modelRef.current.worldToLocal(event.point.clone());
-    const zAxis = Math.min(0.7, Math.max(-0.2, localPoint.z + 0.015));
-
-    return {
-      position: [Math.min(0.55, Math.max(-0.55, localPoint.x)), Math.min(0.65, Math.max(-0.65, localPoint.y)), zAxis],
-      rotation: [0, 0, 0],
-    };
-  }
-
-  function startDraggingDesign(event) {
-    if (!designTexture) return;
-    const nextPlacement = getPlacementFromEvent(event);
-    if (!nextPlacement) return;
-
-    dragStateRef.current = { pointerId: event.pointerId, active: true };
-    onDesignPlacementChange?.(nextPlacement);
-  }
-
-  function updateDraggingDesign(event) {
-    if (!dragStateRef.current.active || dragStateRef.current.pointerId !== event.pointerId) return;
-    const nextPlacement = getPlacementFromEvent(event);
-    if (!nextPlacement) return;
-
-    onDesignPlacementChange?.(nextPlacement);
-  }
-
-  function stopDraggingDesign(event) {
-    if (dragStateRef.current.pointerId !== event.pointerId) return;
-    dragStateRef.current = { pointerId: null, active: false };
-  }
+  }, [scene, imageUrl, color]);
 
 
 
   return (
-    <group ref={modelRef} onPointerDown={startDraggingDesign} onPointerMove={updateDraggingDesign} onPointerUp={stopDraggingDesign} onPointerCancel={stopDraggingDesign}>
+    <group ref={modelRef} onPointerDown={onPointerDown}>
       <Center>
         <primitive object={scene} />
-        {designTexture && designPlacement && (
-          <mesh
-            position={designPlacement.position}
-            rotation={designPlacement.rotation}
-            scale={[designScale, designScale / designAspectRatio, 1]}
-            renderOrder={2}
-            onPointerDown={startDraggingDesign}
-            onPointerMove={updateDraggingDesign}
-            onPointerUp={stopDraggingDesign}
-            onPointerCancel={stopDraggingDesign}
-          >
-            <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial
-              map={designTexture}
-              transparent
-              alphaTest={0.02}
-              toneMapped={false}
-              depthWrite={false}
-              depthTest={false}
-              side={DoubleSide}
-            />
-          </mesh>
-        )}
       </Center>
     </group>
   );
@@ -133,7 +91,7 @@ function ShirtModel({ modelRef, color, designImageUrl, designScale, designPlacem
 
 useGLTF.preload("/images/models/t_shirt.glb");
 
-const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, color, onColorChange, designImageUrl, designScale, designPlacement, onDesignPlacementChange }, ref) {
+const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, color, onColorChange, imageUrl }, ref) {
   const modelRef = useRef();
   const defaultScale = 0.8;
   const scaleRef = useRef(defaultScale);
@@ -220,7 +178,7 @@ const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, 
   }, [scale, onScaleChange]);
 
   return (
-    <div onWheel={handleWheel} className="relative h-72 w-full max-w-80 cursor-pointer sm:h-90 sm:max-w-90 lg:h-105 lg:max-w-115">
+    <div onWheel={handleWheel} onClick={handleClick} className="relative h-72 w-full max-w-80 sm:h-90 sm:max-w-90 lg:h-105 lg:max-w-115 cursor-pointer">
       <div className="absolute inset-0 rounded-4xl bg-linear-to-br from-white via-indigo-50 to-violet-100 shadow-[0_24px_60px_rgba(99,102,241,0.14)]" />
       <Canvas camera={{ position: [0, 0.18, 2.6], fov: 38 }} shadows className="relative z-10 h-full w-full">
         <ambientLight intensity={1.4} />
@@ -228,14 +186,7 @@ const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, 
         <directionalLight position={[-3, 1, 2]} intensity={0.9} />
         <Suspense fallback={null}>
           <Float speed={1.5} rotationIntensity={0.6} floatIntensity={0.8}>
-            <ShirtModel
-              modelRef={modelRef}
-              color={color}
-              designImageUrl={designImageUrl}
-              designScale={designScale}
-              designPlacement={designPlacement}
-              onDesignPlacementChange={onDesignPlacementChange}
-            />
+            <ShirtModel modelRef={modelRef} color={color} imageUrl={imageUrl} onPointerDown={handleClick} />
           </Float>
         </Suspense>
         <OrbitControls enablePan={false} enableZoom={false} minPolarAngle={Math.PI / 2.8} maxPolarAngle={Math.PI / 2.2} />
