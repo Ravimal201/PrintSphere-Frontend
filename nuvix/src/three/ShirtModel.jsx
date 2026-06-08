@@ -20,12 +20,10 @@ export default function ShirtModel({
     <primitive
       object={scene}
       scale={1.8}
-      position={[0.1, -1.0, 0.2]}
-      rotation={[0, 0.4, -0.005]}
+      position={[0.02, -1.0, -0.1]}
+      rotation={[0.13, 0.5, -0.04]}
     />
   );
 }
 
-useGLTF.preload(
-  "/images/models/t_shirt.glb"
-);
+useGLTF.preload("/images/models/t_shirt.glb");
