@@ -11,6 +11,9 @@ export default function Scene({
   shirtColor,
   logoTexture,
   logoScale,
+  logoX,
+  logoY,
+  logoRotation,
 }) {
   return (
     <Canvas
@@ -26,7 +29,6 @@ export default function Scene({
         intensity={3}
       />
 
-      {/* Debug Helpers */}
       <gridHelper args={[10, 10]} />
       <axesHelper args={[5]} />
 
@@ -39,6 +41,9 @@ export default function Scene({
       <LogoPlane
         logoTexture={logoTexture}
         logoScale={logoScale}
+        logoX={logoX}
+        logoY={logoY}
+        logoRotation={logoRotation}
       />
 
       <OrbitControls />
