@@ -2,42 +2,46 @@ import { useMemo } from "react";
 import * as THREE from "three";
 
 export default function LogoPlane({
-  logoTexture,
-  logoScale,
-  logoX,
-  logoY,
-  logoRotation,
+  design,
+  side,
 }) {
-
   const texture = useMemo(() => {
-    if (!logoTexture) return null;
+    if (!design.texture)
+      return null;
 
     return new THREE.TextureLoader().load(
-      logoTexture
+      design.texture
     );
-  }, [logoTexture]);
+  }, [design.texture]);
 
   if (!texture) return null;
+
+  const z =
+    side === "front"
+      ? 0.2
+      : -0.2;
 
   return (
     <mesh
       position={[
-        logoX,
-        logoY,
-        0.2,
+        design.x,
+        design.y,
+        z,
       ]}
       rotation={[
         0,
-        0,
+        side === "back"
+          ? Math.PI
+          : 0,
         THREE.MathUtils.degToRad(
-          logoRotation
+          design.rotation
         ),
       ]}
     >
       <planeGeometry
         args={[
-          logoScale,
-          logoScale,
+          design.scale,
+          design.scale,
         ]}
       />
 
