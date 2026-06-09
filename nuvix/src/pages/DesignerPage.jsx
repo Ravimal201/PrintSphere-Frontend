@@ -4,37 +4,114 @@ import Scene from "../three/Scene";
 export default function DesignerPage() {
   const [shirtColor, setShirtColor] = useState("#7CFC00");
 
-  const [logoTexture, setLogoTexture] = useState(null);
+  const [activeSide, setActiveSide] = useState("front");
 
-  const [logoScale, setLogoScale] = useState(0.25);
+  const [frontDesign, setFrontDesign] = useState({
+    texture: null,
+    x: 0,
+    y: 1.35,
+    scale: 0.25,
+    rotation: 0,
+  });
 
-  const [logoX, setLogoX] = useState(0);
-  const [logoY, setLogoY] = useState(1.35);
+  const [backDesign, setBackDesign] = useState({
+    texture: null,
+    x: 0,
+    y: 1.35,
+    scale: 0.25,
+    rotation: 0,
+  });
 
-  const [logoRotation, setLogoRotation] = useState(0);
+  const currentDesign =
+    activeSide === "front"
+      ? frontDesign
+      : backDesign;
+
+  const updateCurrentDesign = (
+    field,
+    value
+  ) => {
+    if (activeSide === "front") {
+      setFrontDesign({
+        ...frontDesign,
+        [field]: value,
+      });
+    } else {
+      setBackDesign({
+        ...backDesign,
+        [field]: value,
+      });
+    }
+  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
 
     if (!file) return;
 
-    const imageUrl = URL.createObjectURL(file);
+    const imageUrl =
+      URL.createObjectURL(file);
 
-    setLogoTexture(imageUrl);
+    if (activeSide === "front") {
+      setFrontDesign({
+        ...frontDesign,
+        texture: imageUrl,
+      });
+    } else {
+      setBackDesign({
+        ...backDesign,
+        texture: imageUrl,
+      });
+    }
   };
 
   return (
     <div className="h-screen flex bg-gray-100">
-      {/* LEFT PANEL */}
+      {/* Sidebar */}
       <div className="w-80 bg-white border-r p-5 overflow-y-auto">
 
         <h2 className="text-2xl font-bold mb-6">
-          Design Tools
+          T-Shirt Designer
         </h2>
+
+        {/* Side Switch */}
+        <div className="mb-6">
+          <h3 className="font-semibold mb-2">
+            Design Side
+          </h3>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() =>
+                setActiveSide("front")
+              }
+              className={`px-4 py-2 rounded ${
+                activeSide === "front"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200"
+              }`}
+            >
+              Front
+            </button>
+
+            <button
+              onClick={() =>
+                setActiveSide("back")
+              }
+              className={`px-4 py-2 rounded ${
+                activeSide === "back"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200"
+              }`}
+            >
+              Back
+            </button>
+          </div>
+        </div>
 
         {/* Shirt Color */}
         <div className="mb-6">
-          <label className="block mb-2 font-medium">
+          <label className="block mb-2">
             Shirt Color
           </label>
 
@@ -42,120 +119,116 @@ export default function DesignerPage() {
             type="color"
             value={shirtColor}
             onChange={(e) =>
-              setShirtColor(e.target.value)
+              setShirtColor(
+                e.target.value
+              )
             }
-            className="w-full h-12"
           />
         </div>
 
         {/* Upload */}
         <div className="mb-6">
-          <label className="block mb-2 font-medium">
+          <label className="block mb-2">
             Upload Logo
           </label>
 
           <input
             type="file"
-            accept="image/png,image/jpeg,image/jpg"
+            accept="image/*"
             onChange={handleImageUpload}
           />
         </div>
 
         {/* Size */}
         <div className="mb-6">
-          <label className="block mb-2 font-medium">
-            Logo Size
-          </label>
+          <label>Logo Size</label>
 
           <input
             type="range"
             min="0.1"
             max="1"
             step="0.01"
-            value={logoScale}
+            value={currentDesign.scale}
             onChange={(e) =>
-              setLogoScale(Number(e.target.value))
+              updateCurrentDesign(
+                "scale",
+                Number(e.target.value)
+              )
             }
             className="w-full"
           />
-
-          <p>{logoScale}</p>
         </div>
 
         {/* X */}
         <div className="mb-6">
-          <label className="block mb-2 font-medium">
-            Move Left / Right
-          </label>
+          <label>Move Left / Right</label>
 
           <input
             type="range"
             min="-1"
             max="1"
             step="0.01"
-            value={logoX}
+            value={currentDesign.x}
             onChange={(e) =>
-              setLogoX(Number(e.target.value))
+              updateCurrentDesign(
+                "x",
+                Number(e.target.value)
+              )
             }
             className="w-full"
           />
-
-          <p>{logoX}</p>
         </div>
 
         {/* Y */}
         <div className="mb-6">
-          <label className="block mb-2 font-medium">
-            Move Up / Down
-          </label>
+          <label>Move Up / Down</label>
 
           <input
             type="range"
             min="0.5"
             max="2"
             step="0.01"
-            value={logoY}
+            value={currentDesign.y}
             onChange={(e) =>
-              setLogoY(Number(e.target.value))
+              updateCurrentDesign(
+                "y",
+                Number(e.target.value)
+              )
             }
             className="w-full"
           />
-
-          <p>{logoY}</p>
         </div>
 
         {/* Rotation */}
         <div className="mb-6">
-          <label className="block mb-2 font-medium">
-            Rotation
-          </label>
+          <label>Rotation</label>
 
           <input
             type="range"
             min="-180"
             max="180"
             step="1"
-            value={logoRotation}
+            value={
+              currentDesign.rotation
+            }
             onChange={(e) =>
-              setLogoRotation(Number(e.target.value))
+              updateCurrentDesign(
+                "rotation",
+                Number(e.target.value)
+              )
             }
             className="w-full"
           />
-
-          <p>{logoRotation}°</p>
         </div>
-
       </div>
 
-      {/* 3D VIEWER */}
+      {/* Viewer */}
       <div className="flex-1">
         <Scene
           shirtColor={shirtColor}
-          logoTexture={logoTexture}
-          logoScale={logoScale}
-          logoX={logoX}
-          logoY={logoY}
-          logoRotation={logoRotation}
+          activeSide={activeSide}
+          frontDesign={frontDesign}
+          backDesign={backDesign}
         />
       </div>
     </div>

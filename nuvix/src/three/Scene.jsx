@@ -9,11 +9,9 @@ import LogoPlane from "./LogoPlane";
 
 export default function Scene({
   shirtColor,
-  logoTexture,
-  logoScale,
-  logoX,
-  logoY,
-  logoRotation,
+  activeSide,
+  frontDesign,
+  backDesign,
 }) {
   return (
     <Canvas
@@ -29,21 +27,21 @@ export default function Scene({
         intensity={3}
       />
 
-      <gridHelper args={[10, 10]} />
-      <axesHelper args={[5]} />
-
       <Environment preset="city" />
 
       <ShirtModel
         shirtColor={shirtColor}
+        activeSide={activeSide}
       />
 
       <LogoPlane
-        logoTexture={logoTexture}
-        logoScale={logoScale}
-        logoX={logoX}
-        logoY={logoY}
-        logoRotation={logoRotation}
+        design={frontDesign}
+        side="front"
+      />
+
+      <LogoPlane
+        design={backDesign}
+        side="back"
       />
 
       <OrbitControls />
