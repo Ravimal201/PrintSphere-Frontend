@@ -16,8 +16,8 @@ export default function Scene({
   return (
     <Canvas
       camera={{
-        position: [0, 0, 4],
-        fov: 45,
+        position: [0, 0, 4.5],
+        fov: 50,
       }}
     >
       <ambientLight intensity={2} />
