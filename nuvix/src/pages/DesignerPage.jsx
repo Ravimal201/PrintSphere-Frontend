@@ -1,5 +1,17 @@
 import { useState } from "react";
 import Scene from "../three/Scene";
+import {
+  FRONT_PRINT_AREA,
+  BACK_PRINT_AREA,
+} from "../config/printArea";
+
+import {
+  calculateCoverage,
+} from "../utils/calculateCoverage";
+
+import {
+  calculateDTFCost,
+} from "../utils/calculateDTFCost";
 
 export default function DesignerPage() {
   const [shirtColor, setShirtColor] = useState("#7CFC00");
@@ -26,6 +38,28 @@ export default function DesignerPage() {
     activeSide === "front"
       ? frontDesign
       : backDesign;
+  
+  const designWidth = currentDesign.scale * 20;
+
+  const designHeight = currentDesign.scale * 20;
+
+  const printableArea =
+  activeSide === "front"
+    ? FRONT_PRINT_AREA
+    : BACK_PRINT_AREA;
+
+  const areaData =
+  calculateCoverage(
+    designWidth,
+    designHeight,
+    printableArea.width,
+    printableArea.height
+  );
+
+  const estimatedCost =
+  calculateDTFCost(
+    areaData.percentage
+  );
 
   const updateCurrentDesign = (
     field,
@@ -219,6 +253,39 @@ export default function DesignerPage() {
             }
             className="w-full"
           />
+        </div>
+        <div className="mt-8 p-4 bg-gray-100 rounded-lg">
+          <h3 className="font-bold text-lg mb-3">
+            Print Area Analysis
+          </h3>
+
+          <p className="mb-2">
+            Design Area:
+            {" "}
+            {areaData.designArea.toFixed(2)}
+            cm²
+          </p>
+
+          <p className="mb-2">
+            Printable Area:
+            {" "}
+            {areaData.printableArea.toFixed(2)}
+            cm²
+          </p>
+
+          <p className="mb-2">
+            Coverage:
+            {" "}
+            {areaData.percentage.toFixed(2)}
+            %
+          </p>
+
+          <hr className="my-3" />
+
+          <p className="text-green-600 font-bold text-lg">
+            Estimated Print Cost:
+            Rs. {estimatedCost}
+          </p>
         </div>
       </div>
 

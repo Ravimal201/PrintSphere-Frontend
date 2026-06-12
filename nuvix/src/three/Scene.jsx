@@ -6,6 +6,7 @@ import {
 
 import ShirtModel from "./ShirtModel";
 import LogoPlane from "./LogoPlane";
+import PrintableArea from "./PrintableArea";
 
 export default function Scene({
   shirtColor,
@@ -16,8 +17,8 @@ export default function Scene({
   return (
     <Canvas
       camera={{
-        position: [0, 0, 4.5],
-        fov: 50,
+        position: [0, 0, 4],
+        fov: 45,
       }}
     >
       <ambientLight intensity={2} />
@@ -33,6 +34,9 @@ export default function Scene({
         shirtColor={shirtColor}
         activeSide={activeSide}
       />
+      <PrintableArea side="front" />
+
+      <PrintableArea side="back" />
 
       <LogoPlane
         design={frontDesign}
