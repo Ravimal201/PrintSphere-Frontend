@@ -19,7 +19,7 @@ export default function GNavbar() {
           <a href="/" className="hover:text-indigo-600 transition">Home</a>
           <a href="#" className="hover:text-indigo-600 transition">About</a>
           <a href="#" className="hover:text-indigo-600 transition">Store</a>
-          <a href="#" className="hover:text-indigo-600 transition">3D Designer</a>
+          <a href="/designer" className="hover:text-indigo-600 transition">3D Designer</a>
           <a href="#" className="hover:text-indigo-600 transition">Contact Us</a>
         </div>
 
@@ -50,7 +50,7 @@ export default function GNavbar() {
           <a href="/" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Home</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">About</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Store</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">3D Designer</a>
+          <a href="/designer" className="block text-gray-700 font-medium hover:text-indigo-600 transition">3D Designer</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Contact Us</a>     
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Help</a>
           <div className="flex gap-2 pt-2">

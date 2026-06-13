@@ -1,54 +1,105 @@
-import { Canvas } from "@react-three/fiber";
-import {
-  OrbitControls,
-  Environment,
-} from "@react-three/drei";
-
+import { useRef, Suspense } from "react";
+import * as THREE from "three";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, Environment } from "@react-three/drei";
 import ShirtModel from "./ShirtModel";
-import LogoPlane from "./LogoPlane";
-import PrintableArea from "./PrintableArea";
+
+// Helper component to manage smooth turntable transitions and zoom changes
+function ViewManager({ activeSide, zoomLevel, groupRef }) {
+  const { camera } = useThree();
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+
+    // 1. Calculate target turntable rotation based on active view side
+    let targetY = 0;
+    if (activeSide === "back") targetY = Math.PI;
+    if (activeSide === "left") targetY = Math.PI / 2;
+    if (activeSide === "right") targetY = -Math.PI / 2;
+
+    // Smoothly spin the model to the target Y angle
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(
+      groupRef.current.rotation.y,
+      targetY,
+      0.08
+    );
+
+    // 2. Smoothly adjust camera distance based on zoom level slider
+    const baseDistance = 3.8;
+    const targetZ = baseDistance / zoomLevel;
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZ, 0.08);
+  });
+
+  return null;
+}
 
 export default function Scene({
   shirtColor,
   activeSide,
-  frontDesign,
-  backDesign,
+  zoomLevel,
+  layers,
+  selectedLayerId,
+  onSelectLayer,
+  onUpdateLayers
 }) {
+  const groupRef = useRef();
+
   return (
     <Canvas
       camera={{
-        position: [0, 0, 4],
-        fov: 45,
+        position: [0, 0.1, 3.8],
+        fov: 40
       }}
+      shadows
+      className="w-full h-full"
     >
-      <ambientLight intensity={2} />
-
+      {/* Studio Lighting */}
+      <ambientLight intensity={1.5} />
+      
+      {/* Front Key Light */}
       <directionalLight
-        position={[5, 5, 5]}
-        intensity={3}
+        position={[4, 5, 5]}
+        intensity={2.2}
+        castShadow
+        shadow-mapSize={[1024, 1024]}
       />
 
-      <Environment preset="city" />
+      {/* Back Rim Light */}
+      <directionalLight
+        position={[-4, 3, -5]}
+        intensity={1.2}
+      />
 
-      <ShirtModel
-        shirtColor={shirtColor}
+      {/* Environment preset to add subtle realistic reflections */}
+      <Suspense fallback={null}>
+        <Environment preset="city" />
+
+        {/* Rotatable Group containing the T-shirt */}
+        <group ref={groupRef}>
+          <ShirtModel
+            shirtColor={shirtColor}
+            layers={layers}
+            selectedLayerId={selectedLayerId}
+            onSelectLayer={onSelectLayer}
+            onUpdateLayers={onUpdateLayers}
+          />
+        </group>
+      </Suspense>
+
+      {/* Smoothly controls camera zoom and turntable rotation */}
+      <ViewManager
         activeSide={activeSide}
-      />
-      <PrintableArea side="front" />
-
-      <PrintableArea side="back" />
-
-      <LogoPlane
-        design={frontDesign}
-        side="front"
+        zoomLevel={zoomLevel}
+        groupRef={groupRef}
       />
 
-      <LogoPlane
-        design={backDesign}
-        side="back"
+      {/* Allow the user to manually rotate the shirt, but constrain angles for a premium experience */}
+      <OrbitControls
+        enablePan={false}
+        enableZoom={false}
+        minPolarAngle={Math.PI / 2.5}
+        maxPolarAngle={Math.PI / 1.7}
       />
-
-      <OrbitControls />
     </Canvas>
   );
 }

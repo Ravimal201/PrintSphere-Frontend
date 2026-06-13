@@ -66,7 +66,7 @@ export default function RNavbar() {
         <div className="md:hidden bg-white px-4 py-4 space-y-3">
           <a href="/" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Home</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Store</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">3D Designer</a>
+          <a href="/designer" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">3D Designer</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">My Designs</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">My Orders</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Cart</a>
