@@ -1,303 +1,1057 @@
 import { useState } from "react";
 import Scene from "../three/Scene";
 import {
-  FRONT_PRINT_AREA,
-  BACK_PRINT_AREA,
-} from "../config/printArea";
+  Layers,
+  Type,
+  Upload,
+  Sparkles,
+  RotateCcw,
+  Trash2,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  Save,
+  ShoppingBag,
+  Sliders,
+  X,
+  Copy,
+  FolderHeart,
+  Palette,
+  ZoomIn,
+  Move,
+  RotateCw,
+  Scale
+} from "lucide-react";
 
-import {
-  calculateCoverage,
-} from "../utils/calculateCoverage";
+const shirtColors = [
+  { name: "White", value: "#ffffff" },
+  { name: "Black", value: "#111827" },
+  { name: "Charcoal", value: "#4b5563" },
+  { name: "Navy Blue", value: "#1e3a8a" },
+  { name: "Red", value: "#dc2626" },
+  { name: "Gold", value: "#fbbf24" },
+  { name: "Green", value: "#16a34a" },
+  { name: "Violet", value: "#6d28d9" },
+  { name: "Pink", value: "#f472b6" },
+  { name: "Beige", value: "#f5f5dc" },
+  { name: "Light Grey", value: "#e5e7eb" },
+  { name: "Light Blue", value: "#93c5fd" },
+  { name: "Brown", value: "#78350f" }
+];
 
-import {
-  calculateDTFCost,
-} from "../utils/calculateDTFCost";
+const fontFamilies = [
+  "Outfit",
+  "Inter",
+  "Roboto",
+  "Playfair Display",
+  "Cinzel",
+  "Pacifico",
+  "Montserrat"
+];
+
+const presetLogos = [
+  { name: "Mountain Adventure", url: "/images/dumyImage.png" },
+  { name: "PrintSphere Brand", url: "/images/Logo.png" }
+];
 
 export default function DesignerPage() {
-  const [shirtColor, setShirtColor] = useState("#7CFC00");
-
-  const [activeSide, setActiveSide] = useState("front");
-
-  const [frontDesign, setFrontDesign] = useState({
-    texture: null,
-    x: 0,
-    y: 1.35,
-    scale: 0.25,
-    rotation: 0,
+  const [activeMenu, setActiveMenu] = useState("3d-designer");
+  const [leftTab, setLeftTab] = useState("add");
+  const [rightTab, setRightTab] = useState("layers");
+  const [shirtColor, setShirtColor] = useState("#ffffff");
+  const [shirtType, setShirtType] = useState("Crew Neck");
+  const [shirtMaterial, setShirtMaterial] = useState("Cotton");
+  const [activeView, setActiveView] = useState("front");
+  const [zoomLevel, setZoomLevel] = useState(0.85);
+  const [showManagerSettings, setShowManagerSettings] = useState(false);
+  const [pricingRules, setPricingRules] = useState({
+    baseCrewNeck: 12.00,
+    baseVNeck: 14.00,
+    basePolo: 18.00,
+    premiumPolyester: 1.50,
+    premiumOrganic: 3.00,
+    costPerSqIn: 0.02,
+    complexityFeePerLayer: 1.00,
+    volumeDiscountThreshold: 5,
+    volumeDiscountPercentage: 10
   });
 
-  const [backDesign, setBackDesign] = useState({
-    texture: null,
-    x: 0,
-    y: 1.35,
-    scale: 0.25,
-    rotation: 0,
-  });
-
-  const currentDesign =
-    activeSide === "front"
-      ? frontDesign
-      : backDesign;
-  
-  const designWidth = currentDesign.scale * 20;
-
-  const designHeight = currentDesign.scale * 20;
-
-  const printableArea =
-  activeSide === "front"
-    ? FRONT_PRINT_AREA
-    : BACK_PRINT_AREA;
-
-  const areaData =
-  calculateCoverage(
-    designWidth,
-    designHeight,
-    printableArea.width,
-    printableArea.height
-  );
-
-  const estimatedCost =
-  calculateDTFCost(
-    areaData.percentage
-  );
-
-  const updateCurrentDesign = (
-    field,
-    value
-  ) => {
-    if (activeSide === "front") {
-      setFrontDesign({
-        ...frontDesign,
-        [field]: value,
-      });
-    } else {
-      setBackDesign({
-        ...backDesign,
-        [field]: value,
-      });
+  const [layers, setLayers] = useState([
+    {
+      id: "layer-mountains",
+      type: "image",
+      name: "Mountains",
+      url: "/images/dumyImage.png",
+      visible: true,
+      locked: false,
+      position: [0, 0.05, 0.16],
+      rotation: [0, 0, 0],
+      scale: [0.38, 0.38, 0.25],
+      aspectRatio: 1
+    },
+    {
+      id: "layer-adventure",
+      type: "text",
+      name: "Adventure",
+      text: "Adventure",
+      fontFamily: "Outfit",
+      color: "#ffffff",
+      bold: true,
+      italic: false,
+      visible: true,
+      locked: false,
+      position: [0, 0.22, 0.16],
+      rotation: [0, 0, 0],
+      scale: [0.35, 0.1, 0.25]
+    },
+    {
+      id: "layer-is-calling",
+      type: "text",
+      name: "is calling",
+      text: "IS CALLING",
+      fontFamily: "Inter",
+      color: "#ffffff",
+      bold: true,
+      italic: true,
+      visible: true,
+      locked: false,
+      position: [0, -0.12, 0.16],
+      rotation: [0, 0, 0],
+      scale: [0.25, 0.06, 0.25]
     }
+  ]);
+
+  const [selectedLayerId, setSelectedLayerId] = useState("layer-mountains");
+  const [quantity, setQuantity] = useState(2);
+
+  const selectLayer = (id) => {
+    setSelectedLayerId(id);
+    setRightTab("properties");
+  };
+
+  const activeLayer = layers.find((l) => l.id === selectedLayerId);
+
+  const addTextLayer = () => {
+    const id = `text-${Date.now()}`;
+    const newLayer = {
+      id,
+      type: "text",
+      name: "New Text",
+      text: "Edit Me",
+      fontFamily: "Inter",
+      color: "#2563eb",
+      bold: false,
+      italic: false,
+      visible: true,
+      locked: false,
+      position: [0, 0, 0.16],
+      rotation: [0, 0, 0],
+      scale: [0.3, 0.1, 0.25]
+    };
+    setLayers([...layers, newLayer]);
+    selectLayer(id);
   };
 
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-
+    const file = e.target.files?.[0];
     if (!file) return;
+    const url = URL.createObjectURL(file);
+    const id = `img-${Date.now()}`;
+    const newLayer = {
+      id,
+      type: "image",
+      name: file.name.substring(0, 15),
+      url,
+      visible: true,
+      locked: false,
+      position: [0, 0, 0.16],
+      rotation: [0, 0, 0],
+      scale: [0.3, 0.3, 0.25],
+      aspectRatio: 1
+    };
+    setLayers([...layers, newLayer]);
+    selectLayer(id);
+  };
 
-    const imageUrl =
-      URL.createObjectURL(file);
+  const addPresetImage = (url, name) => {
+    const id = `img-${Date.now()}`;
+    const newLayer = {
+      id,
+      type: "image",
+      name,
+      url,
+      visible: true,
+      locked: false,
+      position: [0, 0, 0.16],
+      rotation: [0, 0, 0],
+      scale: [0.3, 0.3, 0.25],
+      aspectRatio: 1
+    };
+    setLayers([...layers, newLayer]);
+    selectLayer(id);
+  };
 
-    if (activeSide === "front") {
-      setFrontDesign({
-        ...frontDesign,
-        texture: imageUrl,
-      });
-    } else {
-      setBackDesign({
-        ...backDesign,
-        texture: imageUrl,
-      });
+  const updateActiveLayer = (field, value) => {
+    if (!selectedLayerId) return;
+    setLayers(
+      layers.map((l) => {
+        if (l.id === selectedLayerId) {
+          return { ...l, [field]: value };
+        }
+        return l;
+      })
+    );
+  };
+
+  const updateActiveLayerPosition = (axisIndex, val) => {
+    if (!activeLayer) return;
+    const nextPos = [...activeLayer.position];
+    nextPos[axisIndex] = val;
+    updateActiveLayer("position", nextPos);
+  };
+
+  const deleteLayer = (id) => {
+    setLayers(layers.filter((l) => l.id !== id));
+    if (selectedLayerId === id) {
+      setSelectedLayerId(null);
+      setRightTab("layers");
     }
   };
 
+  const duplicateLayer = (layer) => {
+    const id = `${layer.type}-${Date.now()}`;
+    const duplicated = {
+      ...layer,
+      id,
+      name: `${layer.name} (Copy)`,
+      position: [layer.position[0] + 0.05, layer.position[1] - 0.05, layer.position[2]]
+    };
+    setLayers([...layers, duplicated]);
+    selectLayer(id);
+  };
+
+  const toggleLayerVisibility = (id) => {
+    setLayers(
+      layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l))
+    );
+  };
+
+  const toggleLayerLock = (id) => {
+    setLayers(
+      layers.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l))
+    );
+  };
+
+  const getLayerPrintArea = (layer) => {
+    if (!layer.visible) return 0;
+    const widthInches = layer.scale[0] * 25;
+    const heightInches = layer.scale[1] * 25;
+    return widthInches * heightInches;
+  };
+
+  const totalPrintArea = layers.reduce((acc, curr) => acc + getLayerPrintArea(curr), 0);
+  const printableAreaLimit = 12 * 16;
+  const coveragePercentage = Math.min(100, (totalPrintArea / printableAreaLimit) * 100);
+
+  const visibleLayersCount = layers.filter((l) => l.visible).length;
+  let designComplexity = "Low";
+  if (visibleLayersCount >= 4) {
+    designComplexity = "High";
+  } else if (visibleLayersCount >= 2) {
+    designComplexity = "Medium";
+  }
+
+  const getBasePrice = () => {
+    let price = pricingRules.baseCrewNeck;
+    if (shirtType === "V-Neck") price = pricingRules.baseVNeck;
+    if (shirtType === "Polo") price = pricingRules.basePolo;
+
+    if (shirtMaterial === "Polyester") price += pricingRules.premiumPolyester;
+    if (shirtMaterial === "Organic Cotton") price += pricingRules.premiumOrganic;
+    return price;
+  };
+
+  const getPrintAreaCost = () => {
+    return totalPrintArea * pricingRules.costPerSqIn;
+  };
+
+  const getComplexityCost = () => {
+    return visibleLayersCount * pricingRules.complexityFeePerLayer;
+  };
+
+  const unitPrice = getBasePrice() + getPrintAreaCost() + getComplexityCost();
+  
+  const discountMultiplier = quantity >= pricingRules.volumeDiscountThreshold 
+    ? (100 - pricingRules.volumeDiscountPercentage) / 100 
+    : 1;
+
+  const totalCost = unitPrice * quantity * discountMultiplier;
+
   return (
-    <div className="h-screen flex bg-gray-100">
-      {/* Sidebar */}
-      <div className="w-80 bg-white border-r p-5 overflow-y-auto">
+    <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
+      
+      <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
+        <div>
+          <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
+              P
+            </div>
+            <div>
+              <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">3D Customizer</span>
+            </div>
+          </div>
 
-        <h2 className="text-2xl font-bold mb-6">
-          T-Shirt Designer
-        </h2>
+          <nav className="p-4 space-y-1">
+            {[
+              { id: "dashboard", label: "Dashboard", icon: Sparkles },
+              { id: "store", label: "Store", icon: ShoppingBag },
+              { id: "3d-designer", label: "3D Designer", icon: Layers },
+              { id: "my-orders", label: "My Orders", icon: FolderHeart },
+              { id: "my-designs", label: "My Designs", icon: Palette }
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeMenu === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveMenu(item.id)}
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.25)]"
+                      : "hover:bg-slate-800 hover:text-slate-200"
+                  }`}
+                >
+                  <Icon className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
-        {/* Side Switch */}
-        <div className="mb-6">
-          <h3 className="font-semibold mb-2">
-            Design Side
-          </h3>
+        <div className="p-4 border-t border-slate-800 space-y-4">
+          <button
+            onClick={() => setShowManagerSettings(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-800 text-xs text-slate-300 font-semibold hover:bg-slate-800 transition"
+          >
+            <Sliders className="h-3.5 w-3.5" />
+            Pricing Console (Manager)
+          </button>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() =>
-                setActiveSide("front")
-              }
-              className={`px-4 py-2 rounded ${
-                activeSide === "front"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200"
-              }`}
-            >
-              Front
-            </button>
-
-            <button
-              onClick={() =>
-                setActiveSide("back")
-              }
-              className={`px-4 py-2 rounded ${
-                activeSide === "back"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200"
-              }`}
-            >
-              Back
-            </button>
+          <div className="flex items-center gap-3 px-2">
+            <img
+              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
+              alt="Avatar"
+              className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover"
+            />
+            <div className="leading-tight">
+              <p className="text-sm font-bold text-white">Nuwan</p>
+              <span className="text-xs text-slate-500">Customer</span>
+            </div>
           </div>
         </div>
+      </aside>
 
-        {/* Shirt Color */}
-        <div className="mb-6">
-          <label className="block mb-2">
-            Shirt Color
-          </label>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        
+        <header className="h-16 border-b bg-white flex items-center justify-between px-8 select-none shrink-0 z-10">
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <span className="hover:text-indigo-600 cursor-pointer transition">Store</span>
+            <span>/</span>
+            <span className="text-slate-600 font-medium">3D Customizer</span>
+          </div>
 
-          <input
-            type="color"
-            value={shirtColor}
-            onChange={(e) =>
-              setShirtColor(
-                e.target.value
-              )
-            }
-          />
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-700 font-bold text-xs">
+              <ShoppingBag className="h-3.5 w-3.5" />
+              <span>Cart ({quantity})</span>
+            </div>
+            <button className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition">
+              <Save className="h-4 w-4" />
+              Save Design
+            </button>
+          </div>
+        </header>
+
+        <div className="flex-1 flex overflow-hidden">
+          
+          <aside className="w-80 border-r bg-white flex flex-col select-none shrink-0 overflow-y-auto">
+            <div className="flex border-b text-center shrink-0">
+              <button
+                onClick={() => setLeftTab("add")}
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
+                  leftTab === "add"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                Add Elements
+              </button>
+              <button
+                onClick={() => setLeftTab("edit")}
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
+                  leftTab === "edit"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                T-Shirt Style
+              </button>
+            </div>
+
+            {leftTab === "add" && (
+              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Design Tools</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={addTextLayer}
+                      className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-slate-100 hover:border-indigo-500 hover:bg-indigo-50/20 transition group"
+                    >
+                      <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-indigo-100/50 transition">
+                        <Type className="h-5 w-5 text-indigo-600" />
+                      </div>
+                      <span className="text-xs font-bold">Add Text</span>
+                    </button>
+                    <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-slate-100 hover:border-indigo-500 hover:bg-indigo-50/20 cursor-pointer transition group">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                      <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-indigo-100/50 transition">
+                        <Upload className="h-5 w-5 text-indigo-600" />
+                      </div>
+                      <span className="text-xs font-bold">Upload Image</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Presets & Logos</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {presetLogos.map((logo) => (
+                      <button
+                        key={logo.name}
+                        onClick={() => addPresetImage(logo.url, logo.name)}
+                        className="p-2 border rounded-xl hover:border-indigo-500 hover:bg-slate-50 transition flex flex-col items-center gap-2"
+                      >
+                        <img src={logo.url} alt={logo.name} className="h-12 w-12 object-contain bg-slate-50 rounded p-1" />
+                        <span className="text-[10px] font-bold text-center text-slate-500 line-clamp-1">{logo.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric Color</h3>
+                  <div className="flex flex-wrap gap-2.5">
+                    {shirtColors.map((color) => (
+                      <button
+                        key={color.name}
+                        onClick={() => setShirtColor(color.value)}
+                        className={`h-7 w-7 rounded-full border-2 transition-transform ${
+                          shirtColor === color.value
+                            ? "scale-125 border-indigo-600 shadow-lg"
+                            : "border-slate-200 hover:scale-110"
+                        }`}
+                        style={{ backgroundColor: color.value }}
+                        title={color.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {leftTab === "edit" && (
+              <div className="p-6 space-y-6 flex-1">
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">T-Shirt Cut</h3>
+                  {["Crew Neck", "V-Neck", "Polo"].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setShirtType(type)}
+                      className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${
+                        shirtType === type
+                          ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 font-bold"
+                          : "border-slate-100 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{type}</span>
+                      {type === "Crew Neck" && <span className="text-xs text-slate-400">Base</span>}
+                      {type === "V-Neck" && <span className="text-xs text-slate-400">+${(pricingRules.baseVNeck - pricingRules.baseCrewNeck).toFixed(2)}</span>}
+                      {type === "Polo" && <span className="text-xs text-slate-400">+${(pricingRules.basePolo - pricingRules.baseCrewNeck).toFixed(2)}</span>}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric Material</h3>
+                  {["Cotton", "Polyester", "Organic Cotton"].map((material) => (
+                    <button
+                      key={material}
+                      onClick={() => setShirtMaterial(material)}
+                      className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${
+                        shirtMaterial === material
+                          ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 font-bold"
+                          : "border-slate-100 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{material}</span>
+                      {material === "Cotton" && <span className="text-xs text-slate-400">Base</span>}
+                      {material === "Polyester" && <span className="text-xs text-slate-400">+${pricingRules.premiumPolyester.toFixed(2)}</span>}
+                      {material === "Organic Cotton" && <span className="text-xs text-slate-400">+${pricingRules.premiumOrganic.toFixed(2)}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </aside>
+
+          <main className="flex-1 flex flex-col justify-between p-8 relative overflow-hidden bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20">
+            
+            <div className="absolute top-8 left-8 flex items-center gap-2 bg-white/80 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none">
+              {["front", "back", "left", "right"].map((view) => (
+                <button
+                  key={view}
+                  onClick={() => setActiveView(view)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+                    activeView === view
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {view}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 flex items-center justify-center min-h-0 relative">
+              <Scene
+                shirtColor={shirtColor}
+                activeSide={activeView}
+                zoomLevel={zoomLevel}
+                layers={layers}
+                selectedLayerId={selectedLayerId}
+                onSelectLayer={selectLayer}
+                onUpdateLayers={setLayers}
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 max-w-sm mx-auto w-full bg-white border p-4 rounded-2xl shadow-sm select-none z-10">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                <span className="flex items-center gap-1">
+                  <ZoomIn className="h-3.5 w-3.5" /> View Zoom
+                </span>
+                <span>{Math.round(zoomLevel * 100)}%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.15))}
+                  className="p-1 rounded-lg border hover:bg-slate-50 text-slate-600 font-bold"
+                >
+                  -
+                </button>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.5"
+                  step="0.05"
+                  value={zoomLevel}
+                  onChange={(e) => setZoomLevel(Number(e.target.value))}
+                  className="flex-1 accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                />
+                <button
+                  onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.15))}
+                  className="p-1 rounded-lg border hover:bg-slate-50 text-slate-600 font-bold"
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => {
+                    setZoomLevel(0.85);
+                    setActiveView("front");
+                  }}
+                  className="p-1 rounded-lg border hover:bg-slate-50 text-slate-500"
+                  title="Reset View"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </main>
+
+          <aside className="w-80 border-l bg-white flex flex-col select-none shrink-0 overflow-y-auto">
+            <div className="flex border-b text-center shrink-0">
+              <button
+                onClick={() => setRightTab("layers")}
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
+                  rightTab === "layers"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                Layers
+              </button>
+              <button
+                onClick={() => setRightTab("properties")}
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
+                  rightTab === "properties"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
+                disabled={!selectedLayerId}
+              >
+                Properties
+              </button>
+            </div>
+
+            {rightTab === "layers" && (
+              <div className="p-5 flex-1 overflow-y-auto space-y-4">
+                <div className="space-y-2">
+                  {layers.length === 0 ? (
+                    <div className="p-6 text-center border-2 border-dashed border-slate-100 rounded-2xl">
+                      <p className="text-xs text-slate-400 font-medium">No design elements added yet.</p>
+                      <p className="text-[10px] text-slate-300 mt-1">Use the tools panel on the left to add text or images.</p>
+                    </div>
+                  ) : (
+                    layers.map((layer) => {
+                      const isSelected = selectedLayerId === layer.id;
+                      return (
+                        <div
+                          key={layer.id}
+                          onClick={() => selectLayer(layer.id)}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition ${
+                            isSelected
+                              ? "border-indigo-500 bg-indigo-50/10 shadow-sm"
+                              : "border-slate-100 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {layer.type === "text" ? (
+                              <Type className="h-4 w-4 text-indigo-500 shrink-0" />
+                            ) : (
+                              <Upload className="h-4 w-4 text-teal-500 shrink-0" />
+                            )}
+                            <div className="leading-tight min-w-0">
+                              <p className={`text-xs font-bold truncate ${isSelected ? "text-indigo-600" : ""}`}>
+                                {layer.name}
+                              </p>
+                              <span className="text-[10px] text-slate-400 capitalize">{layer.type} Layer</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => toggleLayerVisibility(layer.id)}
+                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                            >
+                              {layer.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5 text-rose-500" />}
+                            </button>
+                            <button
+                              onClick={() => toggleLayerLock(layer.id)}
+                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                            >
+                              {layer.locked ? <Lock className="h-3.5 w-3.5 text-amber-500" /> : <Unlock className="h-3.5 w-3.5" />}
+                            </button>
+                            <button
+                              onClick={() => duplicateLayer(layer)}
+                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                              title="Duplicate"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => deleteLayer(layer.id)}
+                              className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rightTab === "properties" && activeLayer && (
+              <div className="p-5 flex-1 overflow-y-auto space-y-5">
+                <div className="flex items-center justify-between border-b pb-3 shrink-0">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Editing Layer</span>
+                  <button onClick={() => setRightTab("layers")} className="p-1 rounded-lg hover:bg-slate-50">
+                    <X className="h-4 w-4 text-slate-400" />
+                  </button>
+                </div>
+
+                {activeLayer.type === "text" && (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500">Text Content</label>
+                      <input
+                        type="text"
+                        value={activeLayer.text}
+                        onChange={(e) => {
+                          updateActiveLayer("text", e.target.value);
+                          updateActiveLayer("name", e.target.value.substring(0, 15));
+                        }}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500">Font Family</label>
+                      <select
+                        value={activeLayer.fontFamily}
+                        onChange={(e) => updateActiveLayer("fontFamily", e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                      >
+                        {fontFamilies.map((font) => (
+                          <option key={font} value={font} style={{ fontFamily: font }}>
+                            {font}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 block">Text Style & Color</label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateActiveLayer("bold", !activeLayer.bold)}
+                          className={`flex-1 py-2 rounded-lg border text-xs font-bold ${
+                            activeLayer.bold ? "bg-indigo-50 text-indigo-600 border-indigo-200" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          B
+                        </button>
+                        <button
+                          onClick={() => updateActiveLayer("italic", !activeLayer.italic)}
+                          className={`flex-1 py-2 rounded-lg border text-xs font-bold italic ${
+                            activeLayer.italic ? "bg-indigo-50 text-indigo-600 border-indigo-200" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          I
+                        </button>
+                        <input
+                          type="color"
+                          value={activeLayer.color}
+                          onChange={(e) => updateActiveLayer("color", e.target.value)}
+                          className="w-12 h-9 border rounded-lg cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4 pt-3 border-t">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">3D Decal Transforms</span>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                      <span className="flex items-center gap-1"><Scale className="h-3.5 w-3.5" /> Decal Size</span>
+                      <span>{Math.round(activeLayer.scale[0] * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.2"
+                      step="0.02"
+                      value={activeLayer.scale[0]}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        updateActiveLayer("scale", [val, val, activeLayer.scale[2]]);
+                      }}
+                      className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                      <span className="flex items-center gap-1"><Move className="h-3.5 w-3.5" /> Move Horizontal (X)</span>
+                      <span>{activeLayer.position[0].toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-0.6"
+                      max="0.6"
+                      step="0.01"
+                      value={activeLayer.position[0]}
+                      onChange={(e) => updateActiveLayerPosition(0, Number(e.target.value))}
+                      className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                      <span className="flex items-center gap-1"><Move className="h-3.5 w-3.5" /> Move Vertical (Y)</span>
+                      <span>{activeLayer.position[1].toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-0.6"
+                      max="0.6"
+                      step="0.01"
+                      value={activeLayer.position[1]}
+                      onChange={(e) => updateActiveLayerPosition(1, Number(e.target.value))}
+                      className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                      <span className="flex items-center gap-1"><RotateCw className="h-3.5 w-3.5" /> Rotation</span>
+                      <span>{Math.round(activeLayer.rotation[2] * (180 / Math.PI))}°</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-180"
+                      max="180"
+                      step="2"
+                      value={activeLayer.rotation[2] * (180 / Math.PI)}
+                      onChange={(e) => {
+                        const deg = Number(e.target.value);
+                        const rad = deg * (Math.PI / 180);
+                        updateActiveLayer("rotation", [activeLayer.rotation[0], activeLayer.rotation[1], rad]);
+                      }}
+                      className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="p-5 border-t bg-slate-50/50 space-y-4 shrink-0">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                  <span>Print Area (Estimated)</span>
+                  <span>{totalPrintArea.toFixed(2)} in²</span>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+                    <span>Print Coverage</span>
+                    <span>{coveragePercentage.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all duration-300"
+                      style={{ width: `${coveragePercentage}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500 pt-1">
+                  <span>Design Complexity</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                    designComplexity === "High"
+                      ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
+                      : designComplexity === "Medium"
+                      ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
+                      : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                  }`}>
+                    {designComplexity}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t bg-white space-y-4 shrink-0">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                  <span>Base Price ({shirtType})</span>
+                  <span>${getBasePrice().toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                  <span>Print Area ({totalPrintArea.toFixed(1)} in²)</span>
+                  <span>${getPrintAreaCost().toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                  <span>Design Complexity</span>
+                  <span>${getComplexityCost().toFixed(2)}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-1">
+                  <span>Quantity</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="h-6 w-6 rounded border flex items-center justify-center font-bold text-slate-600 hover:bg-slate-50"
+                    >
+                      -
+                    </button>
+                    <span className="font-bold text-slate-700 w-4 text-center">{quantity}</span>
+                    <button
+                      onClick={() => setQuantity(quantity + 1)}
+                      className="h-6 w-6 rounded border flex items-center justify-center font-bold text-slate-600 hover:bg-slate-50"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {quantity >= pricingRules.volumeDiscountThreshold && (
+                  <div className="flex items-center justify-between text-xs font-semibold text-emerald-600">
+                    <span>Volume Discount ({pricingRules.volumeDiscountPercentage}%)</span>
+                    <span>-${(unitPrice * quantity * (pricingRules.volumeDiscountPercentage / 100)).toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="border-t pt-3 flex items-baseline justify-between select-none">
+                  <span className="text-sm font-extrabold text-slate-900">Total Price</span>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-slate-900 leading-none">${totalCost.toFixed(2)}</p>
+                    <span className="text-[10px] text-slate-400 font-medium">${unitPrice.toFixed(2)} each</span>
+                  </div>
+                </div>
+              </div>
+
+              <button className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight">
+                <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Continue to Checkout</span>
+                <span className="text-sm mt-0.5">Total: ${totalCost.toFixed(2)}</span>
+              </button>
+            </div>
+          </aside>
+
         </div>
 
-        {/* Upload */}
-        <div className="mb-6">
-          <label className="block mb-2">
-            Upload Logo
-          </label>
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-          />
-        </div>
-
-        {/* Size */}
-        <div className="mb-6">
-          <label>Logo Size</label>
-
-          <input
-            type="range"
-            min="0.1"
-            max="1"
-            step="0.01"
-            value={currentDesign.scale}
-            onChange={(e) =>
-              updateCurrentDesign(
-                "scale",
-                Number(e.target.value)
-              )
-            }
-            className="w-full"
-          />
-        </div>
-
-        {/* X */}
-        <div className="mb-6">
-          <label>Move Left / Right</label>
-
-          <input
-            type="range"
-            min="-1"
-            max="1"
-            step="0.01"
-            value={currentDesign.x}
-            onChange={(e) =>
-              updateCurrentDesign(
-                "x",
-                Number(e.target.value)
-              )
-            }
-            className="w-full"
-          />
-        </div>
-
-        {/* Y */}
-        <div className="mb-6">
-          <label>Move Up / Down</label>
-
-          <input
-            type="range"
-            min="0.5"
-            max="2"
-            step="0.01"
-            value={currentDesign.y}
-            onChange={(e) =>
-              updateCurrentDesign(
-                "y",
-                Number(e.target.value)
-              )
-            }
-            className="w-full"
-          />
-        </div>
-
-        {/* Rotation */}
-        <div className="mb-6">
-          <label>Rotation</label>
-
-          <input
-            type="range"
-            min="-180"
-            max="180"
-            step="1"
-            value={
-              currentDesign.rotation
-            }
-            onChange={(e) =>
-              updateCurrentDesign(
-                "rotation",
-                Number(e.target.value)
-              )
-            }
-            className="w-full"
-          />
-        </div>
-        <div className="mt-8 p-4 bg-gray-100 rounded-lg">
-          <h3 className="font-bold text-lg mb-3">
-            Print Area Analysis
-          </h3>
-
-          <p className="mb-2">
-            Design Area:
-            {" "}
-            {areaData.designArea.toFixed(2)}
-            cm²
-          </p>
-
-          <p className="mb-2">
-            Printable Area:
-            {" "}
-            {areaData.printableArea.toFixed(2)}
-            cm²
-          </p>
-
-          <p className="mb-2">
-            Coverage:
-            {" "}
-            {areaData.percentage.toFixed(2)}
-            %
-          </p>
-
-          <hr className="my-3" />
-
-          <p className="text-green-600 font-bold text-lg">
-            Estimated Print Cost:
-            Rs. {estimatedCost}
-          </p>
-        </div>
       </div>
 
-      {/* Viewer */}
-      <div className="flex-1">
-        <Scene
-          shirtColor={shirtColor}
-          activeSide={activeSide}
-          frontDesign={frontDesign}
-          backDesign={backDesign}
-        />
-      </div>
+      {showManagerSettings && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border">
+            <div className="bg-slate-950 text-white px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-300">Manager Admin Console</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Configure automated cost formulas</p>
+              </div>
+              <button onClick={() => setShowManagerSettings(false)} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[450px] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Crew Neck ($)</label>
+                  <input
+                    type="number"
+                    value={pricingRules.baseCrewNeck}
+                    onChange={(e) => setPricingRules({ ...pricingRules, baseCrewNeck: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base V-Neck ($)</label>
+                  <input
+                    type="number"
+                    value={pricingRules.baseVNeck}
+                    onChange={(e) => setPricingRules({ ...pricingRules, baseVNeck: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Polo ($)</label>
+                  <input
+                    type="number"
+                    value={pricingRules.basePolo}
+                    onChange={(e) => setPricingRules({ ...pricingRules, basePolo: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Polyester Extra ($)</label>
+                  <input
+                    type="number"
+                    value={pricingRules.premiumPolyester}
+                    onChange={(e) => setPricingRules({ ...pricingRules, premiumPolyester: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Organic Cotton Extra ($)</label>
+                  <input
+                    type="number"
+                    value={pricingRules.premiumOrganic}
+                    onChange={(e) => setPricingRules({ ...pricingRules, premiumOrganic: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Cost Per Sq In ($)</label>
+                  <input
+                    type="number"
+                    step="0.005"
+                    value={pricingRules.costPerSqIn}
+                    onChange={(e) => setPricingRules({ ...pricingRules, costPerSqIn: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-4 grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Complexity Fee/Layer ($)</label>
+                  <input
+                    type="number"
+                    value={pricingRules.complexityFeePerLayer}
+                    onChange={(e) => setPricingRules({ ...pricingRules, complexityFeePerLayer: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Discount Threshold</label>
+                  <input
+                    type="number"
+                    value={pricingRules.volumeDiscountThreshold}
+                    onChange={(e) => setPricingRules({ ...pricingRules, volumeDiscountThreshold: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Volume Discount Percentage (%)</label>
+                  <input
+                    type="number"
+                    value={pricingRules.volumeDiscountPercentage}
+                    onChange={(e) => setPricingRules({ ...pricingRules, volumeDiscountPercentage: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t">
+              <button
+                onClick={() => setPricingRules({
+                  baseCrewNeck: 12.00,
+                  baseVNeck: 14.00,
+                  basePolo: 18.00,
+                  premiumPolyester: 1.50,
+                  premiumOrganic: 3.00,
+                  costPerSqIn: 0.02,
+                  complexityFeePerLayer: 1.00,
+                  volumeDiscountThreshold: 5,
+                  volumeDiscountPercentage: 10
+                })}
+                className="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-white transition"
+              >
+                Reset Default
+              </button>
+              <button
+                onClick={() => setShowManagerSettings(false)}
+                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition"
+              >
+                Save & Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
