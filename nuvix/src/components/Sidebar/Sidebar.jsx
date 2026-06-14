@@ -57,7 +57,10 @@ export default function Sidebar() {
           <span>Support</span>
         </button>
 
-        <button className="w-full text-left px-5 py-3 rounded-2xl bg-white border border-red-100 text-red-600 inline-flex items-center gap-3">
+        <button 
+          onClick={() => { localStorage.clear(); window.location.href = "/"; }}
+          className="w-full text-left px-5 py-3 rounded-2xl bg-white border border-red-100 text-red-600 inline-flex items-center gap-3 hover:bg-red-50 transition"
+        >
           <LogOut className="h-5 w-5" />
           <span>Log out</span>
         </button>

@@ -73,7 +73,10 @@ export default function RNavbar() {
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Account</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Help</a>
           <div className="flex gap-2 pt-2">
-            <button className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm">
+            <button 
+              onClick={() => { localStorage.clear(); window.location.href = "/"; }}
+              className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm"
+            >
               Log out
             </button>
           </div>
