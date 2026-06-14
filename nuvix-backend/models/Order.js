@@ -1,0 +1,128 @@
+const mongoose = require("mongoose");
+
+const OrderItemSchema = new mongoose.Schema({
+  itemType: {
+    type: String,
+    enum: ["Ready-made", "Customized"],
+    required: true
+  },
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Product"
+  },
+  designId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "CustomizedDesign"
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  size: {
+    type: String,
+    required: true
+  },
+  color: {
+    type: String,
+    required: true
+  },
+  material: {
+    type: String,
+    required: true
+  },
+  unitPrice: {
+    type: Number,
+    required: true
+  }
+});
+
+const StatusTimelineSchema = new mongoose.Schema({
+  status: {
+    type: String,
+    enum: [
+      "Pending Payment",
+      "Processing",
+      "Printing",
+      "Completed",
+      "Shipped",
+      "Cancelled"
+    ]
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
+  note: String,
+  timestamp: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const OrderSchema = new mongoose.Schema(
+  {
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User" // Null if guest user checked out
+    },
+    guestEmail: String, // if guest checkout
+    items: [OrderItemSchema],
+    subtotal: {
+      type: Number,
+      required: true
+    },
+    printCost: {
+      type: Number,
+      default: 0
+    },
+    complexityFee: {
+      type: Number,
+      default: 0
+    },
+    discount: {
+      type: Number,
+      default: 0
+    },
+    totalCost: {
+      type: Number,
+      required: true
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["Pending", "Paid", "Failed"],
+      default: "Pending"
+    },
+    paymentTransactionId: String,
+    orderStatus: {
+      type: String,
+      enum: [
+        "Pending Payment",
+        "Processing",
+        "Printing",
+        "Completed",
+        "Shipped",
+        "Cancelled"
+      ],
+      default: "Pending Payment"
+    },
+    shippingAddress: {
+      street: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String
+    },
+    assignedEmployee: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User" // Assigned printing operator
+    },
+    timeline: [StatusTimelineSchema], // History of order lifecycle
+    invoiceUrl: String
+  },
+  {
+    timestamps: true
+  }
+);
+
+module.exports = mongoose.model("Order", OrderSchema);

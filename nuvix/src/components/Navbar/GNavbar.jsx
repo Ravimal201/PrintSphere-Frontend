@@ -25,14 +25,14 @@ export default function GNavbar() {
 
         {/* Desktop Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          <a href="/customer-home" className="px-5 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
+          <a href="/login" className="px-5 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
             Login
           </a>
-          <button className="px-5 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition">
+          <a href="/register" className="px-5 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition">
             Register
-          </button>
+          </a>
         </div>
-
+ 
         {/* Mobile Menu Button */}
         <button 
           onClick={() => setIsOpen(!isOpen)}
@@ -43,7 +43,7 @@ export default function GNavbar() {
           <span className={`w-5 h-0.5 bg-gray-700 transition-all ${isOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
         </button>
       </div>
-
+ 
       {/* Mobile Menu */}
       {isOpen && (
         <div className="md:hidden bg-white border-t px-4 py-4 space-y-3">
@@ -54,12 +54,12 @@ export default function GNavbar() {
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Contact Us</a>     
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Help</a>
           <div className="flex gap-2 pt-2">
-            <a href="/customer-home" className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm text-center">
+            <a href="/login" className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm text-center">
               Login
             </a>
-            <button className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition text-sm">
+            <a href="/register" className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition text-sm text-center">
               Register
-            </button>
+            </a>
           </div>
         </div>
       )}
