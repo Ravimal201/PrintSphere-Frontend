@@ -5,6 +5,8 @@ import DesignerPage from "./pages/DesignerPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import AdminPage from "./pages/AdminPage";
+import ManagerPage from "./pages/ManagerPage";
+import EmployeePage from "./pages/EmployeePage";
 
 function App() {
   const path = window.location.pathname;
@@ -19,6 +21,14 @@ function App() {
 
   if (path === "/admin") {
     return <AdminPage />;
+  }
+
+  if (path === "/manager") {
+    return <ManagerPage />;
+  }
+
+  if (path === "/employee") {
+    return <EmployeePage />;
   }
 
   if (path === "/designer" || path.startsWith("/designer/")) {

@@ -32,6 +32,10 @@ export default function LoginPage() {
       const role = response.data.user.role;
       if (role === "Admin") {
         window.location.href = "/admin";
+      } else if (role === "Manager") {
+        window.location.href = "/manager";
+      } else if (role === "Employee") {
+        window.location.href = "/employee";
       } else if (role === "Customer") {
         window.location.href = "/customer-home";
       } else {
