@@ -91,41 +91,6 @@ exports.createStaffAccount = async (req, res) => {
   }
 };
 
-// @desc    Reset/change password of a staff account
-// @route   PUT /api/admin/update-staff-password
-exports.updateStaffPassword = async (req, res) => {
-  try {
-    if (!verifyAdmin(req)) {
-      return res.status(403).json({ message: "Access denied. Admin role required." });
-    }
-
-    const { userId, newPassword } = req.body;
-
-    if (!userId || !newPassword) {
-      return res.status(400).json({ message: "Please provide user ID and new password" });
-    }
-
-    // Hash the new password
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(newPassword, salt);
-
-    // Update user
-    const updatedUser = await User.findOneAndUpdate(
-      { _id: userId, role: { $in: ["Manager", "Employee"] } },
-      { passwordHash },
-      { new: true }
-    );
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: "Staff account not found or cannot be modified" });
-    }
-
-    res.json({ message: "Password updated successfully for " + updatedUser.name });
-  } catch (error) {
-    console.error("Update password error:", error);
-    res.status(500).json({ message: "Server error while resetting password" });
-  }
-};
 
 // @desc    Delete a staff account
 // @route   DELETE /api/admin/delete-staff/:id

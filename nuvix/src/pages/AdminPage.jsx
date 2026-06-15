@@ -461,13 +461,6 @@ export default function AdminPage() {
                           <td className="py-4 text-sm text-slate-500">{member.phone || "—"}</td>
                           <td className="py-4 text-right space-x-2">
                             <button
-                              onClick={() => setSelectedStaff(member)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 transition"
-                            >
-                              <Key className="h-3.5 w-3.5" />
-                              Password
-                            </button>
-                            <button
                               onClick={() => handleDeleteStaff(member._id)}
                               className="inline-flex items-center p-1.5 rounded-lg border border-red-50 text-red-500 hover:bg-red-50 transition"
                             >
@@ -746,73 +739,6 @@ export default function AdminPage() {
         )}
 
       </div>
-
-      {/* Password Reset Modal */}
-      {selectedStaff && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm border shadow-2xl overflow-hidden">
-            <div className="bg-slate-950 text-white px-5 py-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300">Reset Password</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Changing password for {selectedStaff.name}</p>
-              </div>
-              <button onClick={() => setSelectedStaff(null)} className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
-                <X className="h-4.5 w-4.5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdatePassword} className="p-5 space-y-4">
-              {passError && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{passError}</span>
-                </div>
-              )}
-
-              {passSuccess && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold">
-                  <CheckCircle className="h-4 w-4 shrink-0" />
-                  <span>{passSuccess}</span>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">New Password</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                    <Lock className="h-3.5 w-3.5" />
-                  </span>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className="w-full pl-9 pr-3 py-2 border rounded-xl text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedStaff(null)}
-                  className="px-4 py-2 border rounded-xl text-xs font-bold hover:bg-slate-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={passLoading}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition"
-                >
-                  {passLoading ? "Saving..." : "Change Password"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );

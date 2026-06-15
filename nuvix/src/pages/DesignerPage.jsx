@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Scene from "../three/Scene";
+import axios from "axios";
 import {
   Layers,
   Type,
@@ -21,7 +22,9 @@ import {
   ZoomIn,
   Move,
   RotateCw,
-  Scale
+  Scale,
+  AlertCircle,
+  CheckCircle
 } from "lucide-react";
 
 const shirtColors = [
@@ -57,6 +60,77 @@ const presetLogos = [
 
 export default function DesignerPage() {
   const [activeMenu, setActiveMenu] = useState("3d-designer");
+  
+  const [isEmployee, setIsEmployee] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submitForm, setSubmitForm] = useState({
+    title: "",
+    description: "",
+    category: "",
+    basePrice: 15.00
+  });
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState("");
+
+  const API_BASE_URL = "http://localhost:5000/api";
+
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role === "Employee") {
+          setIsEmployee(true);
+        }
+      } catch (err) {
+        console.error("Parse user error:", err);
+      }
+    }
+  }, []);
+
+  const handleSubmitDesignConcept = async (e) => {
+    e.preventDefault();
+    setSubmitError("");
+    setSubmitSuccess("");
+    setSubmitLoading(true);
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSubmitError("No token, authorization denied");
+      setSubmitLoading(false);
+      return;
+    }
+
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const imageLayers = layers.filter(l => l.type === "image" || l.type === "logo");
+    const previewImages = imageLayers.map(l => l.url).filter(Boolean);
+
+    const payload = {
+      title: submitForm.title,
+      description: submitForm.description,
+      category: submitForm.category,
+      basePrice: submitForm.basePrice,
+      sizes: ["S", "M", "L", "XL", "XXL"],
+      colors: [shirtColor],
+      images: previewImages.length > 0 ? previewImages : ["/images/dumyImage.png"]
+    };
+
+    try {
+      await axios.post(`${API_BASE_URL}/employee/products`, payload, { headers });
+      setSubmitSuccess("Design concept sent to manager successfully!");
+      setTimeout(() => {
+        window.location.href = "/employee";
+      }, 1500);
+    } catch (err) {
+      console.error("Submit design concept error:", err);
+      setSubmitError(err.response?.data?.message || "Failed to submit design concept");
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
   const [leftTab, setLeftTab] = useState("add");
   const [rightTab, setRightTab] = useState("layers");
   const [shirtColor, setShirtColor] = useState("#ffffff");
@@ -368,9 +442,20 @@ export default function DesignerPage() {
               <ShoppingBag className="h-3.5 w-3.5" />
               <span>Cart ({quantity})</span>
             </div>
-            <button className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition">
+            <button
+              onClick={() => {
+                if (isEmployee) {
+                  setSubmitError("");
+                  setSubmitSuccess("");
+                  setShowSubmitModal(true);
+                } else {
+                  alert("Design saved locally! (Only Employee accounts can submit designs for Manager approval)");
+                }
+              }}
+              className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition"
+            >
               <Save className="h-4 w-4" />
-              Save Design
+              {isEmployee ? "Submit to Manager" : "Save Design"}
             </button>
           </div>
         </header>
@@ -1049,6 +1134,103 @@ export default function DesignerPage() {
                 Save & Apply
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit Design Concept Modal for Employees */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm border shadow-2xl overflow-hidden select-none text-slate-800">
+            <div className="bg-slate-950 text-white px-5 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-teal-300">Submit Design Concept</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Publish your design to the Store catalog</p>
+              </div>
+              <button onClick={() => setShowSubmitModal(false)} className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitDesignConcept} className="p-5 space-y-4">
+              {submitError && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
+              {submitSuccess && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold">
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                  <span>{submitSuccess}</span>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Design Title</label>
+                <input
+                  type="text"
+                  required
+                  value={submitForm.title}
+                  onChange={(e) => setSubmitForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g. Vintage Sunset Polo"
+                  className="w-full px-3 py-2 border rounded-xl text-sm"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Description</label>
+                <textarea
+                  required
+                  value={submitForm.description}
+                  onChange={(e) => setSubmitForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Describe details, graphic assets..."
+                  className="w-full px-3 py-2 border rounded-xl text-sm h-16"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Category</label>
+                <input
+                  type="text"
+                  required
+                  value={submitForm.category}
+                  onChange={(e) => setSubmitForm(prev => ({ ...prev, category: e.target.value }))}
+                  placeholder="e.g. Summer Collection"
+                  className="w-full px-3 py-2 border rounded-xl text-sm"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Proposed Price ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={submitForm.basePrice}
+                  onChange={(e) => setSubmitForm(prev => ({ ...prev, basePrice: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 border rounded-xl text-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowSubmitModal(false)}
+                  className="px-4 py-2 border rounded-xl text-xs font-bold hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitLoading}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition"
+                >
+                  {submitLoading ? "Submitting..." : "Submit to Manager"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
