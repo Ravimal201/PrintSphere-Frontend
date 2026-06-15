@@ -1,6 +1,9 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Product = require("../models/Product");
+const Order = require("../models/Order");
+const PricingRules = require("../models/PricingRules");
 
 // JWT Secret Key fallback
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -136,5 +139,79 @@ exports.changePassword = async (req, res) => {
   } catch (error) {
     console.error("Change password error:", error);
     res.status(500).json({ message: "Server error during password change" });
+  }
+};
+
+// @desc    Get all active store products
+// @route   GET /api/auth/products
+exports.getStoreProducts = async (req, res) => {
+  try {
+    const products = await Product.find({ isApproved: true, status: "Active" })
+      .populate("createdBy", "name")
+      .sort({ createdAt: -1 });
+    res.json(products);
+  } catch (error) {
+    console.error("Fetch store products error:", error);
+    res.status(500).json({ message: "Server error while fetching store products" });
+  }
+};
+
+// @desc    Get recommended products (popular & frequently ordered)
+// @route   GET /api/auth/recommendations
+exports.getRecommendations = async (req, res) => {
+  try {
+    const products = await Product.find({ isApproved: true, status: "Active" }).populate("createdBy", "name");
+    const orders = await Order.find();
+
+    const orderCounts = {};
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.productId) {
+          const prodId = item.productId.toString();
+          orderCounts[prodId] = (orderCounts[prodId] || 0) + item.quantity;
+        }
+      });
+    });
+
+    const frequentlyOrdered = [...products].sort((a, b) => {
+      const countA = orderCounts[a._id.toString()] || 0;
+      const countB = orderCounts[b._id.toString()] || 0;
+      return countB - countA;
+    });
+
+    const popular = [...products].sort((a, b) => {
+      const scoreA = (orderCounts[a._id.toString()] || 0) * 1.5 + (a.discount || 0);
+      const scoreB = (orderCounts[b._id.toString()] || 0) * 1.5 + (b.discount || 0);
+      return scoreB - scoreA;
+    });
+
+    res.json({
+      popular: popular.slice(0, 4),
+      frequentlyOrdered: frequentlyOrdered.slice(0, 4)
+    });
+  } catch (error) {
+    console.error("Fetch recommendations error:", error);
+    res.status(500).json({ message: "Server error while fetching recommendations" });
+  }
+};
+
+// @desc    Get active pricing rules for storefront calculations
+// @route   GET /api/auth/pricing-rules
+exports.getActivePricingRules = async (req, res) => {
+  try {
+    let rules = await PricingRules.findOne({ isActive: true });
+    if (!rules) {
+      rules = await PricingRules.create({
+        baseRates: { crewNeck: 12.00, vNeck: 14.00, polo: 18.00 },
+        materialPremiums: { cotton: 0.00, polyester: 1.50, organicCotton: 3.00 },
+        costPerSqIn: 0.02,
+        complexityFeePerLayer: 1.00,
+        volumeDiscount: { thresholdQty: 5, discountPercentage: 10 }
+      });
+    }
+    res.json(rules);
+  } catch (error) {
+    console.error("Get active pricing rules error:", error);
+    res.status(500).json({ message: "Server error while fetching pricing rules" });
   }
 };

@@ -18,7 +18,7 @@ export default function RNavbar() {
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
           <a href="#" className="hover:text-indigo-600 transition">About</a>
-          <a href="#" className="hover:text-indigo-600 transition">Store</a>
+          <a href="/store" className="hover:text-indigo-600 transition">Store</a>
           <a href="#" className="hover:text-indigo-600 transition">Track Order</a>
           <a href="#" className="hover:text-indigo-600 transition">Contact Us</a>
         </div>
@@ -65,7 +65,7 @@ export default function RNavbar() {
       {isOpen && (
         <div className="md:hidden bg-white px-4 py-4 space-y-3">
           <a href="/" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Home</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Store</a>
+           <a href="/store" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Store</a>
           <a href="/designer" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">3D Designer</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">My Designs</a>
           <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">My Orders</a>

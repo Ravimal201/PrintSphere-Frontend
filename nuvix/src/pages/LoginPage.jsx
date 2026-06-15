@@ -37,7 +37,7 @@ export default function LoginPage() {
       } else if (role === "Employee") {
         window.location.href = "/employee";
       } else if (role === "Customer") {
-        window.location.href = "/customer-home";
+        window.location.href = "/store";
       } else {
         window.location.href = "/designer";
       }
