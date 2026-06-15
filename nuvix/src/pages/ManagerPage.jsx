@@ -412,6 +412,26 @@ export default function ManagerPage() {
     ];
   };
 
+  const getSubmissionModelPath = () => {
+    if (!selectedSubmissionProduct) return "/images/models/male normal t-shirt1.glb";
+    const title = (selectedSubmissionProduct.title || "").toLowerCase();
+    const category = (selectedSubmissionProduct.category || "").toLowerCase();
+
+    if (title.includes("female") || title.includes("women") || category.includes("female") || category.includes("women")) {
+      return "/images/models/female normal t-shirt.glb";
+    }
+    if (title.includes("long sleeve") || category.includes("long sleeve")) {
+      return "/images/models/long_sleeve_t-_shirt.glb";
+    }
+    if (title.includes("oversized") || category.includes("oversized")) {
+      return "/images/models/oversized t-sdirt1.glb";
+    }
+    if (title.includes("hoodie") || category.includes("hoodie")) {
+      return "/images/models/t_shirt_hoodie.glb";
+    }
+    return "/images/models/male normal t-shirt1.glb";
+  };
+
   if (loading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-slate-50">
@@ -1518,6 +1538,7 @@ export default function ManagerPage() {
               {/* 3D Scene container */}
               <div className="w-full h-full min-h-[280px] md:min-h-0 flex-1">
                 <Scene
+                  modelPath={getSubmissionModelPath()}
                   shirtColor={selectedSubmissionProduct.colors?.[0] || "#ffffff"}
                   activeSide={submissionSide}
                   zoomLevel={submissionZoom}

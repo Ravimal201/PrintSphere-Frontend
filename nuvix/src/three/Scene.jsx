@@ -34,6 +34,7 @@ function ViewManager({ activeSide, zoomLevel, groupRef }) {
 }
 
 export default function Scene({
+  modelPath,
   shirtColor,
   activeSide,
   zoomLevel,
@@ -72,11 +73,12 @@ export default function Scene({
 
       {/* Environment preset to add subtle realistic reflections */}
       <Suspense fallback={null}>
-        <Environment preset="city" />
+         <Environment preset="city" />
 
         {/* Rotatable Group containing the T-shirt */}
         <group ref={groupRef}>
           <ShirtModel
+            modelPath={modelPath}
             shirtColor={shirtColor}
             layers={layers}
             selectedLayerId={selectedLayerId}

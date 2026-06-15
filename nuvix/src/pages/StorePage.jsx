@@ -71,6 +71,26 @@ export default function StorePage() {
     ];
   };
 
+  const getModalModelPath = () => {
+    if (!selected3DProduct) return "/images/models/male normal t-shirt1.glb";
+    const title = (selected3DProduct.title || "").toLowerCase();
+    const category = (selected3DProduct.category || "").toLowerCase();
+
+    if (title.includes("female") || title.includes("women") || category.includes("female") || category.includes("women")) {
+      return "/images/models/female normal t-shirt.glb";
+    }
+    if (title.includes("long sleeve") || category.includes("long sleeve")) {
+      return "/images/models/long_sleeve_t-_shirt.glb";
+    }
+    if (title.includes("oversized") || category.includes("oversized")) {
+      return "/images/models/oversized t-sdirt1.glb";
+    }
+    if (title.includes("hoodie") || category.includes("hoodie")) {
+      return "/images/models/t_shirt_hoodie.glb";
+    }
+    return "/images/models/male normal t-shirt1.glb";
+  };
+
   const handleAddToCartFromModal = (product, selectedColor, selectedSize, quantity) => {
     const cartKey = `${product._id}-${selectedSize}-${selectedColor}`;
 
@@ -686,6 +706,7 @@ export default function StorePage() {
               {/* 3D canvas container */}
               <div className="w-full h-full min-h-[280px] md:min-h-0 flex-1">
                 <Scene
+                  modelPath={getModalModelPath()}
                   shirtColor={modalColor}
                   activeSide={modalSide}
                   zoomLevel={modalZoom}
