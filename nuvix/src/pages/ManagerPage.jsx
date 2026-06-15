@@ -5,6 +5,8 @@ import {
   Edit2, Trash2, Check, X, ShieldAlert, Award, FileText, ChevronRight, Download
 } from "lucide-react";
 import axios from "axios";
+import Scene from "../three/Scene";
+import TShirt2D from "../components/TShirt2D";
 
 const API_BASE_URL = "http://localhost:5000/api";
 
@@ -53,6 +55,11 @@ export default function ManagerPage() {
 
   // Restock states
   const [restockQuantities, setRestockQuantities] = useState({});
+
+  // Manager 3D preview modal state for pending submissions
+  const [selectedSubmissionProduct, setSelectedSubmissionProduct] = useState(null);
+  const [submissionSide, setSubmissionSide] = useState("front");
+  const [submissionZoom, setSubmissionZoom] = useState(0.85);
 
   // Assign employee & order status transitions
   const [assignLoading, setAssignLoading] = useState({});
@@ -389,6 +396,22 @@ export default function ManagerPage() {
     .filter(o => o.paymentStatus === "Paid")
     .reduce((sum, o) => sum + (o.totalCost || 0), 0);
 
+  const getSubmissionLayers = () => {
+    if (!selectedSubmissionProduct) return [];
+    return [
+      {
+        id: "logo-layer",
+        type: "image",
+        url: selectedSubmissionProduct.images?.[0] || "/images/dumyImage.png",
+        visible: true,
+        locked: true,
+        position: [0, 0.1, 0.15],
+        rotation: [0, 0, 0],
+        scale: [0.35, 0.35, 0.35]
+      }
+    ];
+  };
+
   if (loading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-slate-50">
@@ -655,16 +678,34 @@ export default function ManagerPage() {
                   <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                     {pendingDrafts.map(draft => (
                       <div key={draft._id} className="flex items-center justify-between border rounded-2xl p-4 hover:bg-slate-50 transition">
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{draft.title}</p>
-                          <p className="text-[11px] text-slate-500">{draft.category} — ${draft.basePrice.toFixed(2)}</p>
-                          {draft.createdBy && (
-                            <span className="text-[9px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-block">
-                              By {draft.createdBy.name || "Employee"}
-                            </span>
-                          )}
+                        <div className="flex items-center gap-4">
+                          <TShirt2D 
+                            color={draft.colors?.[0]} 
+                            designUrl={draft.images?.[0]} 
+                            className="h-16 w-16 bg-slate-50 border rounded-xl shrink-0" 
+                          />
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{draft.title}</p>
+                            <p className="text-[11px] text-slate-500">{draft.category} — ${draft.basePrice.toFixed(2)}</p>
+                            {draft.createdBy && (
+                              <span className="text-[9px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-block">
+                                By {draft.createdBy.name || "Employee"}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedSubmissionProduct(draft);
+                              setSubmissionSide("front");
+                              setSubmissionZoom(0.85);
+                            }}
+                            className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5"
+                          >
+                            <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+                            <span>View 3D</span>
+                          </button>
                           <button
                             onClick={() => handleApproveProductDraft(draft._id, "approve")}
                             className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition shadow-sm"
@@ -918,13 +959,20 @@ export default function ManagerPage() {
                       {products.map((p) => (
                         <tr key={p._id} className="border-b last:border-b-0 hover:bg-slate-50/50 transition">
                           <td className="py-4 font-bold text-slate-900">
-                            <div>
-                              <p>{p.title}</p>
-                              {!p.isApproved && (
-                                <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[8px] font-black rounded-full uppercase mt-1 inline-block">
-                                  Awaiting Approval
-                                </span>
-                              )}
+                            <div className="flex items-center gap-3">
+                              <TShirt2D 
+                                color={p.colors?.[0]} 
+                                designUrl={p.images?.[0]} 
+                                className="h-10 w-10 bg-slate-50 border rounded-lg shrink-0" 
+                              />
+                              <div>
+                                <p>{p.title}</p>
+                                {!p.isApproved && (
+                                  <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[8px] font-black rounded-full uppercase mt-1 inline-block">
+                                    Awaiting Approval
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="py-4 text-xs text-slate-600">{p.category}</td>
@@ -1436,6 +1484,161 @@ export default function ManagerPage() {
         )}
 
       </div>
+
+      {/* Manager interactive 3D review modal */}
+      {selectedSubmissionProduct && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[600px] select-none text-slate-800">
+            
+            {/* Left 3D Panel */}
+            <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-6 border-b md:border-b-0 md:border-r">
+              <div className="absolute top-4 left-4 z-10">
+                <span className="px-3 py-1 bg-purple-50 border border-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-wider">
+                  Employee Submission 3D Review
+                </span>
+              </div>
+              
+              {/* Preset Side buttons */}
+              <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
+                {["front", "back", "left", "right"].map((side) => (
+                  <button
+                    key={side}
+                    onClick={() => setSubmissionSide(side)}
+                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${
+                      submissionSide === side
+                        ? "bg-purple-600 border-purple-600 text-white"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {side}
+                  </button>
+                ))}
+              </div>
+
+              {/* 3D Scene container */}
+              <div className="w-full h-full min-h-[280px] md:min-h-0 flex-1">
+                <Scene
+                  shirtColor={selectedSubmissionProduct.colors?.[0] || "#ffffff"}
+                  activeSide={submissionSide}
+                  zoomLevel={submissionZoom}
+                  layers={getSubmissionLayers()}
+                  selectedLayerId={null}
+                  onSelectLayer={() => {}}
+                  onUpdateLayers={() => {}}
+                />
+              </div>
+
+              {/* Zoom control */}
+              <div className="flex items-center gap-3 bg-white/80 backdrop-blur-xs border rounded-2xl px-4 py-2 self-center z-10 shadow-xs">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Zoom</span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="1.5"
+                  step="0.05"
+                  value={submissionZoom}
+                  onChange={(e) => setSubmissionZoom(parseFloat(e.target.value))}
+                  className="w-28 accent-purple-600 h-1 bg-slate-200 rounded-lg appearance-none"
+                />
+              </div>
+            </div>
+
+            {/* Right Product metadata & actions */}
+            <div className="w-full md:w-[400px] flex flex-col justify-between p-6 bg-white overflow-y-auto">
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">
+                      {selectedSubmissionProduct.category}
+                    </span>
+                    <h3 className="text-xl font-black text-slate-900 leading-tight mt-0.5">
+                      {selectedSubmissionProduct.title}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setSelectedSubmissionProduct(null)}
+                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="pb-4 border-b">
+                  <span className="text-2xl font-black text-slate-955">
+                    Proposed Price: ${selectedSubmissionProduct.basePrice.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Description</span>
+                  <p className="text-xs text-slate-600 leading-relaxed">{selectedSubmissionProduct.description}</p>
+                </div>
+
+                {selectedSubmissionProduct.createdBy && (
+                  <div className="p-3 bg-purple-50 rounded-2xl border border-purple-100 flex items-center gap-2">
+                    <Award className="h-4.5 w-4.5 text-purple-600 shrink-0" />
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block">Designer</span>
+                      <span className="text-xs font-bold text-purple-800">{selectedSubmissionProduct.createdBy.name || "Employee"}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sizes Included</span>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {selectedSubmissionProduct.sizes?.map((sz) => (
+                      <span key={sz} className="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">
+                        {sz}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fabric Colors</span>
+                  <div className="flex gap-2">
+                    {selectedSubmissionProduct.colors?.map((col) => (
+                      <span
+                        key={col}
+                        className="w-6 h-6 rounded-full border border-slate-300 shadow-xs"
+                        style={{ backgroundColor: col }}
+                        title={col}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="mt-8 pt-4 border-t flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    handleApproveProductDraft(selectedSubmissionProduct._id, "approve");
+                    setSelectedSubmissionProduct(null);
+                  }}
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Approve & Publish to Store</span>
+                </button>
+                <button
+                  onClick={() => {
+                    handleApproveProductDraft(selectedSubmissionProduct._id, "reject");
+                    setSelectedSubmissionProduct(null);
+                  }}
+                  className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  <span>Reject Submission</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

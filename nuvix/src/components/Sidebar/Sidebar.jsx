@@ -13,7 +13,7 @@ export default function Sidebar() {
       </button>
 
       <button 
-        onClick={() => window.location.href = '/customer-home'}
+        onClick={() => window.location.href = '/store'}
         className="w-full text-left px-5 py-3 rounded-2xl bg-gray-100 text-gray-800 inline-flex items-center gap-3 hover:bg-slate-50 transition"
       >
         <ShoppingCart className="h-5 w-5" />
