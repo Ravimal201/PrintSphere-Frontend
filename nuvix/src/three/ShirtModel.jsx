@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
 import { useGLTF, Decal } from "@react-three/drei";
+import { createPortal } from "@react-three/fiber";
 import { createTextTexture } from "./TextureCanvas";
 
 // Sub-component to manage texture loading and rendering for each decal layer
@@ -87,53 +88,157 @@ function DecalItem({ layer, isSelected, targetMesh }) {
 }
 
 export default function ShirtModel({
+  modelPath = "/images/models/male normal t-shirt1.glb",
   shirtColor,
   layers,
   selectedLayerId,
   onSelectLayer,
   onUpdateLayers
 }) {
-  const { scene } = useGLTF("/images/models/t_shirt.glb");
+  const { scene } = useGLTF(modelPath);
   const bodyMeshRef = useRef(null);
   const [meshLoaded, setMeshLoaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Sync fabric colors and resolve target body mesh
+  // Center and normalize scale once when model loads
   useEffect(() => {
     if (scene) {
+      // Force matrix update
+      scene.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(scene);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      // Scale so max dimension is 2.2 units
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const targetScale = maxDim > 0 ? 2.2 / maxDim : 1.8;
+      
+      scene.scale.set(targetScale, targetScale, targetScale);
+      
+      // Center the model in viewport
+      scene.position.set(
+        -center.x * targetScale,
+        -center.y * targetScale - 0.2,
+        -center.z * targetScale
+      );
+      
+      // Face slightly to the side for the default view
+      scene.rotation.set(0.05, 0.3, 0);
+    }
+  }, [scene]);
+
+  // Sync fabric colors and resolve target body mesh by volume & keywords
+  useEffect(() => {
+    if (scene) {
+      scene.updateMatrixWorld(true);
+      let bestMesh = null;
+      let maxScore = -1;
+
       scene.traverse((child) => {
         if (child.isMesh) {
           // Color mesh
           if (child.material) {
-            if (Array.isArray(child.material)) {
-              child.material.forEach((mat) => {
-                mat.color.set(shirtColor);
-                mat.needsUpdate = true;
-              });
-            } else {
-              child.material.color.set(shirtColor);
-              child.material.needsUpdate = true;
-            }
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach((mat) => {
+              mat.color.set(shirtColor);
+              mat.needsUpdate = true;
+            });
           }
-          // Match main body mesh
-          if (child.name.includes("Object_6") || child.name.toLowerCase().includes("body")) {
-            bodyMeshRef.current = child;
-            setMeshLoaded(true);
+
+          // Calculate mesh local volume in world space
+          const box = new THREE.Box3().setFromObject(child);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const volume = size.x * size.y * size.z;
+          
+          let score = volume;
+          const nameLower = child.name.toLowerCase();
+          
+          // Keyword score adjustment
+          if (nameLower.includes("inside") || nameLower.includes("inner") || nameLower.includes("collar_in")) {
+            score *= 0.05; // heavily penalize inner meshes
+          }
+          if (nameLower.includes("body") || nameLower.includes("front") || nameLower.includes("outside") || nameLower.includes("t-shirt") || nameLower.includes("shirt")) {
+            score *= 10.0; // boost main outer parts
+          }
+          if (nameLower.includes("object_6") || nameLower.includes("object_2")) {
+            score *= 5.0; // boost known standard mesh nodes
+          }
+
+          if (score > maxScore) {
+            maxScore = score;
+            bestMesh = child;
           }
         }
       });
 
-      // Fallback: If no node name matches, use the first mesh found as target
-      if (!bodyMeshRef.current) {
-        scene.traverse((child) => {
-          if (child.isMesh && !bodyMeshRef.current) {
-            bodyMeshRef.current = child;
-            setMeshLoaded(true);
-          }
-        });
+      if (bestMesh) {
+        bodyMeshRef.current = bestMesh;
+        setMeshLoaded(true);
       }
     }
   }, [scene, shirtColor]);
+
+  // Auto-project decals on the surface of the body mesh when scene or layers change
+  useEffect(() => {
+    if (meshLoaded && bodyMeshRef.current && onUpdateLayers && layers.length > 0) {
+      const mesh = bodyMeshRef.current;
+      mesh.updateMatrixWorld(true);
+      
+      let changed = false;
+      const nextLayers = layers.map((layer) => {
+        if (layer.locked) return layer;
+
+        const lx = layer.position[0];
+        const ly = layer.position[1];
+        
+        // Raycast down along local Z axis to find outer surface
+        const localOrigin = new THREE.Vector3(lx, ly, 5);
+        const localDir = new THREE.Vector3(0, 0, -1);
+        
+        const worldOrigin = localOrigin.clone().applyMatrix4(mesh.matrixWorld);
+        const worldDir = localDir.clone().transformDirection(mesh.matrixWorld).normalize();
+        
+        const raycaster = new THREE.Raycaster();
+        raycaster.set(worldOrigin, worldDir);
+        const intersects = raycaster.intersectObject(mesh);
+        
+        if (intersects.length > 0) {
+          const hit = intersects[0];
+          const localHitPoint = mesh.worldToLocal(hit.point.clone());
+          
+          const currentZ = layer.position[2];
+          // Check if Z difference is noticeable
+          if (Math.abs(currentZ - localHitPoint.z) > 0.005) {
+            const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+            const localNormal = hit.normal.clone().applyMatrix3(normalMatrix).normalize();
+            
+            const up = new THREE.Vector3(0, 1, 0);
+            const matrix = new THREE.Matrix4().lookAt(
+              new THREE.Vector3(0, 0, 0),
+              localNormal,
+              up
+            );
+            const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
+            
+            changed = true;
+            return {
+              ...layer,
+              position: [localHitPoint.x, localHitPoint.y, localHitPoint.z],
+              rotation: [rotation.x, rotation.y, layer.rotation[2] || 0]
+            };
+          }
+        }
+        return layer;
+      });
+      
+      if (changed) {
+        onUpdateLayers(nextLayers);
+      }
+    }
+  }, [meshLoaded, scene, layers, onUpdateLayers]);
 
   const activeLayer = layers.find((l) => l.id === selectedLayerId);
 
@@ -199,30 +304,34 @@ export default function ShirtModel({
 
   return (
     <group>
-      {/* 
-        Original GLTF hierarchy primitive. Safe from key changes.
-      */}
       <primitive
         object={scene}
-        scale={1.8}
-        position={[0.02, -1.0, -0.1]}
-        rotation={[0.13, 0.5, -0.04]}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       />
 
-      {/* Render decals targeting the bodyMeshRef */}
-      {meshLoaded && bodyMeshRef.current && layers.map((layer) => (
-        <DecalItem
-          key={layer.id}
-          layer={layer}
-          isSelected={selectedLayerId === layer.id}
-          targetMesh={bodyMeshRef}
-        />
-      ))}
+      {/* Render decals inside the bodyMeshRef portal so they inherit local transforms */}
+      {meshLoaded && bodyMeshRef.current && createPortal(
+        <>
+          {layers.map((layer) => (
+            <DecalItem
+              key={layer.id}
+              layer={layer}
+              isSelected={selectedLayerId === layer.id}
+              targetMesh={bodyMeshRef}
+            />
+          ))}
+        </>,
+        bodyMeshRef.current
+      )}
     </group>
   );
 }
 
-useGLTF.preload("/images/models/t_shirt.glb");
+// Preload all dynamic GLB models to eliminate switching latency
+useGLTF.preload("/images/models/male normal t-shirt1.glb");
+useGLTF.preload("/images/models/female normal t-shirt.glb");
+useGLTF.preload("/images/models/long_sleeve_t-_shirt.glb");
+useGLTF.preload("/images/models/oversized t-sdirt1.glb");
+useGLTF.preload("/images/models/t_shirt_hoodie.glb");

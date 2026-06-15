@@ -58,6 +58,34 @@ const presetLogos = [
   { name: "PrintSphere Brand", url: "/images/Logo.png" }
 ];
 
+const tShirtModels = [
+  {
+    name: "Men's T-Shirt",
+    path: "/images/models/male normal t-shirt1.glb",
+    type: "Crew Neck"
+  },
+  {
+    name: "Women's T-Shirt",
+    path: "/images/models/female normal t-shirt.glb",
+    type: "V-Neck"
+  },
+  {
+    name: "Long Sleeve Shirt",
+    path: "/images/models/long_sleeve_t-_shirt.glb",
+    type: "Crew Neck"
+  },
+  {
+    name: "Oversized T-Shirt",
+    path: "/images/models/oversized t-sdirt1.glb",
+    type: "Crew Neck"
+  },
+  {
+    name: "Hoodie",
+    path: "/images/models/t_shirt_hoodie.glb",
+    type: "Polo"
+  }
+];
+
 export default function DesignerPage() {
   const [activeMenu, setActiveMenu] = useState("3d-designer");
   
@@ -134,8 +162,10 @@ export default function DesignerPage() {
   const [leftTab, setLeftTab] = useState("add");
   const [rightTab, setRightTab] = useState("layers");
   const [shirtColor, setShirtColor] = useState("#ffffff");
+  const [selectedModel, setSelectedModel] = useState(tShirtModels[0]);
+  const [selectedSize, setSelectedSize] = useState("M");
   const [shirtType, setShirtType] = useState("Crew Neck");
-  const [shirtMaterial, setShirtMaterial] = useState("Cotton");
+  const [shirtMaterial, setShirtMaterial] = useState("180GSM");
   const [activeView, setActiveView] = useState("front");
   const [zoomLevel, setZoomLevel] = useState(0.85);
   const [showManagerSettings, setShowManagerSettings] = useState(false);
@@ -337,12 +367,10 @@ export default function DesignerPage() {
   }
 
   const getBasePrice = () => {
-    let price = pricingRules.baseCrewNeck;
-    if (shirtType === "V-Neck") price = pricingRules.baseVNeck;
-    if (shirtType === "Polo") price = pricingRules.basePolo;
-
-    if (shirtMaterial === "Polyester") price += pricingRules.premiumPolyester;
-    if (shirtMaterial === "Organic Cotton") price += pricingRules.premiumOrganic;
+    let price = pricingRules.baseCrewNeck; // base rate
+    if (shirtMaterial === "220 GSM") price += 3.00;
+    if (shirtMaterial === "280GSM") price += 6.00;
+    if (shirtMaterial === "320GSM") price += 10.00;
     return price;
   };
 
@@ -553,45 +581,80 @@ export default function DesignerPage() {
             )}
 
             {leftTab === "edit" && (
-              <div className="p-6 space-y-6 flex-1">
+              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
                 <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">T-Shirt Cut</h3>
-                  {["Crew Neck", "V-Neck", "Polo"].map((type) => (
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">T-Shirt Style (3D Model)</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {tShirtModels.map((model) => {
+                      const isSelected = selectedModel.path === model.path;
+                      return (
+                        <button
+                          key={model.name}
+                          onClick={() => {
+                            setSelectedModel(model);
+                            setShirtType(model.type);
+                          }}
+                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-left transition duration-200 ${
+                            isSelected
+                              ? "border-indigo-600 bg-indigo-50/20 ring-1 ring-indigo-600 font-bold"
+                              : "border-slate-100 hover:bg-slate-50 hover:border-slate-200"
+                          }`}
+                        >
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl mb-2 transition ${
+                            isSelected ? "bg-indigo-600 text-white" : "bg-slate-50 text-slate-400"
+                          }`}>
+                            👕
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-800 text-center leading-tight truncate w-full">{model.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric GSM (Weight)</h3>
+                  {[
+                    { name: "180GSM", premium: 0.00, label: "Base" },
+                    { name: "220 GSM", premium: 3.00, label: "+$3.00" },
+                    { name: "280GSM", premium: 6.00, label: "+$6.00" },
+                    { name: "320GSM", premium: 10.00, label: "+$10.00" }
+                  ].map((material) => (
                     <button
-                      key={type}
-                      onClick={() => setShirtType(type)}
+                      key={material.name}
+                      onClick={() => setShirtMaterial(material.name)}
                       className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${
-                        shirtType === type
+                        shirtMaterial === material.name
                           ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 font-bold"
                           : "border-slate-100 hover:bg-slate-50"
                       }`}
                     >
-                      <span>{type}</span>
-                      {type === "Crew Neck" && <span className="text-xs text-slate-400">Base</span>}
-                      {type === "V-Neck" && <span className="text-xs text-slate-400">+${(pricingRules.baseVNeck - pricingRules.baseCrewNeck).toFixed(2)}</span>}
-                      {type === "Polo" && <span className="text-xs text-slate-400">+${(pricingRules.basePolo - pricingRules.baseCrewNeck).toFixed(2)}</span>}
+                      <span>{material.name}</span>
+                      <span className="text-xs text-slate-400">{material.label}</span>
                     </button>
                   ))}
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric Material</h3>
-                  {["Cotton", "Polyester", "Organic Cotton"].map((material) => (
-                    <button
-                      key={material}
-                      onClick={() => setShirtMaterial(material)}
-                      className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${
-                        shirtMaterial === material
-                          ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 font-bold"
-                          : "border-slate-100 hover:bg-slate-50"
-                      }`}
-                    >
-                      <span>{material}</span>
-                      {material === "Cotton" && <span className="text-xs text-slate-400">Base</span>}
-                      {material === "Polyester" && <span className="text-xs text-slate-400">+${pricingRules.premiumPolyester.toFixed(2)}</span>}
-                      {material === "Organic Cotton" && <span className="text-xs text-slate-400">+${pricingRules.premiumOrganic.toFixed(2)}</span>}
-                    </button>
-                  ))}
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Select Size</h3>
+                  <div className="flex gap-2">
+                    {["S", "M", "L", "XL", "XXL"].map((size) => {
+                      const isSelected = selectedSize === size;
+                      return (
+                        <button
+                          key={size}
+                          onClick={() => setSelectedSize(size)}
+                          className={`flex-1 py-2 rounded-xl border text-xs font-extrabold transition ${
+                            isSelected
+                              ? "border-indigo-600 bg-indigo-50/20 text-indigo-700"
+                              : "border-slate-100 hover:bg-slate-50 text-slate-600"
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -617,6 +680,7 @@ export default function DesignerPage() {
 
             <div className="flex-1 flex items-center justify-center min-h-0 relative">
               <Scene
+                modelPath={selectedModel.path}
                 shirtColor={shirtColor}
                 activeSide={activeView}
                 zoomLevel={zoomLevel}
@@ -996,7 +1060,45 @@ export default function DesignerPage() {
                 </div>
               </div>
 
-              <button className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight">
+              <button
+                onClick={() => {
+                  const designId = `custom-${Date.now()}`;
+                  const cartKey = `${designId}-${selectedSize}-${shirtColor}`;
+                  
+                  const savedCart = localStorage.getItem("printsphere_cart");
+                  let currentCart = [];
+                  if (savedCart) {
+                    try {
+                      currentCart = JSON.parse(savedCart);
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }
+                  
+                  const cartItem = {
+                    cartKey,
+                    designId: designId,
+                    productId: null,
+                    title: `${selectedModel.name} (Custom Design)`,
+                    basePrice: unitPrice,
+                    discount: 0,
+                    category: "Customized",
+                    size: selectedSize,
+                    color: shirtColors.find(c => c.value.toLowerCase() === shirtColor.toLowerCase())?.name || "Custom Color",
+                    material: shirtMaterial,
+                    tShirtType: shirtType,
+                    quantity: quantity,
+                    image: "/images/dumyImage.png",
+                    isCustom: true,
+                    layers: layers
+                  };
+                  
+                  localStorage.setItem("printsphere_cart", JSON.stringify([...currentCart, cartItem]));
+                  alert(`Added ${selectedModel.name} (${selectedSize}) to cart! Redirecting to checkout...`);
+                  window.location.href = "/store";
+                }}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight"
+              >
                 <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Continue to Checkout</span>
                 <span className="text-sm mt-0.5">Total: ${totalCost.toFixed(2)}</span>
               </button>
