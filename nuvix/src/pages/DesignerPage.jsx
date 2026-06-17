@@ -140,7 +140,7 @@ export default function DesignerPage() {
       description: submitForm.description,
       category: submitForm.category,
       basePrice: submitForm.basePrice,
-      sizes: ["S", "M", "L", "XL", "XXL"],
+      sizes: [selectedSize],
       colors: [shirtColor],
       images: previewImages.length > 0 ? previewImages : ["/images/dumyImage.png"]
     };
@@ -605,7 +605,10 @@ export default function DesignerPage() {
                           }`}>
                             👕
                           </div>
-                          <span className="text-[11px] font-bold text-slate-800 text-center leading-tight truncate w-full">{model.name}</span>
+                          <div className="flex flex-col items-center w-full">
+                            <span className="text-[11px] font-bold text-slate-800 text-center leading-tight truncate w-full">{model.name}</span>
+                            <span className="text-[9px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">{model.type}</span>
+                          </div>
                         </button>
                       );
                     })}
