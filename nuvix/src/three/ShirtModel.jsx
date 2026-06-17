@@ -52,28 +52,44 @@ function DecalItem({ layer, isSelected, targetMesh }) {
 
   if (!layer.visible || !texture || !targetMesh?.current) return null;
 
+  const mesh = targetMesh.current;
+  mesh.geometry.computeBoundingBox();
+  const localBox = mesh.geometry.boundingBox;
+  const localCenter = new THREE.Vector3();
+  localBox.getCenter(localCenter);
+
+  const decalPos = [
+    localCenter.x + layer.position[0],
+    localCenter.y + layer.position[1],
+    localCenter.z + layer.position[2]
+  ];
+
   return (
     <group>
       {/* 3D Projected Decal on target Mesh */}
       <Decal
         mesh={targetMesh}
-        position={layer.position}
+        position={decalPos}
         rotation={layer.rotation}
         scale={layer.scale}
       >
-        <meshBasicMaterial
+        <meshStandardMaterial
           map={texture}
           transparent
-          alphaTest={0.01}
+          alphaTest={0.05}
           polygonOffset
           polygonOffsetFactor={-10}
+          // Fabric settings
+          roughness={0.8}
+          metalness={0.0}
           side={THREE.DoubleSide}
+          depthWrite={true}
         />
       </Decal>
 
       {/* Blue wireframe bounding helper when selected */}
       {isSelected && (
-        <mesh position={layer.position} rotation={layer.rotation}>
+        <mesh position={decalPos} rotation={layer.rotation}>
           <boxGeometry args={[layer.scale[0], layer.scale[1], 0.05]} />
           <meshBasicMaterial
             color="#4f46e5"
@@ -187,15 +203,20 @@ export default function ShirtModel({
       const mesh = bodyMeshRef.current;
       mesh.updateMatrixWorld(true);
       
+      mesh.geometry.computeBoundingBox();
+      const localBox = mesh.geometry.boundingBox;
+      const localCenter = new THREE.Vector3();
+      localBox.getCenter(localCenter);
+
       let changed = false;
       const nextLayers = layers.map((layer) => {
         if (layer.locked) return layer;
 
-        const lx = layer.position[0];
-        const ly = layer.position[1];
+        const lx = localCenter.x + layer.position[0];
+        const ly = localCenter.y + layer.position[1];
         
         // Raycast down along local Z axis to find outer surface
-        const localOrigin = new THREE.Vector3(lx, ly, 5);
+        const localOrigin = new THREE.Vector3(lx, ly, localBox.max.z + 2.0);
         const localDir = new THREE.Vector3(0, 0, -1);
         
         const worldOrigin = localOrigin.clone().applyMatrix4(mesh.matrixWorld);
@@ -209,9 +230,13 @@ export default function ShirtModel({
           const hit = intersects[0];
           const localHitPoint = mesh.worldToLocal(hit.point.clone());
           
+          const newOffsetX = localHitPoint.x - localCenter.x;
+          const newOffsetY = localHitPoint.y - localCenter.y;
+          const newOffsetZ = localHitPoint.z - localCenter.z;
+          
           const currentZ = layer.position[2];
           // Check if Z difference is noticeable
-          if (Math.abs(currentZ - localHitPoint.z) > 0.005) {
+          if (Math.abs(currentZ - newOffsetZ) > 0.005) {
             const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
             const localNormal = hit.normal.clone().applyMatrix3(normalMatrix).normalize();
             
@@ -226,7 +251,7 @@ export default function ShirtModel({
             changed = true;
             return {
               ...layer,
-              position: [localHitPoint.x, localHitPoint.y, localHitPoint.z],
+              position: [newOffsetX, newOffsetY, newOffsetZ],
               rotation: [rotation.x, rotation.y, layer.rotation[2] || 0]
             };
           }
@@ -263,13 +288,24 @@ export default function ShirtModel({
     );
     const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
 
+    // Get local center of the mesh geometry
+    mesh.geometry.computeBoundingBox();
+    const localBox = mesh.geometry.boundingBox;
+    const localCenter = new THREE.Vector3();
+    localBox.getCenter(localCenter);
+
+    // Store position as offset from localCenter
+    const offsetX = localPoint.x - localCenter.x;
+    const offsetY = localPoint.y - localCenter.y;
+    const offsetZ = localPoint.z - localCenter.z;
+
     // 4. Update the layer parameters in State
     onUpdateLayers((prev) =>
       prev.map((l) => {
         if (l.id === selectedLayerId) {
           return {
             ...l,
-            position: [localPoint.x, localPoint.y, localPoint.z],
+            position: [offsetX, offsetY, offsetZ],
             rotation: [rotation.x, rotation.y, l.rotation[2] || 0]
           };
         }
