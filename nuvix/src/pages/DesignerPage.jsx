@@ -90,6 +90,7 @@ export default function DesignerPage() {
   const [activeMenu, setActiveMenu] = useState("3d-designer");
   
   const [isEmployee, setIsEmployee] = useState(false);
+  const [isManager, setIsManager] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitForm, setSubmitForm] = useState({
     title: "",
@@ -110,6 +111,8 @@ export default function DesignerPage() {
         const user = JSON.parse(userStr);
         if (user.role === "Employee") {
           setIsEmployee(true);
+        } else if (user.role === "Manager" || user.role === "Admin") {
+          setIsManager(true);
         }
       } catch (err) {
         console.error("Parse user error:", err);
@@ -148,12 +151,29 @@ export default function DesignerPage() {
       layers: layers
     };
 
+    if (isManager) {
+      payload.status = "Active";
+      payload.isApproved = true;
+    }
+
     try {
-      await axios.post(`${API_BASE_URL}/employee/products`, payload, { headers });
-      setSubmitSuccess("Design concept sent to manager successfully!");
-      setTimeout(() => {
-        window.location.href = "/employee";
-      }, 1500);
+      const endpoint = isManager
+        ? `${API_BASE_URL}/manager/products`
+        : `${API_BASE_URL}/employee/products`;
+
+      await axios.post(endpoint, payload, { headers });
+      
+      if (isManager) {
+        setSubmitSuccess("Design published directly to catalog successfully!");
+        setTimeout(() => {
+          window.location.href = "/manager";
+        }, 1500);
+      } else {
+        setSubmitSuccess("Design concept sent to manager successfully!");
+        setTimeout(() => {
+          window.location.href = "/employee";
+        }, 1500);
+      }
     } catch (err) {
       console.error("Submit design concept error:", err);
       setSubmitError(err.response?.data?.message || "Failed to submit design concept");
@@ -263,22 +283,25 @@ export default function DesignerPage() {
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    const id = `img-${Date.now()}`;
-    const newLayer = {
-      id,
-      type: "image",
-      name: file.name.substring(0, 15),
-      url,
-      visible: true,
-      locked: false,
-      position: [0, 0, 0.16],
-      rotation: [0, 0, 0],
-      scale: [0.3, 0.3, 0.25],
-      aspectRatio: 1
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const id = `img-${Date.now()}`;
+      const newLayer = {
+        id,
+        type: "image",
+        name: file.name.substring(0, 15),
+        url: reader.result,
+        visible: true,
+        locked: false,
+        position: [0, 0, 0.16],
+        rotation: [0, 0, 0],
+        scale: [0.3, 0.3, 0.25],
+        aspectRatio: 1
+      };
+      setLayers([...layers, newLayer]);
+      selectLayer(id);
     };
-    setLayers([...layers, newLayer]);
-    selectLayer(id);
+    reader.readAsDataURL(file);
   };
 
   const addPresetImage = (url, name) => {
@@ -475,18 +498,18 @@ export default function DesignerPage() {
             </div>
             <button
               onClick={() => {
-                if (isEmployee) {
+                if (isEmployee || isManager) {
                   setSubmitError("");
                   setSubmitSuccess("");
                   setShowSubmitModal(true);
                 } else {
-                  alert("Design saved locally! (Only Employee accounts can submit designs for Manager approval)");
+                  alert("Design saved locally! (Only Employee/Manager accounts can submit or publish designs to the store)");
                 }
               }}
               className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition"
             >
               <Save className="h-4 w-4" />
-              {isEmployee ? "Submit to Manager" : "Save Design"}
+              {isManager ? "Publish to Store" : isEmployee ? "Submit to Manager" : "Save Design"}
             </button>
           </div>
         </header>
@@ -1246,14 +1269,18 @@ export default function DesignerPage() {
         </div>
       )}
 
-      {/* Submit Design Concept Modal for Employees */}
+      {/* Submit Design Concept Modal for Employees/Managers */}
       {showSubmitModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-sm border shadow-2xl overflow-hidden select-none text-slate-800">
             <div className="bg-slate-950 text-white px-5 py-4 flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-teal-300">Submit Design Concept</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Publish your design to the Store catalog</p>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-teal-300">
+                  {isManager ? "Publish Design to Store" : "Submit Design Concept"}
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  {isManager ? "Add this pre-designed item directly to the catalog" : "Publish your design for Manager approval"}
+                </p>
               </div>
               <button onClick={() => setShowSubmitModal(false)} className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
                 <X className="h-4.5 w-4.5" />
@@ -1335,7 +1362,7 @@ export default function DesignerPage() {
                   disabled={submitLoading}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition"
                 >
-                  {submitLoading ? "Submitting..." : "Submit to Manager"}
+                  {submitLoading ? (isManager ? "Publishing..." : "Submitting...") : (isManager ? "Publish to Store" : "Submit to Manager")}
                 </button>
               </div>
             </form>

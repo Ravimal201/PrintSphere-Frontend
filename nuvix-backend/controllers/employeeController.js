@@ -2,6 +2,8 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
+const CustomizedDesign = require("../models/CustomizedDesign");
+
 
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
 

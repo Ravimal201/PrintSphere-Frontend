@@ -17,6 +17,16 @@ app.use(cors());
 // Connect to MongoDB Database
 connectDB();
 
+// Register all Mongoose models globally
+require("./models/User");
+require("./models/Product");
+require("./models/Order");
+require("./models/Inventory");
+require("./models/PricingRules");
+require("./models/CustomizedDesign");
+require("./models/Notification");
+
+
 // Route Imports
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
