@@ -34,8 +34,11 @@ export default function ManagerPage() {
     category: "",
     basePrice: 0,
     discount: 0,
-    sizes: ["S", "M", "L"],
-    colors: ["White"],
+    sizes: ["S", "M", "L", "XL", "XXL"],
+    colors: ["#ffffff"],
+    images: [],
+    modelPath: "/images/models/male normal t-shirt1.glb",
+    defaultColor: "#ffffff",
     status: "Active"
   });
   const [productError, setProductError] = useState("");
@@ -272,6 +275,19 @@ export default function ManagerPage() {
     }
   };
 
+  const handleProductImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProductForm(prev => ({
+        ...prev,
+        images: [reader.result]
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const openEditProduct = (product) => {
     setEditingProduct(product);
     setProductForm({
@@ -280,8 +296,11 @@ export default function ManagerPage() {
       category: product.category,
       basePrice: product.basePrice,
       discount: product.discount || 0,
-      sizes: product.sizes || ["S", "M", "L"],
-      colors: product.colors || ["White"],
+      sizes: product.sizes || ["S", "M", "L", "XL", "XXL"],
+      colors: product.colors || ["#ffffff"],
+      images: product.images || [],
+      modelPath: product.modelPath || "/images/models/male normal t-shirt1.glb",
+      defaultColor: product.defaultColor || "#ffffff",
       status: product.status || "Active"
     });
     setShowProductModal(true);
@@ -294,8 +313,11 @@ export default function ManagerPage() {
       category: "",
       basePrice: 0,
       discount: 0,
-      sizes: ["S", "M", "L"],
-      colors: ["White"],
+      sizes: ["S", "M", "L", "XL", "XXL"],
+      colors: ["#ffffff"],
+      images: [],
+      modelPath: "/images/models/male normal t-shirt1.glb",
+      defaultColor: "#ffffff",
       status: "Active"
     });
     setProductError("");
@@ -1145,6 +1167,62 @@ export default function ManagerPage() {
                           <option value="Archived">Archived</option>
                         </select>
                       </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">3D T-Shirt Cut Style</label>
+                        <select
+                          value={productForm.modelPath}
+                          onChange={(e) => setProductForm(prev => ({ ...prev, modelPath: e.target.value }))}
+                          className="w-full px-3 py-2 border rounded-xl text-sm"
+                        >
+                          <option value="/images/models/male normal t-shirt1.glb">Men's T-Shirt</option>
+                          <option value="/images/models/female normal t-shirt.glb">Women's T-Shirt</option>
+                          <option value="/images/models/long_sleeve_t-_shirt.glb">Long Sleeve Shirt</option>
+                          <option value="/images/models/oversized t-sdirt1.glb">Oversized T-Shirt</option>
+                          <option value="/images/models/t_shirt_hoodie.glb">Hoodie</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Default Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={productForm.defaultColor}
+                            onChange={(e) => setProductForm(prev => ({ ...prev, defaultColor: e.target.value, colors: [e.target.value] }))}
+                            className="h-8 w-10 border rounded-lg p-0 bg-transparent cursor-pointer shrink-0"
+                          />
+                          <input
+                            type="text"
+                            value={productForm.defaultColor}
+                            onChange={(e) => setProductForm(prev => ({ ...prev, defaultColor: e.target.value, colors: [e.target.value] }))}
+                            className="w-full px-3 py-1.5 border rounded-xl text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Product Image (Mockup)</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProductImageUpload}
+                          className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Or Image URL</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. /images/dumyImage.png or Base64 string..."
+                        value={productForm.images?.[0] || ""}
+                        onChange={(e) => setProductForm(prev => ({ ...prev, images: [e.target.value] }))}
+                        className="w-full px-3 py-2 border rounded-xl text-xs"
+                      />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2 border-t mt-4">
