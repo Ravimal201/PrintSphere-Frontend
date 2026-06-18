@@ -109,7 +109,7 @@ exports.submitProductConcept = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Employee role required." });
     }
 
-    const { title, description, category, basePrice, sizes, colors, images } = req.body;
+    const { title, description, category, basePrice, sizes, colors, images, modelPath, defaultColor, layers } = req.body;
 
     if (!title || !description || !category || basePrice === undefined) {
       return res.status(400).json({ message: "Please provide all required product fields" });
@@ -125,7 +125,10 @@ exports.submitProductConcept = async (req, res) => {
       images: images && images.length > 0 ? images : ["/images/dumyImage.png"],
       status: "Draft",
       isApproved: false,
-      createdBy: decoded.id
+      createdBy: decoded.id,
+      modelPath: modelPath || "/images/models/male normal t-shirt1.glb",
+      defaultColor: defaultColor || "#ffffff",
+      layers: layers || []
     });
 
     res.status(201).json({ message: "Design concept submitted for manager approval", product });

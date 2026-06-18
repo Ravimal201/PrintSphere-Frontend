@@ -1,5 +1,49 @@
 const mongoose = require("mongoose");
 
+const LayerSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true
+  },
+  type: {
+    type: String,
+    enum: ["text", "image", "logo", "shape"],
+    required: true
+  },
+  name: {
+    type: String,
+    required: true
+  },
+  text: String,
+  fontFamily: String,
+  color: String,
+  bold: {
+    type: Boolean,
+    default: false
+  },
+  italic: {
+    type: Boolean,
+    default: false
+  },
+  url: String,
+  position: {
+    type: [Number],
+    required: true
+  },
+  rotation: {
+    type: [Number],
+    required: true
+  },
+  scale: {
+    type: [Number],
+    required: true
+  },
+  aspectRatio: {
+    type: Number,
+    default: 1
+  }
+});
+
 const ProductSchema = new mongoose.Schema(
   {
     title: {
@@ -43,7 +87,16 @@ const ProductSchema = new mongoose.Schema(
     isApproved: {
       type: Boolean,
       default: false
-    }
+    },
+    modelPath: {
+      type: String,
+      default: "/images/models/male normal t-shirt1.glb"
+    },
+    defaultColor: {
+      type: String,
+      default: "#ffffff"
+    },
+    layers: [LayerSchema]
   },
   {
     timestamps: true
