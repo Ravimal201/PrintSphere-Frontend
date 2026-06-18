@@ -289,7 +289,7 @@ exports.createProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { title, description, category, basePrice, sizes, colors, images, status, discount } = req.body;
+    const { title, description, category, basePrice, sizes, colors, images, status, discount, modelPath, defaultColor, layers } = req.body;
 
     if (!title || !description || !category || basePrice === undefined) {
       return res.status(400).json({ message: "Please provide all required product fields" });
@@ -309,7 +309,10 @@ exports.createProduct = async (req, res) => {
       status: status || "Active",
       isApproved: true,
       createdBy: decoded.id,
-      discount: discount || 0
+      discount: discount || 0,
+      modelPath: modelPath || "/images/models/male normal t-shirt1.glb",
+      defaultColor: defaultColor || "#ffffff",
+      layers: layers || []
     });
 
     res.status(201).json({ message: "Product created successfully", product });
@@ -327,7 +330,7 @@ exports.updateProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { title, description, category, basePrice, sizes, colors, images, status, isApproved, discount } = req.body;
+    const { title, description, category, basePrice, sizes, colors, images, status, isApproved, discount, modelPath, defaultColor, layers } = req.body;
 
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
@@ -341,7 +344,10 @@ exports.updateProduct = async (req, res) => {
         images,
         status,
         isApproved,
-        discount
+        discount,
+        modelPath,
+        defaultColor,
+        layers
       },
       { new: true }
     );

@@ -57,6 +57,9 @@ export default function StorePage() {
 
   const getModalLayers = () => {
     if (!selected3DProduct) return [];
+    if (selected3DProduct.layers && selected3DProduct.layers.length > 0) {
+      return selected3DProduct.layers;
+    }
     return [
       {
         id: "logo-layer",
@@ -73,6 +76,9 @@ export default function StorePage() {
 
   const getModalModelPath = () => {
     if (!selected3DProduct) return "/images/models/male normal t-shirt1.glb";
+    if (selected3DProduct.modelPath) {
+      return selected3DProduct.modelPath;
+    }
     const title = (selected3DProduct.title || "").toLowerCase();
     const category = (selected3DProduct.category || "").toLowerCase();
 

@@ -398,6 +398,9 @@ export default function ManagerPage() {
 
   const getSubmissionLayers = () => {
     if (!selectedSubmissionProduct) return [];
+    if (selectedSubmissionProduct.layers && selectedSubmissionProduct.layers.length > 0) {
+      return selectedSubmissionProduct.layers;
+    }
     return [
       {
         id: "logo-layer",
@@ -414,6 +417,9 @@ export default function ManagerPage() {
 
   const getSubmissionModelPath = () => {
     if (!selectedSubmissionProduct) return "/images/models/male normal t-shirt1.glb";
+    if (selectedSubmissionProduct.modelPath) {
+      return selectedSubmissionProduct.modelPath;
+    }
     const title = (selectedSubmissionProduct.title || "").toLowerCase();
     const category = (selectedSubmissionProduct.category || "").toLowerCase();
 

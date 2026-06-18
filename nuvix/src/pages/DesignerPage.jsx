@@ -142,7 +142,10 @@ export default function DesignerPage() {
       basePrice: submitForm.basePrice,
       sizes: [selectedSize],
       colors: [shirtColor],
-      images: previewImages.length > 0 ? previewImages : ["/images/dumyImage.png"]
+      images: previewImages.length > 0 ? previewImages : ["/images/dumyImage.png"],
+      modelPath: selectedModel.path,
+      defaultColor: shirtColor,
+      layers: layers
     };
 
     try {
