@@ -28,18 +28,26 @@ export default function LoginPage() {
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("user", JSON.stringify(response.data.user));
 
-      // Redirect based on user role
-      const role = response.data.user.role;
-      if (role === "Admin") {
-        window.location.href = "/admin";
-      } else if (role === "Manager") {
-        window.location.href = "/manager";
-      } else if (role === "Employee") {
-        window.location.href = "/employee";
-      } else if (role === "Customer") {
-        window.location.href = "/store";
+      // Extract optional redirect parameter
+      const params = new URLSearchParams(window.location.search);
+      const redirectUrl = params.get("redirect");
+
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
       } else {
-        window.location.href = "/designer";
+        // Redirect based on user role
+        const role = response.data.user.role;
+        if (role === "Admin") {
+          window.location.href = "/admin";
+        } else if (role === "Manager") {
+          window.location.href = "/manager";
+        } else if (role === "Employee") {
+          window.location.href = "/employee";
+        } else if (role === "Customer") {
+          window.location.href = "/customer-home";
+        } else {
+          window.location.href = "/designer";
+        }
       }
     } catch (err) {
       console.error(err);
