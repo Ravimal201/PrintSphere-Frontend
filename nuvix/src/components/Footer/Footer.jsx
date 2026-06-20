@@ -35,22 +35,22 @@ export default function Footer({ withSidebarOffset = false }) {
           <div>
             <h3 className="mb-4 text-sm font-semibold text-gray-800">SHOP</h3>
             <ul className="space-y-2 text-gray-600">
-              <li><a href="#">All Products</a></li>
-              <li><a href="#">T-shirts</a></li>
-              <li><a href="#">Hoodies</a></li>
-              <li><a href="#">Accessories</a></li>
-              <li><a href="#">Gift Cards</a></li>
+              <li><a href="/store">All Products</a></li>
+              <li><a href="/store">T-shirts</a></li>
+              <li><a href="/store">Hoodies</a></li>
+              <li><a href="/store">Accessories</a></li>
+              <li><a href="/support">Support Help</a></li>
             </ul>
           </div>
 
           <div>
             <h3 className="mb-4 text-sm font-semibold text-gray-800">COMPANY</h3>
             <ul className="space-y-2 text-gray-600">
-              <li><a href="#">About Us</a></li>
-              <li><a href="#">How It Works</a></li>
-              <li><a href="#">Contact Us</a></li>
-              <li><a href="#">Blog</a></li>
-              <li><a href="#">Careers</a></li>
+              <li><a href="/about">About Us</a></li>
+              <li><a href="/">How It Works</a></li>
+              <li><a href="/contact">Contact Us</a></li>
+              <li><a href="/support">Faqs</a></li>
+              <li><a href="/about">Careers</a></li>
             </ul>
           </div>
 

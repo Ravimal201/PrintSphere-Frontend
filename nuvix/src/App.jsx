@@ -8,6 +8,12 @@ import AdminPage from "./pages/AdminPage";
 import ManagerPage from "./pages/ManagerPage";
 import EmployeePage from "./pages/EmployeePage";
 import StorePage from "./pages/StorePage";
+import AccountPage from "./pages/AccountPage";
+import MyDesignsPage from "./pages/MyDesignsPage";
+import MyOrdersPage from "./pages/MyOrdersPage";
+import SupportPage from "./pages/SupportPage";
+import AboutUsPage from "./pages/AboutUsPage";
+import ContactUsPage from "./pages/ContactUsPage";
 
 function App() {
   const path = window.location.pathname;
@@ -52,6 +58,45 @@ function App() {
       return null;
     }
     return <CustomerHomePage />;
+  }
+
+  if (path === "/account") {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/login?redirect=/account";
+      return null;
+    }
+    return <AccountPage />;
+  }
+
+  if (path === "/my-designs") {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/login?redirect=/my-designs";
+      return null;
+    }
+    return <MyDesignsPage />;
+  }
+
+  if (path === "/my-orders") {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/login?redirect=/my-orders";
+      return null;
+    }
+    return <MyOrdersPage />;
+  }
+
+  if (path === "/support") {
+    return <SupportPage />;
+  }
+
+  if (path === "/about") {
+    return <AboutUsPage />;
+  }
+
+  if (path === "/contact") {
+    return <ContactUsPage />;
   }
 
   return <GUserPage />;

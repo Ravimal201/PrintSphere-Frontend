@@ -221,13 +221,89 @@ export default function StorePage() {
     saveCart(updatedCart);
   };
 
-  const handleCheckout = () => {
-    setCheckoutSuccess(true);
-    saveCart([]); // Clear cart
-    setTimeout(() => {
-      setCheckoutSuccess(false);
-      setIsCartOpen(false);
-    }, 2000);
+  const handleCheckout = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to complete your checkout.");
+      window.location.href = "/login?redirect=/store";
+      return;
+    }
+    const headers = { Authorization: `Bearer ${token}` };
+
+    let userAddress = { street: "", city: "", country: "Sri Lanka" };
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const parsedUser = JSON.parse(userStr);
+        if (parsedUser.address) {
+          userAddress = {
+            street: parsedUser.address.street || "",
+            city: parsedUser.address.city || "",
+            country: parsedUser.address.country || "Sri Lanka"
+          };
+        }
+      } catch (e) {
+        console.error("Failed to parse user for address:", e);
+      }
+    }
+
+    try {
+      const resolvedItems = [];
+      for (const item of cart) {
+        if (item.isCustom || item.designId?.startsWith("custom-")) {
+          // It's a local unsaved custom design. Let's save it to the DB first.
+          const payload = {
+            tShirtType: item.tShirtType || item.title || "Custom T-Shirt",
+            fabricColor: item.color,
+            material: item.material || "180GSM",
+            size: item.size || "M",
+            layers: item.layers || [],
+            estimatedCost: item.basePrice,
+            thumbnailUrl: item.image || "/images/dumyImage.png"
+          };
+          const designRes = await axios.post(`${API_BASE_URL}/auth/designs`, payload, { headers });
+          const dbDesignId = designRes.data.design._id;
+          resolvedItems.push({
+            designId: dbDesignId,
+            quantity: item.quantity,
+            price: item.basePrice,
+            selectedSize: item.size,
+            selectedColor: item.color
+          });
+        } else {
+          // Standard product
+          resolvedItems.push({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.basePrice * (1 - (item.discount / 100)),
+            selectedSize: item.size,
+            selectedColor: item.color
+          });
+        }
+      }
+
+      const orderPayload = {
+        items: resolvedItems,
+        subtotal: cartSubtotal,
+        printCost: 0,
+        complexityFee: 0,
+        totalCost: cartTotal,
+        shippingAddress: userAddress
+      };
+
+      await axios.post(`${API_BASE_URL}/auth/orders`, orderPayload, { headers });
+      setCheckoutSuccess(true);
+      saveCart([]); // Clear cart
+      setTimeout(() => {
+        setCheckoutSuccess(false);
+        setIsCartOpen(false);
+        // Redirect to my orders page
+        window.location.href = "/my-orders";
+      }, 2000);
+    } catch (err) {
+      console.error("Checkout order error:", err);
+      alert(err.response?.data?.message || "Failed to process checkout. Please try again.");
+    }
   };
 
   // Calculations for cart
