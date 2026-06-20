@@ -14,6 +14,7 @@ import MyOrdersPage from "./pages/MyOrdersPage";
 import SupportPage from "./pages/SupportPage";
 import AboutUsPage from "./pages/AboutUsPage";
 import ContactUsPage from "./pages/ContactUsPage";
+import CartPage from "./pages/CartPage";
 
 function App() {
   const path = window.location.pathname;
@@ -67,6 +68,10 @@ function App() {
       return null;
     }
     return <AccountPage />;
+  }
+
+  if (path === "/cart") {
+    return <CartPage />;
   }
 
   if (path === "/my-designs") {
