@@ -118,6 +118,25 @@ export default function DesignerPage() {
         console.error("Parse user error:", err);
       }
     }
+
+    // Pre-load custom design draft if flagged by My Designs page
+    const designToLoad = localStorage.getItem("load_custom_design");
+    if (designToLoad) {
+      try {
+        const design = JSON.parse(designToLoad);
+        if (design.layers) setLayers(design.layers);
+        if (design.fabricColor) setShirtColor(design.fabricColor);
+        if (design.tShirtType) {
+          const model = tShirtModels.find(m => m.name === design.tShirtType) || 
+                        tShirtModels.find(m => m.name.toLowerCase().includes(design.tShirtType.toLowerCase()));
+          if (model) setSelectedModel(model);
+        }
+        if (design.size) setSelectedSize(design.size);
+        localStorage.removeItem("load_custom_design");
+      } catch (err) {
+        console.error("Error loading design:", err);
+      }
+    }
   }, []);
 
   const handleSubmitDesignConcept = async (e) => {
@@ -179,6 +198,36 @@ export default function DesignerPage() {
       setSubmitError(err.response?.data?.message || "Failed to submit design concept");
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  const handleSaveCustomerDesign = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to save your design to your account.");
+      return;
+    }
+    const headers = { Authorization: `Bearer ${token}` };
+    const imageLayers = layers.filter(l => l.type === "image" || l.type === "logo");
+    const previewImages = imageLayers.map(l => l.url).filter(Boolean);
+    const thumbnailUrl = previewImages.length > 0 ? previewImages[0] : "/images/dumyImage.png";
+
+    const payload = {
+      tShirtType: selectedModel?.name || "Crew Neck T-Shirt",
+      fabricColor: shirtColor,
+      material: shirtMaterial,
+      size: selectedSize,
+      layers: layers,
+      estimatedCost: unitPrice,
+      thumbnailUrl: thumbnailUrl
+    };
+
+    try {
+      await axios.post(`${API_BASE_URL}/auth/designs`, payload, { headers });
+      alert("Design saved successfully to your account!");
+    } catch (err) {
+      console.error("Save customer design error:", err);
+      alert(err.response?.data?.message || "Failed to save design. Please try again.");
     }
   };
 
@@ -503,7 +552,7 @@ export default function DesignerPage() {
                   setSubmitSuccess("");
                   setShowSubmitModal(true);
                 } else {
-                  alert("Design saved locally! (Only Employee/Manager accounts can submit or publish designs to the store)");
+                  handleSaveCustomerDesign();
                 }
               }}
               className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition"

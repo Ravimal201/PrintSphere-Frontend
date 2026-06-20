@@ -4,6 +4,7 @@ const User = require("../models/User");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const PricingRules = require("../models/PricingRules");
+const CustomizedDesign = require("../models/CustomizedDesign");
 
 // JWT Secret Key fallback
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -213,5 +214,126 @@ exports.getActivePricingRules = async (req, res) => {
   } catch (error) {
     console.error("Get active pricing rules error:", error);
     res.status(500).json({ message: "Server error while fetching pricing rules" });
+  }
+};
+
+// Helper to verify customer token
+const verifyUserToken = (req) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+  const token = authHeader.split(" ")[1];
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    return null;
+  }
+};
+
+// @desc    Submit checkout order
+// @route   POST /api/auth/orders
+exports.createOrder = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { items, subtotal, printCost, complexityFee, totalCost, shippingAddress } = req.body;
+
+    const order = await Order.create({
+      customerId: decoded.id,
+      items,
+      subtotal,
+      printCost: printCost || 0,
+      complexityFee: complexityFee || 0,
+      totalCost,
+      shippingAddress,
+      paymentStatus: "Paid",
+      orderStatus: "Processing", // default to processing after checkout
+      timeline: [
+        { status: "Pending Payment", note: "Order placed by customer" },
+        { status: "Processing", note: "Payment verified, order sent to printing queue" }
+      ]
+    });
+
+    res.status(201).json({ message: "Order placed successfully", order });
+  } catch (error) {
+    console.error("Create order error:", error);
+    res.status(500).json({ message: "Server error while placing order" });
+  }
+};
+
+// @desc    Get customer orders
+// @route   GET /api/auth/orders
+exports.getCustomerOrders = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const orders = await Order.find({ customerId: decoded.id })
+      .populate("items.productId")
+      .populate("items.designId")
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
+  } catch (error) {
+    console.error("Get customer orders error:", error);
+    res.status(500).json({ message: "Server error while fetching orders" });
+  }
+};
+
+// @desc    Save customer custom design draft
+// @route   POST /api/auth/designs
+exports.saveCustomerDesign = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { tShirtType, fabricColor, material, size, layers, estimatedCost, thumbnailUrl } = req.body;
+
+    const design = await CustomizedDesign.create({
+      userId: decoded.id,
+      tShirtType,
+      fabricColor,
+      material,
+      size,
+      layers: layers || [],
+      estimatedCost,
+      thumbnailUrl
+    });
+
+    await User.findByIdAndUpdate(decoded.id, {
+      $push: { savedDesigns: design._id }
+    });
+
+    res.status(201).json({ message: "Design saved successfully", design });
+  } catch (error) {
+    console.error("Save customer design error:", error);
+    res.status(500).json({ message: "Server error while saving design" });
+  }
+};
+
+// @desc    Get customer saved designs
+// @route   GET /api/auth/designs
+exports.getCustomerDesigns = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const designs = await CustomizedDesign.find({ userId: decoded.id })
+      .sort({ createdAt: -1 });
+
+    res.json(designs);
+  } catch (error) {
+    console.error("Get customer designs error:", error);
+    res.status(500).json({ message: "Server error while fetching designs" });
   }
 };
