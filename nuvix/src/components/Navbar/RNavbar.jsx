@@ -43,8 +43,8 @@ export default function RNavbar() {
           <button
             type="button"
             aria-label="Cart"
-            onClick={() => { window.location.href = "/store"; }}
-            className="inline-flex items-center justify-center rounded-xl border border-indigo-600 p-2 text-indigo-600 transition hover:bg-indigo-50"
+            onClick={() => { window.location.href = "/cart"; }}
+            className="inline-flex items-center justify-center rounded-xl border border-indigo-600 p-2 text-indigo-600 transition hover:bg-indigo-55"
           >
             <ShoppingCart className="h-5 w-5" />
           </button>
@@ -86,7 +86,7 @@ export default function RNavbar() {
           <a href="/designer" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">3D Designer</a>
           <a href="/my-designs" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">My Designs</a>
           <a href="/my-orders" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">My Orders</a>
-          <a href="/store" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Cart</a>
+          <a href="/cart" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Cart</a>
           <a href="/account" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Account</a>
           <a href="/support" className="block text-gray-700 font-medium hover:text-indigo-600 transition bg-gray-50 hover:bg-indigo-50 rounded-lg px-3 py-2">Help</a>
           <div className="flex gap-2 pt-2">
