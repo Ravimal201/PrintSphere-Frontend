@@ -1,11 +1,35 @@
 import { Layers, Maximize2, MoveDown, MoveUp, RotateCcw, RotateCw, Sparkles, Truck, Undo2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Hero3DPreview from "./Hero3DPreview";
 
 export default function HeroSection() {
   const heroRef = useRef(null);
   const [scale, setScale] = useState(1.6);
   const [shirtColor, setShirtColor] = useState("#ffffff");
+  const [selectedSymbol, setSelectedSymbol] = useState("ⵣ");
+  const [symbolColor, setSymbolColor] = useState("#dc2626");
+  const [decalUrl, setDecalUrl] = useState("");
+  const [designPlacement, setDesignPlacement] = useState({ position: [0, 0.1, 0.18], rotation: [0, 0, 0] });
+
+  useEffect(() => {
+    if (selectedSymbol === "None") {
+      setDecalUrl("");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, 512, 512);
+
+    ctx.font = "bold 280px sans-serif";
+    ctx.fillStyle = symbolColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(selectedSymbol, 256, 256);
+
+    setDecalUrl(canvas.toDataURL());
+  }, [selectedSymbol, symbolColor]);
   return (
     <section className="relative mb-8 overflow-hidden rounded-4xl border border-indigo-100 bg-linear-to-br from-white via-indigo-50 to-indigo-100/80 p-6 shadow-[0_24px_80px_rgba(99,102,241,0.12)] lg:p-8">
       <div className="absolute inset-x-6 top-5 h-px bg-linear-to-r from-transparent via-indigo-200 to-transparent" />
@@ -140,6 +164,10 @@ export default function HeroSection() {
               onScaleChange={setScale}
               color={shirtColor}
               onColorChange={setShirtColor}
+              designImageUrl={decalUrl}
+              designScale={0.55}
+              designPlacement={designPlacement}
+              onDesignPlacementChange={setDesignPlacement}
             />
 
             <div className="mt-8 flex w-full items-center gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
@@ -202,22 +230,62 @@ export default function HeroSection() {
             </div>
           </div>
 
-          <div className="hidden lg:absolute lg:right-3 lg:top-10 lg:block lg:w-52 rounded-3xl bg-white p-4 shadow-xl shadow-indigo-100 ring-1 ring-white/70 z-20">
-            <p className="text-sm font-semibold text-slate-900">Shirt Color</p>
-            <div className="mt-4 grid grid-cols-5 gap-3">
-              {['#ffffff', '#111827', '#9ca3af', '#1f3b73', '#ef4444', '#fbbf24', '#22c55e', '#8b5cf6', '#f9a8d4', '#f5deb3'].map((color, index) => (
-                <button
-                  key={color}
-                  type="button"
-                  className={`h-9 w-9 rounded-full border-2 transition ${shirtColor === color ? 'border-indigo-500 ring-2 ring-indigo-200 scale-110' : 'border-transparent hover:scale-105'}`}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Color ${index + 1}`}
-                  onClick={() => {
-                    setShirtColor(color);
-                    heroRef.current?.setColor(color);
-                  }}
-                />
-              ))}
+          <div className="hidden lg:absolute lg:right-3 lg:top-10 lg:block lg:w-52 rounded-3xl bg-white p-4 shadow-xl shadow-indigo-100 ring-1 ring-white/70 z-20 space-y-4">
+            <div>
+              <p className="text-xs font-bold text-slate-900">Shirt Color</p>
+              <div className="mt-2.5 grid grid-cols-5 gap-2.5">
+                {['#ffffff', '#111827', '#9ca3af', '#1f3b73', '#ef4444', '#fbbf24', '#22c55e', '#8b5cf6', '#f9a8d4', '#f5deb3'].map((color, index) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`h-7 w-7 rounded-full border-2 transition ${shirtColor === color ? 'border-indigo-500 ring-2 ring-indigo-200 scale-110' : 'border-transparent hover:scale-105'}`}
+                    style={{ backgroundColor: color }}
+                    aria-label={`Color ${index + 1}`}
+                    onClick={() => {
+                      setShirtColor(color);
+                      heroRef.current?.setColor(color);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t pt-3">
+              <p className="text-xs font-bold text-slate-900">Amazigh Symbol</p>
+              <div className="mt-2.5 grid grid-cols-5 gap-2">
+                {[
+                  { char: "ⵣ", label: "Yaz" },
+                  { char: "✦", label: "Star" },
+                  { char: "☼", label: "Sun" },
+                  { char: "ⵓ", label: "Chevron" },
+                  { char: "None", label: "Clear" }
+                ].map((sym) => (
+                  <button
+                    key={sym.char}
+                    type="button"
+                    onClick={() => setSelectedSymbol(sym.char)}
+                    className={`h-7 w-7 text-xs font-black rounded-lg border transition flex items-center justify-center ${selectedSymbol === sym.char ? 'border-indigo-650 bg-indigo-50 text-indigo-750' : 'border-slate-200 hover:bg-slate-50 text-slate-700'}`}
+                    title={sym.label}
+                  >
+                    {sym.char === "None" ? "✕" : sym.char}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t pt-3">
+              <p className="text-xs font-bold text-slate-900">Symbol Color</p>
+              <div className="mt-2.5 grid grid-cols-5 gap-2.5">
+                {['#dc2626', '#1e3a8a', '#fbbf24', '#16a34a', '#6d28d9'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`h-6 w-6 rounded-full border transition ${symbolColor === color ? 'border-slate-800 scale-110 ring-2 ring-indigo-105' : 'border-transparent hover:scale-105'}`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setSymbolColor(color)}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
