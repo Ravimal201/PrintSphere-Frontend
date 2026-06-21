@@ -9,7 +9,8 @@ export default function HeroSection() {
 
   const [scale, setScale] = useState(0.5); // Initial minimum size
   const [shirtColor, setShirtColor] = useState("#ffffff");
-  const [customText, setCustomText] = useState("ⵣ"); // Yaz symbol by default
+  const [customText, setCustomText] = useState(""); // Clean on load
+  const [tempText, setTempText] = useState(""); // Input field state
   const [symbolColor, setSymbolColor] = useState("#dc2626");
   const [decalUrl, setDecalUrl] = useState("");
   const [designPlacement, setDesignPlacement] = useState({ position: [0, 0.1, 0.18], rotation: [0, 0, 0] });
@@ -63,6 +64,15 @@ export default function HeroSection() {
     } else {
       window.location.href = "/designer";
     }
+  };
+
+  const handleAddText = () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/login?redirect=/designer";
+      return;
+    }
+    setCustomText(tempText);
   };
 
   useEffect(() => {
@@ -338,33 +348,22 @@ export default function HeroSection() {
 
             <div className="border-t pt-3">
               <p className="text-xs font-bold text-slate-900">Imprint Custom Text</p>
-              <input
-                type="text"
-                value={customText}
-                onClick={(e) => {
-                  const token = localStorage.getItem("token");
-                  if (!token) {
-                    alert("You must log in to the system to add text or customize designs.");
-                    window.location.href = "/login?redirect=/designer";
-                  }
-                }}
-                onChange={(e) => {
-                  const token = localStorage.getItem("token");
-                  if (!token) {
-                    alert("You must log in to the system to add text or customize designs.");
-                    window.location.href = "/login?redirect=/designer";
-                    return;
-                  }
-                  setCustomText(e.target.value);
-                }}
-                placeholder="Type text overlay..."
-                className="mt-2 w-full px-2.5 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-indigo-500 text-slate-800 bg-slate-50/50"
-              />
-              {!localStorage.getItem("token") && (
-                <p className="text-[9px] text-rose-500 font-bold mt-1.5 leading-snug">
-                  ⚠️ Note: You must log in to customize and save designs or order.
-                </p>
-              )}
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={tempText}
+                  onChange={(e) => setTempText(e.target.value)}
+                  placeholder="Type text overlay..."
+                  className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-indigo-500 text-slate-800 bg-slate-50/50 min-w-0"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddText}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0 cursor-pointer"
+                >
+                  Add Text
+                </button>
+              </div>
             </div>
           </div>
         </div>
