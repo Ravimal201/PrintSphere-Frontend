@@ -3,7 +3,7 @@ import { Center, Float, OrbitControls, useGLTF } from "@react-three/drei";
 import { Suspense, useRef, useEffect, forwardRef, useImperativeHandle, useState } from "react";
 import { DoubleSide, TextureLoader, SRGBColorSpace } from "three";
 
-function ShirtModel({ modelRef, color, designImageUrl, designScale, designPlacement, onDesignPlacementChange }) {
+function ShirtModel({ modelRef, scale, color, designImageUrl, designScale, designPlacement, onDesignPlacementChange }) {
   const { scene } = useGLTF("/images/models/amazigh_traditional_t-shirt.glb");
   const textureRef = useRef(null);
   const dragStateRef = useRef({ pointerId: null, active: false });
@@ -100,7 +100,7 @@ function ShirtModel({ modelRef, color, designImageUrl, designScale, designPlacem
 
 
   return (
-    <group ref={modelRef} onPointerDown={startDraggingDesign} onPointerMove={updateDraggingDesign} onPointerUp={stopDraggingDesign} onPointerCancel={stopDraggingDesign}>
+    <group ref={modelRef} scale={scale} onPointerDown={startDraggingDesign} onPointerMove={updateDraggingDesign} onPointerUp={stopDraggingDesign} onPointerCancel={stopDraggingDesign}>
       <Center>
         <primitive object={scene} />
         {designTexture && designPlacement && (
@@ -135,7 +135,7 @@ useGLTF.preload("/images/models/amazigh_traditional_t-shirt.glb");
 
 const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, color, onColorChange, designImageUrl, designScale, designPlacement, onDesignPlacementChange }, ref) {
   const modelRef = useRef();
-  const defaultScale = 0.8;
+  const defaultScale = 0.5;
   const scaleRef = useRef(defaultScale);
   const rotationRef = useRef({ x: 0, y: 0, z: 0 });
 
@@ -230,6 +230,7 @@ const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, 
           <Float speed={1.5} rotationIntensity={0.6} floatIntensity={0.8}>
             <ShirtModel
               modelRef={modelRef}
+              scale={scale}
               color={color}
               designImageUrl={designImageUrl}
               designScale={designScale}
