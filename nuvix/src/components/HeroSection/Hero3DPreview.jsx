@@ -4,7 +4,7 @@ import { Suspense, useRef, useEffect, forwardRef, useImperativeHandle, useState 
 import { DoubleSide, TextureLoader, SRGBColorSpace } from "three";
 
 function ShirtModel({ modelRef, color, designImageUrl, designScale, designPlacement, onDesignPlacementChange }) {
-  const { scene } = useGLTF("/images/models/t_shirt.glb");
+  const { scene } = useGLTF("/images/models/amazigh_traditional_t-shirt.glb");
   const textureRef = useRef(null);
   const dragStateRef = useRef({ pointerId: null, active: false });
   const [designTexture, setDesignTexture] = useState(null);
@@ -131,7 +131,7 @@ function ShirtModel({ modelRef, color, designImageUrl, designScale, designPlacem
   );
 }
 
-useGLTF.preload("/images/models/t_shirt.glb");
+useGLTF.preload("/images/models/amazigh_traditional_t-shirt.glb");
 
 const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, color, onColorChange, designImageUrl, designScale, designPlacement, onDesignPlacementChange }, ref) {
   const modelRef = useRef();
