@@ -91,6 +91,7 @@ export default function DesignerPage() {
   
   const [isEmployee, setIsEmployee] = useState(false);
   const [isManager, setIsManager] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitForm, setSubmitForm] = useState({
     title: "",
@@ -109,6 +110,7 @@ export default function DesignerPage() {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
+        setCurrentUser(user);
         if (user.role === "Employee") {
           setIsEmployee(true);
         } else if (user.role === "Manager" || user.role === "Admin") {
@@ -482,18 +484,22 @@ export default function DesignerPage() {
 
           <nav className="p-4 space-y-1">
             {[
-              { id: "dashboard", label: "Dashboard", icon: Sparkles },
-              { id: "store", label: "Store", icon: ShoppingBag },
-              { id: "3d-designer", label: "3D Designer", icon: Layers },
-              { id: "my-orders", label: "My Orders", icon: FolderHeart },
-              { id: "my-designs", label: "My Designs", icon: Palette }
+              { id: "dashboard", label: "Dashboard", icon: Sparkles, path: "/customer-home" },
+              { id: "store", label: "Store", icon: ShoppingBag, path: "/store" },
+              { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
+              { id: "my-orders", label: "My Orders", icon: FolderHeart, path: "/my-orders" },
+              { id: "my-designs", label: "My Designs", icon: Palette, path: "/my-designs" }
             ].map((item) => {
               const Icon = item.icon;
-              const isActive = activeMenu === item.id;
+              const isActive = item.id === "3d-designer";
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveMenu(item.id)}
+                  onClick={() => {
+                    if (item.path) {
+                      window.location.href = item.path;
+                    }
+                  }}
                   className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive
                       ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.25)]"
@@ -509,14 +515,6 @@ export default function DesignerPage() {
         </div>
 
         <div className="p-4 border-t border-slate-800 space-y-4">
-          <button
-            onClick={() => setShowManagerSettings(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-800 text-xs text-slate-300 font-semibold hover:bg-slate-800 transition"
-          >
-            <Sliders className="h-3.5 w-3.5" />
-            Pricing Console (Manager)
-          </button>
-
           <div className="flex items-center gap-3 px-2">
             <img
               src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
@@ -524,8 +522,8 @@ export default function DesignerPage() {
               className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover"
             />
             <div className="leading-tight">
-              <p className="text-sm font-bold text-white">Nuwan</p>
-              <span className="text-xs text-slate-500">Customer</span>
+              <p className="text-sm font-bold text-white">{currentUser?.name || "User"}</p>
+              <span className="text-xs text-slate-500">{currentUser?.role || "Customer"}</span>
             </div>
           </div>
         </div>
