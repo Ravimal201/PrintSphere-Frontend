@@ -12,7 +12,11 @@ const {
   approveProduct,
   getOrders,
   updateOrderStatus,
-  getEmployees
+  getEmployees,
+  getTShirtStyles,
+  createTShirtStyle,
+  updateTShirtStyle,
+  deleteTShirtStyle
 } = require("../controllers/managerController");
 
 router.get("/pricing-rules", getPricingRules);
@@ -31,5 +35,10 @@ router.get("/orders", getOrders);
 router.put("/orders/:id/status", updateOrderStatus);
 
 router.get("/employees", getEmployees);
+
+router.get("/tshirt-styles", getTShirtStyles);
+router.post("/tshirt-styles", createTShirtStyle);
+router.put("/tshirt-styles/:id", updateTShirtStyle);
+router.delete("/tshirt-styles/:id", deleteTShirtStyle);
 
 module.exports = router;

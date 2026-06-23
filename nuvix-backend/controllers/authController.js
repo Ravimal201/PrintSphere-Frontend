@@ -5,6 +5,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
+const TShirtStyle = require("../models/TShirtStyle");
 
 // JWT Secret Key fallback
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -335,5 +336,63 @@ exports.getCustomerDesigns = async (req, res) => {
   } catch (error) {
     console.error("Get customer designs error:", error);
     res.status(500).json({ message: "Server error while fetching designs" });
+  }
+};
+
+// @desc    Get all active T-shirt styles (Public)
+// @route   GET /api/auth/tshirt-styles
+exports.getTShirtStylesPublic = async (req, res) => {
+  try {
+    const count = await TShirtStyle.countDocuments();
+    if (count === 0) {
+      await TShirtStyle.insertMany([
+        {
+          name: "Male Normal T-Shirt",
+          path: "/images/models/male normal t-shirt1.glb",
+          type: "Crew Neck",
+          gsms: ["180GSM", "220 GSM", "280GSM"],
+          colors: [
+            { name: "White", value: "#ffffff" },
+            { name: "Black", value: "#111827" },
+            { name: "Charcoal", value: "#4b5563" },
+            { name: "Navy Blue", value: "#1e3a8a" },
+            { name: "Red", value: "#dc2626" },
+            { name: "Gold", value: "#fbbf24" },
+            { name: "Green", value: "#16a34a" }
+          ]
+        },
+        {
+          name: "Oversized T-Shirt",
+          path: "/images/models/oversized t-sdirt1.glb",
+          type: "Crew Neck",
+          gsms: ["220 GSM", "280GSM", "320GSM"],
+          colors: [
+            { name: "White", value: "#ffffff" },
+            { name: "Black", value: "#111827" },
+            { name: "Beige", value: "#f5f5dc" },
+            { name: "Light Grey", value: "#e5e7eb" },
+            { name: "Pink", value: "#f472b6" }
+          ]
+        },
+        {
+          name: "Hoodie",
+          path: "/images/models/t_shirt_hoodie.glb",
+          type: "Polo",
+          gsms: ["280GSM", "320GSM"],
+          colors: [
+            { name: "Black", value: "#111827" },
+            { name: "Navy Blue", value: "#1e3a8a" },
+            { name: "Violet", value: "#6d28d9" },
+            { name: "Brown", value: "#78350f" },
+            { name: "Red", value: "#dc2626" }
+          ]
+        }
+      ]);
+    }
+    const styles = await TShirtStyle.find().sort({ createdAt: -1 });
+    res.json(styles);
+  } catch (error) {
+    console.error("Get public tshirt styles error:", error);
+    res.status(500).json({ message: "Server error while fetching tshirt styles" });
   }
 };

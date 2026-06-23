@@ -10,7 +10,8 @@ const {
   createOrder,
   getCustomerOrders,
   saveCustomerDesign,
-  getCustomerDesigns
+  getCustomerDesigns,
+  getTShirtStylesPublic
 } = require("../controllers/authController");
 
 router.post("/register", registerCustomer);
@@ -19,6 +20,7 @@ router.put("/change-password", changePassword);
 router.get("/products", getStoreProducts);
 router.get("/recommendations", getRecommendations);
 router.get("/pricing-rules", getActivePricingRules);
+router.get("/tshirt-styles", getTShirtStylesPublic);
 
 // Orders and Designs for customers
 router.post("/orders", createOrder);
