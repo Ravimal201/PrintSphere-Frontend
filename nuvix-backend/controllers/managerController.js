@@ -5,6 +5,7 @@ const Order = require("../models/Order");
 const Inventory = require("../models/Inventory");
 const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
+const TShirtStyle = require("../models/TShirtStyle");
 
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
 
@@ -381,5 +382,144 @@ exports.deleteProduct = async (req, res) => {
   } catch (error) {
     console.error("Delete product error:", error);
     res.status(500).json({ message: "Server error while deleting product" });
+  }
+};
+
+// ================= T-SHIRT STYLES =================
+
+// @desc    Get all T-shirt styles, auto-seeding defaults if empty
+// @route   GET /api/manager/tshirt-styles
+exports.getTShirtStyles = async (req, res) => {
+  try {
+    if (!verifyManager(req)) {
+      return res.status(403).json({ message: "Access denied. Manager role required." });
+    }
+
+    const count = await TShirtStyle.countDocuments();
+    if (count === 0) {
+      await TShirtStyle.insertMany([
+        {
+          name: "Male Normal T-Shirt",
+          path: "/images/models/male normal t-shirt1.glb",
+          type: "Crew Neck",
+          gsms: ["180GSM", "220 GSM", "280GSM"],
+          colors: [
+            { name: "White", value: "#ffffff" },
+            { name: "Black", value: "#111827" },
+            { name: "Charcoal", value: "#4b5563" },
+            { name: "Navy Blue", value: "#1e3a8a" },
+            { name: "Red", value: "#dc2626" },
+            { name: "Gold", value: "#fbbf24" },
+            { name: "Green", value: "#16a34a" }
+          ]
+        },
+        {
+          name: "Oversized T-Shirt",
+          path: "/images/models/oversized t-sdirt1.glb",
+          type: "Crew Neck",
+          gsms: ["220 GSM", "280GSM", "320GSM"],
+          colors: [
+            { name: "White", value: "#ffffff" },
+            { name: "Black", value: "#111827" },
+            { name: "Beige", value: "#f5f5dc" },
+            { name: "Light Grey", value: "#e5e7eb" },
+            { name: "Pink", value: "#f472b6" }
+          ]
+        },
+        {
+          name: "Hoodie",
+          path: "/images/models/t_shirt_hoodie.glb",
+          type: "Polo",
+          gsms: ["280GSM", "320GSM"],
+          colors: [
+            { name: "Black", value: "#111827" },
+            { name: "Navy Blue", value: "#1e3a8a" },
+            { name: "Violet", value: "#6d28d9" },
+            { name: "Brown", value: "#78350f" },
+            { name: "Red", value: "#dc2626" }
+          ]
+        }
+      ]);
+    }
+
+    const styles = await TShirtStyle.find().sort({ createdAt: -1 });
+    res.json(styles);
+  } catch (error) {
+    console.error("Get tshirt styles error:", error);
+    res.status(500).json({ message: "Server error while fetching tshirt styles" });
+  }
+};
+
+// @desc    Create a new T-shirt style
+// @route   POST /api/manager/tshirt-styles
+exports.createTShirtStyle = async (req, res) => {
+  try {
+    if (!verifyManager(req)) {
+      return res.status(403).json({ message: "Access denied. Manager role required." });
+    }
+
+    const { name, path, type, gsms, colors } = req.body;
+    if (!name || !path) {
+      return res.status(400).json({ message: "Please provide style name and model path" });
+    }
+
+    const style = await TShirtStyle.create({
+      name,
+      path,
+      type: type || "Crew Neck",
+      gsms: gsms || ["180GSM"],
+      colors: colors || [{ name: "White", value: "#ffffff" }]
+    });
+
+    res.status(201).json({ message: "T-Shirt style created successfully", style });
+  } catch (error) {
+    console.error("Create tshirt style error:", error);
+    res.status(500).json({ message: "Server error while creating tshirt style" });
+  }
+};
+
+// @desc    Update an existing T-shirt style
+// @route   PUT /api/manager/tshirt-styles/:id
+exports.updateTShirtStyle = async (req, res) => {
+  try {
+    if (!verifyManager(req)) {
+      return res.status(403).json({ message: "Access denied. Manager role required." });
+    }
+
+    const { name, path, type, gsms, colors } = req.body;
+    const updated = await TShirtStyle.findByIdAndUpdate(
+      req.params.id,
+      { name, path, type, gsms, colors },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "T-Shirt style not found" });
+    }
+
+    res.json({ message: "T-Shirt style updated successfully", style: updated });
+  } catch (error) {
+    console.error("Update tshirt style error:", error);
+    res.status(500).json({ message: "Server error while updating tshirt style" });
+  }
+};
+
+// @desc    Delete a T-shirt style
+// @route   DELETE /api/manager/tshirt-styles/:id
+exports.deleteTShirtStyle = async (req, res) => {
+  try {
+    if (!verifyManager(req)) {
+      return res.status(403).json({ message: "Access denied. Manager role required." });
+    }
+
+    const deleted = await TShirtStyle.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "T-Shirt style not found" });
+    }
+
+    res.json({ message: "T-Shirt style deleted successfully" });
+  } catch (error) {
+    console.error("Delete tshirt style error:", error);
+    res.status(500).json({ message: "Server error while deleting tshirt style" });
   }
 };

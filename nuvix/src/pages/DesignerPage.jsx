@@ -105,6 +105,8 @@ export default function DesignerPage() {
 
   const API_BASE_URL = "http://localhost:5000/api";
 
+  const [availableStyles, setAvailableStyles] = useState(tShirtModels);
+
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
@@ -121,24 +123,52 @@ export default function DesignerPage() {
       }
     }
 
-    // Pre-load custom design draft if flagged by My Designs page
-    const designToLoad = localStorage.getItem("load_custom_design");
-    if (designToLoad) {
+    const loadAndFetch = async () => {
+      let stylesList = tShirtModels;
       try {
-        const design = JSON.parse(designToLoad);
-        if (design.layers) setLayers(design.layers);
-        if (design.fabricColor) setShirtColor(design.fabricColor);
-        if (design.tShirtType) {
-          const model = tShirtModels.find(m => m.name === design.tShirtType) || 
-                        tShirtModels.find(m => m.name.toLowerCase().includes(design.tShirtType.toLowerCase()));
-          if (model) setSelectedModel(model);
+        const res = await axios.get(`${API_BASE_URL}/auth/tshirt-styles`);
+        if (res.data && res.data.length > 0) {
+          setAvailableStyles(res.data);
+          stylesList = res.data;
         }
-        if (design.size) setSelectedSize(design.size);
-        localStorage.removeItem("load_custom_design");
       } catch (err) {
-        console.error("Error loading design:", err);
+        console.error("Failed to fetch T-shirt styles:", err);
       }
-    }
+
+      // Pre-load custom design draft if flagged by My Designs page
+      const designToLoad = localStorage.getItem("load_custom_design");
+      if (designToLoad) {
+        try {
+          const design = JSON.parse(designToLoad);
+          if (design.layers) setLayers(design.layers);
+          if (design.fabricColor) setShirtColor(design.fabricColor);
+          if (design.tShirtType) {
+            const model = stylesList.find(m => m.name === design.tShirtType) || 
+                          stylesList.find(m => m.name.toLowerCase().includes(design.tShirtType.toLowerCase()));
+            if (model) {
+              setSelectedModel(model);
+              setShirtType(model.type);
+            }
+          }
+          if (design.size) setSelectedSize(design.size);
+          localStorage.removeItem("load_custom_design");
+        } catch (err) {
+          console.error("Error loading design:", err);
+        }
+      } else {
+        const defaultModel = stylesList[0];
+        setSelectedModel(defaultModel);
+        setShirtType(defaultModel.type);
+        if (defaultModel.colors && defaultModel.colors.length > 0) {
+          setShirtColor(defaultModel.colors[0].value);
+        }
+        if (defaultModel.gsms && defaultModel.gsms.length > 0) {
+          setShirtMaterial(defaultModel.gsms[0]);
+        }
+      }
+    };
+
+    loadAndFetch();
   }, []);
 
   const handleSubmitDesignConcept = async (e) => {
@@ -443,11 +473,25 @@ export default function DesignerPage() {
     designComplexity = "Medium";
   }
 
+  const getGSMDetails = (gsmName) => {
+    if (!gsmName) return { premium: 0.00, label: "Base" };
+    const cleanGsm = gsmName.replace(/\s+/g, "").toUpperCase();
+    if (cleanGsm.includes("180GSM")) return { premium: 0.00, label: "Base" };
+    if (cleanGsm.includes("220GSM")) return { premium: 3.00, label: "+$3.00" };
+    if (cleanGsm.includes("280GSM")) return { premium: 6.00, label: "+$6.00" };
+    if (cleanGsm.includes("320GSM")) return { premium: 10.00, label: "+$10.00" };
+    return { premium: 0.00, label: "Base" };
+  };
+
   const getBasePrice = () => {
-    let price = pricingRules.baseCrewNeck; // base rate
-    if (shirtMaterial === "220 GSM") price += 3.00;
-    if (shirtMaterial === "280GSM") price += 6.00;
-    if (shirtMaterial === "320GSM") price += 10.00;
+    let price = pricingRules.baseCrewNeck; // default base rate
+    if (shirtType === "V-Neck") price = pricingRules.baseVNeck;
+    if (shirtType === "Polo") price = pricingRules.basePolo;
+
+    // Add dynamic GSM premium
+    const gsmDetails = getGSMDetails(shirtMaterial);
+    price += gsmDetails.premium;
+    
     return price;
   };
 
@@ -635,7 +679,7 @@ export default function DesignerPage() {
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric Color</h3>
                   <div className="flex flex-wrap gap-2.5">
-                    {shirtColors.map((color) => (
+                    {(selectedModel?.colors && selectedModel.colors.length > 0 ? selectedModel.colors : shirtColors).map((color) => (
                       <button
                         key={color.name}
                         onClick={() => setShirtColor(color.value)}
@@ -658,7 +702,7 @@ export default function DesignerPage() {
                 <div className="space-y-4">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">T-Shirt Style (3D Model)</h3>
                   <div className="grid grid-cols-2 gap-3">
-                    {tShirtModels.map((model) => {
+                    {availableStyles.map((model) => {
                       const isSelected = selectedModel.path === model.path;
                       return (
                         <button
@@ -666,6 +710,12 @@ export default function DesignerPage() {
                           onClick={() => {
                             setSelectedModel(model);
                             setShirtType(model.type);
+                            if (model.colors && model.colors.length > 0) {
+                              setShirtColor(model.colors[0].value);
+                            }
+                            if (model.gsms && model.gsms.length > 0) {
+                              setShirtMaterial(model.gsms[0]);
+                            }
                           }}
                           className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-left transition duration-200 ${
                             isSelected
@@ -690,25 +740,26 @@ export default function DesignerPage() {
 
                 <div className="space-y-4">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric GSM (Weight)</h3>
-                  {[
-                    { name: "180GSM", premium: 0.00, label: "Base" },
-                    { name: "220 GSM", premium: 3.00, label: "+$3.00" },
-                    { name: "280GSM", premium: 6.00, label: "+$6.00" },
-                    { name: "320GSM", premium: 10.00, label: "+$10.00" }
-                  ].map((material) => (
-                    <button
-                      key={material.name}
-                      onClick={() => setShirtMaterial(material.name)}
-                      className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${
-                        shirtMaterial === material.name
-                          ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 font-bold"
-                          : "border-slate-100 hover:bg-slate-50"
-                      }`}
-                    >
-                      <span>{material.name}</span>
-                      <span className="text-xs text-slate-400">{material.label}</span>
-                    </button>
-                  ))}
+                  {(selectedModel?.gsms && selectedModel.gsms.length > 0
+                    ? selectedModel.gsms
+                    : ["180GSM", "220 GSM", "280GSM", "320GSM"]
+                  ).map((gsm) => {
+                    const details = getGSMDetails(gsm);
+                    return (
+                      <button
+                        key={gsm}
+                        onClick={() => setShirtMaterial(gsm)}
+                        className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${
+                          shirtMaterial === gsm
+                            ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 font-bold"
+                            : "border-slate-100 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span>{gsm}</span>
+                        <span className="text-xs text-slate-400">{details.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="space-y-4">
@@ -1160,7 +1211,7 @@ export default function DesignerPage() {
                     discount: 0,
                     category: "Customized",
                     size: selectedSize,
-                    color: shirtColors.find(c => c.value.toLowerCase() === shirtColor.toLowerCase())?.name || "Custom Color",
+                    color: (selectedModel?.colors && selectedModel.colors.length > 0 ? selectedModel.colors : shirtColors).find(c => c.value.toLowerCase() === shirtColor.toLowerCase())?.name || "Custom Color",
                     material: shirtMaterial,
                     tShirtType: shirtType,
                     quantity: quantity,

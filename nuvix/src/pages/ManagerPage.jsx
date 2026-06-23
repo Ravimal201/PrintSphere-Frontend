@@ -13,7 +13,25 @@ const API_BASE_URL = "http://localhost:5000/api";
 export default function ManagerPage() {
   const [isManager, setIsManager] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "orders" | "products" | "pricing" | "inventory" | "settings"
+  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "orders" | "products" | "pricing" | "inventory" | "styles" | "settings"
+
+  // Styles tab states
+  const [styles, setStyles] = useState([]);
+  const [stylesLoading, setStylesLoading] = useState(false);
+  const [stylesError, setStylesError] = useState("");
+  const [showStyleModal, setShowStyleModal] = useState(false);
+  const [editingStyle, setEditingStyle] = useState(null);
+  const [styleForm, setStyleForm] = useState({
+    name: "",
+    path: "",
+    type: "Crew Neck",
+    gsms: "180GSM, 220 GSM, 280GSM",
+    colors: [
+      { name: "White", value: "#ffffff" },
+      { name: "Black", value: "#111827" }
+    ]
+  });
+  const [newColor, setNewColor] = useState({ name: "", value: "#ffffff" });
 
   // Data states
   const [orders, setOrders] = useState([]);
@@ -109,12 +127,13 @@ export default function ManagerPage() {
 
     try {
       // Fetch concurrently
-      const [ordersRes, productsRes, inventoryRes, pricingRes, employeesRes] = await Promise.all([
+      const [ordersRes, productsRes, inventoryRes, pricingRes, employeesRes, stylesRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/manager/orders`, { headers }),
         axios.get(`${API_BASE_URL}/manager/products`, { headers }),
         axios.get(`${API_BASE_URL}/manager/inventory`, { headers }),
         axios.get(`${API_BASE_URL}/manager/pricing-rules`, { headers }),
-        axios.get(`${API_BASE_URL}/manager/employees`, { headers })
+        axios.get(`${API_BASE_URL}/manager/employees`, { headers }),
+        axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers })
       ]);
 
       setOrders(ordersRes.data);
@@ -122,6 +141,7 @@ export default function ManagerPage() {
       setInventory(inventoryRes.data);
       setPricingRules(pricingRes.data);
       setEmployees(employeesRes.data);
+      setStyles(stylesRes.data);
 
       if (pricingRes.data) {
         setPricingForm({
@@ -410,6 +430,68 @@ export default function ManagerPage() {
     }
   };
 
+  // ================= T-SHIRT STYLES CRUD =================
+
+  const handleSaveStyle = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    setStylesLoading(true);
+    setStylesError("");
+
+    const parsedGSMs = styleForm.gsms.split(",").map(s => s.trim()).filter(Boolean);
+
+    const payload = {
+      name: styleForm.name,
+      path: styleForm.path,
+      type: styleForm.type,
+      gsms: parsedGSMs,
+      colors: styleForm.colors
+    };
+
+    try {
+      if (editingStyle) {
+        await axios.put(`${API_BASE_URL}/manager/tshirt-styles/${editingStyle._id}`, payload, { headers });
+      } else {
+        await axios.post(`${API_BASE_URL}/manager/tshirt-styles`, payload, { headers });
+      }
+      setShowStyleModal(false);
+      setEditingStyle(null);
+      setStyleForm({
+        name: "",
+        path: "",
+        type: "Crew Neck",
+        gsms: "180GSM, 220 GSM, 280GSM",
+        colors: [
+          { name: "White", value: "#ffffff" },
+          { name: "Black", value: "#111827" }
+        ]
+      });
+      // Re-fetch
+      const stylesRes = await axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers });
+      setStyles(stylesRes.data);
+    } catch (err) {
+      console.error("Save style error:", err);
+      setStylesError(err.response?.data?.message || "Failed to save style.");
+    } finally {
+      setStylesLoading(false);
+    }
+  };
+
+  const handleDeleteStyle = async (styleId) => {
+    if (!confirm("Are you sure you want to delete this style?")) return;
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      await axios.delete(`${API_BASE_URL}/manager/tshirt-styles/${styleId}`, { headers });
+      const stylesRes = await axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers });
+      setStyles(stylesRes.data);
+    } catch (err) {
+      console.error("Delete style error:", err);
+      alert("Failed to delete style.");
+    }
+  };
+
   // Helper selectors / values
   const pendingDrafts = products.filter(p => !p.isApproved && p.status === "Draft");
   const lowStockItems = inventory.filter(item => item.quantity <= item.minThreshold);
@@ -562,6 +644,17 @@ export default function ManagerPage() {
                   {lowStockItems.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab("styles")}
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "styles"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "hover:bg-slate-800 hover:text-slate-200"
+              }`}
+            >
+              <Layers className="h-4.5 w-4.5" />
+              T-Shirt Styles
             </button>
             <button
               onClick={() => setActiveTab("settings")}
@@ -1512,6 +1605,116 @@ export default function ManagerPage() {
           </div>
         )}
 
+        {/* ================= TAB: T-SHIRT STYLES ================= */}
+        {activeTab === "styles" && (
+          <div className="bg-white border rounded-3xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                <Layers className="h-5 w-5 text-indigo-600" />
+                Manage T-Shirt Styles
+              </h3>
+              <button
+                onClick={() => {
+                  setEditingStyle(null);
+                  setStyleForm({
+                    name: "",
+                    path: "",
+                    type: "Crew Neck",
+                    gsms: "180GSM, 220 GSM, 280GSM",
+                    colors: [
+                      { name: "White", value: "#ffffff" },
+                      { name: "Black", value: "#111827" }
+                    ]
+                  });
+                  setShowStyleModal(true);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                Add New Style
+              </button>
+            </div>
+
+            {styles.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-sm text-slate-500 font-semibold">No T-Shirt styles configured.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {styles.map((style) => (
+                  <div key={style._id} className="border rounded-2xl p-5 hover:shadow-md transition bg-slate-50/50 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between border-b pb-3 mb-3">
+                        <h4 className="font-bold text-slate-900 text-base">{style.name}</h4>
+                        <span className="px-2 py-0.5 text-[9px] font-black bg-indigo-100 text-indigo-700 rounded-full uppercase">
+                          {style.type}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-mono break-all mb-3.5">
+                        Model Path: <span className="text-slate-600 font-semibold">{style.path}</span>
+                      </p>
+                      <div className="mb-3.5">
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1">Weights (GSM)</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(style.gsms || []).map((gsm, i) => (
+                            <span key={i} className="text-[10px] font-bold text-slate-700 bg-white border px-2 py-0.5 rounded-lg shadow-2xs">
+                              {gsm}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mb-3.5">
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1">Colors ({style.colors?.length || 0})</span>
+                        <div className="flex flex-wrap gap-2">
+                          {(style.colors || []).map((color, i) => (
+                            <div 
+                              key={i} 
+                              className="group relative flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 shadow-2xs"
+                              style={{ backgroundColor: color.value }}
+                              title={`${color.name} (${color.value})`}
+                            >
+                              <span className="pointer-events-none absolute -bottom-6 left-1/2 -translate-x-1/2 rounded bg-slate-950 px-1.5 py-0.5 text-[8px] font-bold text-white opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-10">
+                                {color.name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 border-t pt-4 mt-4">
+                      <button
+                        onClick={() => {
+                          setEditingStyle(style);
+                          setStyleForm({
+                            name: style.name,
+                            path: style.path,
+                            type: style.type,
+                            gsms: (style.gsms || []).join(", "),
+                            colors: style.colors || []
+                          });
+                          setShowStyleModal(true);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        <Edit2 className="h-3 w-3" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStyle(style._id)}
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ================= TAB 6: SETTINGS ================= */}
         {activeTab === "settings" && (
           <div className="bg-white border rounded-3xl p-6 shadow-sm max-w-md">
@@ -1740,6 +1943,157 @@ export default function ManagerPage() {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {showStyleModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-sm uppercase tracking-wider">
+                {editingStyle ? `Edit Style: ${editingStyle.name}` : "Add New T-Shirt Style"}
+              </h3>
+              <button 
+                onClick={() => { setShowStyleModal(false); setEditingStyle(null); }} 
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStyle} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {stylesError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl text-xs font-semibold">
+                  {stylesError}
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Style Name</label>
+                <input
+                  type="text"
+                  required
+                  value={styleForm.name}
+                  onChange={(e) => setStyleForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. V-Neck Fitted T-Shirt"
+                  className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">3D GLTF Model File Path</label>
+                <input
+                  type="text"
+                  required
+                  value={styleForm.path}
+                  onChange={(e) => setStyleForm(prev => ({ ...prev, path: e.target.value }))}
+                  placeholder="e.g. /images/models/v_neck.glb"
+                  className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Style Type</label>
+                  <select
+                    value={styleForm.type}
+                    onChange={(e) => setStyleForm(prev => ({ ...prev, type: e.target.value }))}
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 bg-white"
+                  >
+                    <option value="Crew Neck">Crew Neck</option>
+                    <option value="Polo">Polo</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">GSM weights (Comma separated)</label>
+                  <input
+                    type="text"
+                    value={styleForm.gsms}
+                    onChange={(e) => setStyleForm(prev => ({ ...prev, gsms: e.target.value }))}
+                    placeholder="e.g. 180GSM, 220 GSM, 280GSM"
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">Configure Allowed Brand Colors</label>
+                
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    placeholder="Color name (e.g. Royal Blue)"
+                    value={newColor.name}
+                    onChange={(e) => setNewColor(prev => ({ ...prev, name: e.target.value }))}
+                    className="flex-1 px-3 py-2 border rounded-xl text-xs font-semibold"
+                  />
+                  <input
+                    type="color"
+                    value={newColor.value}
+                    onChange={(e) => setNewColor(prev => ({ ...prev, value: e.target.value }))}
+                    className="h-8 w-12 p-0.5 border rounded-xl cursor-pointer bg-white shrink-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newColor.name.trim()) return alert("Please type a color name.");
+                      setStyleForm(prev => ({
+                        ...prev,
+                        colors: [...prev.colors, { name: newColor.name.trim(), value: newColor.value }]
+                      }));
+                      setNewColor({ name: "", value: "#ffffff" });
+                    }}
+                    className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
+                  {styleForm.colors.length === 0 ? (
+                    <p className="text-[10px] text-slate-400 font-semibold p-2">No colors added yet.</p>
+                  ) : (
+                    styleForm.colors.map((color, i) => (
+                      <div key={i} className="flex items-center gap-1.5 bg-white border rounded-full px-2.5 py-1 text-xs shadow-2xs">
+                        <span className="h-3.5 w-3.5 rounded-full border border-slate-200" style={{ backgroundColor: color.value }} />
+                        <span className="font-semibold text-slate-700">{color.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStyleForm(prev => ({
+                              ...prev,
+                              colors: prev.colors.filter((_, idx) => idx !== i)
+                            }));
+                          }}
+                          className="text-slate-400 hover:text-rose-500 font-bold ml-1 text-[10px] shrink-0"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowStyleModal(false); setEditingStyle(null); }}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={stylesLoading}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {stylesLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {editingStyle ? "Save Changes" : "Create Style"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
