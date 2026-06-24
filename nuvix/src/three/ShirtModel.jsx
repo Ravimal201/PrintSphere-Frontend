@@ -148,6 +148,8 @@ export default function ShirtModel({
   // Sync fabric colors and resolve target body mesh by volume & keywords
   useEffect(() => {
     if (scene) {
+      setMeshLoaded(false);
+      bodyMeshRef.current = null;
       scene.updateMatrixWorld(true);
       let bestMesh = null;
       let maxScore = -1;
@@ -211,6 +213,7 @@ export default function ShirtModel({
       let changed = false;
       const nextLayers = layers.map((layer) => {
         if (layer.locked) return layer;
+        if (layer.projectedForModel === modelPath) return layer;
 
         const lx = localCenter.x + layer.position[0];
         const ly = localCenter.y + layer.position[1];
@@ -234,36 +237,43 @@ export default function ShirtModel({
           const newOffsetY = localHitPoint.y - localCenter.y;
           const newOffsetZ = localHitPoint.z - localCenter.z;
           
-          const currentZ = layer.position[2];
-          // Check if Z difference is noticeable
-          if (Math.abs(currentZ - newOffsetZ) > 0.005) {
-            const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
-            const localNormal = hit.normal.clone().applyMatrix3(normalMatrix).normalize();
-            
-            const up = new THREE.Vector3(0, 1, 0);
-            const matrix = new THREE.Matrix4().lookAt(
-              new THREE.Vector3(0, 0, 0),
-              localNormal,
-              up
-            );
-            const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
-            
-            changed = true;
-            return {
-              ...layer,
-              position: [newOffsetX, newOffsetY, newOffsetZ],
-              rotation: [rotation.x, rotation.y, layer.rotation[2] || 0]
-            };
+          const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+          const localNormal = hit.normal.clone().applyMatrix3(normalMatrix).normalize();
+          
+          let up = new THREE.Vector3(0, 1, 0);
+          if (Math.abs(localNormal.dot(up)) > 0.99) {
+            up.set(0, 0, 1);
           }
+          
+          const matrix = new THREE.Matrix4().lookAt(
+            new THREE.Vector3(0, 0, 0),
+            localNormal,
+            up
+          );
+          const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
+          
+          changed = true;
+          return {
+            ...layer,
+            position: [newOffsetX, newOffsetY, newOffsetZ],
+            rotation: [rotation.x, rotation.y, layer.rotation[2] || 0],
+            projectedForModel: modelPath
+          };
+        } else {
+          // Even if raycast fails, mark it as projected to prevent infinite retries
+          changed = true;
+          return {
+            ...layer,
+            projectedForModel: modelPath
+          };
         }
-        return layer;
       });
       
       if (changed) {
         onUpdateLayers(nextLayers);
       }
     }
-  }, [meshLoaded, scene, layers, onUpdateLayers]);
+  }, [meshLoaded, scene, layers, onUpdateLayers, modelPath]);
 
   const activeLayer = layers.find((l) => l.id === selectedLayerId);
 
@@ -279,7 +289,10 @@ export default function ShirtModel({
     const localNormal = e.normal.clone().applyMatrix3(normalMatrix).normalize();
 
     // 3. Compute lookAt rotation to project along surface normal
-    const up = new THREE.Vector3(0, 1, 0);
+    let up = new THREE.Vector3(0, 1, 0);
+    if (Math.abs(localNormal.dot(up)) > 0.99) {
+      up.set(0, 0, 1);
+    }
     const target = localNormal.clone();
     const matrix = new THREE.Matrix4().lookAt(
       new THREE.Vector3(0, 0, 0),
@@ -306,7 +319,8 @@ export default function ShirtModel({
           return {
             ...l,
             position: [offsetX, offsetY, offsetZ],
-            rotation: [rotation.x, rotation.y, l.rotation[2] || 0]
+            rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
+            projectedForModel: modelPath
           };
         }
         return l;
