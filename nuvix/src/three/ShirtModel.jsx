@@ -237,7 +237,7 @@ export default function ShirtModel({
           const newOffsetY = localHitPoint.y - localCenter.y;
           const newOffsetZ = localHitPoint.z - localCenter.z;
           
-          const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+          const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
           const localNormal = hit.normal.clone().applyMatrix3(normalMatrix).normalize();
           
           let up = new THREE.Vector3(0, 1, 0);
@@ -285,7 +285,7 @@ export default function ShirtModel({
     const localPoint = mesh.worldToLocal(e.point.clone());
 
     // 2. Calculate local normal vector
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
     const localNormal = e.normal.clone().applyMatrix3(normalMatrix).normalize();
 
     // 3. Compute lookAt rotation to project along surface normal
