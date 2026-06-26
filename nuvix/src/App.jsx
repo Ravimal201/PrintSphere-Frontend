@@ -45,7 +45,8 @@ function App() {
 
   if (path === "/designer" || path.startsWith("/designer/")) {
     const token = localStorage.getItem("token");
-    if (!token) {
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
       window.location.href = "/login?redirect=/designer";
       return null;
     }
@@ -59,7 +60,8 @@ function App() {
   if (path === "/customer-home" || path.startsWith("/customer-home/")) {
     // Redirect to login if customer attempts to access without token
     const token = localStorage.getItem("token");
-    if (!token) {
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
       window.location.href = "/login";
       return null;
     }
@@ -68,7 +70,8 @@ function App() {
 
   if (path === "/account") {
     const token = localStorage.getItem("token");
-    if (!token) {
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
       window.location.href = "/login?redirect=/account";
       return null;
     }
@@ -81,7 +84,8 @@ function App() {
 
   if (path === "/my-designs") {
     const token = localStorage.getItem("token");
-    if (!token) {
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
       window.location.href = "/login?redirect=/my-designs";
       return null;
     }
@@ -90,7 +94,8 @@ function App() {
 
   if (path === "/my-orders") {
     const token = localStorage.getItem("token");
-    if (!token) {
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
       window.location.href = "/login?redirect=/my-orders";
       return null;
     }

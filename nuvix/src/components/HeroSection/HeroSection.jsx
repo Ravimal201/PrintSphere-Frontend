@@ -58,8 +58,8 @@ export default function HeroSection() {
   const handleDesignClick = (e) => {
     if (e) e.preventDefault();
     const token = localStorage.getItem("token");
-    if (!token) {
-      alert("You need to log in to the system to access the 3D Customizer.");
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
       window.location.href = "/login?redirect=/designer";
     } else {
       window.location.href = "/designer";
@@ -68,7 +68,8 @@ export default function HeroSection() {
 
   const handleAddText = () => {
     const token = localStorage.getItem("token");
-    if (!token) {
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
       window.location.href = "/login?redirect=/designer";
       return;
     }
@@ -233,9 +234,16 @@ export default function HeroSection() {
             className="hidden lg:flex relative z-10 w-full max-w-130 flex-col items-center justify-center rounded-4xl border border-white/70 bg-white/60 px-6 py-8 shadow-[0_20px_60px_rgba(99,102,241,0.12)] backdrop-blur-md sm:px-8 cursor-pointer select-none"
             title="Double Click to Customize"
           >
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md z-20 pointer-events-none">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDesignClick(e);
+              }}
+              className="absolute top-3 left-1/2 -translate-x-1/2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md z-20 cursor-pointer transition"
+            >
               Double Click to Customize
-            </div>
+            </button>
 
             <Hero3DPreview
               ref={heroRef}
@@ -249,7 +257,10 @@ export default function HeroSection() {
               onDesignPlacementChange={setDesignPlacement}
             />
 
-            <div className="mt-8 flex w-full items-center gap-3 rounded-2xl bg-white border border-slate-100 p-3 shadow-md backdrop-blur-md">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="mt-8 flex w-full items-center gap-3 rounded-2xl bg-white border border-slate-100 p-3 shadow-md backdrop-blur-md"
+            >
               <button
                 className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 border border-slate-200/80 text-slate-655 hover:text-indigo-655 hover:border-indigo-200 hover:bg-indigo-50/50 shadow-xs transition shrink-0"
                 type="button"
