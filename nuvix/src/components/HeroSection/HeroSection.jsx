@@ -21,7 +21,7 @@ export default function HeroSection() {
   const handleMouseDown = (e, setPos, currentPos, panelRef) => {
     if (e.target.closest('button') || e.target.closest('input')) return;
     e.preventDefault();
-    
+
     let startPos = currentPos;
     if (!startPos && panelRef.current) {
       const parentRect = panelRef.current.parentElement.getBoundingClientRect();
@@ -159,7 +159,7 @@ export default function HeroSection() {
         <div className="hidden lg:relative lg:flex lg:min-h-130 lg:items-center lg:justify-center">
           <div className="absolute inset-8 rounded-full bg-indigo-200/35 blur-2xl" />
 
-          <div 
+          <div
             ref={rotationRef}
             className="hidden lg:absolute lg:left-4 lg:top-1/2 lg:flex lg:-translate-y-1/2 z-20 cursor-move"
             style={rotationPos ? { left: `${rotationPos.x}px`, top: `${rotationPos.y}px`, transform: 'none' } : {}}
@@ -229,7 +229,7 @@ export default function HeroSection() {
             </div>
           </div>
 
-          <div 
+          <div
             onDoubleClick={handleDesignClick}
             className="hidden lg:flex relative z-10 w-full max-w-130 flex-col items-center justify-center rounded-4xl border border-white/70 bg-white/60 px-6 py-8 shadow-[0_20px_60px_rgba(99,102,241,0.12)] backdrop-blur-md sm:px-8 cursor-pointer select-none"
             title="Double Click to Customize"
@@ -257,7 +257,7 @@ export default function HeroSection() {
               onDesignPlacementChange={setDesignPlacement}
             />
 
-            <div 
+            <div
               onClick={(e) => e.stopPropagation()}
               className="mt-8 flex w-full items-center gap-3 rounded-2xl bg-white border border-slate-100 p-3 shadow-md backdrop-blur-md"
             >
@@ -288,11 +288,11 @@ export default function HeroSection() {
                 </button>
 
                 <div className="relative flex-1 h-2 rounded-full bg-slate-200">
-                  <div 
+                  <div
                     className="absolute top-0 left-0 h-full bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full"
                     style={{ width: `${((scale - 0.5) / (2.5 - 0.5)) * 100}%` }}
                   />
-                  <div 
+                  <div
                     className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-white border-2 border-indigo-600 shadow-md transition-all duration-75 pointer-events-none"
                     style={{ left: `${((scale - 0.5) / (2.5 - 0.5)) * 100}%` }}
                   />
@@ -332,7 +332,7 @@ export default function HeroSection() {
             </div>
           </div>
 
-          <div 
+          <div
             ref={customizerRef}
             className="hidden lg:absolute lg:right-3 lg:top-10 lg:block lg:w-52 rounded-3xl bg-white p-4 shadow-xl shadow-indigo-100 ring-1 ring-white/70 z-20 space-y-4 cursor-move"
             style={customizerPos ? { left: `${customizerPos.x}px`, top: `${customizerPos.y}px`, right: 'auto', transform: 'none' } : {}}
