@@ -35,10 +35,10 @@ export default function GNavbar() {
 
         {/* Desktop Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          <a href="/login" className="px-5 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
+          <a href="/login" className="px-4 py-1.5 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
             Login
           </a>
-          <a href="/register" className="px-5 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition">
+          <a href="/register" className="px-4 py-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition">
             Register
           </a>
         </div>
