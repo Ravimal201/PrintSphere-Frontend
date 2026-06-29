@@ -263,7 +263,7 @@ export default function DesignerPage() {
     }
   };
 
-  const [leftTab, setLeftTab] = useState("add");
+  const [leftTab, setLeftTab] = useState("edit");
   const [rightTab, setRightTab] = useState("layers");
   const [shirtColor, setShirtColor] = useState("#ffffff");
   const [selectedModel, setSelectedModel] = useState(tShirtModels[0]);
@@ -610,16 +610,6 @@ export default function DesignerPage() {
           <aside className="w-80 border-r bg-white flex flex-col select-none shrink-0 overflow-y-auto">
             <div className="flex border-b text-center shrink-0">
               <button
-                onClick={() => setLeftTab("add")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
-                  leftTab === "add"
-                    ? "border-indigo-600 text-indigo-600"
-                    : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
-              >
-                Add Elements
-              </button>
-              <button
                 onClick={() => setLeftTab("edit")}
                 className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
                   leftTab === "edit"
@@ -628,6 +618,16 @@ export default function DesignerPage() {
                 }`}
               >
                 T-Shirt Style
+              </button>
+              <button
+                onClick={() => setLeftTab("add")}
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
+                  leftTab === "add"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                Add Elements
               </button>
             </div>
 
@@ -783,6 +783,7 @@ export default function DesignerPage() {
                     })}
                   </div>
                 </div>
+
               </div>
             )}
           </aside>

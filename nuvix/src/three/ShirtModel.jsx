@@ -1,8 +1,132 @@
 import { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
-import { useGLTF, Decal } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { createPortal } from "@react-three/fiber";
+import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
+
+// Helper to convert vectors/eulers to arrays
+function vecToArray(vec = [0, 0, 0]) {
+  if (Array.isArray(vec)) {
+    return vec;
+  } else if (vec instanceof THREE.Vector3 || vec instanceof THREE.Euler) {
+    return [vec.x, vec.y, vec.z];
+  } else {
+    return [vec, vec, vec];
+  }
+}
+
+// Custom Safe Decal Component to prevent React 19/R3F null ref crashes
+function SafeDecal({
+  mesh,
+  position,
+  rotation,
+  scale,
+  children,
+  polygonOffsetFactor = -10,
+  depthTest = false,
+  map,
+  ...props
+}) {
+  const [decalMesh, setDecalMesh] = useState(null);
+
+  useEffect(() => {
+    if (!decalMesh) return;
+
+    const parent = (mesh && mesh.current) || decalMesh.parent;
+    if (!parent || !(parent instanceof THREE.Mesh)) {
+      return;
+    }
+
+    // Save parent's matrixWorld and identity it for DecalGeometry calculation
+    const matrixWorld = parent.matrixWorld.clone();
+    parent.matrixWorld.identity();
+
+    const posVec = new THREE.Vector3().fromArray(vecToArray(position));
+    const scaleVec = new THREE.Vector3().fromArray(vecToArray(scale));
+    
+    let rotEuler;
+    if (!rotation || typeof rotation === 'number') {
+      const o = new THREE.Object3D();
+      o.position.copy(posVec);
+
+      if (parent.geometry.attributes.normal === undefined) {
+        parent.geometry.computeVertexNormals();
+      }
+      
+      const vertices = parent.geometry.attributes.position.array;
+      const normal = parent.geometry.attributes.normal.array;
+      
+      let distance = Infinity;
+      let closestNormal = new THREE.Vector3();
+      const ox = o.position.x;
+      const oy = o.position.y;
+      const oz = o.position.z;
+      const vLength = vertices.length;
+      let chosenIdx = -1;
+      
+      for (let i = 0; i < vLength; i += 3) {
+        const x = vertices[i];
+        const y = vertices[i + 1];
+        const z = vertices[i + 2];
+        const xDiff = x - ox;
+        const yDiff = y - oy;
+        const zDiff = z - oz;
+        const distSquared = xDiff * xDiff + yDiff * yDiff + zDiff * zDiff;
+        if (distSquared < distance) {
+          distance = distSquared;
+          chosenIdx = i;
+        }
+      }
+      
+      closestNormal.fromArray(normal, chosenIdx);
+      o.lookAt(o.position.clone().add(closestNormal));
+      o.rotateZ(Math.PI);
+      o.rotateY(Math.PI);
+      if (typeof rotation === 'number') o.rotateZ(rotation);
+      rotEuler = o.rotation.clone();
+    } else {
+      rotEuler = new THREE.Euler().fromArray(vecToArray(rotation));
+    }
+
+    let geom = null;
+    try {
+      geom = new DecalGeometry(parent, posVec, rotEuler, scaleVec);
+      decalMesh.geometry = geom;
+    } catch (err) {
+      console.error("SafeDecal geometry generation failed:", err);
+    }
+
+    // Restore parent's matrixWorld
+    parent.matrixWorld.copy(matrixWorld);
+
+    return () => {
+      if (decalMesh && decalMesh.geometry) {
+        decalMesh.geometry.dispose();
+      }
+    };
+  }, [
+    decalMesh,
+    mesh,
+    ...vecToArray(position),
+    ...vecToArray(scale),
+    ...vecToArray(rotation)
+  ]);
+
+  return (
+    <mesh
+      ref={setDecalMesh}
+      material-transparent
+      material-polygonOffset
+      material-polygonOffsetFactor={polygonOffsetFactor}
+      material-depthTest={depthTest}
+      material-map={map}
+      {...props}
+    >
+      {children}
+    </mesh>
+  );
+}
 
 // Sub-component to manage texture loading and rendering for each decal layer
 function DecalItem({ layer, isSelected, targetMesh }) {
@@ -67,7 +191,7 @@ function DecalItem({ layer, isSelected, targetMesh }) {
   return (
     <group>
       {/* 3D Projected Decal on target Mesh */}
-      <Decal
+      <SafeDecal
         mesh={targetMesh}
         position={decalPos}
         rotation={layer.rotation}
@@ -85,7 +209,7 @@ function DecalItem({ layer, isSelected, targetMesh }) {
           side={THREE.DoubleSide}
           depthWrite={true}
         />
-      </Decal>
+      </SafeDecal>
 
       {/* Blue wireframe bounding helper when selected */}
       {isSelected && (
@@ -237,8 +361,12 @@ export default function ShirtModel({
           const newOffsetY = localHitPoint.y - localCenter.y;
           const newOffsetZ = localHitPoint.z - localCenter.z;
           
-          const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
-          const localNormal = hit.normal.clone().applyMatrix3(normalMatrix).normalize();
+          let localNormal;
+          if (hit.face && hit.face.normal) {
+            localNormal = hit.face.normal.clone().normalize();
+          } else {
+            localNormal = new THREE.Vector3(0, 0, 1);
+          }
           
           let up = new THREE.Vector3(0, 1, 0);
           if (Math.abs(localNormal.dot(up)) > 0.99) {
