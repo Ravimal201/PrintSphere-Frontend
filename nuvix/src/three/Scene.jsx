@@ -26,8 +26,10 @@ function ViewManager({ activeSide, zoomLevel, groupRef }) {
 
     // 2. Smoothly adjust camera distance based on zoom level slider
     const baseDistance = 3.8;
-    const targetZ = baseDistance / zoomLevel;
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZ, 0.08);
+    const targetDistance = baseDistance / zoomLevel;
+    const currentDistance = camera.position.length();
+    const newDistance = THREE.MathUtils.lerp(currentDistance, targetDistance, 0.08);
+    camera.position.setLength(newDistance);
   });
 
   return null;
