@@ -771,7 +771,7 @@ export default function StorePage() {
 
 
               {/* 3D canvas container */}
-              <div className="w-full h-full min-h-[280px] md:min-h-0 flex-1">
+              <div className="w-full flex-1 relative min-h-[300px] md:min-h-0">
                 <Scene
                   modelPath={getModalModelPath()}
                   shirtColor={modalColor}
