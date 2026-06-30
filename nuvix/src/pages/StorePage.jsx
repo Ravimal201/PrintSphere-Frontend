@@ -768,22 +768,7 @@ export default function StorePage() {
                 </span>
               </div>
               
-              {/* Preset Side buttons */}
-              <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
-                {["front", "back", "left", "right"].map((side) => (
-                  <button
-                    key={side}
-                    onClick={() => setModalSide(side)}
-                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${
-                      modalSide === side
-                        ? "bg-indigo-600 border-indigo-600 text-white"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {side}
-                  </button>
-                ))}
-              </div>
+
 
               {/* 3D canvas container */}
               <div className="w-full h-full min-h-[280px] md:min-h-0 flex-1">
