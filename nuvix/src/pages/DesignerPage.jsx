@@ -477,9 +477,9 @@ export default function DesignerPage() {
     if (!gsmName) return { premium: 0.00, label: "Base" };
     const cleanGsm = gsmName.replace(/\s+/g, "").toUpperCase();
     if (cleanGsm.includes("180GSM")) return { premium: 0.00, label: "Base" };
-    if (cleanGsm.includes("220GSM")) return { premium: 3.00, label: "+$3.00" };
-    if (cleanGsm.includes("280GSM")) return { premium: 6.00, label: "+$6.00" };
-    if (cleanGsm.includes("320GSM")) return { premium: 10.00, label: "+$10.00" };
+    if (cleanGsm.includes("220GSM")) return { premium: 3.00, label: "+Rs. 3.00" };
+    if (cleanGsm.includes("280GSM")) return { premium: 6.00, label: "+Rs. 6.00" };
+    if (cleanGsm.includes("320GSM")) return { premium: 10.00, label: "+Rs. 10.00" };
     return { premium: 0.00, label: "Base" };
   };
 
@@ -1142,15 +1142,15 @@ export default function DesignerPage() {
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                   <span>Base Price ({shirtType})</span>
-                  <span>${getBasePrice().toFixed(2)}</span>
+                  <span>Rs. {getBasePrice().toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                   <span>Print Area ({totalPrintArea.toFixed(1)} in²)</span>
-                  <span>${getPrintAreaCost().toFixed(2)}</span>
+                  <span>Rs. {getPrintAreaCost().toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                   <span>Design Complexity</span>
-                  <span>${getComplexityCost().toFixed(2)}</span>
+                  <span>Rs. {getComplexityCost().toFixed(2)}</span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-1">
@@ -1175,15 +1175,15 @@ export default function DesignerPage() {
                 {quantity >= pricingRules.volumeDiscountThreshold && (
                   <div className="flex items-center justify-between text-xs font-semibold text-emerald-600">
                     <span>Volume Discount ({pricingRules.volumeDiscountPercentage}%)</span>
-                    <span>-${(unitPrice * quantity * (pricingRules.volumeDiscountPercentage / 100)).toFixed(2)}</span>
+                    <span>-Rs. {(unitPrice * quantity * (pricingRules.volumeDiscountPercentage / 100)).toFixed(2)}</span>
                   </div>
                 )}
 
                 <div className="border-t pt-3 flex items-baseline justify-between select-none">
                   <span className="text-sm font-extrabold text-slate-900">Total Price</span>
                   <div className="text-right">
-                    <p className="text-xl font-black text-slate-900 leading-none">${totalCost.toFixed(2)}</p>
-                    <span className="text-[10px] text-slate-400 font-medium">${unitPrice.toFixed(2)} each</span>
+                    <p className="text-xl font-black text-slate-900 leading-none">Rs. {totalCost.toFixed(2)}</p>
+                    <span className="text-[10px] text-slate-400 font-medium">Rs. {unitPrice.toFixed(2)} each</span>
                   </div>
                 </div>
               </div>
@@ -1228,7 +1228,7 @@ export default function DesignerPage() {
                 className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight"
               >
                 <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Continue to Checkout</span>
-                <span className="text-sm mt-0.5">Total: ${totalCost.toFixed(2)}</span>
+                <span className="text-sm mt-0.5">Total: Rs. {totalCost.toFixed(2)}</span>
               </button>
             </div>
           </aside>
@@ -1253,7 +1253,7 @@ export default function DesignerPage() {
             <div className="p-6 space-y-4 max-h-[450px] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Crew Neck ($)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Crew Neck (Rs)</label>
                   <input
                     type="number"
                     value={pricingRules.baseCrewNeck}
@@ -1262,7 +1262,7 @@ export default function DesignerPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base V-Neck ($)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base V-Neck (Rs)</label>
                   <input
                     type="number"
                     value={pricingRules.baseVNeck}
@@ -1271,7 +1271,7 @@ export default function DesignerPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Polo ($)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Polo (Rs)</label>
                   <input
                     type="number"
                     value={pricingRules.basePolo}
@@ -1280,7 +1280,7 @@ export default function DesignerPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Polyester Extra ($)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Polyester Extra (Rs)</label>
                   <input
                     type="number"
                     value={pricingRules.premiumPolyester}
@@ -1289,7 +1289,7 @@ export default function DesignerPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Organic Cotton Extra ($)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Organic Cotton Extra (Rs)</label>
                   <input
                     type="number"
                     value={pricingRules.premiumOrganic}
@@ -1298,7 +1298,7 @@ export default function DesignerPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Cost Per Sq In ($)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Cost Per Sq In (Rs)</label>
                   <input
                     type="number"
                     step="0.005"
@@ -1311,7 +1311,7 @@ export default function DesignerPage() {
 
               <div className="border-t pt-4 grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Complexity Fee/Layer ($)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Complexity Fee/Layer (Rs)</label>
                   <input
                     type="number"
                     value={pricingRules.complexityFeePerLayer}

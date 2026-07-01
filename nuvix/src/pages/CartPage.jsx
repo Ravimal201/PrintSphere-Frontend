@@ -228,7 +228,7 @@ export default function CartPage() {
                           </div>
                           
                           <div className="flex justify-between items-center mt-3">
-                            <span className="text-sm font-black text-slate-950">${priceAfterDiscount.toFixed(2)}</span>
+                            <span className="text-sm font-black text-slate-950">Rs. {priceAfterDiscount.toFixed(2)}</span>
                             
                             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 rounded-xl px-1.5 py-0.5">
                               <button
@@ -260,13 +260,13 @@ export default function CartPage() {
                     <div className="space-y-2.5 text-xs text-slate-500 font-medium">
                       <div className="flex justify-between">
                         <span>Subtotal ({cartItemCount} items)</span>
-                        <span className="text-slate-800 font-bold">${cartSubtotal.toFixed(2)}</span>
+                        <span className="text-slate-800 font-bold">Rs. {cartSubtotal.toFixed(2)}</span>
                       </div>
                       
                       {isVolumeDiscountEligible && (
                         <div className="flex justify-between text-emerald-600 font-bold">
                           <span>Volume Discount ({pricingRules?.volumeDiscount?.discountPercentage}%)</span>
-                          <span>-${volumeDiscountAmount.toFixed(2)}</span>
+                          <span>-Rs. {volumeDiscountAmount.toFixed(2)}</span>
                         </div>
                       )}
 
@@ -281,7 +281,7 @@ export default function CartPage() {
 
                       <div className="flex justify-between text-sm font-black text-slate-950 pt-3 border-t">
                         <span>Total Cost</span>
-                        <span className="text-indigo-650 font-black">${cartTotal.toFixed(2)}</span>
+                        <span className="text-indigo-650 font-black">Rs. {cartTotal.toFixed(2)}</span>
                       </div>
                     </div>
 

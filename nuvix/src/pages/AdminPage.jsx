@@ -267,7 +267,7 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Gross Revenue</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">$12,430.00</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">Rs. 12,430.00</p>
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold">
               <TrendingUp className="h-3.5 w-3.5" />
               <span>+14.2% this week</span>
@@ -636,10 +636,10 @@ export default function AdminPage() {
               
               <div className="space-y-4">
                 {[
-                  { rank: 1, name: "Adventure Calls Design (White Crew)", sales: 486, revenue: "$10,230" },
-                  { rank: 2, name: "Plain Cotton Tee V-Neck (Black)", sales: 320, revenue: "$4,480" },
-                  { rank: 3, name: "Premium Polo (Gold)", sales: 180, revenue: "$3,240" },
-                  { rank: 4, name: "Custom SVG Logo projection (Collar)", sales: 120, revenue: "$2,800" }
+                  { rank: 1, name: "Adventure Calls Design (White Crew)", sales: 486, revenue: "Rs. 10,230" },
+                  { rank: 2, name: "Plain Cotton Tee V-Neck (Black)", sales: 320, revenue: "Rs. 4,480" },
+                  { rank: 3, name: "Premium Polo (Gold)", sales: 180, revenue: "Rs. 3,240" },
+                  { rank: 4, name: "Custom SVG Logo projection (Collar)", sales: 120, revenue: "Rs. 2,800" }
                 ].map((item) => (
                   <div key={item.name} className="flex items-center justify-between border-b pb-3 last:border-b-0 last:pb-0">
                     <div className="flex items-center gap-3">
