@@ -702,7 +702,7 @@ export default function ManagerPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Settled Revenue</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">${totalRevenue.toFixed(2)}</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">Rs. {totalRevenue.toFixed(2)}</p>
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold">
               <TrendingUp className="h-3.5 w-3.5" />
               <span>Paid transactions verified</span>
@@ -827,7 +827,7 @@ export default function ManagerPage() {
                           />
                           <div>
                             <p className="text-sm font-bold text-slate-900">{draft.title}</p>
-                            <p className="text-[11px] text-slate-500">{draft.category} — ${draft.basePrice.toFixed(2)}</p>
+                            <p className="text-[11px] text-slate-500">{draft.category} — Rs. {draft.basePrice.toFixed(2)}</p>
                             {draft.createdBy && (
                               <span className="text-[9px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-block">
                                 By {draft.createdBy.name || "Employee"}
@@ -906,7 +906,7 @@ export default function ManagerPage() {
                         <p className="text-xs text-slate-500 mt-1">Customer: {order.guestEmail || order.customerId?.email || "Unknown"}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-black text-slate-900">${(order.totalCost || 0).toFixed(2)}</p>
+                        <p className="text-lg font-black text-slate-900">Rs. {(order.totalCost || 0).toFixed(2)}</p>
                         <p className="text-[10px] text-slate-400">{new Date(order.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
@@ -1117,7 +1117,7 @@ export default function ManagerPage() {
                             </div>
                           </td>
                           <td className="py-4 text-xs text-slate-600">{p.category}</td>
-                          <td className="py-4 text-xs font-bold text-slate-900">${(p.basePrice || 0).toFixed(2)}</td>
+                          <td className="py-4 text-xs font-bold text-slate-900">Rs. {(p.basePrice || 0).toFixed(2)}</td>
                           <td className="py-4 text-xs">
                             {p.discount > 0 ? (
                               <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-bold">
@@ -1224,7 +1224,7 @@ export default function ManagerPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Base Price ($)</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Base Price (Rs.)</label>
                         <input
                           type="number"
                           step="0.01"
@@ -1365,7 +1365,7 @@ export default function ManagerPage() {
 
               {/* Base Rates */}
               <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">T-Shirt Cut Base Rates ($)</h4>
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">T-Shirt Cut Base Rates (Rs.)</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="text-[10px] text-slate-500 font-bold uppercase">Crew Neck</label>
@@ -1411,7 +1411,7 @@ export default function ManagerPage() {
 
               {/* Material Premiums */}
               <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Material Premiums ($)</h4>
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Material Premiums (Rs.)</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="text-[10px] text-slate-500 font-bold uppercase">Cotton</label>
@@ -1460,7 +1460,7 @@ export default function ManagerPage() {
                 <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Printing & Estimation parameters</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Printing Cost per Sq. Inch ($)</label>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase">Printing Cost per Sq. Inch (Rs.)</label>
                     <input
                       type="number"
                       step="0.001"
@@ -1470,7 +1470,7 @@ export default function ManagerPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Complexity Fee per layer ($)</label>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase">Complexity Fee per layer (Rs.)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1873,7 +1873,7 @@ export default function ManagerPage() {
 
                 <div className="pb-4 border-b">
                   <span className="text-2xl font-black text-slate-955">
-                    Proposed Price: ${selectedSubmissionProduct.basePrice.toFixed(2)}
+                    Proposed Price: Rs. {selectedSubmissionProduct.basePrice.toFixed(2)}
                   </span>
                 </div>
 

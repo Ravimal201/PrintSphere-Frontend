@@ -105,7 +105,7 @@ export default function MyDesignsPage() {
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-start">
                         <h4 className="font-extrabold text-slate-900 text-sm capitalize">{design.tShirtType}</h4>
-                        <span className="text-indigo-600 font-bold text-sm">${design.estimatedCost?.toFixed(2)}</span>
+                        <span className="text-indigo-600 font-bold text-sm">Rs. {design.estimatedCost?.toFixed(2)}</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                         <span className="bg-slate-100 px-2 py-0.5 rounded-full">{design.material}</span>

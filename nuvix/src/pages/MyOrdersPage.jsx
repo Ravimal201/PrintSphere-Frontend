@@ -103,7 +103,7 @@ export default function MyOrdersPage() {
                         </div>
                         <div className="space-y-0.5">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Price</span>
-                          <span className="text-slate-800 block text-sm font-black">${order.totalCost?.toFixed(2)}</span>
+                          <span className="text-slate-800 block text-sm font-black">Rs. {order.totalCost?.toFixed(2)}</span>
                         </div>
                         <div className="space-y-0.5">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Order ID</span>
@@ -155,7 +155,7 @@ export default function MyOrdersPage() {
                                     </div>
                                   </div>
                                 </div>
-                                <span className="font-extrabold text-slate-800 text-sm">${(item.price * item.quantity).toFixed(2)}</span>
+                                <span className="font-extrabold text-slate-800 text-sm">Rs. {(item.price * item.quantity).toFixed(2)}</span>
                               </div>
                             );
                           })}
