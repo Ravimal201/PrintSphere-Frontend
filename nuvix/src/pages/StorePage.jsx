@@ -449,7 +449,7 @@ export default function StorePage() {
                 <div className="space-y-1">
                   <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
                     <span>Max Price</span>
-                    <span>${maxPrice}</span>
+                    <span>Rs. {maxPrice}</span>
                   </div>
                   <input
                     type="range"
@@ -517,11 +517,11 @@ export default function StorePage() {
                             <div>
                               {hasDiscount ? (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-sm font-black text-slate-950">${finalPrice.toFixed(2)}</span>
-                                  <span className="text-[10px] text-slate-400 line-through">${p.basePrice.toFixed(2)}</span>
+                                  <span className="text-sm font-black text-slate-950">Rs. {finalPrice.toFixed(2)}</span>
+                                  <span className="text-[10px] text-slate-400 line-through">Rs. {p.basePrice.toFixed(2)}</span>
                                 </div>
                               ) : (
-                                <span className="text-sm font-black text-slate-950">${p.basePrice.toFixed(2)}</span>
+                                <span className="text-sm font-black text-slate-950">Rs. {p.basePrice.toFixed(2)}</span>
                               )}
                             </div>
                             <span className="text-[9px] font-bold text-slate-400">Sizes: {(p.sizes || []).join(", ")}</span>
@@ -566,7 +566,7 @@ export default function StorePage() {
                               <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">{p.title}</h4>
                               <p className="text-[10px] text-slate-400 mt-0.5">{p.category}</p>
                               <div className="flex justify-between items-center mt-1">
-                                <span className="text-xs font-black text-slate-950">${finalPrice.toFixed(2)}</span>
+                                <span className="text-xs font-black text-slate-955">Rs. {finalPrice.toFixed(2)}</span>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setSelected3DProduct(p); }}
                                   className="text-[9px] font-black text-indigo-600 hover:underline"
@@ -603,7 +603,7 @@ export default function StorePage() {
                               <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">{p.title}</h4>
                               <p className="text-[10px] text-slate-400 mt-0.5">{p.category}</p>
                               <div className="flex justify-between items-center mt-1">
-                                <span className="text-xs font-black text-slate-950">${finalPrice.toFixed(2)}</span>
+                                <span className="text-xs font-black text-slate-955">Rs. {finalPrice.toFixed(2)}</span>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setSelected3DProduct(p); }}
                                   className="text-[9px] font-black text-indigo-600 hover:underline"
@@ -685,7 +685,7 @@ export default function StorePage() {
                           </div>
                           
                           <div className="flex justify-between items-center mt-2">
-                            <span className="text-xs font-black text-slate-950">${priceAfterDiscount.toFixed(2)}</span>
+                            <span className="text-xs font-black text-slate-950">Rs. {priceAfterDiscount.toFixed(2)}</span>
                             
                             <div className="flex items-center gap-1 bg-white border rounded-xl px-1">
                               <button
@@ -717,13 +717,13 @@ export default function StorePage() {
                 <div className="space-y-1 text-xs text-slate-650">
                   <div className="flex justify-between">
                     <span>Cart Subtotal</span>
-                    <span>${cartSubtotal.toFixed(2)}</span>
+                    <span>Rs. {cartSubtotal.toFixed(2)}</span>
                   </div>
                   
                   {isVolumeDiscountEligible && (
                     <div className="flex justify-between text-emerald-600 font-bold">
                       <span>Volume Discount ({pricingRules.volumeDiscount.discountPercentage}%)</span>
-                      <span>-${volumeDiscountAmount.toFixed(2)}</span>
+                      <span>-Rs. {volumeDiscountAmount.toFixed(2)}</span>
                     </div>
                   )}
 
@@ -738,7 +738,7 @@ export default function StorePage() {
 
                   <div className="flex justify-between text-sm font-black text-slate-950 pt-2 border-t">
                     <span>Estimated Total</span>
-                    <span>${cartTotal.toFixed(2)}</span>
+                    <span>Rs. {cartTotal.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -821,10 +821,10 @@ export default function StorePage() {
                   {selected3DProduct.discount > 0 ? (
                     <>
                       <span className="text-2xl font-black text-slate-950">
-                        ${(selected3DProduct.basePrice * (1 - (selected3DProduct.discount / 100))).toFixed(2)}
+                        Rs. {(selected3DProduct.basePrice * (1 - (selected3DProduct.discount / 100))).toFixed(2)}
                       </span>
                       <span className="text-sm text-slate-400 line-through">
-                        ${selected3DProduct.basePrice.toFixed(2)}
+                        Rs. {selected3DProduct.basePrice.toFixed(2)}
                       </span>
                       <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase ml-1">
                         {selected3DProduct.discount}% Off
@@ -832,7 +832,7 @@ export default function StorePage() {
                     </>
                   ) : (
                     <span className="text-2xl font-black text-slate-950">
-                      ${selected3DProduct.basePrice.toFixed(2)}
+                      Rs. {selected3DProduct.basePrice.toFixed(2)}
                     </span>
                   )}
                 </div>
@@ -920,7 +920,7 @@ export default function StorePage() {
                   }}
                   className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition"
                 >
-                  Add to Cart — ${(
+                  Add to Cart — Rs. {(
                     (selected3DProduct.basePrice * (1 - (selected3DProduct.discount / 100))) * modalQty
                   ).toFixed(2)}
                 </button>
