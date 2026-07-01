@@ -6,7 +6,7 @@ import TShirt2D from "../TShirt2D";
 const fallbackProducts = [
   {
     name: "Wolf Graphic Tee",
-    price: "$24.99",
+    price: "Rs. 24.99",
     rating: "4.7",
     accent: "from-slate-100 via-white to-indigo-50",
     shirt: "before:bg-[linear-gradient(145deg,#ffffff_0%,#f3f4f6_100%)]",
@@ -14,7 +14,7 @@ const fallbackProducts = [
   },
   {
     name: "NOWIX Classic Tee",
-    price: "$22.99",
+    price: "Rs. 22.99",
     rating: "4.6",
     accent: "from-slate-900 via-slate-950 to-slate-700",
     shirt: "before:bg-[linear-gradient(145deg,#111827_0%,#000000_100%)]",
@@ -22,7 +22,7 @@ const fallbackProducts = [
   },
   {
     name: "Splash Design Tee",
-    price: "$23.99",
+    price: "Rs. 23.99",
     rating: "4.8",
     accent: "from-slate-50 via-white to-slate-100",
     shirt: "before:bg-[linear-gradient(145deg,#ffffff_0%,#f8fafc_100%)]",
@@ -30,7 +30,7 @@ const fallbackProducts = [
   },
   {
     name: "Neon Wolf Tee",
-    price: "$25.99",
+    price: "Rs. 25.99",
     rating: "4.9",
     accent: "from-slate-950 via-slate-900 to-slate-700",
     shirt: "before:bg-[linear-gradient(145deg,#111827_0%,#030712_100%)]",
@@ -48,7 +48,7 @@ function ProductCard({ product }) {
     : (isDbProduct ? product.basePrice : null);
   
   const priceText = isDbProduct 
-    ? `$${finalPrice.toFixed(2)}` 
+    ? `Rs. ${finalPrice.toFixed(2)}` 
     : product.price;
 
   const rating = isDbProduct ? "4.8" : product.rating;
@@ -157,7 +157,7 @@ function ProductCard({ product }) {
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-black text-slate-950">{priceText}</span>
               {hasDiscount && (
-                <span className="text-[10px] text-slate-400 line-through">${product.basePrice.toFixed(2)}</span>
+                <span className="text-[10px] text-slate-400 line-through">Rs. {product.basePrice.toFixed(2)}</span>
               )}
             </div>
 

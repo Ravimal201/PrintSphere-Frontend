@@ -495,7 +495,7 @@ export default function EmployeePage() {
                         <tr key={p._id} className="border-b last:border-b-0 hover:bg-slate-50/50 transition">
                           <td className="py-4 font-bold text-slate-900">{p.title}</td>
                           <td className="py-4 text-xs text-slate-600">{p.category}</td>
-                          <td className="py-4 text-xs font-bold text-slate-950">${p.basePrice.toFixed(2)}</td>
+                          <td className="py-4 text-xs font-bold text-slate-950">Rs. {p.basePrice.toFixed(2)}</td>
                           <td className="py-4 text-xs text-slate-500">{(p.sizes || []).join(", ")}</td>
                           <td className="py-4 text-xs">
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
