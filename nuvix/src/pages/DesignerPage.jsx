@@ -199,8 +199,11 @@ export default function DesignerPage() {
         if (defaultModel.colors && defaultModel.colors.length > 0) {
           setShirtColor(defaultModel.colors[0].value);
         }
-        if (defaultModel.gsms && defaultModel.gsms.length > 0) {
-          setShirtMaterial(defaultModel.gsms[0]);
+        const defaultGSMs = defaultModel.gsmPrices && defaultModel.gsmPrices.length > 0
+          ? defaultModel.gsmPrices.map(gp => gp.gsm)
+          : (defaultModel.gsms || []);
+        if (defaultGSMs.length > 0) {
+          setShirtMaterial(defaultGSMs[0]);
         }
       }
     };
@@ -543,6 +546,18 @@ export default function DesignerPage() {
     return 0;
   };
 
+  const getGsmPriceLabel = (gsmName) => {
+    if (selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0) {
+      const match = selectedModel.gsmPrices.find(
+        (gp) => gp.gsm.replace(/\s+/g, "").toUpperCase() === gsmName.replace(/\s+/g, "").toUpperCase()
+      );
+      if (match) return `Rs. ${match.price.toFixed(2)}`;
+    }
+    const details = getGSMDetails(gsmName);
+    const basePrice = selectedModel?.price || 1200.00;
+    return `Rs. ${(basePrice + details.premium).toFixed(2)}`;
+  };
+
   const unitPrice = getBasePrice() + getPrintAreaCost();
   
   const discountMultiplier = quantity >= pricingRules.volumeDiscountThreshold 
@@ -753,9 +768,12 @@ export default function DesignerPage() {
                             if (model.colors && model.colors.length > 0) {
                               setShirtColor(model.colors[0].value);
                             }
-                            if (model.gsms && model.gsms.length > 0) {
-                              setShirtMaterial(model.gsms[0]);
-                            }
+                             const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
+                               ? model.gsmPrices.map(gp => gp.gsm)
+                               : (model.gsms || []);
+                             if (modelGSMs.length > 0) {
+                               setShirtMaterial(modelGSMs[0]);
+                             }
                           }}
                           className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-left transition duration-200 ${
                             isSelected
@@ -779,12 +797,12 @@ export default function DesignerPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric GSM (Weight)</h3>
-                  {(selectedModel?.gsms && selectedModel.gsms.length > 0
-                    ? selectedModel.gsms
-                    : ["180GSM", "220 GSM", "280GSM", "320GSM"]
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric GSM (Weight & Price)</h3>
+                  {(selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0
+                    ? selectedModel.gsmPrices.map(gp => gp.gsm)
+                    : (selectedModel?.gsms || ["180GSM", "220 GSM", "280GSM", "320GSM"])
                   ).map((gsm) => {
-                    const details = getGSMDetails(gsm);
+                    const priceLabel = getGsmPriceLabel(gsm);
                     return (
                       <button
                         key={gsm}
@@ -796,7 +814,7 @@ export default function DesignerPage() {
                         }`}
                       >
                         <span>{gsm}</span>
-                        <span className="text-xs text-slate-400">{details.label}</span>
+                        <span className="text-xs text-indigo-650 font-bold">{priceLabel}</span>
                       </button>
                     );
                   })}
