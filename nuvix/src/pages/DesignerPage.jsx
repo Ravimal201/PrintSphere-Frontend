@@ -62,27 +62,32 @@ const tShirtModels = [
   {
     name: "Men's T-Shirt",
     path: "/images/models/male normal t-shirt1.glb",
-    type: "Crew Neck"
+    type: "Crew Neck",
+    price: 1200.00
   },
   {
     name: "Women's T-Shirt",
     path: "/images/models/female normal t-shirt.glb",
-    type: "V-Neck"
+    type: "V-Neck",
+    price: 1400.00
   },
   {
     name: "Long Sleeve Shirt",
     path: "/images/models/long_sleeve_t-_shirt.glb",
-    type: "Crew Neck"
+    type: "Crew Neck",
+    price: 1800.00
   },
   {
     name: "Oversized T-Shirt",
     path: "/images/models/oversized t-sdirt1.glb",
-    type: "Crew Neck"
+    type: "Crew Neck",
+    price: 1500.00
   },
   {
     name: "Hoodie",
     path: "/images/models/t_shirt_hoodie.glb",
-    type: "Polo"
+    type: "Polo",
+    price: 2500.00
   }
 ];
 
@@ -126,13 +131,29 @@ export default function DesignerPage() {
     const loadAndFetch = async () => {
       let stylesList = tShirtModels;
       try {
-        const res = await axios.get(`${API_BASE_URL}/auth/tshirt-styles`);
-        if (res.data && res.data.length > 0) {
-          setAvailableStyles(res.data);
-          stylesList = res.data;
+        const [stylesRes, pricingRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/auth/tshirt-styles`),
+          axios.get(`${API_BASE_URL}/auth/pricing-rules`)
+        ]);
+        if (stylesRes.data && stylesRes.data.length > 0) {
+          setAvailableStyles(stylesRes.data);
+          stylesList = stylesRes.data;
+        }
+        if (pricingRes.data) {
+          setPricingRules({
+            baseCrewNeck: pricingRes.data.baseRates?.crewNeck ?? 12.00,
+            baseVNeck: pricingRes.data.baseRates?.vNeck ?? 14.00,
+            basePolo: pricingRes.data.baseRates?.polo ?? 18.00,
+            premiumPolyester: pricingRes.data.materialPremiums?.polyester ?? 1.50,
+            premiumOrganic: pricingRes.data.materialPremiums?.organicCotton ?? 3.00,
+            costPerSqIn: pricingRes.data.costPerSqIn ?? 0.02,
+            complexityFeePerLayer: pricingRes.data.complexityFeePerLayer ?? 1.00,
+            volumeDiscountThreshold: pricingRes.data.volumeDiscount?.thresholdQty ?? 5,
+            volumeDiscountPercentage: pricingRes.data.volumeDiscount?.discountPercentage ?? 10
+          });
         }
       } catch (err) {
-        console.error("Failed to fetch T-shirt styles:", err);
+        console.error("Failed to fetch customizer config:", err);
       }
 
       // Pre-load custom design draft if flagged by My Designs page
@@ -484,9 +505,7 @@ export default function DesignerPage() {
   };
 
   const getBasePrice = () => {
-    let price = pricingRules.baseCrewNeck; // default base rate
-    if (shirtType === "V-Neck") price = pricingRules.baseVNeck;
-    if (shirtType === "Polo") price = pricingRules.basePolo;
+    let price = selectedModel?.price || 1200.00; // default base rate from style
 
     // Add dynamic GSM premium
     const gsmDetails = getGSMDetails(shirtMaterial);
@@ -500,10 +519,10 @@ export default function DesignerPage() {
   };
 
   const getComplexityCost = () => {
-    return visibleLayersCount * pricingRules.complexityFeePerLayer;
+    return 0;
   };
 
-  const unitPrice = getBasePrice() + getPrintAreaCost() + getComplexityCost();
+  const unitPrice = getBasePrice() + getPrintAreaCost();
   
   const discountMultiplier = quantity >= pricingRules.volumeDiscountThreshold 
     ? (100 - pricingRules.volumeDiscountPercentage) / 100 
@@ -1141,16 +1160,12 @@ export default function DesignerPage() {
             <div className="p-5 border-t bg-white space-y-4 shrink-0">
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                  <span>Base Price ({shirtType})</span>
+                  <span>Base Price ({selectedModel?.name || shirtType})</span>
                   <span>Rs. {getBasePrice().toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                   <span>Print Area ({totalPrintArea.toFixed(1)} in²)</span>
                   <span>Rs. {getPrintAreaCost().toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                  <span>Design Complexity</span>
-                  <span>Rs. {getComplexityCost().toFixed(2)}</span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-1">
@@ -1251,74 +1266,18 @@ export default function DesignerPage() {
             </div>
 
             <div className="p-6 space-y-4 max-h-[450px] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Crew Neck (Rs)</label>
-                  <input
-                    type="number"
-                    value={pricingRules.baseCrewNeck}
-                    onChange={(e) => setPricingRules({ ...pricingRules, baseCrewNeck: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base V-Neck (Rs)</label>
-                  <input
-                    type="number"
-                    value={pricingRules.baseVNeck}
-                    onChange={(e) => setPricingRules({ ...pricingRules, baseVNeck: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Polo (Rs)</label>
-                  <input
-                    type="number"
-                    value={pricingRules.basePolo}
-                    onChange={(e) => setPricingRules({ ...pricingRules, basePolo: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Polyester Extra (Rs)</label>
-                  <input
-                    type="number"
-                    value={pricingRules.premiumPolyester}
-                    onChange={(e) => setPricingRules({ ...pricingRules, premiumPolyester: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Organic Cotton Extra (Rs)</label>
-                  <input
-                    type="number"
-                    value={pricingRules.premiumOrganic}
-                    onChange={(e) => setPricingRules({ ...pricingRules, premiumOrganic: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Cost Per Sq In (Rs)</label>
-                  <input
-                    type="number"
-                    step="0.005"
-                    value={pricingRules.costPerSqIn}
-                    onChange={(e) => setPricingRules({ ...pricingRules, costPerSqIn: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg text-sm"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Cost Per Sq In (Rs)</label>
+                <input
+                  type="number"
+                  step="0.005"
+                  value={pricingRules.costPerSqIn}
+                  onChange={(e) => setPricingRules({ ...pricingRules, costPerSqIn: Number(e.target.value) })}
+                  className="w-full p-2 border rounded-lg text-sm"
+                />
               </div>
 
               <div className="border-t pt-4 grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Complexity Fee/Layer (Rs)</label>
-                  <input
-                    type="number"
-                    value={pricingRules.complexityFeePerLayer}
-                    onChange={(e) => setPricingRules({ ...pricingRules, complexityFeePerLayer: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg text-sm"
-                  />
-                </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Discount Threshold</label>
                   <input
@@ -1328,7 +1287,7 @@ export default function DesignerPage() {
                     className="w-full p-2 border rounded-lg text-sm"
                   />
                 </div>
-                <div className="space-y-1 col-span-2">
+                <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Volume Discount Percentage (%)</label>
                   <input
                     type="number"
@@ -1343,13 +1302,8 @@ export default function DesignerPage() {
             <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t">
               <button
                 onClick={() => setPricingRules({
-                  baseCrewNeck: 12.00,
-                  baseVNeck: 14.00,
-                  basePolo: 18.00,
-                  premiumPolyester: 1.50,
-                  premiumOrganic: 3.00,
+                  ...pricingRules,
                   costPerSqIn: 0.02,
-                  complexityFeePerLayer: 1.00,
                   volumeDiscountThreshold: 5,
                   volumeDiscountPercentage: 10
                 })}

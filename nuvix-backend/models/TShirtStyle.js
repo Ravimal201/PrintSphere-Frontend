@@ -15,6 +15,10 @@ const TShirtStyleSchema = new mongoose.Schema(
       type: String,
       default: "Crew Neck"
     },
+    price: {
+      type: Number,
+      default: 0
+    },
     gsms: [
       {
         type: String
