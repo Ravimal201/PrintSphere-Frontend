@@ -63,31 +63,47 @@ const tShirtModels = [
     name: "Men's T-Shirt",
     path: "/images/models/male normal t-shirt1.glb",
     type: "Crew Neck",
-    price: 1200.00
+    gsmPrices: [
+      { gsm: "180GSM", price: 1200.00 },
+      { gsm: "220GSM", price: 1500.00 },
+      { gsm: "280GSM", price: 1800.00 }
+    ]
   },
   {
     name: "Women's T-Shirt",
     path: "/images/models/female normal t-shirt.glb",
     type: "V-Neck",
-    price: 1400.00
+    gsmPrices: [
+      { gsm: "180GSM", price: 1400.00 },
+      { gsm: "220GSM", price: 1700.00 }
+    ]
   },
   {
     name: "Long Sleeve Shirt",
     path: "/images/models/long_sleeve_t-_shirt.glb",
     type: "Crew Neck",
-    price: 1800.00
+    gsmPrices: [
+      { gsm: "180GSM", price: 1800.00 },
+      { gsm: "220GSM", price: 2100.00 }
+    ]
   },
   {
     name: "Oversized T-Shirt",
     path: "/images/models/oversized t-sdirt1.glb",
     type: "Crew Neck",
-    price: 1500.00
+    gsmPrices: [
+      { gsm: "180GSM", price: 1500.00 },
+      { gsm: "220GSM", price: 1800.00 }
+    ]
   },
   {
     name: "Hoodie",
     path: "/images/models/t_shirt_hoodie.glb",
     type: "Polo",
-    price: 2500.00
+    gsmPrices: [
+      { gsm: "180GSM", price: 2500.00 },
+      { gsm: "220GSM", price: 2800.00 }
+    ]
   }
 ];
 
@@ -505,12 +521,17 @@ export default function DesignerPage() {
   };
 
   const getBasePrice = () => {
-    let price = selectedModel?.price || 1200.00; // default base rate from style
+    if (selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0) {
+      const match = selectedModel.gsmPrices.find(
+        (gp) => gp.gsm.replace(/\s+/g, "").toUpperCase() === shirtMaterial.replace(/\s+/g, "").toUpperCase()
+      );
+      if (match) return match.price;
+      return selectedModel.gsmPrices[0].price;
+    }
 
-    // Add dynamic GSM premium
+    let price = selectedModel?.price || 1200.00;
     const gsmDetails = getGSMDetails(shirtMaterial);
     price += gsmDetails.premium;
-    
     return price;
   };
 

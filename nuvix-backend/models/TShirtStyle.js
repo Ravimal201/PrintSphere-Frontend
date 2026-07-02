@@ -24,6 +24,12 @@ const TShirtStyleSchema = new mongoose.Schema(
         type: String
       }
     ],
+    gsmPrices: [
+      {
+        gsm: { type: String, required: true },
+        price: { type: Number, required: true }
+      }
+    ],
     colors: [
       {
         name: { type: String, required: true },
