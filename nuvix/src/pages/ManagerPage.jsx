@@ -24,14 +24,17 @@ export default function ManagerPage() {
   const [styleForm, setStyleForm] = useState({
     name: "",
     path: "",
-    type: "Crew Neck",
-    price: 0,
-    gsms: "180GSM, 220 GSM, 280GSM",
+    gsmPrices: [
+      { gsm: "180GSM", price: 1200 },
+      { gsm: "220GSM", price: 1500 }
+    ],
     colors: [
       { name: "White", value: "#ffffff" },
       { name: "Black", value: "#111827" }
     ]
   });
+  const [newGsmName, setNewGsmName] = useState("");
+  const [newGsmPrice, setNewGsmPrice] = useState("");
   const [newColor, setNewColor] = useState({ name: "", value: "#ffffff" });
 
   // Data states
@@ -440,14 +443,10 @@ export default function ManagerPage() {
     setStylesLoading(true);
     setStylesError("");
 
-    const parsedGSMs = styleForm.gsms.split(",").map(s => s.trim()).filter(Boolean);
-
     const payload = {
       name: styleForm.name,
       path: styleForm.path,
-      type: styleForm.type,
-      price: Number(styleForm.price) || 0,
-      gsms: parsedGSMs,
+      gsmPrices: styleForm.gsmPrices,
       colors: styleForm.colors
     };
 
@@ -462,9 +461,10 @@ export default function ManagerPage() {
       setStyleForm({
         name: "",
         path: "",
-        type: "Crew Neck",
-        price: 0,
-        gsms: "180GSM, 220 GSM, 280GSM",
+        gsmPrices: [
+          { gsm: "180GSM", price: 1200 },
+          { gsm: "220GSM", price: 1500 }
+        ],
         colors: [
           { name: "White", value: "#ffffff" },
           { name: "Black", value: "#111827" }
@@ -1518,9 +1518,10 @@ export default function ManagerPage() {
                   setStyleForm({
                     name: "",
                     path: "",
-                    type: "Crew Neck",
-                    price: 0,
-                    gsms: "180GSM, 220 GSM, 280GSM",
+                    gsmPrices: [
+                      { gsm: "180GSM", price: 1200 },
+                      { gsm: "220GSM", price: 1500 }
+                    ],
                     colors: [
                       { name: "White", value: "#ffffff" },
                       { name: "Black", value: "#111827" }
@@ -1547,22 +1548,23 @@ export default function ManagerPage() {
                       <div className="flex items-center justify-between border-b pb-3 mb-3">
                         <div>
                           <h4 className="font-bold text-slate-900 text-base">{style.name}</h4>
-                          <span className="text-xs font-black text-indigo-600">Rs. {(style.price || 0).toFixed(2)}</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase">{style.type || "Crew Neck"}</span>
                         </div>
-                        <span className="px-2 py-0.5 text-[9px] font-black bg-indigo-100 text-indigo-700 rounded-full uppercase">
-                          {style.type}
-                        </span>
                       </div>
                       <p className="text-[10px] text-slate-400 font-mono break-all mb-3.5">
                         Model Path: <span className="text-slate-600 font-semibold">{style.path}</span>
                       </p>
                       <div className="mb-3.5">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1">Weights (GSM)</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(style.gsms || []).map((gsm, i) => (
-                            <span key={i} className="text-[10px] font-bold text-slate-700 bg-white border px-2 py-0.5 rounded-lg shadow-2xs">
-                              {gsm}
-                            </span>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1.5">Weights & Pricing</span>
+                        <div className="flex flex-col gap-1.5">
+                          {(style.gsmPrices && style.gsmPrices.length > 0
+                            ? style.gsmPrices
+                            : (style.gsms || []).map(g => ({ gsm: g, price: style.price || 1200 }))
+                          ).map((gp, i) => (
+                            <div key={i} className="flex justify-between items-center text-[11px] font-semibold text-slate-700 bg-white border px-2.5 py-1.5 rounded-xl shadow-2xs">
+                              <span>{gp.gsm}</span>
+                              <span className="text-indigo-650 font-bold">Rs. {(gp.price || 0).toFixed(2)}</span>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -1592,9 +1594,9 @@ export default function ManagerPage() {
                           setStyleForm({
                             name: style.name,
                             path: style.path,
-                            type: style.type,
-                            price: style.price || 0,
-                            gsms: (style.gsms || []).join(", "),
+                            gsmPrices: style.gsmPrices && style.gsmPrices.length > 0
+                              ? style.gsmPrices
+                              : (style.gsms || []).map(g => ({ gsm: g, price: style.price || 1200 })),
                             colors: style.colors || []
                           });
                           setShowStyleModal(true);
@@ -1897,40 +1899,72 @@ export default function ManagerPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Style Type</label>
-                  <select
-                    value={styleForm.type}
-                    onChange={(e) => setStyleForm(prev => ({ ...prev, type: e.target.value }))}
-                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 bg-white"
-                  >
-                    <option value="Crew Neck">Crew Neck</option>
-                    <option value="Polo">Polo</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Base Price (Rs.)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={styleForm.price}
-                    onChange={(e) => setStyleForm(prev => ({ ...prev, price: Number(e.target.value) }))}
-                    placeholder="e.g. 1200"
-                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">GSM weights</label>
+              <div className="border-t pt-4">
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">Configure GSM Weights & Prices</label>
+                
+                <div className="flex gap-2 mb-3">
                   <input
                     type="text"
-                    value={styleForm.gsms}
-                    onChange={(e) => setStyleForm(prev => ({ ...prev, gsms: e.target.value }))}
-                    placeholder="e.g. 180GSM, 220 GSM"
-                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500"
+                    placeholder="GSM name (e.g. 220GSM)"
+                    value={newGsmName}
+                    onChange={(e) => setNewGsmName(e.target.value)}
+                    className="flex-1 px-3 py-2 border rounded-xl text-xs font-semibold"
                   />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Price (Rs.)"
+                    value={newGsmPrice}
+                    onChange={(e) => setNewGsmPrice(e.target.value)}
+                    className="w-28 px-3 py-2 border rounded-xl text-xs font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newGsmName.trim()) return alert("Please type a GSM name.");
+                      if (!newGsmPrice) return alert("Please type a price.");
+                      setStyleForm(prev => ({
+                        ...prev,
+                        gsmPrices: [
+                          ...prev.gsmPrices.filter(gp => gp.gsm.toLowerCase() !== newGsmName.trim().toLowerCase()),
+                          { gsm: newGsmName.trim(), price: Number(newGsmPrice) }
+                        ]
+                      }));
+                      setNewGsmName("");
+                      setNewGsmPrice("");
+                    }}
+                    className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Add GSM
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
+                  {styleForm.gsmPrices.length === 0 ? (
+                    <p className="text-[10px] text-slate-400 font-semibold p-2">No GSM prices added yet.</p>
+                  ) : (
+                    styleForm.gsmPrices.map((gp, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white border rounded-xl px-3 py-1.5 text-xs shadow-2xs">
+                        <span className="font-semibold text-slate-700">{gp.gsm}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-black text-slate-900">Rs. {gp.price.toFixed(2)}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStyleForm(prev => ({
+                                ...prev,
+                                gsmPrices: prev.gsmPrices.filter((_, idx) => idx !== i)
+                              }));
+                            }}
+                            className="text-rose-500 hover:text-rose-700 transition"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
