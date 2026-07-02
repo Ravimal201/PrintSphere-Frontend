@@ -458,7 +458,7 @@ exports.createTShirtStyle = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { name, path, type, gsms, colors } = req.body;
+    const { name, path, type, price, gsms, colors } = req.body;
     if (!name || !path) {
       return res.status(400).json({ message: "Please provide style name and model path" });
     }
@@ -467,6 +467,7 @@ exports.createTShirtStyle = async (req, res) => {
       name,
       path,
       type: type || "Crew Neck",
+      price: Number(price) || 0,
       gsms: gsms || ["180GSM"],
       colors: colors || [{ name: "White", value: "#ffffff" }]
     });
@@ -486,10 +487,10 @@ exports.updateTShirtStyle = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { name, path, type, gsms, colors } = req.body;
+    const { name, path, type, price, gsms, colors } = req.body;
     const updated = await TShirtStyle.findByIdAndUpdate(
       req.params.id,
-      { name, path, type, gsms, colors },
+      { name, path, type, price: Number(price) || 0, gsms, colors },
       { new: true }
     );
 

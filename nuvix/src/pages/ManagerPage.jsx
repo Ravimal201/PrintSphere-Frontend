@@ -25,6 +25,7 @@ export default function ManagerPage() {
     name: "",
     path: "",
     type: "Crew Neck",
+    price: 0,
     gsms: "180GSM, 220 GSM, 280GSM",
     colors: [
       { name: "White", value: "#ffffff" },
@@ -445,6 +446,7 @@ export default function ManagerPage() {
       name: styleForm.name,
       path: styleForm.path,
       type: styleForm.type,
+      price: Number(styleForm.price) || 0,
       gsms: parsedGSMs,
       colors: styleForm.colors
     };
@@ -461,6 +463,7 @@ export default function ManagerPage() {
         name: "",
         path: "",
         type: "Crew Neck",
+        price: 0,
         gsms: "180GSM, 220 GSM, 280GSM",
         colors: [
           { name: "White", value: "#ffffff" },
@@ -1363,122 +1366,18 @@ export default function ManagerPage() {
                 </div>
               )}
 
-              {/* Base Rates */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">T-Shirt Cut Base Rates (Rs.)</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Crew Neck</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
-                      value={pricingForm.baseRates.crewNeck}
-                      onChange={(e) => setPricingForm(prev => ({
-                        ...prev,
-                        baseRates: { ...prev.baseRates, crewNeck: parseFloat(e.target.value) || 0 }
-                      }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">V-Neck</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
-                      value={pricingForm.baseRates.vNeck}
-                      onChange={(e) => setPricingForm(prev => ({
-                        ...prev,
-                        baseRates: { ...prev.baseRates, vNeck: parseFloat(e.target.value) || 0 }
-                      }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Polo</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
-                      value={pricingForm.baseRates.polo}
-                      onChange={(e) => setPricingForm(prev => ({
-                        ...prev,
-                        baseRates: { ...prev.baseRates, polo: parseFloat(e.target.value) || 0 }
-                      }))}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Material Premiums */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Material Premiums (Rs.)</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Cotton</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
-                      value={pricingForm.materialPremiums.cotton}
-                      onChange={(e) => setPricingForm(prev => ({
-                        ...prev,
-                        materialPremiums: { ...prev.materialPremiums, cotton: parseFloat(e.target.value) || 0 }
-                      }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Polyester</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
-                      value={pricingForm.materialPremiums.polyester}
-                      onChange={(e) => setPricingForm(prev => ({
-                        ...prev,
-                        materialPremiums: { ...prev.materialPremiums, polyester: parseFloat(e.target.value) || 0 }
-                      }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Organic Cotton</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
-                      value={pricingForm.materialPremiums.organicCotton}
-                      onChange={(e) => setPricingForm(prev => ({
-                        ...prev,
-                        materialPremiums: { ...prev.materialPremiums, organicCotton: parseFloat(e.target.value) || 0 }
-                      }))}
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Formulas and Coefficients */}
               <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Printing & Estimation parameters</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Printing Cost per Sq. Inch (Rs.)</label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
-                      value={pricingForm.costPerSqIn}
-                      onChange={(e) => setPricingForm(prev => ({ ...prev, costPerSqIn: parseFloat(e.target.value) || 0 }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Complexity Fee per layer (Rs.)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
-                      value={pricingForm.complexityFeePerLayer}
-                      onChange={(e) => setPricingForm(prev => ({ ...prev, complexityFeePerLayer: parseFloat(e.target.value) || 0 }))}
-                    />
-                  </div>
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Printing parameters</h4>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase">Printing Cost per Sq. Inch (Rs.)</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    className="w-full px-3 py-2 border rounded-xl text-sm mt-1 max-w-xs"
+                    value={pricingForm.costPerSqIn}
+                    onChange={(e) => setPricingForm(prev => ({ ...prev, costPerSqIn: parseFloat(e.target.value) || 0 }))}
+                  />
                 </div>
               </div>
 
@@ -1620,6 +1519,7 @@ export default function ManagerPage() {
                     name: "",
                     path: "",
                     type: "Crew Neck",
+                    price: 0,
                     gsms: "180GSM, 220 GSM, 280GSM",
                     colors: [
                       { name: "White", value: "#ffffff" },
@@ -1645,7 +1545,10 @@ export default function ManagerPage() {
                   <div key={style._id} className="border rounded-2xl p-5 hover:shadow-md transition bg-slate-50/50 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between border-b pb-3 mb-3">
-                        <h4 className="font-bold text-slate-900 text-base">{style.name}</h4>
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-base">{style.name}</h4>
+                          <span className="text-xs font-black text-indigo-600">Rs. {(style.price || 0).toFixed(2)}</span>
+                        </div>
                         <span className="px-2 py-0.5 text-[9px] font-black bg-indigo-100 text-indigo-700 rounded-full uppercase">
                           {style.type}
                         </span>
@@ -1690,6 +1593,7 @@ export default function ManagerPage() {
                             name: style.name,
                             path: style.path,
                             type: style.type,
+                            price: style.price || 0,
                             gsms: (style.gsms || []).join(", "),
                             colors: style.colors || []
                           });
@@ -1993,7 +1897,7 @@ export default function ManagerPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Style Type</label>
                   <select
@@ -2006,12 +1910,25 @@ export default function ManagerPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">GSM weights (Comma separated)</label>
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Base Price (Rs.)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={styleForm.price}
+                    onChange={(e) => setStyleForm(prev => ({ ...prev, price: Number(e.target.value) }))}
+                    placeholder="e.g. 1200"
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">GSM weights</label>
                   <input
                     type="text"
                     value={styleForm.gsms}
                     onChange={(e) => setStyleForm(prev => ({ ...prev, gsms: e.target.value }))}
-                    placeholder="e.g. 180GSM, 220 GSM, 280GSM"
+                    placeholder="e.g. 180GSM, 220 GSM"
                     className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500"
                   />
                 </div>
