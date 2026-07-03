@@ -4,7 +4,9 @@ const OrderItemSchema = new mongoose.Schema({
   itemType: {
     type: String,
     enum: ["Ready-made", "Customized"],
-    required: true
+    default: function() {
+      return this.designId ? "Customized" : "Ready-made";
+    }
   },
   productId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -19,19 +21,19 @@ const OrderItemSchema = new mongoose.Schema({
     required: true,
     min: 1
   },
-  size: {
+  selectedSize: {
     type: String,
     required: true
   },
-  color: {
+  selectedColor: {
     type: String,
     required: true
   },
   material: {
     type: String,
-    required: true
+    default: "Standard cotton"
   },
-  unitPrice: {
+  price: {
     type: Number,
     required: true
   }

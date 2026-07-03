@@ -30,7 +30,8 @@ export default function StorePage() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSize, setSelectedSize] = useState("All");
   const [selectedColor, setSelectedColor] = useState("All");
-  const [maxPrice, setMaxPrice] = useState(100);
+  const [maxPrice, setMaxPrice] = useState(5000);
+  const [maxLimit, setMaxLimit] = useState(5000);
 
   // Cart state
   const [cart, setCart] = useState([]);
@@ -155,8 +156,12 @@ export default function StorePage() {
       // Calculate max price from products to set default slider
       if (productsRes.data.length > 0) {
         const prices = productsRes.data.map(p => p.basePrice);
-        const max = Math.max(...prices, 50);
+        const max = Math.max(...prices, 5000);
+        setMaxLimit(Math.ceil(max));
         setMaxPrice(Math.ceil(max));
+      } else {
+        setMaxLimit(5000);
+        setMaxPrice(5000);
       }
     } catch (err) {
       console.error("Fetch store data error:", err);
@@ -454,7 +459,7 @@ export default function StorePage() {
                   <input
                     type="range"
                     min="10"
-                    max="150"
+                    max={maxLimit}
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(parseInt(e.target.value))}
                     className="w-full accent-indigo-600 h-1.5 bg-slate-100 rounded-lg appearance-none mt-2"

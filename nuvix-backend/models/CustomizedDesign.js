@@ -56,7 +56,6 @@ const CustomizedDesignSchema = new mongoose.Schema(
     },
     tShirtType: {
       type: String,
-      enum: ["Crew Neck", "V-Neck", "Polo"],
       required: true
     },
     fabricColor: {
@@ -65,7 +64,6 @@ const CustomizedDesignSchema = new mongoose.Schema(
     },
     material: {
       type: String,
-      enum: ["Cotton", "Polyester", "Organic Cotton"],
       required: true
     },
     size: {
