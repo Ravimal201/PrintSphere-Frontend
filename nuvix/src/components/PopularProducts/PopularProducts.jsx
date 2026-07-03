@@ -55,12 +55,7 @@ function ProductCard({ product }) {
   const category = isDbProduct ? product.category : "Casual";
 
   const handleClick = () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      window.location.href = "/login?redirect=/store";
-    } else {
-      window.location.href = "/store";
-    }
+    window.location.href = "/store";
   };
 
   return (
@@ -197,12 +192,7 @@ export default function PopularProducts() {
 
   const handleViewAll = (e) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
-    if (!token) {
-      window.location.href = "/login?redirect=/store";
-    } else {
-      window.location.href = "/store";
-    }
+    window.location.href = "/store";
   };
 
   useEffect(() => {

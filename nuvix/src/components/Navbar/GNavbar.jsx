@@ -5,12 +5,7 @@ export default function GNavbar() {
 
   const handleStoreClick = (e) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
-    if (!token) {
-      window.location.href = "/login?redirect=/store";
-    } else {
-      window.location.href = "/store";
-    }
+    window.location.href = "/store";
   };
 
   return (
