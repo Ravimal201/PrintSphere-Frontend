@@ -6,6 +6,7 @@ const Order = require("../models/Order");
 const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const TShirtStyle = require("../models/TShirtStyle");
+const { createNotification } = require("../utils/notificationHelper");
 
 // JWT Secret Key fallback
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -257,6 +258,28 @@ exports.createOrder = async (req, res) => {
         { status: "Pending Payment", note: "Order placed by customer" },
         { status: "Processing", note: "Payment verified, order sent to printing queue" }
       ]
+    });
+
+    // Generate notifications
+    await createNotification({
+      recipientRole: "Admin",
+      title: "New Order Placed",
+      message: `Order #${order._id} for Rs. ${totalCost} has been placed.`,
+      type: "Order Update"
+    });
+
+    await createNotification({
+      recipientRole: "Manager",
+      title: "New Order Placed",
+      message: `Order #${order._id} for Rs. ${totalCost} has been placed.`,
+      type: "Order Update"
+    });
+
+    await createNotification({
+      recipientId: decoded.id,
+      title: "Order Placed Successfully",
+      message: `Your order #${order._id} for Rs. ${totalCost} has been received and is being processed.`,
+      type: "Payment Success"
     });
 
     res.status(201).json({ message: "Order placed successfully", order });

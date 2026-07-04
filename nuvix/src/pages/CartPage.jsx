@@ -5,8 +5,7 @@ import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
 import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle } from "lucide-react";
 import axios from "axios";
-
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 export default function CartPage() {
   const [cart, setCart] = useState([]);

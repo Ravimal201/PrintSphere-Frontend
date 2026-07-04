@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { 
-  BarChart3, ShoppingCart, Layers, Inbox, Settings, LogOut, 
+import {
+  BarChart3, ShoppingCart, Layers, Inbox, Settings, LogOut,
   Loader2, AlertCircle, CheckCircle, TrendingUp, Sparkles, Plus,
   Edit2, Trash2, Check, X, ShieldAlert, Award, FileText, ChevronRight, Download
 } from "lucide-react";
@@ -8,7 +8,7 @@ import axios from "axios";
 import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
 
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 export default function ManagerPage() {
   const [isManager, setIsManager] = useState(false);
@@ -182,7 +182,7 @@ export default function ManagerPage() {
         { status, note },
         { headers }
       );
-      
+
       setOrders(prev => prev.map(o => o._id === orderId ? response.data.order : o));
       setOrderNotes(prev => ({ ...prev, [orderId]: "" }));
     } catch (err) {
@@ -205,7 +205,7 @@ export default function ManagerPage() {
         { assignedEmployeeId: employeeId, note: `Assigned employee tasks.` },
         { headers }
       );
-      
+
       // Refresh order list
       const updatedOrders = await axios.get(`${API_BASE_URL}/manager/orders`, { headers });
       setOrders(updatedOrders.data);
@@ -557,7 +557,7 @@ export default function ManagerPage() {
 
   return (
     <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
-      
+
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
         <div>
@@ -574,22 +574,20 @@ export default function ManagerPage() {
           <nav className="p-4 space-y-1">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "overview"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "overview"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <BarChart3 className="h-4.5 w-4.5" />
               Dashboard Overview
             </button>
             <button
               onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "orders"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "orders"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <ShoppingCart className="h-4.5 w-4.5" />
@@ -603,11 +601,10 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("products")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "products"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "products"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Layers className="h-4.5 w-4.5" />
@@ -621,22 +618,20 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("pricing")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "pricing"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "pricing"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <Sparkles className="h-4.5 w-4.5" />
               Pricing Rules
             </button>
             <button
               onClick={() => setActiveTab("inventory")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "inventory"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inventory"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Inbox className="h-4.5 w-4.5" />
@@ -650,22 +645,20 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("styles")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "styles"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "styles"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <Layers className="h-4.5 w-4.5" />
               T-Shirt Styles
             </button>
             <button
               onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "settings"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "settings"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <Settings className="h-4.5 w-4.5" />
               Settings & Security
@@ -700,7 +693,7 @@ export default function ManagerPage() {
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8">
-        
+
         {/* Statistics Widgets */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
@@ -823,10 +816,10 @@ export default function ManagerPage() {
                     {pendingDrafts.map(draft => (
                       <div key={draft._id} className="flex items-center justify-between border rounded-2xl p-4 hover:bg-slate-50 transition">
                         <div className="flex items-center gap-4">
-                          <TShirt2D 
-                            color={draft.colors?.[0]} 
-                            designUrl={draft.images?.[0]} 
-                            className="h-16 w-16 bg-slate-50 border rounded-xl shrink-0" 
+                          <TShirt2D
+                            color={draft.colors?.[0]}
+                            designUrl={draft.images?.[0]}
+                            className="h-16 w-16 bg-slate-50 border rounded-xl shrink-0"
                           />
                           <div>
                             <p className="text-sm font-bold text-slate-900">{draft.title}</p>
@@ -895,14 +888,12 @@ export default function ManagerPage() {
                       <div>
                         <div className="flex items-center gap-3">
                           <span className="text-xs font-bold text-slate-500">Order ID: ...{order._id.slice(-8)}</span>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            order.paymentStatus === "Paid" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                          }`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.paymentStatus === "Paid" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                            }`}>
                             {order.paymentStatus}
                           </span>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            order.orderStatus === "Completed" ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-700"
-                          }`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.orderStatus === "Completed" ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-700"
+                            }`}>
                             {order.orderStatus}
                           </span>
                         </div>
@@ -930,18 +921,18 @@ export default function ManagerPage() {
                                   <div className="mt-2 pt-2 border-t space-y-2">
                                     {item.designId.thumbnailUrl && (
                                       <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
-                                        <img 
-                                          src={item.designId.thumbnailUrl} 
-                                          alt="Preview" 
+                                        <img
+                                          src={item.designId.thumbnailUrl}
+                                          alt="Preview"
                                           className="h-10 w-10 object-contain bg-white rounded border"
                                           onError={(e) => e.target.src = "/images/dumyImage.png"}
                                         />
                                         <div>
                                           <p className="text-[10px] font-bold text-slate-900">Custom design thumbnail</p>
-                                          <a 
-                                            href={item.designId.thumbnailUrl} 
-                                            download 
-                                            target="_blank" 
+                                          <a
+                                            href={item.designId.thumbnailUrl}
+                                            download
+                                            target="_blank"
                                             rel="noreferrer"
                                             className="text-[9px] text-indigo-600 hover:underline flex items-center gap-0.5 mt-0.5"
                                           >
@@ -960,11 +951,11 @@ export default function ManagerPage() {
                                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Logo/Decal Assets:</p>
                                             {imgLayers.map((layer, lIdx) => (
                                               <div key={lIdx} className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg text-[10px]">
-                                                <span className="truncate max-w-[120px] font-semibold">{layer.name || `Asset ${lIdx+1}`}</span>
-                                                <a 
-                                                  href={layer.url} 
-                                                  download 
-                                                  target="_blank" 
+                                                <span className="truncate max-w-[120px] font-semibold">{layer.name || `Asset ${lIdx + 1}`}</span>
+                                                <a
+                                                  href={layer.url}
+                                                  download
+                                                  target="_blank"
                                                   rel="noreferrer"
                                                   className="text-indigo-600 hover:underline"
                                                 >
@@ -1037,11 +1028,10 @@ export default function ManagerPage() {
                             key={st}
                             disabled={assignLoading[order._id]}
                             onClick={() => handleUpdateOrderStatus(order._id, st)}
-                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${
-                              order.orderStatus === st
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${order.orderStatus === st
                                 ? "bg-indigo-600 text-white"
                                 : "bg-white border text-slate-700 hover:bg-slate-50"
-                            }`}
+                              }`}
                           >
                             {st}
                           </button>
@@ -1058,7 +1048,7 @@ export default function ManagerPage() {
         {/* ================= TAB 3: PRODUCT CATALOG ================= */}
         {activeTab === "products" && (
           <div className="space-y-8">
-            
+
             {/* Catalog Grid */}
             <div className="bg-white border rounded-3xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-6">
@@ -1104,10 +1094,10 @@ export default function ManagerPage() {
                         <tr key={p._id} className="border-b last:border-b-0 hover:bg-slate-50/50 transition">
                           <td className="py-4 font-bold text-slate-900">
                             <div className="flex items-center gap-3">
-                              <TShirt2D 
-                                color={p.colors?.[0]} 
-                                designUrl={p.images?.[0]} 
-                                className="h-10 w-10 bg-slate-50 border rounded-lg shrink-0" 
+                              <TShirt2D
+                                color={p.colors?.[0]}
+                                designUrl={p.images?.[0]}
+                                className="h-10 w-10 bg-slate-50 border rounded-lg shrink-0"
                               />
                               <div>
                                 <p>{p.title}</p>
@@ -1132,9 +1122,8 @@ export default function ManagerPage() {
                           </td>
                           <td className="py-4 text-xs text-slate-500">{(p.sizes || []).join(", ")}</td>
                           <td className="py-4 text-xs">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                              p.status === "Active" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600"
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${p.status === "Active" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600"
+                              }`}>
                               {p.status}
                             </span>
                           </td>
@@ -1466,11 +1455,10 @@ export default function ManagerPage() {
                           <td className="py-4 text-xs font-bold text-slate-900">{item.quantity} units</td>
                           <td className="py-4 text-xs text-slate-400">{item.minThreshold} units</td>
                           <td className="py-4 text-xs">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                              isLow 
-                                ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100" 
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isLow
+                                ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
                                 : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                            }`}>
+                              }`}>
                               {isLow ? "Low stock" : "In Stock"}
                             </span>
                           </td>
@@ -1572,8 +1560,8 @@ export default function ManagerPage() {
                         <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1">Colors ({style.colors?.length || 0})</span>
                         <div className="flex flex-wrap gap-2">
                           {(style.colors || []).map((color, i) => (
-                            <div 
-                              key={i} 
+                            <div
+                              key={i}
                               className="group relative flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 shadow-2xs"
                               style={{ backgroundColor: color.value }}
                               title={`${color.name} (${color.value})`}
@@ -1702,7 +1690,7 @@ export default function ManagerPage() {
       {selectedSubmissionProduct && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[600px] select-none text-slate-800">
-            
+
             {/* Left 3D Panel */}
             <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-6 border-b md:border-b-0 md:border-r">
               <div className="absolute top-4 left-4 z-10">
@@ -1710,18 +1698,17 @@ export default function ManagerPage() {
                   Employee Submission 3D Review
                 </span>
               </div>
-              
+
               {/* Preset Side buttons */}
               <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
                 {["front", "back", "left", "right"].map((side) => (
                   <button
                     key={side}
                     onClick={() => setSubmissionSide(side)}
-                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${
-                      submissionSide === side
+                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${submissionSide === side
                         ? "bg-purple-600 border-purple-600 text-white"
                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     {side}
                   </button>
@@ -1737,8 +1724,8 @@ export default function ManagerPage() {
                   zoomLevel={submissionZoom}
                   layers={getSubmissionLayers()}
                   selectedLayerId={null}
-                  onSelectLayer={() => {}}
-                  onUpdateLayers={() => {}}
+                  onSelectLayer={() => { }}
+                  onUpdateLayers={() => { }}
                 />
               </div>
 
@@ -1860,8 +1847,8 @@ export default function ManagerPage() {
               <h3 className="font-bold text-sm uppercase tracking-wider">
                 {editingStyle ? `Edit Style: ${editingStyle.name}` : "Add New T-Shirt Style"}
               </h3>
-              <button 
-                onClick={() => { setShowStyleModal(false); setEditingStyle(null); }} 
+              <button
+                onClick={() => { setShowStyleModal(false); setEditingStyle(null); }}
                 className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
               >
                 <X className="h-5 w-5" />
@@ -1901,7 +1888,7 @@ export default function ManagerPage() {
 
               <div className="border-t pt-4">
                 <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">Configure GSM Weights & Prices</label>
-                
+
                 <div className="flex gap-2 mb-3">
                   <input
                     type="text"
@@ -1970,7 +1957,7 @@ export default function ManagerPage() {
 
               <div className="border-t pt-4">
                 <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">Configure Allowed Brand Colors</label>
-                
+
                 <div className="flex gap-2 mb-3">
                   <input
                     type="text"
