@@ -1,0 +1,23 @@
+{
+  "name": "printsphere",
+  "version": "1.0.0",
+  "description": "3D T-Shirt Customizer and Cost Estimation System",
+  "main": "nuvix-backend/server.js",
+  "scripts": {
+    "backend": "node nuvix-backend/server.js",
+    "frontend": "npm run dev --prefix nuvix",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^7.3.0",
+    "mongoose": "^8.8.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -3,6 +3,11 @@ import { useState } from "react";
 export default function GNavbar() {
   const [isOpen, setIsOpen] = useState(false);
 
+  const handleStoreClick = (e) => {
+    e.preventDefault();
+    window.location.href = "/store";
+  };
+
   return (
     <nav className="w-full bg-white shadow-sm sticky top-0 z-30">
       <div className="flex items-center justify-between px-4 md:px-8 py-1">
@@ -17,22 +22,22 @@ export default function GNavbar() {
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-8 text-gray-700 font-medium">
           <a href="/" className="hover:text-indigo-600 transition">Home</a>
-          <a href="#" className="hover:text-indigo-600 transition">About</a>
-          <a href="#" className="hover:text-indigo-600 transition">Store</a>
-          <a href="#" className="hover:text-indigo-600 transition">3D Designer</a>
-          <a href="#" className="hover:text-indigo-600 transition">Contact Us</a>
+          <a href="/about" className="hover:text-indigo-600 transition">About</a>
+          <a href="/store" onClick={handleStoreClick} className="hover:text-indigo-600 transition">Store</a>
+          <a href="/designer" className="hover:text-indigo-600 transition">3D Designer</a>
+          <a href="/contact" className="hover:text-indigo-600 transition">Contact Us</a>
         </div>
 
         {/* Desktop Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          <a href="/customer-home" className="px-5 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
+          <a href="/login" className="px-4 py-1.5 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
             Login
           </a>
-          <button className="px-5 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition">
+          <a href="/register" className="px-4 py-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition">
             Register
-          </button>
+          </a>
         </div>
-
+ 
         {/* Mobile Menu Button */}
         <button 
           onClick={() => setIsOpen(!isOpen)}
@@ -43,23 +48,23 @@ export default function GNavbar() {
           <span className={`w-5 h-0.5 bg-gray-700 transition-all ${isOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
         </button>
       </div>
-
+ 
       {/* Mobile Menu */}
       {isOpen && (
         <div className="md:hidden bg-white border-t px-4 py-4 space-y-3">
           <a href="/" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Home</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">About</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Store</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">3D Designer</a>
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Contact Us</a>     
-          <a href="#" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Help</a>
+          <a href="/about" className="block text-gray-700 font-medium hover:text-indigo-600 transition">About</a>
+          <a href="/store" onClick={handleStoreClick} className="block text-gray-700 font-medium hover:text-indigo-600 transition">Store</a>
+          <a href="/designer" className="block text-gray-700 font-medium hover:text-indigo-600 transition">3D Designer</a>
+          <a href="/contact" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Contact Us</a>     
+          <a href="/support" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Help</a>
           <div className="flex gap-2 pt-2">
-            <a href="/customer-home" className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm text-center">
+            <a href="/login" className="flex-1 px-4 py-2 rounded-xl border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition text-sm text-center">
               Login
             </a>
-            <button className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition text-sm">
+            <a href="/register" className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition text-sm text-center">
               Register
-            </button>
+            </a>
           </div>
         </div>
       )}

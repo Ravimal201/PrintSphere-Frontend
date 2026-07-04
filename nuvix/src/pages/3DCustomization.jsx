@@ -39,7 +39,7 @@ export default function CustomizationPage() {
 
             <DashboardCard
               title="Revenue"
-              value="$12,430"
+              value="Rs. 12,430"
             />
 
             <DashboardCard

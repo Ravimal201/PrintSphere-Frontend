@@ -1,10 +1,12 @@
 import { ChevronDown, ChevronLeft, ChevronRight, Heart, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import axios from "axios";
+import TShirt2D from "../TShirt2D";
 
-const products = [
+const fallbackProducts = [
   {
     name: "Wolf Graphic Tee",
-    price: "$24.99",
+    price: "Rs. 24.99",
     rating: "4.7",
     accent: "from-slate-100 via-white to-indigo-50",
     shirt: "before:bg-[linear-gradient(145deg,#ffffff_0%,#f3f4f6_100%)]",
@@ -12,7 +14,7 @@ const products = [
   },
   {
     name: "NOWIX Classic Tee",
-    price: "$22.99",
+    price: "Rs. 22.99",
     rating: "4.6",
     accent: "from-slate-900 via-slate-950 to-slate-700",
     shirt: "before:bg-[linear-gradient(145deg,#111827_0%,#000000_100%)]",
@@ -20,7 +22,7 @@ const products = [
   },
   {
     name: "Splash Design Tee",
-    price: "$23.99",
+    price: "Rs. 23.99",
     rating: "4.8",
     accent: "from-slate-50 via-white to-slate-100",
     shirt: "before:bg-[linear-gradient(145deg,#ffffff_0%,#f8fafc_100%)]",
@@ -28,7 +30,7 @@ const products = [
   },
   {
     name: "Neon Wolf Tee",
-    price: "$25.99",
+    price: "Rs. 25.99",
     rating: "4.9",
     accent: "from-slate-950 via-slate-900 to-slate-700",
     shirt: "before:bg-[linear-gradient(145deg,#111827_0%,#030712_100%)]",
@@ -37,79 +39,127 @@ const products = [
 ];
 
 function ProductCard({ product }) {
+  const isDbProduct = !!product._id;
+  const name = isDbProduct ? product.title : product.name;
+  
+  const hasDiscount = isDbProduct && product.discount > 0;
+  const finalPrice = hasDiscount 
+    ? product.basePrice * (1 - product.discount / 100) 
+    : (isDbProduct ? product.basePrice : null);
+  
+  const priceText = isDbProduct 
+    ? `Rs. ${finalPrice.toFixed(2)}` 
+    : product.price;
+
+  const rating = isDbProduct ? "4.8" : product.rating;
+  const category = isDbProduct ? product.category : "Casual";
+
+  const handleClick = () => {
+    window.location.href = "/store";
+  };
+
   return (
-    <article className="group rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
-      <div className="flex items-center justify-between px-1 pt-1 text-slate-500">
-        <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">New</span>
-        <button
-          type="button"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-indigo-200 hover:text-indigo-600"
-          aria-label={`Add ${product.name} to favorites`}
-        >
-          <Heart className="h-4 w-4" />
-        </button>
-      </div>
+    <article 
+      onClick={handleClick}
+      className="group rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer flex flex-col justify-between h-full select-none"
+    >
+      <div>
+        <div className="flex items-center justify-between px-1 pt-1 text-slate-500">
+          <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-indigo-600">
+            {category}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              alert(`Added ${name} to favorites!`);
+            }}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-indigo-200 hover:text-indigo-600"
+            aria-label={`Add ${name} to favorites`}
+          >
+            <Heart className="h-4 w-4" />
+          </button>
+        </div>
 
-      <div className={`mt-2 flex h-56 items-center justify-center overflow-hidden rounded-2xl bg-linear-to-b ${product.accent}`}>
-        <svg viewBox="0 0 220 220" className="h-48 w-48 drop-shadow-[0_18px_24px_rgba(15,23,42,0.12)]" aria-hidden="true">
-          <defs>
-            <linearGradient id={`shirt-${product.name.replace(/\s+/g, "-").toLowerCase()}`} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor={product.name.includes("Classic") || product.name.includes("Neon") ? "#111827" : "#ffffff"} />
-              <stop offset="100%" stopColor={product.name.includes("Classic") || product.name.includes("Neon") ? "#050816" : "#f3f4f6"} />
-            </linearGradient>
-            <radialGradient id={`glow-${product.name.replace(/\s+/g, "-").toLowerCase()}`} cx="50%" cy="30%" r="65%">
-              <stop offset="0%" stopColor={product.name.includes("Neon") ? "#a855f7" : "#6b7280"} stopOpacity="0.95" />
-              <stop offset="55%" stopColor={product.name.includes("Neon") ? "#7c3aed" : "#d1d5db"} stopOpacity="0.8" />
-              <stop offset="100%" stopColor="transparent" />
-            </radialGradient>
-          </defs>
+        <div className="mt-2 flex h-56 items-center justify-center overflow-hidden rounded-2xl bg-slate-50 border relative">
+          {isDbProduct ? (
+            <TShirt2D 
+              color={product.colors?.[0]} 
+              designUrl={product.images?.[0]} 
+              className="h-44 w-44 group-hover:scale-105 transition duration-300"
+            />
+          ) : (
+            <svg viewBox="0 0 220 220" className="h-48 w-48 drop-shadow-[0_18px_24px_rgba(15,23,42,0.12)]" aria-hidden="true">
+              <defs>
+                <linearGradient id={`shirt-${name.replace(/\s+/g, "-").toLowerCase()}`} x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor={name.includes("Classic") || name.includes("Neon") ? "#111827" : "#ffffff"} />
+                  <stop offset="100%" stopColor={name.includes("Classic") || name.includes("Neon") ? "#050816" : "#f3f4f6"} />
+                </linearGradient>
+                <radialGradient id={`glow-${name.replace(/\s+/g, "-").toLowerCase()}`} cx="50%" cy="30%" r="65%">
+                  <stop offset="0%" stopColor={name.includes("Neon") ? "#a855f7" : "#6b7280"} stopOpacity="0.95" />
+                  <stop offset="55%" stopColor={name.includes("Neon") ? "#7c3aed" : "#d1d5db"} stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="transparent" />
+                </radialGradient>
+              </defs>
 
-          <ellipse cx="110" cy="104" rx="62" ry="72" fill="url(#glow-Wolf-Graphic-Tee)" opacity="0.7" />
+              <ellipse cx="110" cy="104" rx="62" ry="72" fill={`url(#glow-${name.replace(/\s+/g, "-").toLowerCase()})`} opacity="0.7" />
 
-          <path
-            d="M84 34c6 11 16 17 26 17s20-6 26-17l28 12-15 34-18-7v99H89V73l-18 7-15-34 28-12z"
-            fill={product.name.includes("NOWIX") || product.name.includes("Neon") ? "url(#shirt-nowix-classic-tee)" : product.name.includes("Splash") ? "#fafafa" : "url(#shirt-wolf-graphic-tee)"}
-            stroke={product.name.includes("NOWIX") || product.name.includes("Neon") ? "#0f172a" : "#e5e7eb"}
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
+              <path
+                d="M84 34c6 11 16 17 26 17s20-6 26-17l28 12-15 34-18-7v99H89V73l-18 7-15-34 28-12z"
+                fill={name.includes("NOWIX") || name.includes("Neon") ? `url(#shirt-${name.replace(/\s+/g, "-").toLowerCase()})` : name.includes("Splash") ? "#fafafa" : `url(#shirt-${name.replace(/\s+/g, "-").toLowerCase()})`}
+                stroke={name.includes("NOWIX") || name.includes("Neon") ? "#0f172a" : "#e5e7eb"}
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
 
-          <path
-            d="M94 49c4 6 10 9 16 9s12-3 16-9"
-            fill="none"
-            stroke={product.name.includes("NOWIX") || product.name.includes("Neon") ? "#f8fafc" : "#cbd5e1"}
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
+              <path
+                d="M94 49c4 6 10 9 16 9s12-3 16-9"
+                fill="none"
+                stroke={name.includes("NOWIX") || name.includes("Neon") ? "#f8fafc" : "#cbd5e1"}
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
 
-          <path
-            d="M110 76c-18 0-32 16-32 34 0 14 9 26 22 31v23h20v-23c13-5 22-17 22-31 0-18-14-34-32-34z"
-            fill={product.name.includes("Neon") ? "#111827" : product.name.includes("NOWIX") ? "#e5e7eb" : "#ffffff"}
-            opacity="0.72"
-          />
+              <path
+                d="M110 76c-18 0-32 16-32 34 0 14 9 26 22 31v23h20v-23c13-5 22-17 22-31 0-18-14-34-32-34z"
+                fill={name.includes("Neon") ? "#111827" : name.includes("NOWIX") ? "#e5e7eb" : "#ffffff"}
+                opacity="0.72"
+              />
 
-          <path
-            d="M97 91l13 13 13-13 9 10-22 23-22-23 9-10z"
-            fill={product.name.includes("Neon") ? "#a855f7" : "#111827"}
-            opacity="0.95"
-          />
+              <path
+                d="M97 91l13 13 13-13 9 10-22 23-22-23 9-10z"
+                fill={name.includes("Neon") ? "#a855f7" : "#111827"}
+                opacity="0.95"
+              />
 
-          <circle cx="110" cy="124" r="26" fill="none" stroke={product.name.includes("Neon") ? "#d8b4fe" : "#111827"} strokeOpacity="0.18" strokeWidth="2" />
+              <circle cx="110" cy="124" r="26" fill="none" stroke={name.includes("Neon") ? "#d8b4fe" : "#111827"} strokeOpacity="0.18" strokeWidth="2" />
 
-          <text x="110" y="153" textAnchor="middle" fontSize="11" fontWeight="800" letterSpacing="3" fill={product.name.includes("Neon") || product.name.includes("NOWIX") ? "#f8fafc" : "#111827"} opacity="0.9">
-            NOWIX
-          </text>
-        </svg>
-      </div>
+              <text x="110" y="153" textAnchor="middle" fontSize="11" fontWeight="800" letterSpacing="3" fill={name.includes("Neon") || name.includes("NOWIX") ? "#f8fafc" : "#111827"} opacity="0.9">
+                NOWIX
+              </text>
+            </svg>
+          )}
+          {hasDiscount && (
+            <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase shadow-xs z-10">
+              {product.discount}% Off
+            </span>
+          )}
+        </div>
 
-      <div className="mt-3 px-1 pb-1">
-        <h3 className="text-sm font-medium text-slate-900">{product.name}</h3>
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-900">{product.price}</p>
+        <div className="mt-3 px-1 pb-1">
+          <h3 className="text-sm font-bold text-slate-800 line-clamp-1">{name}</h3>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-black text-slate-950">{priceText}</span>
+              {hasDiscount && (
+                <span className="text-[10px] text-slate-400 line-through">Rs. {product.basePrice.toFixed(2)}</span>
+              )}
+            </div>
 
-          <div className="flex items-center gap-1 text-amber-500">
-            <Star className="h-3.5 w-3.5 fill-current" />
-            <span className="text-xs font-medium text-slate-500">{product.rating}</span>
+            <div className="flex items-center gap-1 text-amber-500">
+              <Star className="h-3.5 w-3.5 fill-current" />
+              <span className="text-xs font-medium text-slate-500">{rating}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -120,8 +170,30 @@ function ProductCard({ product }) {
 export default function PopularProducts() {
   const [activeDot, setActiveDot] = useState(0);
   const scrollRef = useRef(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const dotCount = Math.max(1, products.length);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await axios.get("http://localhost:5000/api/auth/products");
+        setProducts(response.data);
+      } catch (err) {
+        console.error("Error loading popular products:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  const displayProducts = products.length > 0 ? products.slice(0, 8) : fallbackProducts;
+  const dotCount = Math.max(1, displayProducts.length);
+
+  const handleViewAll = (e) => {
+    e.preventDefault();
+    window.location.href = "/store";
+  };
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -192,7 +264,11 @@ export default function PopularProducts() {
           ))}
         </div>
 
-        <a href="#" className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 transition hover:text-indigo-700">
+        <a 
+          href="/store" 
+          onClick={handleViewAll}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 transition hover:text-indigo-700"
+        >
           View All
           <span aria-hidden="true">→</span>
         </a>
@@ -222,8 +298,8 @@ export default function PopularProducts() {
           className="flex gap-5 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-2 xl:grid-cols-4 md:overflow-visible md:pb-0"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {products.map((product) => (
-            <div key={product.name} data-product-card className="w-72 shrink-0 snap-start md:w-auto md:shrink">
+          {displayProducts.map((product) => (
+            <div key={product._id || product.name} data-product-card className="w-72 shrink-0 snap-start md:w-auto md:shrink">
               <ProductCard product={product} />
             </div>
           ))}

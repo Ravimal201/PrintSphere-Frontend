@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar/GNavbar";
 import Hero3DPreview from "../components/HeroSection/Hero3DPreview";
 
@@ -17,8 +17,22 @@ export default function EtiterPage() {
 	const [scale, setScale] = useState(0.5);
 	const [shirtColor, setShirtColor] = useState("#ffffff");
 	const [importedImage, setImportedImage] = useState(null);
+	const [designPlacement, setDesignPlacement] = useState({
+		position: [0, 0.01, 0.34],
+		rotation: [0, 0, 0],
+	});
+	const [designScale, setDesignScale] = useState(0.28);
 	const [isDraggingImage, setIsDraggingImage] = useState(false);
+	const [isOverShirtDropZone, setIsOverShirtDropZone] = useState(false);
+	const previewRef = useRef(null);
 	const importedImageUrl = importedImage?.url ?? null;
+
+	function resetDesignPlacement() {
+		setDesignPlacement({
+			position: [0, 0.01, 0.34],
+			rotation: [0, 0, 0],
+		});
+	}
 
 	function setImageFromFile(file) {
 		if (!file) return;
@@ -33,6 +47,8 @@ export default function EtiterPage() {
 				url: URL.createObjectURL(file),
 			};
 		});
+		resetDesignPlacement();
+		setDesignScale(0.28);
 	}
 
 	function handleImageImport(event) {
@@ -41,9 +57,34 @@ export default function EtiterPage() {
 		event.target.value = "";
 	}
 
+	function isWithinShirtDropZone(event) {
+		const previewElement = previewRef.current;
+		if (!previewElement) return false;
+
+		const rect = previewElement.getBoundingClientRect();
+		const x = event.clientX - rect.left;
+		const y = event.clientY - rect.top;
+		const xRatio = x / rect.width;
+		const yRatio = y / rect.height;
+
+		// Elliptical hit zone approximates the visible shirt body and blocks background drops.
+		const centerX = 0.5;
+		const centerY = 0.5;
+		const radiusX = 0.27;
+		const radiusY = 0.42;
+		const normalized =
+			((xRatio - centerX) * (xRatio - centerX)) / (radiusX * radiusX) +
+			((yRatio - centerY) * (yRatio - centerY)) / (radiusY * radiusY);
+
+		return normalized <= 1;
+	}
+
 	function handlePreviewDrop(event) {
 		event.preventDefault();
 		setIsDraggingImage(false);
+		setIsOverShirtDropZone(false);
+
+		if (!isWithinShirtDropZone(event)) return;
 
 		const file = event.dataTransfer.files?.[0];
 		if (!file || !file.type.startsWith("image/")) return;
@@ -53,11 +94,14 @@ export default function EtiterPage() {
 
 	function handlePreviewDragOver(event) {
 		event.preventDefault();
-		setIsDraggingImage(true);
+		const overShirt = isWithinShirtDropZone(event);
+		setIsDraggingImage(overShirt);
+		setIsOverShirtDropZone(overShirt);
 	}
 
 	function handlePreviewDragLeave() {
 		setIsDraggingImage(false);
+		setIsOverShirtDropZone(false);
 	}
 
 	useEffect(() => {
@@ -189,6 +233,7 @@ export default function EtiterPage() {
 
 							<div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-inner shadow-slate-200/50 sm:p-6">
 								<div
+									ref={previewRef}
 									onDrop={handlePreviewDrop}
 									onDragOver={handlePreviewDragOver}
 									onDragLeave={handlePreviewDragLeave}
@@ -199,13 +244,24 @@ export default function EtiterPage() {
 										onScaleChange={setScale}
 										color={shirtColor}
 										onColorChange={setShirtColor}
-										imageUrl={importedImageUrl}
+										designImageUrl={importedImageUrl}
+										designScale={designScale}
+										designPlacement={designPlacement}
+										onDesignPlacementChange={setDesignPlacement}
 									/>
 
 									{isDraggingImage && (
 										<div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[2rem] border-2 border-dashed border-indigo-500 bg-indigo-500/10">
 											<div className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow-lg">
-												Drop image to apply it to the shirt
+												Drop image on the shirt only
+											</div>
+										</div>
+									)}
+
+									{!isDraggingImage && isOverShirtDropZone && (
+										<div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[2rem] border-2 border-dashed border-emerald-500 bg-emerald-500/10">
+											<div className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-lg">
+												Drop on the shirt body
 											</div>
 										</div>
 									)}
@@ -213,8 +269,33 @@ export default function EtiterPage() {
 
 								<div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200">
 									<span>Zoom starts at 50% on page load.</span>
-									<span>Drag an image onto the shirt to texture it.</span>
+									<span>Drop images on the shirt body, not the background.</span>
 								</div>
+
+								{importedImageUrl && (
+									<div className="mt-4 grid gap-3 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200 sm:grid-cols-[1fr_auto] sm:items-center">
+										<label className="text-sm font-medium text-slate-700">
+											Design size
+											<input
+												type="range"
+												min="0.5"
+												max="2.5"
+												step="0.05"
+												value={designScale}
+												onChange={(event) => setDesignScale(Number(event.target.value))}
+												className="mt-2 w-full accent-indigo-600"
+											/>
+										</label>
+
+										<button
+											type="button"
+											onClick={resetDesignPlacement}
+											className="rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
+										>
+											Center design
+										</button>
+									</div>
+								)}
 							</div>
 						</div>
 					</div>

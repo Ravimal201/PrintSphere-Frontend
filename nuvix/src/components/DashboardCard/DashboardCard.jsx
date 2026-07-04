@@ -18,7 +18,7 @@ export default function DashboardCard({ title, value }) {
     subtitle = 'Based on 2k+ reviews';
   }
 
-  const showPlus = !String(value).includes('$') && !String(value).includes('/');
+  const showPlus = !String(value).includes('$') && !String(value).includes('Rs') && !String(value).includes('/');
 
   return (
     <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-white/60">

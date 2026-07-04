@@ -1,0 +1,13 @@
+const express = require("express");
+const router = express.Router();
+const {
+  getStaffList,
+  createStaffAccount,
+  deleteStaffAccount
+} = require("../controllers/adminController");
+
+router.get("/staff", getStaffList);
+router.post("/create-staff", createStaffAccount);
+router.delete("/delete-staff/:id", deleteStaffAccount);
+
+module.exports = router;
