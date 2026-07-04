@@ -66,7 +66,8 @@ const tShirtModels = [
     gsmPrices: [
       { gsm: "180GSM", price: 1200.00 },
       { gsm: "220GSM", price: 1500.00 },
-      { gsm: "280GSM", price: 1800.00 }
+      { gsm: "280GSM", price: 1800.00 },
+      { gsm: "320GSM", price: 2000.00 }
     ]
   },
   {
@@ -75,7 +76,9 @@ const tShirtModels = [
     type: "V-Neck",
     gsmPrices: [
       { gsm: "180GSM", price: 1400.00 },
-      { gsm: "220GSM", price: 1700.00 }
+      { gsm: "220GSM", price: 1700.00 },
+      { gsm: "280GSM", price: 1900.00 },
+      { gsm: "320GSM", price: 2200.00 }
     ]
   },
   {
@@ -109,7 +112,7 @@ const tShirtModels = [
 
 export default function DesignerPage() {
   const [activeMenu, setActiveMenu] = useState("3d-designer");
-  
+
   const [isEmployee, setIsEmployee] = useState(false);
   const [isManager, setIsManager] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -180,8 +183,8 @@ export default function DesignerPage() {
           if (design.layers) setLayers(design.layers);
           if (design.fabricColor) setShirtColor(design.fabricColor);
           if (design.tShirtType) {
-            const model = stylesList.find(m => m.name === design.tShirtType) || 
-                          stylesList.find(m => m.name.toLowerCase().includes(design.tShirtType.toLowerCase()));
+            const model = stylesList.find(m => m.name === design.tShirtType) ||
+              stylesList.find(m => m.name.toLowerCase().includes(design.tShirtType.toLowerCase()));
             if (model) {
               setSelectedModel(model);
               setShirtType(model.type);
@@ -253,7 +256,7 @@ export default function DesignerPage() {
         : `${API_BASE_URL}/employee/products`;
 
       await axios.post(endpoint, payload, { headers });
-      
+
       if (isManager) {
         setSubmitSuccess("Design published directly to catalog successfully!");
         setTimeout(() => {
@@ -559,16 +562,16 @@ export default function DesignerPage() {
   };
 
   const unitPrice = getBasePrice() + getPrintAreaCost();
-  
-  const discountMultiplier = quantity >= pricingRules.volumeDiscountThreshold 
-    ? (100 - pricingRules.volumeDiscountPercentage) / 100 
+
+  const discountMultiplier = quantity >= pricingRules.volumeDiscountThreshold
+    ? (100 - pricingRules.volumeDiscountPercentage) / 100
     : 1;
 
   const totalCost = unitPrice * quantity * discountMultiplier;
 
   return (
     <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
-      
+
       <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
         <div>
           <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
@@ -599,11 +602,10 @@ export default function DesignerPage() {
                       window.location.href = item.path;
                     }
                   }}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
                       ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.25)]"
                       : "hover:bg-slate-800 hover:text-slate-200"
-                  }`}
+                    }`}
                 >
                   <Icon className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
                   {item.label}
@@ -629,7 +631,7 @@ export default function DesignerPage() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        
+
         <header className="h-16 border-b bg-white flex items-center justify-between px-8 select-none shrink-0 z-10">
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <span className="hover:text-indigo-600 cursor-pointer transition">Store</span>
@@ -661,26 +663,24 @@ export default function DesignerPage() {
         </header>
 
         <div className="flex-1 flex overflow-hidden">
-          
+
           <aside className="w-80 border-r bg-white flex flex-col select-none shrink-0 overflow-y-auto">
             <div className="flex border-b text-center shrink-0">
               <button
                 onClick={() => setLeftTab("edit")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
-                  leftTab === "edit"
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${leftTab === "edit"
                     ? "border-indigo-600 text-indigo-600"
                     : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                  }`}
               >
                 T-Shirt Style
               </button>
               <button
                 onClick={() => setLeftTab("add")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
-                  leftTab === "add"
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${leftTab === "add"
                     ? "border-indigo-600 text-indigo-600"
                     : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                  }`}
               >
                 Add Elements
               </button>
@@ -738,11 +738,10 @@ export default function DesignerPage() {
                       <button
                         key={color.name}
                         onClick={() => setShirtColor(color.value)}
-                        className={`h-7 w-7 rounded-full border-2 transition-transform ${
-                          shirtColor === color.value
+                        className={`h-7 w-7 rounded-full border-2 transition-transform ${shirtColor === color.value
                             ? "scale-125 border-indigo-600 shadow-lg"
                             : "border-slate-200 hover:scale-110"
-                        }`}
+                          }`}
                         style={{ backgroundColor: color.value }}
                         title={color.name}
                       />
@@ -768,22 +767,20 @@ export default function DesignerPage() {
                             if (model.colors && model.colors.length > 0) {
                               setShirtColor(model.colors[0].value);
                             }
-                             const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
-                               ? model.gsmPrices.map(gp => gp.gsm)
-                               : (model.gsms || []);
-                             if (modelGSMs.length > 0) {
-                               setShirtMaterial(modelGSMs[0]);
-                             }
+                            const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
+                              ? model.gsmPrices.map(gp => gp.gsm)
+                              : (model.gsms || []);
+                            if (modelGSMs.length > 0) {
+                              setShirtMaterial(modelGSMs[0]);
+                            }
                           }}
-                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-left transition duration-200 ${
-                            isSelected
+                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-left transition duration-200 ${isSelected
                               ? "border-indigo-600 bg-indigo-50/20 ring-1 ring-indigo-600 font-bold"
                               : "border-slate-100 hover:bg-slate-50 hover:border-slate-200"
-                          }`}
+                            }`}
                         >
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl mb-2 transition ${
-                            isSelected ? "bg-indigo-600 text-white" : "bg-slate-50 text-slate-400"
-                          }`}>
+                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl mb-2 transition ${isSelected ? "bg-indigo-600 text-white" : "bg-slate-50 text-slate-400"
+                            }`}>
                             👕
                           </div>
                           <div className="flex flex-col items-center w-full">
@@ -807,11 +804,10 @@ export default function DesignerPage() {
                       <button
                         key={gsm}
                         onClick={() => setShirtMaterial(gsm)}
-                        className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${
-                          shirtMaterial === gsm
+                        className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${shirtMaterial === gsm
                             ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 font-bold"
                             : "border-slate-100 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <span>{gsm}</span>
                         <span className="text-xs text-indigo-650 font-bold">{priceLabel}</span>
@@ -829,11 +825,10 @@ export default function DesignerPage() {
                         <button
                           key={size}
                           onClick={() => setSelectedSize(size)}
-                          className={`flex-1 py-2 rounded-xl border text-xs font-extrabold transition ${
-                            isSelected
+                          className={`flex-1 py-2 rounded-xl border text-xs font-extrabold transition ${isSelected
                               ? "border-indigo-600 bg-indigo-50/20 text-indigo-700"
                               : "border-slate-100 hover:bg-slate-50 text-slate-600"
-                          }`}
+                            }`}
                         >
                           {size}
                         </button>
@@ -847,17 +842,16 @@ export default function DesignerPage() {
           </aside>
 
           <main className="flex-1 flex flex-col justify-between p-8 relative overflow-hidden bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20">
-            
+
             <div className="absolute top-8 left-8 flex items-center gap-2 bg-white/80 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none">
               {["front", "back", "left", "right"].map((view) => (
                 <button
                   key={view}
                   onClick={() => setActiveView(view)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
-                    activeView === view
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${activeView === view
                       ? "bg-indigo-600 text-white shadow-sm"
                       : "text-slate-500 hover:text-slate-800"
-                  }`}
+                    }`}
                 >
                   {view}
                 </button>
@@ -924,21 +918,19 @@ export default function DesignerPage() {
             <div className="flex border-b text-center shrink-0">
               <button
                 onClick={() => setRightTab("layers")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
-                  rightTab === "layers"
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${rightTab === "layers"
                     ? "border-indigo-600 text-indigo-600"
                     : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                  }`}
               >
                 Layers
               </button>
               <button
                 onClick={() => setRightTab("properties")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${
-                  rightTab === "properties"
+                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${rightTab === "properties"
                     ? "border-indigo-600 text-indigo-600"
                     : "border-transparent text-slate-400 hover:text-slate-600"
-                }`}
+                  }`}
                 disabled={!selectedLayerId}
               >
                 Properties
@@ -960,11 +952,10 @@ export default function DesignerPage() {
                         <div
                           key={layer.id}
                           onClick={() => selectLayer(layer.id)}
-                          className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition ${
-                            isSelected
+                          className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition ${isSelected
                               ? "border-indigo-500 bg-indigo-50/10 shadow-sm"
                               : "border-slate-100 hover:bg-slate-50"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             {layer.type === "text" ? (
@@ -1059,17 +1050,15 @@ export default function DesignerPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => updateActiveLayer("bold", !activeLayer.bold)}
-                          className={`flex-1 py-2 rounded-lg border text-xs font-bold ${
-                            activeLayer.bold ? "bg-indigo-50 text-indigo-600 border-indigo-200" : "hover:bg-slate-50"
-                          }`}
+                          className={`flex-1 py-2 rounded-lg border text-xs font-bold ${activeLayer.bold ? "bg-indigo-50 text-indigo-600 border-indigo-200" : "hover:bg-slate-50"
+                            }`}
                         >
                           B
                         </button>
                         <button
                           onClick={() => updateActiveLayer("italic", !activeLayer.italic)}
-                          className={`flex-1 py-2 rounded-lg border text-xs font-bold italic ${
-                            activeLayer.italic ? "bg-indigo-50 text-indigo-600 border-indigo-200" : "hover:bg-slate-50"
-                          }`}
+                          className={`flex-1 py-2 rounded-lg border text-xs font-bold italic ${activeLayer.italic ? "bg-indigo-50 text-indigo-600 border-indigo-200" : "hover:bg-slate-50"
+                            }`}
                         >
                           I
                         </button>
@@ -1167,7 +1156,7 @@ export default function DesignerPage() {
                   <span>Print Area (Estimated)</span>
                   <span>{totalPrintArea.toFixed(2)} in²</span>
                 </div>
-                
+
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
                     <span>Print Coverage</span>
@@ -1183,13 +1172,12 @@ export default function DesignerPage() {
 
                 <div className="flex items-center justify-between text-xs font-bold text-slate-500 pt-1">
                   <span>Design Complexity</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                    designComplexity === "High"
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${designComplexity === "High"
                       ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
                       : designComplexity === "Medium"
-                      ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
-                      : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                  }`}>
+                        ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
+                        : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                    }`}>
                     {designComplexity}
                   </span>
                 </div>
@@ -1246,7 +1234,7 @@ export default function DesignerPage() {
                 onClick={() => {
                   const designId = `custom-${Date.now()}`;
                   const cartKey = `${designId}-${selectedSize}-${shirtColor}`;
-                  
+
                   const savedCart = localStorage.getItem("printsphere_cart");
                   let currentCart = [];
                   if (savedCart) {
@@ -1256,7 +1244,7 @@ export default function DesignerPage() {
                       console.error(e);
                     }
                   }
-                  
+
                   const cartItem = {
                     cartKey,
                     designId: designId,
@@ -1274,7 +1262,7 @@ export default function DesignerPage() {
                     isCustom: true,
                     layers: layers
                   };
-                  
+
                   localStorage.setItem("printsphere_cart", JSON.stringify([...currentCart, cartItem]));
                   alert(`Added ${selectedModel.name} (${selectedSize}) to cart! Redirecting to checkout...`);
                   window.location.href = "/store";
