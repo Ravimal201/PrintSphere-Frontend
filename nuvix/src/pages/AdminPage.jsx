@@ -2,16 +2,15 @@ import { useState, useEffect } from "react";
 import { 
   Users, UserPlus, Lock, Trash2, Key, Mail, Phone, Shield, LogOut, 
   Loader2, AlertCircle, CheckCircle, BarChart3, TrendingUp, Inbox, 
-  Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check 
+  Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check, Bell, Download, FileText
 } from "lucide-react";
 import axios from "axios";
-
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("analytics"); // "analytics" | "staff" | "inventory" | "settings"
+  const [activeTab, setActiveTab] = useState("analytics"); // "analytics" | "staff" | "inventory" | "settings" | "notifications"
 
   // Staff list state
   const [staff, setStaff] = useState([]);
@@ -40,7 +39,12 @@ export default function AdminPage() {
   const [logLevel, setLogLevel] = useState("info");
   const [settingsSuccess, setSettingsSuccess] = useState(false);
 
-  // Check authentication on mount
+  // Live System Analytics & Notifications State
+  const [notifications, setNotifications] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+
+  // Check authentication and load data on mount
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     const token = localStorage.getItem("token");
@@ -50,11 +54,16 @@ export default function AdminPage() {
       return;
     }
 
+    let intervalId;
     try {
       const user = JSON.parse(userStr);
       if (user.role === "Admin") {
         setIsAdmin(true);
         fetchStaff();
+        fetchAnalytics();
+        fetchNotifications();
+        // Poll notifications every 10 seconds
+        intervalId = setInterval(fetchNotifications, 10000);
       } else {
         window.location.href = "/customer-home";
       }
@@ -64,6 +73,10 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
   const fetchStaff = async () => {
@@ -79,6 +92,95 @@ export default function AdminPage() {
     } finally {
       setFetchLoading(false);
     }
+  };
+
+  const fetchAnalytics = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const response = await axios.get(`${API_BASE_URL}/admin/analytics`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAnalytics(response.data);
+    } catch (err) {
+      console.error("Fetch analytics error:", err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const response = await axios.get(`${API_BASE_URL}/notifications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(response.data);
+    } catch (err) {
+      console.error("Fetch notifications error:", err);
+    }
+  };
+
+  const handleMarkAsRead = async (id) => {
+    const token = localStorage.getItem("token");
+    try {
+      await axios.put(`${API_BASE_URL}/notifications/${id}/read`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+    } catch (err) {
+      console.error("Mark notification read error:", err);
+    }
+  };
+
+  const handleClearAllNotifications = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      await axios.post(`${API_BASE_URL}/notifications/clear`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error("Clear notifications error:", err);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!analytics) return;
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "PRINTSPHERE ADMIN ANALYTICS REPORT\r\n";
+    csvContent += `Generated At,${new Date().toLocaleString()}\r\n\r\n`;
+    csvContent += "SUMMARY METRICS\r\n";
+    csvContent += `Gross Revenue,Rs. ${analytics.grossRevenue.toFixed(2)}\r\n`;
+    csvContent += `Total Orders,${analytics.totalOrders}\r\n`;
+    csvContent += `Custom Designs Count,${analytics.customDesigns}\r\n\r\n`;
+    csvContent += "MONTHLY REVENUE TRENDS\r\n";
+    csvContent += "Month,Year,Revenue (Rs.)\r\n";
+    analytics.monthlyTrends.forEach(t => {
+      csvContent += `${t.month},${t.year},${t.total.toFixed(2)}\r\n`;
+    });
+    csvContent += "\r\n";
+    csvContent += "BEST SELLING PRODUCTS\r\n";
+    csvContent += "Rank,Product/Design Name,Quantity Sold,Revenue\r\n";
+    analytics.bestSellers.forEach(b => {
+      csvContent += `${b.rank},"${b.name.replace(/"/g, '""')}",${b.sales},"${b.revenue}"\r\n`;
+    });
+    csvContent += "\r\n";
+    csvContent += "POPULAR FABRIC COLORS\r\n";
+    csvContent += "Color,Quantity Ordered,Revenue (Rs.)\r\n";
+    analytics.popularColors.forEach(c => {
+      csvContent += `${c.color},${c.count},Rs. ${(c.revenue || 0).toFixed(2)}\r\n`;
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `printsphere_analytics_report_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrintPDF = () => {
+    window.print();
   };
 
   const handleCreateStaff = async (e) => {
@@ -175,8 +277,236 @@ export default function AdminPage() {
 
   if (!isAdmin) return null;
 
+  const getSvgPathData = () => {
+    if (!analytics || !analytics.monthlyTrends || analytics.monthlyTrends.length === 0) {
+      return { linePath: "", areaPath: "", points: [] };
+    }
+    const trends = analytics.monthlyTrends;
+    const maxVal = Math.max(...trends.map(t => t.total), 1000);
+    const points = trends.map((item, idx) => {
+      const x = 50 + idx * 140;
+      const y = 200 - (item.total / maxVal) * 160;
+      return { x, y, ...item };
+    });
+
+    let linePath = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      linePath += ` L ${points[i].x} ${points[i].y}`;
+    }
+
+    let areaPath = `M ${points[0].x} 220 L ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      areaPath += ` L ${points[i].x} ${points[i].y}`;
+    }
+    areaPath += ` L ${points[points.length - 1].x} 220 Z`;
+
+    return { linePath, areaPath, points };
+  };
+
+  const getPrintSvgPathData = () => {
+    if (!analytics || !analytics.monthlyTrends || analytics.monthlyTrends.length === 0) {
+      return { printLinePath: "", printAreaPath: "", printPoints: [] };
+    }
+    const trends = analytics.monthlyTrends;
+    const maxVal = Math.max(...trends.map(t => t.total), 1000);
+    const printPoints = trends.map((item, idx) => {
+      const x = 50 + idx * 140;
+      const y = 180 - (item.total / maxVal) * 140;
+      return { x, y, ...item };
+    });
+
+    let printLinePath = `M ${printPoints[0].x} ${printPoints[0].y}`;
+    for (let i = 1; i < printPoints.length; i++) {
+      printLinePath += ` L ${printPoints[i].x} ${printPoints[i].y}`;
+    }
+
+    let printAreaPath = `M ${printPoints[0].x} 200 L ${printPoints[0].x} ${printPoints[0].y}`;
+    for (let i = 1; i < printPoints.length; i++) {
+      printAreaPath += ` L ${printPoints[i].x} ${printPoints[i].y}`;
+    }
+    printAreaPath += ` L ${printPoints[printPoints.length - 1].x} 200 Z`;
+
+    return { printLinePath, printAreaPath, printPoints };
+  };
+
+  const { linePath, areaPath, points } = getSvgPathData();
+  const { printLinePath, printAreaPath, printPoints } = getPrintSvgPathData();
+
   return (
-    <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
+    <>
+      <style dangerouslySetInnerHTML={{__html: `
+        @media screen {
+          .print-only-report {
+            display: none !important;
+          }
+        }
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 1.2cm;
+          }
+          html, body {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          #admin-dashboard-screen {
+            display: none !important;
+          }
+          .print-only-report {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 186mm !important;
+            height: 270mm !important;
+            justify-content: space-between !important;
+            box-sizing: border-box !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}} />
+
+      {/* Printable Report Wrapper */}
+      <div className="print-only-report h-full p-4 bg-white text-slate-900">
+        {/* Header */}
+        <div className="border-b pb-4 mb-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-950 uppercase">PrintSphere Analytics Report</h1>
+              <p className="text-xs text-slate-500 mt-1">System Administration & Decision Making Document</p>
+            </div>
+            <div className="text-right text-xs text-slate-500">
+              <p className="font-bold text-slate-700">Role: Administrator</p>
+              <p>Generated: {new Date().toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary metrics cards */}
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          <div className="border rounded-2xl p-4 bg-slate-50/50">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gross Revenue</span>
+            <p className="text-xl font-extrabold text-slate-950 mt-1">
+              Rs. {(analytics?.grossRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="border rounded-2xl p-4 bg-slate-50/50">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Orders</span>
+            <p className="text-xl font-extrabold text-slate-950 mt-1">
+              {(analytics?.totalOrders || 0).toLocaleString()}
+            </p>
+          </div>
+          <div className="border rounded-2xl p-4 bg-slate-50/50">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Custom Designs Uploaded</span>
+            <p className="text-xl font-extrabold text-slate-950 mt-1">
+              {(analytics?.customDesigns || 0).toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Sales Trend chart */}
+        <div className="border rounded-2xl p-5 mb-6">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Monthly Sales Trends</h3>
+          <div className="h-56 w-full flex items-end">
+            {analyticsLoading ? (
+              <p className="text-xs text-slate-400 text-center w-full">Loading trend data...</p>
+            ) : (
+              <svg className="w-full h-full" viewBox="0 0 800 220">
+                <defs>
+                  <linearGradient id="gradient-print" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.1" />
+                    <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+                <line x1="0" y1="30" x2="800" y2="30" stroke="#f1f5f9" strokeWidth="1" />
+                <line x1="0" y1="90" x2="800" y2="90" stroke="#f1f5f9" strokeWidth="1" />
+                <line x1="0" y1="150" x2="800" y2="150" stroke="#f1f5f9" strokeWidth="1" />
+                {printAreaPath && (
+                  <path d={printAreaPath} fill="url(#gradient-print)" />
+                )}
+                {printLinePath && (
+                  <path
+                    d={printLinePath}
+                    fill="none"
+                    stroke="#4f46e5"
+                    strokeWidth="2.5"
+                  />
+                )}
+                {printPoints.map((pt, idx) => (
+                  <circle key={idx} cx={pt.x} cy={pt.y} r="4" fill="#4f46e5" />
+                ))}
+              </svg>
+            )}
+          </div>
+          <div className="flex justify-between text-[10px] text-slate-400 font-bold px-6 pt-2">
+            {printPoints.map((pt, idx) => (
+              <span key={idx}>{pt.month}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Popular colors and best-selling products */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* Colors */}
+          <div className="border rounded-2xl p-5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">Fabric Color Breakdown</h3>
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b pb-2 text-slate-400 font-bold">
+                  <th className="pb-2">Color</th>
+                  <th className="pb-2">Quantity</th>
+                  <th className="pb-2 text-right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(analytics?.popularColors || []).map((item) => (
+                  <tr key={item.color} className="border-b last:border-b-0">
+                    <td className="py-2.5 font-bold text-slate-800">{item.color}</td>
+                    <td className="py-2.5 text-slate-600">{item.count} ordered</td>
+                    <td className="py-2.5 text-right font-semibold text-slate-900">Rs. {(item.revenue || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Best Sellers */}
+          <div className="border rounded-2xl p-5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">Top-Selling Products</h3>
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b pb-2 text-slate-400 font-bold">
+                  <th className="pb-2">Product/Design</th>
+                  <th className="pb-2">Sales</th>
+                  <th className="pb-2 text-right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(analytics?.bestSellers || []).map((item) => (
+                  <tr key={item.name} className="border-b last:border-b-0">
+                    <td className="py-2.5 font-bold text-slate-800 truncate max-w-[140px]">{item.name}</td>
+                    <td className="py-2.5 text-slate-600">{item.sales} sold</td>
+                    <td className="py-2.5 text-right font-semibold text-slate-900">{item.revenue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t pt-4 text-center text-[10px] text-slate-400 flex justify-between select-none mt-auto">
+          <span>Confidential - For Internal Use Only</span>
+          <span>Page 1 of 1</span>
+        </div>
+      </div>
+
+      <div id="admin-dashboard-screen" className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
+
       
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
@@ -226,6 +556,22 @@ export default function AdminPage() {
               Products & Inventory
             </button>
             <button
+              onClick={() => setActiveTab("notifications")}
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "notifications"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "hover:bg-slate-800 hover:text-slate-200"
+              }`}
+            >
+              <Bell className="h-4.5 w-4.5" />
+              Notifications
+              {notifications.filter(n => !n.isRead).length > 0 && (
+                <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  {notifications.filter(n => !n.isRead).length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab("settings")}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
                 activeTab === "settings"
@@ -236,6 +582,7 @@ export default function AdminPage() {
               <Settings className="h-4.5 w-4.5" />
               System Settings
             </button>
+
             
             <div className="pt-4 border-t border-slate-800">
               <button
@@ -267,31 +614,39 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Gross Revenue</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">Rs. 12,430.00</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              {analyticsLoading ? "Loading..." : `Rs. ${(analytics?.grossRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+            </p>
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold">
               <TrendingUp className="h-3.5 w-3.5" />
-              <span>+14.2% this week</span>
+              <span>Real-time earnings</span>
             </div>
           </div>
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Total Orders</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">1,240</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              {analyticsLoading ? "Loading..." : (analytics?.totalOrders || 0).toLocaleString()}
+            </p>
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold">
               <TrendingUp className="h-3.5 w-3.5" />
-              <span>+8.7% new customers</span>
+              <span>Lifetime volume</span>
             </div>
           </div>
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Custom Designs</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">846</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              {analyticsLoading ? "Loading..." : (analytics?.customDesigns || 0).toLocaleString()}
+            </p>
             <div className="flex items-center gap-1.5 text-xs text-indigo-600 mt-2 font-bold">
               <Layers className="h-3.5 w-3.5" />
-              <span>68% coverage avg</span>
+              <span>User uploads</span>
             </div>
           </div>
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">System Status</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">99.92%</p>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">System Connection</span>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              {analytics ? "Active" : "Offline"}
+            </p>
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold">
               <Check className="h-3.5 w-3.5" />
               <span>MongoDB connected</span>
@@ -299,9 +654,27 @@ export default function AdminPage() {
           </div>
         </div>
 
+
         {/* ================= TAB 1: ANALYTICS & REPORTS ================= */}
         {activeTab === "analytics" && (
           <div className="space-y-8">
+            {/* Dashboard Actions Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border rounded-3xl p-6 shadow-sm">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Analytics & Reports</h2>
+                <p className="text-xs text-slate-400 mt-1">Review real-time performance, revenues, and sales trends.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handlePrintPDF}
+                  disabled={analyticsLoading}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl shadow-md transition disabled:opacity-50"
+                >
+                  <FileText className="h-4.5 w-4.5" /> Download PDF Report
+                </button>
+              </div>
+            </div>
+
             <div className="bg-white border rounded-3xl p-6 shadow-sm select-none">
               <h3 className="text-lg font-bold text-slate-950 mb-6 flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-indigo-600" />
@@ -309,43 +682,54 @@ export default function AdminPage() {
               </h3>
               {/* Sales trend SVG path chart */}
               <div className="h-72 w-full flex items-end">
-                <svg className="w-full h-full" viewBox="0 0 800 240">
-                  <defs>
-                    <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.15" />
-                      <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Grid Lines */}
-                  <line x1="0" y1="40" x2="800" y2="40" stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1="0" y1="100" x2="800" y2="100" stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1="0" y1="160" x2="800" y2="160" stroke="#f1f5f9" strokeWidth="1" />
-                  {/* Area beneath curve */}
-                  <path
-                    d="M 50 180 C 150 140, 200 190, 300 120 C 400 50, 480 130, 600 60 C 700 10, 750 30, 800 20 L 800 220 L 50 220 Z"
-                    fill="url(#gradient)"
-                  />
-                  {/* Trend Curve Line */}
-                  <path
-                    d="M 50 180 C 150 140, 200 190, 300 120 C 400 50, 480 130, 600 60 C 700 10, 750 30, 800 20"
-                    fill="none"
-                    stroke="#4f46e5"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                  />
-                  {/* Scatter Dots */}
-                  <circle cx="50" cy="180" r="5" fill="#4f46e5" />
-                  <circle cx="300" cy="120" r="5" fill="#4f46e5" />
-                  <circle cx="600" cy="60" r="5" fill="#4f46e5" />
-                </svg>
+                {analyticsLoading ? (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <Loader2 className="h-7 w-7 text-indigo-600 animate-spin" />
+                  </div>
+                ) : (
+                  <svg className="w-full h-full" viewBox="0 0 800 240">
+                    <defs>
+                      <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.15" />
+                        <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+                    {/* Grid Lines */}
+                    <line x1="0" y1="40" x2="800" y2="40" stroke="#f1f5f9" strokeWidth="1" />
+                    <line x1="0" y1="100" x2="800" y2="100" stroke="#f1f5f9" strokeWidth="1" />
+                    <line x1="0" y1="160" x2="800" y2="160" stroke="#f1f5f9" strokeWidth="1" />
+                    {/* Area beneath curve */}
+                    {areaPath && (
+                      <path d={areaPath} fill="url(#gradient)" />
+                    )}
+                    {/* Trend Curve Line */}
+                    {linePath && (
+                      <path
+                        d={linePath}
+                        fill="none"
+                        stroke="#4f46e5"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                      />
+                    )}
+                    {/* Scatter Dots */}
+                    {points.map((pt, idx) => (
+                      <g key={idx}>
+                        <circle cx={pt.x} cy={pt.y} r="5" fill="#4f46e5" className="cursor-pointer" />
+                        <title>{pt.month} {pt.year}: Rs. {pt.total.toLocaleString()}</title>
+                      </g>
+                    ))}
+                  </svg>
+                )}
               </div>
               <div className="flex justify-between text-xs text-slate-400 font-bold px-6 pt-3">
-                <span>Jan</span>
-                <span>Feb</span>
-                <span>Mar</span>
-                <span>Apr</span>
-                <span>May</span>
-                <span>Jun</span>
+                {analyticsLoading ? (
+                  <span>Loading trends...</span>
+                ) : (
+                  points.map((pt, idx) => (
+                    <span key={idx}>{pt.month}</span>
+                  ))
+                )}
               </div>
             </div>
 
@@ -357,25 +741,39 @@ export default function AdminPage() {
                   Popular Fabric Colors
                 </h3>
                 <div className="space-y-4">
-                  {[
-                    { color: "White", count: 486, pct: 57, bg: "bg-slate-200" },
-                    { color: "Black", count: 242, pct: 28, bg: "bg-slate-900" },
-                    { color: "Navy Blue", count: 120, pct: 14, bg: "bg-indigo-950" },
-                    { color: "Red", count: 86, pct: 10, bg: "bg-rose-600" }
-                  ].map((item) => (
-                    <div key={item.color} className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-bold text-slate-600">
-                        <span className="flex items-center gap-2">
-                          <span className={`h-3.5 w-3.5 rounded-full border ${item.bg}`} />
-                          {item.color}
-                        </span>
-                        <span>{item.count} orders ({item.pct}%)</span>
-                      </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${item.pct}%` }} />
-                      </div>
+                  {analyticsLoading ? (
+                    <div className="py-12 flex justify-center">
+                      <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
                     </div>
-                  ))}
+                  ) : (analytics?.popularColors || []).map((item) => {
+                    const bgClass = item.color.toLowerCase() === "white" 
+                      ? "bg-slate-200" 
+                      : item.color.toLowerCase() === "black" 
+                      ? "bg-slate-900" 
+                      : item.color.toLowerCase() === "navy blue" 
+                      ? "bg-indigo-950" 
+                      : item.color.toLowerCase() === "red" 
+                      ? "bg-rose-600" 
+                      : "bg-indigo-600";
+                    
+                    const maxCount = Math.max(...(analytics?.popularColors || []).map(c => c.count), 1);
+                    const pct = Math.round((item.count / maxCount) * 100);
+                    
+                    return (
+                      <div key={item.color} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-bold text-slate-600">
+                          <span className="flex items-center gap-2">
+                            <span className={`h-3.5 w-3.5 rounded-full border ${bgClass}`} />
+                            {item.color}
+                          </span>
+                          <span>{item.count} items ({pct}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -635,25 +1033,28 @@ export default function AdminPage() {
               </h3>
               
               <div className="space-y-4">
-                {[
-                  { rank: 1, name: "Adventure Calls Design (White Crew)", sales: 486, revenue: "Rs. 10,230" },
-                  { rank: 2, name: "Plain Cotton Tee V-Neck (Black)", sales: 320, revenue: "Rs. 4,480" },
-                  { rank: 3, name: "Premium Polo (Gold)", sales: 180, revenue: "Rs. 3,240" },
-                  { rank: 4, name: "Custom SVG Logo projection (Collar)", sales: 120, revenue: "Rs. 2,800" }
-                ].map((item) => (
-                  <div key={item.name} className="flex items-center justify-between border-b pb-3 last:border-b-0 last:pb-0">
-                    <div className="flex items-center gap-3">
-                      <span className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center">
-                        #{item.rank}
-                      </span>
-                      <div className="leading-tight">
-                        <p className="text-xs font-bold text-slate-900">{item.name}</p>
-                        <span className="text-[10px] text-slate-400">{item.sales} sold</span>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-slate-800">{item.revenue}</span>
+                {analyticsLoading ? (
+                  <div className="py-8 flex justify-center">
+                    <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
                   </div>
-                ))}
+                ) : !analytics?.bestSellers || analytics.bestSellers.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-4 font-semibold">No sales data recorded yet.</p>
+                ) : (
+                  analytics.bestSellers.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between border-b pb-3 last:border-b-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <span className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center">
+                          #{item.rank}
+                        </span>
+                        <div className="leading-tight">
+                          <p className="text-xs font-bold text-slate-900">{item.name}</p>
+                          <span className="text-[10px] text-slate-400">{item.sales} sold</span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-slate-800">{item.revenue}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -738,9 +1139,101 @@ export default function AdminPage() {
           </div>
         )}
 
-      </div>
+        {/* ================= TAB 5: NOTIFICATIONS ================= */}
+        {activeTab === "notifications" && (
+          <div className="bg-white border rounded-3xl p-6 shadow-sm flex flex-col">
+            <div className="flex items-center justify-between mb-6 select-none">
+              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                <Bell className="h-5 w-5 text-indigo-600" />
+                Live Notification Center
+              </h3>
+              <div className="space-x-4">
+                <button
+                  onClick={fetchNotifications}
+                  className="text-xs text-indigo-600 font-bold hover:underline"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={handleClearAllNotifications}
+                  disabled={notifications.filter(n => !n.isRead).length === 0}
+                  className="text-xs text-slate-500 font-bold hover:underline disabled:opacity-50"
+                >
+                  Mark All Read
+                </button>
+              </div>
+            </div>
 
+            {notifications.length === 0 ? (
+              <div className="py-20 text-center border-2 border-dashed rounded-2xl select-none">
+                <Bell className="h-8 w-8 text-slate-300 mx-auto mb-2 animate-bounce" />
+                <p className="text-sm text-slate-400 font-semibold">You have no notifications.</p>
+                <p className="text-xs text-slate-300 mt-1">Updates on order activities and alerts will appear here.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                {notifications.map((item) => {
+                  const isLowStock = item.type === "Low Stock";
+                  const isNewTask = item.type === "New Print Task";
+                  const isPayment = item.type === "Payment Success";
+
+                  const badgeColor = isLowStock 
+                    ? "bg-rose-50 border-rose-100 text-rose-600" 
+                    : isNewTask 
+                    ? "bg-purple-50 border-purple-100 text-purple-600" 
+                    : isPayment 
+                    ? "bg-emerald-50 border-emerald-100 text-emerald-600" 
+                    : "bg-blue-50 border-blue-100 text-blue-600";
+
+                  const timeStr = new Date(item.createdAt).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  });
+
+                  return (
+                    <div
+                      key={item._id}
+                      className={`flex items-start justify-between p-4 rounded-2xl border transition duration-200 ${
+                        item.isRead ? "bg-slate-50/50 border-slate-100" : "bg-white border-indigo-100/80 shadow-sm"
+                      }`}
+                    >
+                      <div className="flex gap-4">
+                        <span className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-black h-fit uppercase tracking-wider select-none ${badgeColor}`}>
+                          {item.type}
+                        </span>
+                        <div className="leading-tight">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                            {!item.isRead && (
+                              <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{item.message}</p>
+                          <span className="text-[10px] text-slate-400 font-bold block mt-2 select-none">{timeStr}</span>
+                        </div>
+                      </div>
+                      {!item.isRead && (
+                        <button
+                          onClick={() => handleMarkAsRead(item._id)}
+                          className="text-[10px] text-indigo-600 font-extrabold hover:underline select-none"
+                        >
+                          Mark Read
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+
+      </div>
     </div>
+    </>
   );
 }
 

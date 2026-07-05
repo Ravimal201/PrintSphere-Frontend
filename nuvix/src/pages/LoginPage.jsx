@@ -4,7 +4,7 @@ import Footer from "../components/Footer/Footer";
 import { Lock, Mail, Eye, EyeOff, AlertCircle } from "lucide-react";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -65,7 +65,7 @@ export default function LoginPage() {
 
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="bg-white/80 border border-white/70 shadow-[0_24px_90px_rgba(15,23,42,0.06)] backdrop-blur-md rounded-[2.5rem] p-8 sm:p-10 max-w-md w-full relative overflow-hidden">
-          
+
           {/* Accent decoration */}
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600" />
 

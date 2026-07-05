@@ -4,8 +4,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import { User, Mail, Phone, MapPin, Calendar, Lock, Shield, CheckCircle, AlertCircle } from "lucide-react";
 import axios from "axios";
-
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 export default function AccountPage() {
   const [user, setUser] = useState(null);

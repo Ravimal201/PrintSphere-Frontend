@@ -32,12 +32,14 @@ const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const managerRoutes = require("./routes/managerRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 // Mount API Endpoints
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/manager", managerRoutes);
 app.use("/api/employee", employeeRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Test Connection Endpoint
 app.get("/api/health", (req, res) => {

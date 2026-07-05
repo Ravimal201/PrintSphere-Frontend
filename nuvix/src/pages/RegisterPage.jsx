@@ -4,7 +4,7 @@ import Footer from "../components/Footer/Footer";
 import { Lock, Mail, User, Phone, MapPin, Eye, EyeOff, AlertCircle } from "lucide-react";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState("");
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,7 +58,7 @@ export default function RegisterPage() {
 
       <main className="flex-1 flex items-center justify-center p-6 my-6">
         <div className="bg-white/80 border border-white/70 shadow-[0_24px_90px_rgba(15,23,42,0.06)] backdrop-blur-md rounded-[2.5rem] p-8 sm:p-10 max-w-lg w-full relative overflow-hidden">
-          
+
           {/* Accent decoration */}
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600" />
 
@@ -78,7 +78,7 @@ export default function RegisterPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Full Name</label>
