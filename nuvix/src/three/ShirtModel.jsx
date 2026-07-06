@@ -116,6 +116,8 @@ function SafeDecal({
   return (
     <mesh
       ref={setDecalMesh}
+      name="decal"
+      userData={{ isDecal: true }}
       material-transparent
       material-polygonOffset
       material-polygonOffsetFactor={polygonOffsetFactor}
@@ -213,7 +215,7 @@ function DecalItem({ layer, isSelected, targetMesh }) {
 
       {/* Blue wireframe bounding helper when selected */}
       {isSelected && (
-        <mesh position={decalPos} rotation={layer.rotation}>
+        <mesh position={decalPos} rotation={layer.rotation} name="decal-helper" userData={{ isDecal: true }}>
           <boxGeometry args={[layer.scale[0], layer.scale[1], 0.05]} />
           <meshBasicMaterial
             color="#4f46e5"
@@ -239,6 +241,8 @@ export default function ShirtModel({
   const bodyMeshRef = useRef(null);
   const [meshLoaded, setMeshLoaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const dragStartLocalPointRef = useRef(null);
+  const dragStartLayerPosRef = useRef(null);
 
   // Center and normalize scale once when model loads
   useEffect(() => {
@@ -305,9 +309,7 @@ export default function ShirtModel({
           if (nameLower.includes("body") || nameLower.includes("front") || nameLower.includes("outside") || nameLower.includes("t-shirt") || nameLower.includes("shirt")) {
             score *= 10.0; // boost main outer parts
           }
-          if (nameLower.includes("object_6") || nameLower.includes("object_2")) {
-            score *= 5.0; // boost known standard mesh nodes
-          }
+          // No incorrect hardcoded boosts here to let volume-based selection win correctly
 
           if (score > maxScore) {
             maxScore = score;
@@ -326,18 +328,25 @@ export default function ShirtModel({
   // Auto-project decals on the surface of the body mesh when scene or layers change
   useEffect(() => {
     if (meshLoaded && bodyMeshRef.current && onUpdateLayers && layers.length > 0) {
-      const mesh = bodyMeshRef.current;
-      mesh.updateMatrixWorld(true);
-      
-      mesh.geometry.computeBoundingBox();
-      const localBox = mesh.geometry.boundingBox;
-      const localCenter = new THREE.Vector3();
-      localBox.getCenter(localCenter);
-
+      // Safety guard: ensure bodyMeshRef.current belongs to the current scene
+      let isCurrentMesh = false;
+      scene.traverse((child) => {
+        if (child === bodyMeshRef.current) isCurrentMesh = true;
+      });
+      if (!isCurrentMesh) return;
       let changed = false;
       const nextLayers = layers.map((layer) => {
         if (layer.locked) return layer;
         if (layer.projectedForModel === modelPath) return layer;
+
+        const mesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
+        if (!mesh) return layer;
+
+        mesh.updateMatrixWorld(true);
+        mesh.geometry.computeBoundingBox();
+        const localBox = mesh.geometry.boundingBox;
+        const localCenter = new THREE.Vector3();
+        localBox.getCenter(localCenter);
 
         const lx = localCenter.x + layer.position[0];
         const ly = localCenter.y + layer.position[1];
@@ -385,14 +394,16 @@ export default function ShirtModel({
             ...layer,
             position: [newOffsetX, newOffsetY, newOffsetZ],
             rotation: [rotation.x, rotation.y, layer.rotation[2] || 0],
-            projectedForModel: modelPath
+            projectedForModel: modelPath,
+            targetMeshName: mesh.name
           };
         } else {
           // Even if raycast fails, mark it as projected to prevent infinite retries
           changed = true;
           return {
             ...layer,
-            projectedForModel: modelPath
+            projectedForModel: modelPath,
+            targetMeshName: mesh.name
           };
         }
       });
@@ -406,15 +417,32 @@ export default function ShirtModel({
   const activeLayer = layers.find((l) => l.id === selectedLayerId);
 
   const updateDecalFromRaycast = (e) => {
-    const mesh = bodyMeshRef.current;
-    if (!mesh || !e.point || !e.normal || !selectedLayerId || activeLayer?.locked) return;
+    if (!selectedLayerId || activeLayer?.locked) return;
+
+    // Filter out decal and decal helper meshes to get the actual model mesh underneath
+    const intersection = e.intersections?.find(
+      (intersect) =>
+        intersect.object &&
+        intersect.object.name !== "decal" &&
+        intersect.object.name !== "decal-helper" &&
+        !intersect.object.userData?.isDecal
+    );
+
+    if (!intersection) return;
+
+    const mesh = intersection.object;
+    if (!mesh || !mesh.isMesh) return;
+
+    const point = intersection.point;
+    let normal = intersection.face?.normal;
+    if (!normal) return;
 
     // 1. Calculate local coordinates on the targeted body mesh
-    const localPoint = mesh.worldToLocal(e.point.clone());
+    const localPoint = mesh.worldToLocal(point.clone());
 
     // 2. Calculate local normal vector
     const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
-    const localNormal = e.normal.clone().applyMatrix3(normalMatrix).normalize();
+    const localNormal = normal.clone().applyMatrix3(normalMatrix).normalize();
 
     // 3. Compute lookAt rotation to project along surface normal
     let up = new THREE.Vector3(0, 1, 0);
@@ -448,7 +476,75 @@ export default function ShirtModel({
             ...l,
             position: [offsetX, offsetY, offsetZ],
             rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
-            projectedForModel: modelPath
+            projectedForModel: modelPath,
+            targetMeshName: mesh.name
+          };
+        }
+        return l;
+      })
+    );
+  };
+
+  const updateDecalFromDrag = (e) => {
+    if (!selectedLayerId || activeLayer?.locked || !dragStartLocalPointRef.current || !dragStartLayerPosRef.current) return;
+
+    // Filter out decal and decal helper meshes to get the actual model mesh underneath
+    const intersection = e.intersections?.find(
+      (intersect) =>
+        intersect.object &&
+        intersect.object.name !== "decal" &&
+        intersect.object.name !== "decal-helper" &&
+        !intersect.object.userData?.isDecal
+    );
+
+    if (!intersection) return;
+
+    const mesh = intersection.object;
+    if (!mesh || !mesh.isMesh) return;
+
+    const point = intersection.point;
+    let normal = intersection.face?.normal;
+    if (!normal) return;
+
+    // Calculate current local coordinates
+    const localPoint = mesh.worldToLocal(point.clone());
+
+    // Calculate normal matrix and rotation
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
+    const localNormal = normal.clone().applyMatrix3(normalMatrix).normalize();
+
+    let up = new THREE.Vector3(0, 1, 0);
+    if (Math.abs(localNormal.dot(up)) > 0.99) {
+      up.set(0, 0, 1);
+    }
+    const target = localNormal.clone();
+    const matrix = new THREE.Matrix4().lookAt(
+      new THREE.Vector3(0, 0, 0),
+      target,
+      up
+    );
+    const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
+
+    // Calculate delta from drag start local point
+    const deltaX = localPoint.x - dragStartLocalPointRef.current.x;
+    const deltaY = localPoint.y - dragStartLocalPointRef.current.y;
+    const deltaZ = localPoint.z - dragStartLocalPointRef.current.z;
+
+    const newPosition = [
+      dragStartLayerPosRef.current[0] + deltaX,
+      dragStartLayerPosRef.current[1] + deltaY,
+      dragStartLayerPosRef.current[2] + deltaZ
+    ];
+
+    onUpdateLayers((prev) =>
+      prev.map((l) => {
+        if (l.id === selectedLayerId) {
+          return {
+            ...l,
+            position: newPosition,
+            rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
+            projectedForModel: modelPath,
+            targetMeshName: mesh.name
           };
         }
         return l;
@@ -459,16 +555,32 @@ export default function ShirtModel({
   const handlePointerDown = (e) => {
     e.stopPropagation();
     if (selectedLayerId && !activeLayer?.locked) {
+      // Find intersection to record drag start local point
+      const intersection = e.intersections?.find(
+        (intersect) =>
+          intersect.object &&
+          intersect.object.name !== "decal" &&
+          intersect.object.name !== "decal-helper" &&
+          !intersect.object.userData?.isDecal
+      );
+      if (!intersection) return;
+
+      const mesh = intersection.object;
+      if (!mesh || !mesh.isMesh) return;
+
+      const localPoint = mesh.worldToLocal(intersection.point.clone());
+      dragStartLocalPointRef.current = localPoint;
+      dragStartLayerPosRef.current = [...activeLayer.position];
+
       setIsDragging(true);
       e.target.setPointerCapture(e.pointerId);
-      updateDecalFromRaycast(e);
     }
   };
 
   const handlePointerMove = (e) => {
     e.stopPropagation();
     if (isDragging) {
-      updateDecalFromRaycast(e);
+      updateDecalFromDrag(e);
     }
   };
 
@@ -476,6 +588,8 @@ export default function ShirtModel({
     e.stopPropagation();
     if (isDragging) {
       setIsDragging(false);
+      dragStartLocalPointRef.current = null;
+      dragStartLayerPosRef.current = null;
       e.target.releasePointerCapture(e.pointerId);
     }
   };
@@ -489,20 +603,38 @@ export default function ShirtModel({
         onPointerUp={handlePointerUp}
       />
 
-      {/* Render decals inside the bodyMeshRef portal so they inherit local transforms */}
-      {meshLoaded && bodyMeshRef.current && createPortal(
-        <>
-          {layers.map((layer) => (
+      {/* Render decals inside target mesh portals so they inherit their local coordinates */}
+      {meshLoaded && bodyMeshRef.current && (() => {
+        // Safety guard: ensure bodyMeshRef.current belongs to the current scene
+        let isCurrentMesh = false;
+        scene.traverse((child) => {
+          if (child === bodyMeshRef.current) isCurrentMesh = true;
+        });
+        if (!isCurrentMesh) return null;
+
+        return layers.map((layer) => {
+          const targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
+          if (!targetMesh) return null;
+
+          // Double check that targetMesh belongs to the current scene
+          let isTargetInScene = false;
+          scene.traverse((c) => {
+            if (c === targetMesh) isTargetInScene = true;
+          });
+          if (!isTargetInScene) return null;
+
+          const meshRef = { current: targetMesh };
+          return createPortal(
             <DecalItem
               key={layer.id}
               layer={layer}
               isSelected={selectedLayerId === layer.id}
-              targetMesh={bodyMeshRef}
-            />
-          ))}
-        </>,
-        bodyMeshRef.current
-      )}
+              targetMesh={meshRef}
+            />,
+            targetMesh
+          );
+        });
+      })()}
     </group>
   );
 }
