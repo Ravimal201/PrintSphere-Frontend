@@ -205,11 +205,12 @@ function DecalItem({ layer, isSelected, targetMesh }) {
           alphaTest={0.05}
           polygonOffset
           polygonOffsetFactor={-10}
+          polygonOffsetUnits={-10}
           // Fabric settings
           roughness={0.8}
           metalness={0.0}
           side={THREE.DoubleSide}
-          depthWrite={true}
+          depthWrite={false}
         />
       </SafeDecal>
 

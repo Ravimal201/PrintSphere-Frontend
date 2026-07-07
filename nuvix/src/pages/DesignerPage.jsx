@@ -409,41 +409,57 @@ export default function DesignerPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
-      const id = `img-${Date.now()}`;
-      const newLayer = {
-        id,
-        type: "image",
-        name: file.name.substring(0, 15),
-        url: reader.result,
-        visible: true,
-        locked: false,
-        position: [0, 0, 0.16],
-        rotation: [0, 0, 0],
-        scale: [0.3, 0.3, 0.25],
-        aspectRatio: 1
+      const img = new Image();
+      img.src = reader.result;
+      img.onload = () => {
+        const aspect = img.width / img.height;
+        const scaleX = 0.3;
+        const scaleY = 0.3 / aspect;
+        
+        const id = `img-${Date.now()}`;
+        const newLayer = {
+          id,
+          type: "image",
+          name: file.name.substring(0, 15),
+          url: reader.result,
+          visible: true,
+          locked: false,
+          position: [0, 0, 0.16],
+          rotation: [0, 0, 0],
+          scale: [scaleX, scaleY, 0.25],
+          aspectRatio: aspect
+        };
+        setLayers([...layers, newLayer]);
+        selectLayer(id);
       };
-      setLayers([...layers, newLayer]);
-      selectLayer(id);
     };
     reader.readAsDataURL(file);
   };
 
   const addPresetImage = (url, name) => {
-    const id = `img-${Date.now()}`;
-    const newLayer = {
-      id,
-      type: "image",
-      name,
-      url,
-      visible: true,
-      locked: false,
-      position: [0, 0, 0.16],
-      rotation: [0, 0, 0],
-      scale: [0.3, 0.3, 0.25],
-      aspectRatio: 1
+    const img = new Image();
+    img.src = url;
+    img.onload = () => {
+      const aspect = img.width / img.height;
+      const scaleX = 0.3;
+      const scaleY = 0.3 / aspect;
+
+      const id = `img-${Date.now()}`;
+      const newLayer = {
+        id,
+        type: "image",
+        name,
+        url,
+        visible: true,
+        locked: false,
+        position: [0, 0, 0.16],
+        rotation: [0, 0, 0],
+        scale: [scaleX, scaleY, 0.25],
+        aspectRatio: aspect
+      };
+      setLayers([...layers, newLayer]);
+      selectLayer(id);
     };
-    setLayers([...layers, newLayer]);
-    selectLayer(id);
   };
 
   const updateActiveLayer = (field, value) => {
@@ -1089,7 +1105,8 @@ export default function DesignerPage() {
                       value={activeLayer.scale[0]}
                       onChange={(e) => {
                         const val = Number(e.target.value);
-                        updateActiveLayer("scale", [val, val, activeLayer.scale[2]]);
+                        const aspect = activeLayer.aspectRatio || (activeLayer.scale[0] / activeLayer.scale[1]) || 1;
+                        updateActiveLayer("scale", [val, val / aspect, activeLayer.scale[2]]);
                       }}
                       className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
                     />
