@@ -241,6 +241,7 @@ export default function ShirtModel({
   const { scene } = useGLTF(modelPath);
   const bodyMeshRef = useRef(null);
   const [meshLoaded, setMeshLoaded] = useState(false);
+  const [activeScene, setActiveScene] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartLocalPointRef = useRef(null);
   const dragStartLayerPosRef = useRef(null);
@@ -279,6 +280,7 @@ export default function ShirtModel({
     if (scene) {
       setMeshLoaded(false);
       bodyMeshRef.current = null;
+      setActiveScene(null);
       scene.updateMatrixWorld(true);
       let bestMesh = null;
       let maxScore = -1;
@@ -310,7 +312,6 @@ export default function ShirtModel({
           if (nameLower.includes("body") || nameLower.includes("front") || nameLower.includes("outside") || nameLower.includes("t-shirt") || nameLower.includes("shirt")) {
             score *= 10.0; // boost main outer parts
           }
-          // No incorrect hardcoded boosts here to let volume-based selection win correctly
 
           if (score > maxScore) {
             maxScore = score;
@@ -322,13 +323,19 @@ export default function ShirtModel({
       if (bestMesh) {
         bodyMeshRef.current = bestMesh;
         setMeshLoaded(true);
+        setActiveScene(scene);
       }
     }
+    return () => {
+      setActiveScene(null);
+      setMeshLoaded(false);
+      bodyMeshRef.current = null;
+    };
   }, [scene, shirtColor]);
 
   // Auto-project decals on the surface of the body mesh when scene or layers change
   useEffect(() => {
-    if (meshLoaded && bodyMeshRef.current && onUpdateLayers && layers.length > 0) {
+    if (meshLoaded && activeScene === scene && bodyMeshRef.current && onUpdateLayers && layers.length > 0) {
       // Safety guard: ensure bodyMeshRef.current belongs to the current scene
       let isCurrentMesh = false;
       scene.traverse((child) => {
@@ -510,9 +517,8 @@ export default function ShirtModel({
     // Calculate current local coordinates
     const localPoint = mesh.worldToLocal(point.clone());
 
-    // Calculate normal matrix and rotation
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
-    const localNormal = normal.clone().applyMatrix3(normalMatrix).normalize();
+    // Calculate local normal and rotation
+    const localNormal = normal.clone().normalize();
 
     let up = new THREE.Vector3(0, 1, 0);
     if (Math.abs(localNormal.dot(up)) > 0.99) {
@@ -605,37 +611,28 @@ export default function ShirtModel({
       />
 
       {/* Render decals inside target mesh portals so they inherit their local coordinates */}
-      {meshLoaded && bodyMeshRef.current && (() => {
-        // Safety guard: ensure bodyMeshRef.current belongs to the current scene
-        let isCurrentMesh = false;
-        scene.traverse((child) => {
-          if (child === bodyMeshRef.current) isCurrentMesh = true;
+      {meshLoaded && activeScene === scene && bodyMeshRef.current && layers.map((layer) => {
+        const targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
+        if (!targetMesh) return null;
+
+        // Double check that targetMesh belongs to the current scene
+        let isTargetInScene = false;
+        scene.traverse((c) => {
+          if (c === targetMesh) isTargetInScene = true;
         });
-        if (!isCurrentMesh) return null;
+        if (!isTargetInScene) return null;
 
-        return layers.map((layer) => {
-          const targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
-          if (!targetMesh) return null;
-
-          // Double check that targetMesh belongs to the current scene
-          let isTargetInScene = false;
-          scene.traverse((c) => {
-            if (c === targetMesh) isTargetInScene = true;
-          });
-          if (!isTargetInScene) return null;
-
-          const meshRef = { current: targetMesh };
-          return createPortal(
-            <DecalItem
-              key={layer.id}
-              layer={layer}
-              isSelected={selectedLayerId === layer.id}
-              targetMesh={meshRef}
-            />,
-            targetMesh
-          );
-        });
-      })()}
+        const meshRef = { current: targetMesh };
+        return createPortal(
+          <DecalItem
+            key={layer.id}
+            layer={layer}
+            isSelected={selectedLayerId === layer.id}
+            targetMesh={meshRef}
+          />,
+          targetMesh
+        );
+      })}
     </group>
   );
 }
