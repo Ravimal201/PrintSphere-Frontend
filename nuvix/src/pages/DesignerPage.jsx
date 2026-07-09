@@ -24,7 +24,9 @@ import {
   RotateCw,
   Scale,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  LogIn,
+  LogOut
 } from "lucide-react";
 
 const shirtColors = [
@@ -637,18 +639,48 @@ export default function DesignerPage() {
           </nav>
         </div>
 
-        <div className="p-4 border-t border-slate-800 space-y-4">
-          <div className="flex items-center gap-3 px-2">
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
-              alt="Avatar"
-              className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover"
-            />
-            <div className="leading-tight">
-              <p className="text-sm font-bold text-white">{currentUser?.name || "User"}</p>
-              <span className="text-xs text-slate-500">{currentUser?.role || "Customer"}</span>
+        <div className="p-4 border-t border-slate-800 space-y-3">
+          {currentUser ? (
+            <div className="space-y-3">
+              <div
+                onClick={() => window.location.href = "/account"}
+                className="flex items-center gap-3 px-2 py-1.5 cursor-pointer rounded-xl hover:bg-slate-800/40 transition group select-none"
+              >
+                <img
+                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
+                  alt="Avatar"
+                  className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover group-hover:ring-indigo-500 transition duration-200"
+                />
+                <div className="leading-tight">
+                  <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition duration-200">{currentUser.name}</p>
+                  <span className="text-xs text-slate-500">{currentUser.role || "Customer"}</span>
+                </div>
+              </div>
+              <div className="px-1.5">
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("printsphere_cart");
+                    window.location.href = "/login";
+                  }}
+                  className="w-full py-2 px-4 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/20 hover:border-transparent rounded-xl font-bold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Logout
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="px-1.5 pb-1">
+              <button
+                onClick={() => window.location.href = "/login?redirect=/designer"}
+                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              >
+                <LogIn className="h-4 w-4" />
+                Login / Sign Up
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
