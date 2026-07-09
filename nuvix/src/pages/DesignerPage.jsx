@@ -154,7 +154,7 @@ export default function DesignerPage() {
           axios.get(`${API_BASE_URL}/auth/tshirt-styles`),
           axios.get(`${API_BASE_URL}/auth/pricing-rules`)
         ]);
-        if (stylesRes.data && stylesRes.data.length > 0) {
+        if (stylesRes.data) {
           setAvailableStyles(stylesRes.data);
           stylesList = stylesRes.data;
         }
@@ -196,17 +196,23 @@ export default function DesignerPage() {
           console.error("Error loading design:", err);
         }
       } else {
-        const defaultModel = stylesList[0];
-        setSelectedModel(defaultModel);
-        setShirtType(defaultModel.type);
-        if (defaultModel.colors && defaultModel.colors.length > 0) {
-          setShirtColor(defaultModel.colors[0].value);
-        }
-        const defaultGSMs = defaultModel.gsmPrices && defaultModel.gsmPrices.length > 0
-          ? defaultModel.gsmPrices.map(gp => gp.gsm)
-          : (defaultModel.gsms || []);
-        if (defaultGSMs.length > 0) {
-          setShirtMaterial(defaultGSMs[0]);
+        const defaultModel = stylesList && stylesList.length > 0 ? stylesList[0] : null;
+        if (defaultModel) {
+          setSelectedModel(defaultModel);
+          setShirtType(defaultModel.type);
+          if (defaultModel.colors && defaultModel.colors.length > 0) {
+            setShirtColor(defaultModel.colors[0].value);
+          }
+          const defaultGSMs = defaultModel.gsmPrices && defaultModel.gsmPrices.length > 0
+            ? defaultModel.gsmPrices.map(gp => gp.gsm)
+            : (defaultModel.gsms || []);
+          if (defaultGSMs.length > 0) {
+            setShirtMaterial(defaultGSMs[0]);
+          }
+        } else {
+          setSelectedModel(null);
+          setShirtType("Crew Neck");
+          setShirtColor("#ffffff");
         }
       }
     };
@@ -240,7 +246,7 @@ export default function DesignerPage() {
       sizes: [selectedSize],
       colors: [shirtColor],
       images: previewImages.length > 0 ? previewImages : ["/images/dumyImage.png"],
-      modelPath: selectedModel.path,
+      modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
       defaultColor: shirtColor,
       layers: layers
     };
@@ -773,7 +779,7 @@ export default function DesignerPage() {
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">T-Shirt Style (3D Model)</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {availableStyles.map((model) => {
-                      const isSelected = selectedModel.path === model.path;
+                      const isSelected = selectedModel?.path === model.path;
                       return (
                         <button
                           key={model.name}
@@ -876,7 +882,7 @@ export default function DesignerPage() {
 
             <div className="flex-1 flex items-center justify-center min-h-0 relative">
               <Scene
-                modelPath={selectedModel.path}
+                modelPath={selectedModel?.path || "/images/models/male normal t-shirt1.glb"}
                 shirtColor={shirtColor}
                 activeSide={activeView}
                 zoomLevel={zoomLevel}
@@ -1266,7 +1272,7 @@ export default function DesignerPage() {
                     cartKey,
                     designId: designId,
                     productId: null,
-                    title: `${selectedModel.name} (Custom Design)`,
+                    title: `${selectedModel?.name || shirtType} (Custom Design)`,
                     basePrice: unitPrice,
                     discount: 0,
                     category: "Customized",
@@ -1281,7 +1287,7 @@ export default function DesignerPage() {
                   };
 
                   localStorage.setItem("printsphere_cart", JSON.stringify([...currentCart, cartItem]));
-                  alert(`Added ${selectedModel.name} (${selectedSize}) to cart! Redirecting to checkout...`);
+                  alert(`Added ${selectedModel?.name || shirtType} (${selectedSize}) to cart! Redirecting to checkout...`);
                   window.location.href = "/store";
                 }}
                 className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight"
