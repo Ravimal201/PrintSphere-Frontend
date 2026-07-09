@@ -249,9 +249,33 @@ export default function ShirtModel({
   // Center and normalize scale once when model loads
   useEffect(() => {
     if (scene) {
-      // Force matrix update
+      // 1. Reset scene transforms to get clean, unmutated dimensions
+      scene.position.set(0, 0, 0);
+      scene.scale.set(1, 1, 1);
+      scene.rotation.set(0, 0, 0);
       scene.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(scene);
+
+      // 2. Compute bounding box of original meshes only (exclude decals/helpers)
+      const box = new THREE.Box3();
+      let hasMesh = false;
+      scene.traverse((child) => {
+        if (child.isMesh && child.name !== "decal" && child.name !== "decal-helper" && !child.userData?.isDecal) {
+          child.updateMatrixWorld(true);
+          const childBox = new THREE.Box3().setFromObject(child);
+          if (!hasMesh) {
+            box.copy(childBox);
+            hasMesh = true;
+          } else {
+            box.union(childBox);
+          }
+        }
+      });
+
+      // Fallback to full scene if no mesh found (should not happen)
+      if (!hasMesh) {
+        box.setFromObject(scene);
+      }
+
       const size = new THREE.Vector3();
       box.getSize(size);
       const center = new THREE.Vector3();
