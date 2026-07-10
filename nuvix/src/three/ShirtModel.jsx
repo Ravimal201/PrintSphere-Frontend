@@ -117,13 +117,13 @@ function SafeDecal({
     <mesh
       ref={setDecalMesh}
       name="decal"
-      userData={{ isDecal: true }}
       material-transparent
       material-polygonOffset
       material-polygonOffsetFactor={polygonOffsetFactor}
       material-depthTest={depthTest}
       material-map={map}
       {...props}
+      userData={{ isDecal: true, ...props.userData }}
     >
       {children}
     </mesh>
@@ -268,6 +268,15 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     }
   };
 
+  // Copy parent fabric texture settings and normal map (wrinkles) to decal
+  const parentMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  const normalMap = parentMat?.normalMap || null;
+  const roughnessMap = parentMat?.roughnessMap || null;
+  const metalnessMap = parentMat?.metalnessMap || null;
+  const normalScale = parentMat?.normalScale || new THREE.Vector2(1, 1);
+  const roughness = parentMat?.roughness ?? 0.8;
+  const metalness = parentMat?.metalness ?? 0.0;
+
   return (
     <group>
       {/* 3D Projected Decal on target Mesh */}
@@ -276,6 +285,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
         position={decalPos}
         rotation={layer.rotation}
         scale={layer.scale}
+        userData={{ isDecal: true, layerId: layer.id }}
       >
         <meshStandardMaterial
           map={texture}
@@ -284,8 +294,12 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
           polygonOffset
           polygonOffsetFactor={-10}
           polygonOffsetUnits={-10}
-          roughness={0.8}
-          metalness={0.0}
+          normalMap={normalMap}
+          normalScale={normalScale}
+          roughnessMap={roughnessMap}
+          metalnessMap={metalnessMap}
+          roughness={roughness}
+          metalness={metalness}
           side={THREE.DoubleSide}
           depthWrite={false}
         />
@@ -395,8 +409,8 @@ export default function ShirtModel({
   const [meshLoaded, setMeshLoaded] = useState(false);
   const [activeScene, setActiveScene] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartLocalPointRef = useRef(null);
-  const dragStartLayerPosRef = useRef(null);
+  const dragStartWorldOffsetRef = useRef(null);
+  const draggedLayerIdRef = useRef(null);
 
   // Center and normalize scale once when model loads
   useEffect(() => {
@@ -671,7 +685,11 @@ export default function ShirtModel({
   };
 
   const updateDecalFromDrag = (e) => {
-    if (!selectedLayerId || activeLayer?.locked || !dragStartLocalPointRef.current || !dragStartLayerPosRef.current) return;
+    if (!draggedLayerIdRef.current || !dragStartWorldOffsetRef.current) return;
+
+    const layerId = draggedLayerIdRef.current;
+    const activeLayerObj = layers.find((l) => l.id === layerId);
+    if (!activeLayerObj || activeLayerObj.locked) return;
 
     // Filter out decal and decal helper meshes to get the actual model mesh underneath
     const intersection = e.intersections?.find(
@@ -679,6 +697,7 @@ export default function ShirtModel({
         intersect.object &&
         intersect.object.name !== "decal" &&
         intersect.object.name !== "decal-helper" &&
+        intersect.object.name !== "decal-helper-handle" &&
         !intersect.object.userData?.isDecal
     );
 
@@ -687,42 +706,47 @@ export default function ShirtModel({
     const mesh = intersection.object;
     if (!mesh || !mesh.isMesh) return;
 
-    const point = intersection.point;
-    let normal = intersection.face?.normal;
+    const currentWorldPoint = intersection.point.clone();
+    
+    // Calculate target decal center in world space using the world offset
+    const targetDecalWorldPoint = new THREE.Vector3().subVectors(currentWorldPoint, dragStartWorldOffsetRef.current);
+    
+    // Project target world point onto the current intersected mesh local coordinates
+    const localPoint = mesh.worldToLocal(targetDecalWorldPoint.clone());
+    
+    const normal = intersection.face?.normal;
     if (!normal) return;
 
-    // Calculate current local coordinates
-    const localPoint = mesh.worldToLocal(point.clone());
-
     // Calculate local normal and rotation
-    const localNormal = normal.clone().normalize();
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
+    const localNormal = normal.clone().applyMatrix3(normalMatrix).normalize();
 
     let up = new THREE.Vector3(0, 1, 0);
     if (Math.abs(localNormal.dot(up)) > 0.99) {
       up.set(0, 0, 1);
     }
-    const target = localNormal.clone();
     const matrix = new THREE.Matrix4().lookAt(
       new THREE.Vector3(0, 0, 0),
-      target,
+      localNormal,
       up
     );
     const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
 
-    // Calculate delta from drag start local point
-    const deltaX = localPoint.x - dragStartLocalPointRef.current.x;
-    const deltaY = localPoint.y - dragStartLocalPointRef.current.y;
-    const deltaZ = localPoint.z - dragStartLocalPointRef.current.z;
+    // Compute current mesh local center
+    mesh.geometry.computeBoundingBox();
+    const localBox = mesh.geometry.boundingBox;
+    const localCenter = new THREE.Vector3();
+    localBox.getCenter(localCenter);
 
     const newPosition = [
-      dragStartLayerPosRef.current[0] + deltaX,
-      dragStartLayerPosRef.current[1] + deltaY,
-      dragStartLayerPosRef.current[2] + deltaZ
+      localPoint.x - localCenter.x,
+      localPoint.y - localCenter.y,
+      localPoint.z - localCenter.z
     ];
 
     onUpdateLayers((prev) =>
       prev.map((l) => {
-        if (l.id === selectedLayerId) {
+        if (l.id === layerId) {
           return {
             ...l,
             position: newPosition,
@@ -738,8 +762,26 @@ export default function ShirtModel({
 
   const handlePointerDown = (e) => {
     e.stopPropagation();
-    if (selectedLayerId && !activeLayer?.locked) {
-      // Find intersection to record drag start local point
+    
+    // 1. Check if we clicked directly on a decal to select it
+    const decalIntersect = e.intersections?.find(
+      (intersect) =>
+        intersect.object &&
+        (intersect.object.name === "decal" || intersect.object.userData?.isDecal)
+    );
+
+    let targetLayerId = selectedLayerId;
+    if (decalIntersect) {
+      const clickedLayerId = decalIntersect.object.userData?.layerId;
+      if (clickedLayerId) {
+        onSelectLayer(clickedLayerId);
+        targetLayerId = clickedLayerId;
+      }
+    }
+
+    const activeLayerObj = layers.find((l) => l.id === targetLayerId);
+    if (targetLayerId && activeLayerObj && !activeLayerObj.locked) {
+      // 2. Find intersection on the shirt mesh underneath
       const intersection = e.intersections?.find(
         (intersect) =>
           intersect.object &&
@@ -753,9 +795,26 @@ export default function ShirtModel({
       const mesh = intersection.object;
       if (!mesh || !mesh.isMesh) return;
 
-      const localPoint = mesh.worldToLocal(intersection.point.clone());
-      dragStartLocalPointRef.current = localPoint;
-      dragStartLayerPosRef.current = [...activeLayer.position];
+      // 3. Compute active layer's current center in world space
+      const layerMesh = (activeLayerObj.targetMeshName && scene.getObjectByName(activeLayerObj.targetMeshName)) || bodyMeshRef.current;
+      if (!layerMesh) return;
+
+      layerMesh.geometry.computeBoundingBox();
+      const localBox = layerMesh.geometry.boundingBox;
+      const localCenter = new THREE.Vector3();
+      localBox.getCenter(localCenter);
+
+      const localPos = new THREE.Vector3(
+        localCenter.x + activeLayerObj.position[0],
+        localCenter.y + activeLayerObj.position[1],
+        localCenter.z + activeLayerObj.position[2]
+      );
+      const activeLayerWorldPoint = localPos.clone().applyMatrix4(layerMesh.matrixWorld);
+
+      // 4. Calculate world offset from target center to intersection click point
+      const clickWorldPoint = intersection.point.clone();
+      dragStartWorldOffsetRef.current = new THREE.Vector3().subVectors(clickWorldPoint, activeLayerWorldPoint);
+      draggedLayerIdRef.current = targetLayerId;
 
       setIsDragging(true);
       e.target.setPointerCapture(e.pointerId);
@@ -764,7 +823,7 @@ export default function ShirtModel({
 
   const handlePointerMove = (e) => {
     e.stopPropagation();
-    if (isDragging) {
+    if (isDragging && draggedLayerIdRef.current) {
       updateDecalFromDrag(e);
     }
   };
@@ -773,8 +832,8 @@ export default function ShirtModel({
     e.stopPropagation();
     if (isDragging) {
       setIsDragging(false);
-      dragStartLocalPointRef.current = null;
-      dragStartLayerPosRef.current = null;
+      draggedLayerIdRef.current = null;
+      dragStartWorldOffsetRef.current = null;
       e.target.releasePointerCapture(e.pointerId);
     }
   };
