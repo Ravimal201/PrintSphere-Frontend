@@ -131,8 +131,11 @@ function SafeDecal({
 }
 
 // Sub-component to manage texture loading and rendering for each decal layer
-function DecalItem({ layer, isSelected, targetMesh }) {
+function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLayer }) {
   const [texture, setTexture] = useState(null);
+  const [isScaling, setIsScaling] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
+  const groupRef = useRef(null);
 
   useEffect(() => {
     if (!layer.visible) return;
@@ -190,6 +193,81 @@ function DecalItem({ layer, isSelected, targetMesh }) {
     localCenter.z + layer.position[2]
   ];
 
+  const handleScaleDown = (e) => {
+    e.stopPropagation();
+    setIsScaling(true);
+    e.target.setPointerCapture(e.pointerId);
+  };
+
+  const handleScaleMove = (e) => {
+    e.stopPropagation();
+    if (!isScaling) return;
+    if (!groupRef.current) return;
+    
+    const localPoint = groupRef.current.worldToLocal(e.point.clone());
+    const newScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
+    const aspect = layer.aspectRatio || (layer.scale[0] / layer.scale[1]) || 1;
+    const newScaleY = newScaleX / aspect;
+    
+    if (onUpdateLayers) {
+      onUpdateLayers((prev) =>
+        prev.map((l) =>
+          l.id === layer.id
+            ? { ...l, scale: [newScaleX, newScaleY, l.scale[2]] }
+            : l
+        )
+      );
+    }
+  };
+
+  const handleScaleUp = (e) => {
+    e.stopPropagation();
+    setIsScaling(false);
+    e.target.releasePointerCapture(e.pointerId);
+  };
+
+  const handleRotateDown = (e) => {
+    e.stopPropagation();
+    setIsRotating(true);
+    e.target.setPointerCapture(e.pointerId);
+  };
+
+  const handleRotateMove = (e) => {
+    e.stopPropagation();
+    if (!isRotating) return;
+    if (!groupRef.current) return;
+    
+    const localPoint = groupRef.current.worldToLocal(e.point.clone());
+    const angle = Math.atan2(localPoint.x, localPoint.y);
+    
+    if (onUpdateLayers) {
+      onUpdateLayers((prev) =>
+        prev.map((l) =>
+          l.id === layer.id
+            ? { ...l, rotation: [l.rotation[0], l.rotation[1], -angle] }
+            : l
+        )
+      );
+    }
+  };
+
+  const handleRotateUp = (e) => {
+    e.stopPropagation();
+    setIsRotating(false);
+    e.target.releasePointerCapture(e.pointerId);
+  };
+
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this layer?")) {
+      if (onDeleteLayer) {
+        onDeleteLayer(layer.id);
+      } else if (onUpdateLayers) {
+        onUpdateLayers((prev) => prev.filter((l) => l.id !== layer.id));
+      }
+    }
+  };
+
   return (
     <group>
       {/* 3D Projected Decal on target Mesh */}
@@ -206,7 +284,6 @@ function DecalItem({ layer, isSelected, targetMesh }) {
           polygonOffset
           polygonOffsetFactor={-10}
           polygonOffsetUnits={-10}
-          // Fabric settings
           roughness={0.8}
           metalness={0.0}
           side={THREE.DoubleSide}
@@ -214,17 +291,91 @@ function DecalItem({ layer, isSelected, targetMesh }) {
         />
       </SafeDecal>
 
-      {/* Blue wireframe bounding helper when selected */}
+      {/* Interactive Bounding outline and control handles when selected */}
       {isSelected && (
-        <mesh position={decalPos} rotation={layer.rotation} name="decal-helper" userData={{ isDecal: true }}>
-          <boxGeometry args={[layer.scale[0], layer.scale[1], 0.05]} />
-          <meshBasicMaterial
-            color="#4f46e5"
-            wireframe
-            transparent
-            opacity={0.7}
-          />
-        </mesh>
+        <group ref={groupRef} position={decalPos} rotation={layer.rotation}>
+          {/* Outline Box */}
+          <mesh name="decal-helper" userData={{ isDecal: true }}>
+            <planeGeometry args={[layer.scale[0], layer.scale[1]]} />
+            <meshBasicMaterial
+              color="#4f46e5"
+              wireframe
+              transparent
+              opacity={0.8}
+              depthWrite={false}
+            />
+          </mesh>
+
+          {/* Scale Handle (Bottom Right) */}
+          <mesh
+            position={[layer.scale[0] / 2, -layer.scale[1] / 2, 0.01]}
+            name="decal-helper-handle"
+            userData={{ isDecal: true }}
+            onPointerDown={handleScaleDown}
+            onPointerMove={handleScaleMove}
+            onPointerUp={handleScaleUp}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              document.body.style.cursor = "nwse-resize";
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "auto";
+            }}
+          >
+            <sphereGeometry args={[0.012, 16, 16]} />
+            <meshBasicMaterial color="#ffffff" depthTest={false} />
+            <mesh>
+              <sphereGeometry args={[0.006, 16, 16]} />
+              <meshBasicMaterial color="#4f46e5" depthTest={false} />
+            </mesh>
+          </mesh>
+
+          {/* Rotate Handle (Top Center) */}
+          <mesh
+            position={[0, layer.scale[1] / 2 + 0.025, 0.01]}
+            name="decal-helper-handle"
+            userData={{ isDecal: true }}
+            onPointerDown={handleRotateDown}
+            onPointerMove={handleRotateMove}
+            onPointerUp={handleRotateUp}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              document.body.style.cursor = "grab";
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "auto";
+            }}
+          >
+            <sphereGeometry args={[0.012, 16, 16]} />
+            <meshBasicMaterial color="#ffffff" depthTest={false} />
+            <mesh>
+              <sphereGeometry args={[0.006, 16, 16]} />
+              <meshBasicMaterial color="#10b981" depthTest={false} />
+            </mesh>
+          </mesh>
+
+          {/* Delete Handle (Top Left) */}
+          <mesh
+            position={[-layer.scale[0] / 2, layer.scale[1] / 2, 0.01]}
+            name="decal-helper-handle"
+            userData={{ isDecal: true }}
+            onPointerDown={handleDeleteClick}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              document.body.style.cursor = "pointer";
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "auto";
+            }}
+          >
+            <sphereGeometry args={[0.012, 16, 16]} />
+            <meshBasicMaterial color="#ffffff" depthTest={false} />
+            <mesh>
+              <sphereGeometry args={[0.006, 16, 16]} />
+              <meshBasicMaterial color="#ef4444" depthTest={false} />
+            </mesh>
+          </mesh>
+        </group>
       )}
     </group>
   );
@@ -236,7 +387,8 @@ export default function ShirtModel({
   layers,
   selectedLayerId,
   onSelectLayer,
-  onUpdateLayers
+  onUpdateLayers,
+  onDeleteLayer
 }) {
   const { scene } = useGLTF(modelPath);
   const bodyMeshRef = useRef(null);
@@ -457,6 +609,7 @@ export default function ShirtModel({
         intersect.object &&
         intersect.object.name !== "decal" &&
         intersect.object.name !== "decal-helper" &&
+        intersect.object.name !== "decal-helper-handle" &&
         !intersect.object.userData?.isDecal
     );
 
@@ -592,6 +745,7 @@ export default function ShirtModel({
           intersect.object &&
           intersect.object.name !== "decal" &&
           intersect.object.name !== "decal-helper" &&
+          intersect.object.name !== "decal-helper-handle" &&
           !intersect.object.userData?.isDecal
       );
       if (!intersection) return;
@@ -653,6 +807,8 @@ export default function ShirtModel({
             layer={layer}
             isSelected={selectedLayerId === layer.id}
             targetMesh={meshRef}
+            onUpdateLayers={onUpdateLayers}
+            onDeleteLayer={onDeleteLayer}
           />,
           targetMesh
         );
