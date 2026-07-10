@@ -921,6 +921,7 @@ export default function DesignerPage() {
                 selectedLayerId={selectedLayerId}
                 onSelectLayer={selectLayer}
                 onUpdateLayers={setLayers}
+                onDeleteLayer={deleteLayer}
               />
             </div>
 

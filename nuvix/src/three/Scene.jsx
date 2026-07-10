@@ -43,7 +43,8 @@ export default function Scene({
   layers,
   selectedLayerId,
   onSelectLayer,
-  onUpdateLayers
+  onUpdateLayers,
+  onDeleteLayer
 }) {
   const groupRef = useRef();
 
@@ -86,6 +87,7 @@ export default function Scene({
             selectedLayerId={selectedLayerId}
             onSelectLayer={onSelectLayer}
             onUpdateLayers={onUpdateLayers}
+            onDeleteLayer={onDeleteLayer}
           />
         </group>
       </Suspense>
