@@ -85,6 +85,8 @@ function SafeDecal({
       o.rotateY(Math.PI);
       if (typeof rotation === 'number') o.rotateZ(rotation);
       rotEuler = o.rotation.clone();
+    } else if (rotation instanceof THREE.Euler) {
+      rotEuler = rotation;
     } else {
       rotEuler = new THREE.Euler().fromArray(vecToArray(rotation));
     }
@@ -131,7 +133,7 @@ function SafeDecal({
 }
 
 // Sub-component to manage texture loading and rendering for each decal layer
-function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLayer }) {
+function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLayer, scene }) {
   const [texture, setTexture] = useState(null);
   const [isScaling, setIsScaling] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
@@ -179,7 +181,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     layer.visible
   ]);
 
-  if (!layer.visible || !texture || !targetMesh?.current) return null;
+  if (!layer.visible || !texture || !targetMesh?.current || !scene) return null;
 
   const mesh = targetMesh.current;
   mesh.geometry.computeBoundingBox();
@@ -187,11 +189,33 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
   const localCenter = new THREE.Vector3();
   localBox.getCenter(localCenter);
 
-  const decalPos = [
-    localCenter.x + layer.position[0],
-    localCenter.y + layer.position[1],
-    localCenter.z + layer.position[2]
+  // 1. Convert layer.position (stored in scene-group space) to mesh local space
+  const groupPos = new THREE.Vector3().fromArray(layer.position);
+  const worldPos = groupPos.clone().applyMatrix4(scene.matrixWorld);
+  const localPos = worldPos.clone().applyMatrix4(mesh.matrixWorld.clone().invert());
+  const decalPos = [localPos.x, localPos.y, localPos.z];
+
+  // 2. Convert layer.scale (stored in scene-group space) to mesh local scale
+  const groupScale = new THREE.Vector3().fromArray(layer.scale);
+  const meshWorldScale = new THREE.Vector3();
+  mesh.getWorldScale(meshWorldScale);
+  const decalScale = [
+    groupScale.x / (meshWorldScale.x || 1),
+    groupScale.y / (meshWorldScale.y || 1),
+    groupScale.z / (meshWorldScale.z || 1)
   ];
+
+  // Copy parent fabric texture settings and normal map (wrinkles) to decal
+  const parentMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  const normalMap = parentMat?.normalMap || null;
+  const roughnessMap = parentMat?.roughnessMap || null;
+  const metalnessMap = parentMat?.metalnessMap || null;
+  const normalScale = parentMat?.normalScale || new THREE.Vector2(1, 1);
+  const roughness = parentMat?.roughness ?? 0.8;
+  const metalness = parentMat?.metalness ?? 0.0;
+
+  // Convert layer.rotation (stored in YXZ Euler angles) to a local euler angle
+  const rotEuler = new THREE.Euler(layer.rotation[0], layer.rotation[1], layer.rotation[2], "YXZ");
 
   const handleScaleDown = (e) => {
     e.stopPropagation();
@@ -205,15 +229,20 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     if (!groupRef.current) return;
     
     const localPoint = groupRef.current.worldToLocal(e.point.clone());
-    const newScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
+    // Calculate new scale in mesh local space
+    const newLocalScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
     const aspect = layer.aspectRatio || (layer.scale[0] / layer.scale[1]) || 1;
-    const newScaleY = newScaleX / aspect;
+    const newLocalScaleY = newLocalScaleX / aspect;
+
+    // Convert back to scene group scale space
+    const newGroupScaleX = newLocalScaleX * meshWorldScale.x;
+    const newGroupScaleY = newLocalScaleY * meshWorldScale.y;
     
     if (onUpdateLayers) {
       onUpdateLayers((prev) =>
         prev.map((l) =>
           l.id === layer.id
-            ? { ...l, scale: [newScaleX, newScaleY, l.scale[2]] }
+            ? { ...l, scale: [newGroupScaleX, newGroupScaleY, l.scale[2]] }
             : l
         )
       );
@@ -268,14 +297,16 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     }
   };
 
-  // Copy parent fabric texture settings and normal map (wrinkles) to decal
-  const parentMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-  const normalMap = parentMat?.normalMap || null;
-  const roughnessMap = parentMat?.roughnessMap || null;
-  const metalnessMap = parentMat?.metalnessMap || null;
-  const normalScale = parentMat?.normalScale || new THREE.Vector2(1, 1);
-  const roughness = parentMat?.roughness ?? 0.8;
-  const metalness = parentMat?.metalness ?? 0.0;
+  // Define points for a clean rectangular outline (no diagonal lines)
+  const halfW = decalScale[0] / 2;
+  const halfH = decalScale[1] / 2;
+  const borderPoints = [
+    new THREE.Vector3(-halfW, halfH, 0),
+    new THREE.Vector3(halfW, halfH, 0),
+    new THREE.Vector3(halfW, -halfH, 0),
+    new THREE.Vector3(-halfW, -halfH, 0),
+    new THREE.Vector3(-halfW, halfH, 0)
+  ];
 
   return (
     <group>
@@ -283,8 +314,8 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
       <SafeDecal
         mesh={targetMesh}
         position={decalPos}
-        rotation={layer.rotation}
-        scale={layer.scale}
+        rotation={rotEuler}
+        scale={decalScale}
         userData={{ isDecal: true, layerId: layer.id }}
       >
         <meshStandardMaterial
@@ -307,22 +338,23 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
 
       {/* Interactive Bounding outline and control handles when selected */}
       {isSelected && (
-        <group ref={groupRef} position={decalPos} rotation={layer.rotation}>
-          {/* Outline Box */}
-          <mesh name="decal-helper" userData={{ isDecal: true }}>
-            <planeGeometry args={[layer.scale[0], layer.scale[1]]} />
-            <meshBasicMaterial
+        <group ref={groupRef} position={decalPos} rotation={rotEuler}>
+          {/* Clean rectangular border without diagonal line */}
+          <line name="decal-helper" userData={{ isDecal: true }}>
+            <bufferGeometry attach="geometry" onUpdate={(self) => self.setFromPoints(borderPoints)} />
+            <lineBasicMaterial
+              attach="material"
               color="#4f46e5"
-              wireframe
+              linewidth={1.5}
               transparent
               opacity={0.8}
               depthWrite={false}
             />
-          </mesh>
+          </line>
 
           {/* Scale Handle (Bottom Right) */}
           <mesh
-            position={[layer.scale[0] / 2, -layer.scale[1] / 2, 0.01]}
+            position={[decalScale[0] / 2, -decalScale[1] / 2, 0.01]}
             name="decal-helper-handle"
             userData={{ isDecal: true }}
             onPointerDown={handleScaleDown}
@@ -346,7 +378,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
 
           {/* Rotate Handle (Top Center) */}
           <mesh
-            position={[0, layer.scale[1] / 2 + 0.025, 0.01]}
+            position={[0, decalScale[1] / 2 + 0.025 / (meshWorldScale.y || 1), 0.01]}
             name="decal-helper-handle"
             userData={{ isDecal: true }}
             onPointerDown={handleRotateDown}
@@ -370,7 +402,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
 
           {/* Delete Handle (Top Left) */}
           <mesh
-            position={[-layer.scale[0] / 2, layer.scale[1] / 2, 0.01]}
+            position={[-decalScale[0] / 2, decalScale[1] / 2, 0.01]}
             name="decal-helper-handle"
             userData={{ isDecal: true }}
             onPointerDown={handleDeleteClick}
@@ -540,21 +572,15 @@ export default function ShirtModel({
         const mesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
         if (!mesh) return layer;
 
-        mesh.updateMatrixWorld(true);
-        mesh.geometry.computeBoundingBox();
-        const localBox = mesh.geometry.boundingBox;
-        const localCenter = new THREE.Vector3();
-        localBox.getCenter(localCenter);
-
-        const lx = localCenter.x + layer.position[0];
-        const ly = localCenter.y + layer.position[1];
+        // Project position from scene group-space onto the new mesh using a front-to-back raycast
+        const groupPos = new THREE.Vector3().fromArray(layer.position);
         
-        // Raycast down along local Z axis to find outer surface
-        const localOrigin = new THREE.Vector3(lx, ly, localBox.max.z + 2.0);
+        // Raycast from in front of the shirt group (Z=2) backwards (Z=-2) at the (x, y) coordinates
+        const localOrigin = new THREE.Vector3(groupPos.x, groupPos.y, 2.0);
         const localDir = new THREE.Vector3(0, 0, -1);
         
-        const worldOrigin = localOrigin.clone().applyMatrix4(mesh.matrixWorld);
-        const worldDir = localDir.clone().transformDirection(mesh.matrixWorld).normalize();
+        const worldOrigin = localOrigin.clone().applyMatrix4(scene.matrixWorld);
+        const worldDir = localDir.clone().transformDirection(scene.matrixWorld).normalize();
         
         const raycaster = new THREE.Raycaster();
         raycaster.set(worldOrigin, worldDir);
@@ -562,41 +588,38 @@ export default function ShirtModel({
         
         if (intersects.length > 0) {
           const hit = intersects[0];
-          const localHitPoint = mesh.worldToLocal(hit.point.clone());
+          // Convert the hit point back to group-space coordinates
+          const scenePoint = scene.worldToLocal(hit.point.clone());
           
-          const newOffsetX = localHitPoint.x - localCenter.x;
-          const newOffsetY = localHitPoint.y - localCenter.y;
-          const newOffsetZ = localHitPoint.z - localCenter.z;
-          
-          let localNormal;
-          if (hit.face && hit.face.normal) {
-            localNormal = hit.face.normal.clone().normalize();
-          } else {
-            localNormal = new THREE.Vector3(0, 0, 1);
-          }
+          let normal = hit.face?.normal || new THREE.Vector3(0, 0, 1);
+          // Calculate normal vector relative to the scene group
+          const normalMatrix = new THREE.Matrix3().getNormalMatrix(scene.matrixWorld).invert();
+          const sceneNormal = normal.clone().applyMatrix3(normalMatrix).normalize();
           
           let up = new THREE.Vector3(0, 1, 0);
-          if (Math.abs(localNormal.dot(up)) > 0.99) {
+          if (Math.abs(sceneNormal.dot(up)) > 0.99) {
             up.set(0, 0, 1);
           }
           
           const matrix = new THREE.Matrix4().lookAt(
             new THREE.Vector3(0, 0, 0),
-            localNormal,
+            sceneNormal,
             up
           );
-          const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
+          const rotation = new THREE.Euler().setFromRotationMatrix(matrix, "YXZ");
           
           changed = true;
           return {
             ...layer,
-            position: [newOffsetX, newOffsetY, newOffsetZ],
+            position: [scenePoint.x, scenePoint.y, scenePoint.z],
             rotation: [rotation.x, rotation.y, layer.rotation[2] || 0],
             projectedForModel: modelPath,
             targetMeshName: mesh.name
           };
         } else {
-          // Even if raycast fails, mark it as projected to prevent infinite retries
+          // If the raycast misses (e.g. geometry shifted slightly on style change),
+          // mark it as projected for the new model to prevent infinite retries.
+          // Since the coordinates are stored in scene group-space, they remain valid.
           changed = true;
           return {
             ...layer,
@@ -868,6 +891,7 @@ export default function ShirtModel({
             targetMesh={meshRef}
             onUpdateLayers={onUpdateLayers}
             onDeleteLayer={onDeleteLayer}
+            scene={scene}
           />,
           targetMesh
         );
