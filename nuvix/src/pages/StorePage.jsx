@@ -10,8 +10,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
-
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 export default function StorePage() {
   const [products, setProducts] = useState([]);

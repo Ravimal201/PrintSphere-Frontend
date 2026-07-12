@@ -2,6 +2,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Heart, Star } from "lucide-reac
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import TShirt2D from "../TShirt2D";
+import { API_BASE_URL } from "../../config/api";
 
 const fallbackProducts = [
   {
@@ -176,7 +177,7 @@ export default function PopularProducts() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/auth/products");
+        const response = await axios.get(`${API_BASE_URL}/auth/products`);
         setProducts(response.data);
       } catch (err) {
         console.error("Error loading popular products:", err);

@@ -1,6 +1,6 @@
 import GUserPage from "./pages/GUserPage";
 import CustomerHomePage from "./pages/CustomerHomePage";
-import EtiterPage from "./pages/editer";
+import EtiterPage from "./pages/editer.jsx";
 import DesignerPage from "./pages/DesignerPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";

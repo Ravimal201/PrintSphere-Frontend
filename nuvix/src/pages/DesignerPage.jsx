@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Scene from "../three/Scene";
 import axios from "axios";
+import { API_BASE_URL } from "../config/api";
 import {
   Layers,
   Type,
@@ -128,8 +129,6 @@ export default function DesignerPage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
-
-  const API_BASE_URL = "http://localhost:5000/api";
 
   const [availableStyles, setAvailableStyles] = useState(tShirtModels);
 

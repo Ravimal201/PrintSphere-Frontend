@@ -6,6 +6,7 @@ const Inventory = require("../models/Inventory");
 const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const TShirtStyle = require("../models/TShirtStyle");
+const { createNotification } = require("../utils/notificationHelper");
 
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
 
@@ -123,6 +124,28 @@ exports.updateStock = async (req, res) => {
 
     if (!updated) {
       return res.status(404).json({ message: "Inventory item not found" });
+    }
+
+    // Check if item went below threshold and create alert notifications
+    if (updated.quantity <= updated.minThreshold) {
+      const itemDesc = updated.tShirtType 
+        ? `${updated.tShirtType} T-Shirt (${updated.color}, Size ${updated.size})` 
+        : updated.itemType;
+      const alertMsg = `${itemDesc} has fallen below minimum threshold! Current stock: ${updated.quantity} (Threshold: ${updated.minThreshold}).`;
+      
+      await createNotification({
+        recipientRole: "Admin",
+        title: "Low Stock Alert",
+        message: alertMsg,
+        type: "Low Stock"
+      });
+
+      await createNotification({
+        recipientRole: "Manager",
+        title: "Low Stock Alert",
+        message: alertMsg,
+        type: "Low Stock"
+      });
     }
 
     res.json({ message: "Stock updated successfully", item: updated });
@@ -251,6 +274,8 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    const prevEmployee = order.assignedEmployee;
+
     if (status) {
       order.orderStatus = status;
       order.timeline.push({ status, note: note || `Status updated to ${status}` });
@@ -261,6 +286,42 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     await order.save();
+
+    // Trigger notification if assigned employee changed/assigned
+    if (assignedEmployeeId && (!prevEmployee || prevEmployee.toString() !== assignedEmployeeId.toString())) {
+      await createNotification({
+        recipientId: assignedEmployeeId,
+        title: "New Print Task Assigned",
+        message: `You have been assigned to print Order #${order._id}.`,
+        type: "New Print Task"
+      });
+    }
+
+    // Trigger notification if status was updated
+    if (status) {
+      const msg = `Order #${order._id} status has been updated to "${status}" by manager.`;
+      if (order.customerId) {
+        await createNotification({
+          recipientId: order.customerId,
+          title: `Order Update: ${status}`,
+          message: `Your order #${order._id} has progressed to: ${status}.`,
+          type: "Order Update"
+        });
+      }
+      await createNotification({
+        recipientRole: "Admin",
+        title: `Order #${order._id} Status: ${status}`,
+        message: msg,
+        type: "Order Update"
+      });
+      await createNotification({
+        recipientRole: "Manager",
+        title: `Order #${order._id} Status: ${status}`,
+        message: msg,
+        type: "Order Update"
+      });
+    }
+
     res.json({ message: "Order updated successfully", order });
   } catch (error) {
     console.error("Update order status error:", error);

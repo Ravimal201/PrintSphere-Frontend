@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const CustomizedDesign = require("../models/CustomizedDesign");
+const { createNotification } = require("../utils/notificationHelper");
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -82,6 +83,31 @@ exports.updateAssignedOrderStatus = async (req, res) => {
     }
 
     await order.save();
+
+    // Trigger notifications for status updates (production progress)
+    if (status) {
+      const msg = `Order #${order._id} status has been updated to "${status}" by printing operator.`;
+      if (order.customerId) {
+        await createNotification({
+          recipientId: order.customerId,
+          title: `Order Update: ${status}`,
+          message: `Your order #${order._id} has progressed to: ${status}.`,
+          type: "Order Update"
+        });
+      }
+      await createNotification({
+        recipientRole: "Admin",
+        title: `Order #${order._id} Status: ${status}`,
+        message: msg,
+        type: "Order Update"
+      });
+      await createNotification({
+        recipientRole: "Manager",
+        title: `Order #${order._id} Status: ${status}`,
+        message: msg,
+        type: "Order Update"
+      });
+    }
     
     // Return populated order
     const updated = await Order.findById(order._id)

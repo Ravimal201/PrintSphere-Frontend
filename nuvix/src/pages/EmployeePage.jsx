@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { 
-  ShoppingCart, Layers, Settings, LogOut, Loader2, AlertCircle, 
+import {
+  ShoppingCart, Layers, Settings, LogOut, Loader2, AlertCircle,
   CheckCircle, Plus, Edit2, Check, X, FileText, Download, User, Sparkles
 } from "lucide-react";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 export default function EmployeePage() {
   const [isEmployee, setIsEmployee] = useState(false);
@@ -156,7 +156,7 @@ export default function EmployeePage() {
 
   return (
     <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
-      
+
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
         <div>
@@ -173,11 +173,10 @@ export default function EmployeePage() {
           <nav className="p-4 space-y-1">
             <button
               onClick={() => setActiveTab("tasks")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "tasks"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "tasks"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <ShoppingCart className="h-4.5 w-4.5" />
@@ -191,11 +190,10 @@ export default function EmployeePage() {
             </button>
             <button
               onClick={() => setActiveTab("submissions")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "submissions"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "submissions"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Layers className="h-4.5 w-4.5" />
@@ -209,11 +207,10 @@ export default function EmployeePage() {
             </button>
             <button
               onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "settings"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "settings"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <Settings className="h-4.5 w-4.5" />
               Settings & Security
@@ -238,7 +235,7 @@ export default function EmployeePage() {
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8">
-        
+
         {/* Statistics Widgets */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
@@ -290,23 +287,22 @@ export default function EmployeePage() {
               <div className="space-y-8">
                 {assignedOrders.map((order) => (
                   <div key={order._id} className="border rounded-2xl p-5 hover:border-indigo-100 transition bg-slate-50/20">
-                    
+
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b border-dashed">
                       <div>
                         <span className="text-xs font-bold text-slate-500">Order ID: ...{order._id.slice(-8)}</span>
                         <p className="text-[11px] text-slate-400 mt-0.5">Assigned: {new Date(order.createdAt).toLocaleDateString()}</p>
                       </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                        order.orderStatus === "Completed" ? "bg-indigo-50 text-indigo-600" : "bg-teal-50 text-teal-600"
-                      }`}>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.orderStatus === "Completed" ? "bg-indigo-50 text-indigo-600" : "bg-teal-50 text-teal-600"
+                        }`}>
                         {order.orderStatus}
                       </span>
                     </div>
 
                     {/* Order items, details, and downloads */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-4">
-                      
+
                       {/* Left: Shirt specs */}
                       <div className="space-y-4">
                         <div>
@@ -339,18 +335,18 @@ export default function EmployeePage() {
                                 <div key={idx} className="space-y-2">
                                   {item.designId.thumbnailUrl && (
                                     <div className="flex gap-3 items-center bg-slate-50 p-3 border rounded-xl">
-                                      <img 
-                                        src={item.designId.thumbnailUrl} 
-                                        alt="Design Preview" 
+                                      <img
+                                        src={item.designId.thumbnailUrl}
+                                        alt="Design Preview"
                                         className="h-14 w-14 object-contain bg-white rounded-lg border shadow-xs"
                                         onError={(e) => e.target.src = "/images/dumyImage.png"}
                                       />
                                       <div>
                                         <p className="text-xs font-bold text-slate-900">Custom layout composite</p>
-                                        <a 
-                                          href={item.designId.thumbnailUrl} 
+                                        <a
+                                          href={item.designId.thumbnailUrl}
                                           download
-                                          target="_blank" 
+                                          target="_blank"
                                           rel="noreferrer"
                                           className="inline-flex items-center gap-1 text-[10px] font-extrabold text-indigo-600 hover:underline mt-1"
                                         >
@@ -359,7 +355,7 @@ export default function EmployeePage() {
                                       </div>
                                     </div>
                                   )}
-                                  
+
                                   {imgLayers.length === 0 ? (
                                     <p className="text-[10px] text-slate-400 italic">No custom image layer uploads. Decal is text/shape base.</p>
                                   ) : (
@@ -369,18 +365,18 @@ export default function EmployeePage() {
                                         <div key={lIdx} className="flex justify-between items-center bg-white p-2 border rounded-xl">
                                           <div className="flex items-center gap-2">
                                             {layer.url && (
-                                              <img 
-                                                src={layer.url} 
-                                                alt="Asset Decal" 
+                                              <img
+                                                src={layer.url}
+                                                alt="Asset Decal"
                                                 className="h-8 w-8 object-contain bg-slate-50 border rounded"
                                                 onError={(e) => e.target.src = "/images/dumyImage.png"}
                                               />
                                             )}
                                             <span className="text-xs font-semibold text-slate-700">{layer.name || `Asset ${lIdx + 1}`}</span>
                                           </div>
-                                          <a 
-                                            href={layer.url} 
-                                            download 
+                                          <a
+                                            href={layer.url}
+                                            download
                                             target="_blank"
                                             rel="noreferrer"
                                             className="p-1 text-slate-500 hover:text-indigo-600 transition"
@@ -424,11 +420,10 @@ export default function EmployeePage() {
                             key={st}
                             disabled={actionLoading[order._id]}
                             onClick={() => handleUpdateStatus(order._id, st)}
-                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${
-                              order.orderStatus === st
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${order.orderStatus === st
                                 ? "bg-teal-600 text-white shadow-xs"
                                 : "bg-white border text-slate-700 hover:bg-slate-50"
-                            }`}
+                              }`}
                           >
                             {st}
                           </button>
@@ -498,20 +493,18 @@ export default function EmployeePage() {
                           <td className="py-4 text-xs font-bold text-slate-950">Rs. {p.basePrice.toFixed(2)}</td>
                           <td className="py-4 text-xs text-slate-500">{(p.sizes || []).join(", ")}</td>
                           <td className="py-4 text-xs">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              p.isApproved 
-                                ? "bg-emerald-50 text-emerald-600" 
-                                : p.status === "Archived" 
-                                ? "bg-rose-50 text-rose-600" 
-                                : "bg-amber-50 text-amber-600"
-                            }`}>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${p.isApproved
+                                ? "bg-emerald-50 text-emerald-600"
+                                : p.status === "Archived"
+                                  ? "bg-rose-50 text-rose-600"
+                                  : "bg-amber-50 text-amber-600"
+                              }`}>
                               {p.isApproved ? "Approved" : p.status === "Archived" ? "Rejected" : "Awaiting Review"}
                             </span>
                           </td>
                           <td className="py-4 text-xs">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                              p.status === "Active" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600"
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${p.status === "Active" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600"
+                              }`}>
                               {p.status}
                             </span>
                           </td>

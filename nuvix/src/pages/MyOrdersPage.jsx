@@ -6,7 +6,7 @@ import TShirt2D from "../components/TShirt2D";
 import { ShoppingBag, Calendar, MapPin, ShieldCheck, AlertCircle } from "lucide-react";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 const statusColors = {
   Pending: "bg-amber-50 text-amber-700 border-amber-100",
