@@ -1,4 +1,4 @@
-import { useRef, Suspense } from "react";
+import { useRef, useState, Suspense } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
@@ -47,6 +47,7 @@ export default function Scene({
   onDeleteLayer
 }) {
   const groupRef = useRef();
+  const [isInteracting, setIsInteracting] = useState(false);
 
   return (
     <Canvas
@@ -88,6 +89,8 @@ export default function Scene({
             onSelectLayer={onSelectLayer}
             onUpdateLayers={onUpdateLayers}
             onDeleteLayer={onDeleteLayer}
+            onInteractionStart={() => setIsInteracting(true)}
+            onInteractionEnd={() => setIsInteracting(false)}
           />
         </group>
       </Suspense>
@@ -101,6 +104,7 @@ export default function Scene({
 
       {/* Allow the user to manually rotate the shirt, but constrain angles for a premium experience */}
       <OrbitControls
+        enabled={!isInteracting}
         enablePan={false}
         enableZoom={false}
         minPolarAngle={Math.PI / 2.5}

@@ -136,7 +136,7 @@ function SafeDecal({
 }
 
 // Sub-component to manage texture loading and rendering for each decal layer
-function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLayer, scene }) {
+function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLayer, scene, onInteractionStart, onInteractionEnd }) {
   const { scene: rootScene } = useThree();
   const [texture, setTexture] = useState(null);
   const [isScaling, setIsScaling] = useState(false);
@@ -234,6 +234,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
   const handleScaleDown = (e) => {
     e.stopPropagation();
     setIsScaling(true);
+    if (onInteractionStart) onInteractionStart();
     e.target.setPointerCapture(e.pointerId);
   };
 
@@ -267,11 +268,13 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     e.stopPropagation();
     setIsScaling(false);
     e.target.releasePointerCapture(e.pointerId);
+    if (onInteractionEnd) onInteractionEnd();
   };
 
   const handleRotateDown = (e) => {
     e.stopPropagation();
     setIsRotating(true);
+    if (onInteractionStart) onInteractionStart();
     e.target.setPointerCapture(e.pointerId);
   };
 
@@ -298,6 +301,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     e.stopPropagation();
     setIsRotating(false);
     e.target.releasePointerCapture(e.pointerId);
+    if (onInteractionEnd) onInteractionEnd();
   };
 
   const handleDeleteClick = (e) => {
@@ -448,7 +452,9 @@ export default function ShirtModel({
   selectedLayerId,
   onSelectLayer,
   onUpdateLayers,
-  onDeleteLayer
+  onDeleteLayer,
+  onInteractionStart,
+  onInteractionEnd
 }) {
   const { scene: rootScene } = useThree();
   const { scene } = useGLTF(modelPath);
@@ -852,6 +858,7 @@ export default function ShirtModel({
       draggedLayerIdRef.current = targetLayerId;
 
       setIsDragging(true);
+      if (onInteractionStart) onInteractionStart();
       e.target.setPointerCapture(e.pointerId);
     }
   };
@@ -870,6 +877,7 @@ export default function ShirtModel({
       draggedLayerIdRef.current = null;
       dragStartWorldOffsetRef.current = null;
       e.target.releasePointerCapture(e.pointerId);
+      if (onInteractionEnd) onInteractionEnd();
     }
   };
 
@@ -905,6 +913,8 @@ export default function ShirtModel({
                 onUpdateLayers={onUpdateLayers}
                 onDeleteLayer={onDeleteLayer}
                 scene={scene}
+                onInteractionStart={onInteractionStart}
+                onInteractionEnd={onInteractionEnd}
               />,
               targetMesh
             )}
