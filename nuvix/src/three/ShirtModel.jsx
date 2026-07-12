@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
 import { useGLTF } from "@react-three/drei";
-import { createPortal } from "@react-three/fiber";
+import { createPortal, useThree } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
 
@@ -29,6 +29,7 @@ function SafeDecal({
   ...props
 }) {
   const [decalMesh, setDecalMesh] = useState(null);
+  const [geometry, setGeometry] = useState(null);
 
   useEffect(() => {
     if (!decalMesh) return;
@@ -94,7 +95,7 @@ function SafeDecal({
     let geom = null;
     try {
       geom = new DecalGeometry(parent, posVec, rotEuler, scaleVec);
-      decalMesh.geometry = geom;
+      setGeometry(geom);
     } catch (err) {
       console.error("SafeDecal geometry generation failed:", err);
     }
@@ -103,8 +104,9 @@ function SafeDecal({
     parent.matrixWorld.copy(matrixWorld);
 
     return () => {
-      if (decalMesh && decalMesh.geometry) {
-        decalMesh.geometry.dispose();
+      setGeometry(null);
+      if (geom) {
+        geom.dispose();
       }
     };
   }, [
@@ -118,6 +120,7 @@ function SafeDecal({
   return (
     <mesh
       ref={setDecalMesh}
+      geometry={geometry || undefined}
       name="decal"
       material-transparent
       material-polygonOffset
@@ -134,6 +137,7 @@ function SafeDecal({
 
 // Sub-component to manage texture loading and rendering for each decal layer
 function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLayer, scene }) {
+  const { scene: rootScene } = useThree();
   const [texture, setTexture] = useState(null);
   const [isScaling, setIsScaling] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
@@ -183,7 +187,10 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
 
   if (!layer.visible || !texture || !targetMesh?.current || !scene) return null;
 
+  // Force update world matrices to avoid stale/identity matrix values
+  rootScene.updateMatrixWorld(true);
   const mesh = targetMesh.current;
+
   mesh.geometry.computeBoundingBox();
   const localBox = mesh.geometry.boundingBox;
   const localCenter = new THREE.Vector3();
@@ -214,8 +221,15 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
   const roughness = parentMat?.roughness ?? 0.8;
   const metalness = parentMat?.metalness ?? 0.0;
 
-  // Convert layer.rotation (stored in YXZ Euler angles) to a local euler angle
-  const rotEuler = new THREE.Euler(layer.rotation[0], layer.rotation[1], layer.rotation[2], "YXZ");
+  // Convert layer.rotation (stored in scene group-space YXZ Euler angles) to a local euler angle
+  const sceneQuaternion = new THREE.Quaternion().setFromRotationMatrix(scene.matrixWorld);
+  const layerQuaternion = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(layer.rotation[0], layer.rotation[1], layer.rotation[2], "YXZ")
+  );
+  const worldQuaternion = sceneQuaternion.clone().multiply(layerQuaternion);
+  const meshQuaternion = new THREE.Quaternion().setFromRotationMatrix(mesh.matrixWorld);
+  const localQuaternion = meshQuaternion.clone().invert().multiply(worldQuaternion);
+  const rotEuler = new THREE.Euler().setFromQuaternion(localQuaternion, "YXZ");
 
   const handleScaleDown = (e) => {
     e.stopPropagation();
@@ -436,6 +450,7 @@ export default function ShirtModel({
   onUpdateLayers,
   onDeleteLayer
 }) {
+  const { scene: rootScene } = useThree();
   const { scene } = useGLTF(modelPath);
   const bodyMeshRef = useRef(null);
   const [meshLoaded, setMeshLoaded] = useState(false);
@@ -443,6 +458,7 @@ export default function ShirtModel({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartWorldOffsetRef = useRef(null);
   const draggedLayerIdRef = useRef(null);
+  const rootGroupRef = useRef(null);
 
   // Center and normalize scale once when model loads
   useEffect(() => {
@@ -564,6 +580,12 @@ export default function ShirtModel({
         if (child === bodyMeshRef.current) isCurrentMesh = true;
       });
       if (!isCurrentMesh) return;
+
+      // Force update all world matrices before raycasting
+      rootScene.updateMatrixWorld(true);
+
+      const parentMatrix = rootGroupRef.current ? rootGroupRef.current.matrixWorld : scene.matrixWorld;
+
       let changed = false;
       const nextLayers = layers.map((layer) => {
         if (layer.locked) return layer;
@@ -579,22 +601,38 @@ export default function ShirtModel({
         const localOrigin = new THREE.Vector3(groupPos.x, groupPos.y, 2.0);
         const localDir = new THREE.Vector3(0, 0, -1);
         
-        const worldOrigin = localOrigin.clone().applyMatrix4(scene.matrixWorld);
-        const worldDir = localDir.clone().transformDirection(scene.matrixWorld).normalize();
+        const worldOrigin = localOrigin.clone().applyMatrix4(parentMatrix);
+        const worldDir = localDir.clone().transformDirection(parentMatrix).normalize();
         
         const raycaster = new THREE.Raycaster();
         raycaster.set(worldOrigin, worldDir);
-        const intersects = raycaster.intersectObject(mesh);
         
-        if (intersects.length > 0) {
-          const hit = intersects[0];
+        // Raycast against the entire GLTF scene hierarchy to find any valid outer mesh intersection
+        const intersects = raycaster.intersectObjects(scene.children, true);
+
+        // Find the first intersection that is a mesh and not helper/decal/inner
+        const validHit = intersects.find((hit) => {
+          const child = hit.object;
+          if (!child.isMesh || child.name === "decal" || child.name === "decal-helper" || child.userData?.isDecal) {
+            return false;
+          }
+          const nameLower = child.name.toLowerCase();
+          if (nameLower.includes("inside") || nameLower.includes("inner") || nameLower.includes("collar_in")) {
+            return false;
+          }
+          return true;
+        });
+
+        if (validHit) {
+          const hit = validHit;
+          const targetMesh = hit.object;
           // Convert the hit point back to group-space coordinates
           const scenePoint = scene.worldToLocal(hit.point.clone());
           
           let normal = hit.face?.normal || new THREE.Vector3(0, 0, 1);
           // Calculate normal vector relative to the scene group
-          const normalMatrix = new THREE.Matrix3().getNormalMatrix(scene.matrixWorld).invert();
-          const sceneNormal = normal.clone().applyMatrix3(normalMatrix).normalize();
+          const worldNormal = normal.clone().transformDirection(targetMesh.matrixWorld);
+          const sceneNormal = worldNormal.clone().transformDirection(scene.matrixWorld.clone().invert()).normalize();
           
           let up = new THREE.Vector3(0, 1, 0);
           if (Math.abs(sceneNormal.dot(up)) > 0.99) {
@@ -614,7 +652,7 @@ export default function ShirtModel({
             position: [scenePoint.x, scenePoint.y, scenePoint.z],
             rotation: [rotation.x, rotation.y, layer.rotation[2] || 0],
             projectedForModel: modelPath,
-            targetMeshName: mesh.name
+            targetMeshName: targetMesh.name
           };
         } else {
           // If the raycast misses (e.g. geometry shifted slightly on style change),
@@ -655,48 +693,39 @@ export default function ShirtModel({
     const mesh = intersection.object;
     if (!mesh || !mesh.isMesh) return;
 
+    // Force update world matrices
+    rootScene.updateMatrixWorld(true);
+
     const point = intersection.point;
     let normal = intersection.face?.normal;
     if (!normal) return;
 
-    // 1. Calculate local coordinates on the targeted body mesh
-    const localPoint = mesh.worldToLocal(point.clone());
+    // 1. Convert world intersection point to scene group-space
+    const scenePoint = scene.worldToLocal(point.clone());
 
-    // 2. Calculate local normal vector
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
-    const localNormal = normal.clone().applyMatrix3(normalMatrix).normalize();
+    // 2. Transform normal from mesh local space to world space and then to scene local space
+    const worldNormal = normal.clone().transformDirection(mesh.matrixWorld);
+    const sceneNormal = worldNormal.clone().transformDirection(scene.matrixWorld.clone().invert()).normalize();
 
-    // 3. Compute lookAt rotation to project along surface normal
+    // 3. Compute lookAt rotation to project along surface normal relative to the scene group
     let up = new THREE.Vector3(0, 1, 0);
-    if (Math.abs(localNormal.dot(up)) > 0.99) {
+    if (Math.abs(sceneNormal.dot(up)) > 0.99) {
       up.set(0, 0, 1);
     }
-    const target = localNormal.clone();
     const matrix = new THREE.Matrix4().lookAt(
       new THREE.Vector3(0, 0, 0),
-      target,
+      sceneNormal,
       up
     );
-    const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
+    const rotation = new THREE.Euler().setFromRotationMatrix(matrix, "YXZ");
 
-    // Get local center of the mesh geometry
-    mesh.geometry.computeBoundingBox();
-    const localBox = mesh.geometry.boundingBox;
-    const localCenter = new THREE.Vector3();
-    localBox.getCenter(localCenter);
-
-    // Store position as offset from localCenter
-    const offsetX = localPoint.x - localCenter.x;
-    const offsetY = localPoint.y - localCenter.y;
-    const offsetZ = localPoint.z - localCenter.z;
-
-    // 4. Update the layer parameters in State
+    // 4. Update the layer parameters in State in scene group-space
     onUpdateLayers((prev) =>
       prev.map((l) => {
         if (l.id === selectedLayerId) {
           return {
             ...l,
-            position: [offsetX, offsetY, offsetZ],
+            position: [scenePoint.x, scenePoint.y, scenePoint.z],
             rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
             projectedForModel: modelPath,
             targetMeshName: mesh.name
@@ -729,50 +758,42 @@ export default function ShirtModel({
     const mesh = intersection.object;
     if (!mesh || !mesh.isMesh) return;
 
+    // Force update world matrices
+    rootScene.updateMatrixWorld(true);
+
     const currentWorldPoint = intersection.point.clone();
     
     // Calculate target decal center in world space using the world offset
     const targetDecalWorldPoint = new THREE.Vector3().subVectors(currentWorldPoint, dragStartWorldOffsetRef.current);
     
-    // Project target world point onto the current intersected mesh local coordinates
-    const localPoint = mesh.worldToLocal(targetDecalWorldPoint.clone());
+    // Convert target world point to scene group-space
+    const scenePoint = scene.worldToLocal(targetDecalWorldPoint.clone());
     
     const normal = intersection.face?.normal;
     if (!normal) return;
 
-    // Calculate local normal and rotation
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld).invert();
-    const localNormal = normal.clone().applyMatrix3(normalMatrix).normalize();
+    // Transform normal from mesh local space to world space and then to scene local space
+    const worldNormal = normal.clone().transformDirection(mesh.matrixWorld);
+    const sceneNormal = worldNormal.clone().transformDirection(scene.matrixWorld.clone().invert()).normalize();
 
+    // Compute lookAt rotation to project along surface normal relative to the scene group
     let up = new THREE.Vector3(0, 1, 0);
-    if (Math.abs(localNormal.dot(up)) > 0.99) {
+    if (Math.abs(sceneNormal.dot(up)) > 0.99) {
       up.set(0, 0, 1);
     }
     const matrix = new THREE.Matrix4().lookAt(
       new THREE.Vector3(0, 0, 0),
-      localNormal,
+      sceneNormal,
       up
     );
-    const rotation = new THREE.Euler().setFromRotationMatrix(matrix);
-
-    // Compute current mesh local center
-    mesh.geometry.computeBoundingBox();
-    const localBox = mesh.geometry.boundingBox;
-    const localCenter = new THREE.Vector3();
-    localBox.getCenter(localCenter);
-
-    const newPosition = [
-      localPoint.x - localCenter.x,
-      localPoint.y - localCenter.y,
-      localPoint.z - localCenter.z
-    ];
+    const rotation = new THREE.Euler().setFromRotationMatrix(matrix, "YXZ");
 
     onUpdateLayers((prev) =>
       prev.map((l) => {
         if (l.id === layerId) {
           return {
             ...l,
-            position: newPosition,
+            position: [scenePoint.x, scenePoint.y, scenePoint.z],
             rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
             projectedForModel: modelPath,
             targetMeshName: mesh.name
@@ -818,21 +839,12 @@ export default function ShirtModel({
       const mesh = intersection.object;
       if (!mesh || !mesh.isMesh) return;
 
-      // 3. Compute active layer's current center in world space
-      const layerMesh = (activeLayerObj.targetMeshName && scene.getObjectByName(activeLayerObj.targetMeshName)) || bodyMeshRef.current;
-      if (!layerMesh) return;
+      // Force update world matrices
+      rootScene.updateMatrixWorld(true);
 
-      layerMesh.geometry.computeBoundingBox();
-      const localBox = layerMesh.geometry.boundingBox;
-      const localCenter = new THREE.Vector3();
-      localBox.getCenter(localCenter);
-
-      const localPos = new THREE.Vector3(
-        localCenter.x + activeLayerObj.position[0],
-        localCenter.y + activeLayerObj.position[1],
-        localCenter.z + activeLayerObj.position[2]
-      );
-      const activeLayerWorldPoint = localPos.clone().applyMatrix4(layerMesh.matrixWorld);
+      // 3. Compute active layer's current center in world space (it is in scene group-space)
+      const groupPos = new THREE.Vector3().fromArray(activeLayerObj.position);
+      const activeLayerWorldPoint = groupPos.clone().applyMatrix4(scene.matrixWorld);
 
       // 4. Calculate world offset from target center to intersection click point
       const clickWorldPoint = intersection.point.clone();
@@ -862,7 +874,7 @@ export default function ShirtModel({
   };
 
   return (
-    <group>
+    <group ref={rootGroupRef}>
       <primitive
         object={scene}
         onPointerDown={handlePointerDown}
@@ -883,17 +895,20 @@ export default function ShirtModel({
         if (!isTargetInScene) return null;
 
         const meshRef = { current: targetMesh };
-        return createPortal(
-          <DecalItem
-            key={layer.id}
-            layer={layer}
-            isSelected={selectedLayerId === layer.id}
-            targetMesh={meshRef}
-            onUpdateLayers={onUpdateLayers}
-            onDeleteLayer={onDeleteLayer}
-            scene={scene}
-          />,
-          targetMesh
+        return (
+          <group key={layer.id}>
+            {createPortal(
+              <DecalItem
+                layer={layer}
+                isSelected={selectedLayerId === layer.id}
+                targetMesh={meshRef}
+                onUpdateLayers={onUpdateLayers}
+                onDeleteLayer={onDeleteLayer}
+                scene={scene}
+              />,
+              targetMesh
+            )}
+          </group>
         );
       })}
     </group>

@@ -17,23 +17,25 @@ export function createTextTexture(layer) {
 
   // Clear with transparent background
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+
 
   // Setup font styles
   const fontStyle = [
     layer.italic ? "italic" : "",
     layer.bold ? "bold" : "",
-    "80px", // fixed base text size on canvas, decal scale governs actual dimensions on mesh
+    "96px", // slightly larger base text size on canvas for better readability
     `"${layer.fontFamily || "Inter"}", sans-serif`
   ]
     .filter(Boolean)
     .join(" ");
 
   ctx.font = fontStyle;
-  ctx.fillStyle = layer.color || "#ffffff";
+  ctx.fillStyle = layer.color || "#000000";
   ctx.textBaseline = "middle";
   ctx.textAlign = "center";
 
-  // Optional: Subtle shadow for readability on light fabrics
+  // Subtle shadow for readability on light fabrics
   ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
   ctx.shadowBlur = 4;
   ctx.shadowOffsetX = 1;
