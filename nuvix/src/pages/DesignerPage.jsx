@@ -27,7 +27,9 @@ import {
   AlertCircle,
   CheckCircle,
   LogIn,
-  LogOut
+  LogOut,
+  FlipHorizontal,
+  FlipVertical
 } from "lucide-react";
 
 const shirtColors = [
@@ -335,52 +337,9 @@ export default function DesignerPage() {
     volumeDiscountPercentage: 10
   });
 
-  const [layers, setLayers] = useState([
-    {
-      id: "layer-mountains",
-      type: "image",
-      name: "Mountains",
-      url: "/images/dumyImage.png",
-      visible: true,
-      locked: false,
-      position: [0, 0.05, 0.16],
-      rotation: [0, 0, 0],
-      scale: [0.38, 0.38, 0.25],
-      aspectRatio: 1
-    },
-    {
-      id: "layer-adventure",
-      type: "text",
-      name: "Adventure",
-      text: "Adventure",
-      fontFamily: "Outfit",
-      color: "#4f46e5",
-      bold: true,
-      italic: false,
-      visible: true,
-      locked: false,
-      position: [0, 0.22, 0.16],
-      rotation: [0, 0, 0],
-      scale: [0.35, 0.1, 0.25]
-    },
-    {
-      id: "layer-is-calling",
-      type: "text",
-      name: "is calling",
-      text: "IS CALLING",
-      fontFamily: "Inter",
-      color: "#dc2626",
-      bold: true,
-      italic: true,
-      visible: true,
-      locked: false,
-      position: [0, -0.12, 0.16],
-      rotation: [0, 0, 0],
-      scale: [0.25, 0.06, 0.25]
-    }
-  ]);
+  const [layers, setLayers] = useState([]);
 
-  const [selectedLayerId, setSelectedLayerId] = useState("layer-mountains");
+  const [selectedLayerId, setSelectedLayerId] = useState(null);
   const [quantity, setQuantity] = useState(2);
 
   const selectLayer = (id) => {
@@ -1126,6 +1085,34 @@ export default function DesignerPage() {
                     </div>
                   </div>
                 )}
+
+                <div className="space-y-2 pt-3 border-t">
+                  <label className="text-xs font-bold text-slate-500 block">Flip Operations</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => updateActiveLayer("flipX", !activeLayer.flipX)}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
+                        activeLayer.flipX
+                          ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
+                          : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
+                      }`}
+                    >
+                      <FlipHorizontal className="h-4 w-4" />
+                      Flip Horizontal
+                    </button>
+                    <button
+                      onClick={() => updateActiveLayer("flipY", !activeLayer.flipY)}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
+                        activeLayer.flipY
+                          ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
+                          : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
+                      }`}
+                    >
+                      <FlipVertical className="h-4 w-4" />
+                      Flip Vertical
+                    </button>
+                  </div>
+                </div>
 
                 <div className="space-y-4 pt-3 border-t">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">3D Decal Transforms</span>
