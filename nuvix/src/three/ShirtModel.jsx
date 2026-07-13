@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, Html } from "@react-three/drei";
 import { createPortal, useThree } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
+import { Scale, RotateCw, Trash2 } from "lucide-react";
 
 // Helper to convert vectors/eulers to arrays
 function vecToArray(vec = [0, 0, 0]) {
@@ -15,6 +16,17 @@ function vecToArray(vec = [0, 0, 0]) {
     return [vec, vec, vec];
   }
 }
+
+// Custom raycaster to force handles to the front of intersections, preventing shirt mesh from blocking clicks
+function forceOnTopRaycast(raycaster, intersects) {
+  const localIntersects = [];
+  THREE.Mesh.prototype.raycast.call(this, raycaster, localIntersects);
+  for (let i = 0; i < localIntersects.length; i++) {
+    localIntersects[i].distance = 0.0001; // extremely close, sorting first
+    intersects.push(localIntersects[i]);
+  }
+}
+
 
 // Custom Safe Decal Component to prevent React 19/R3F null ref crashes
 function SafeDecal({
@@ -395,6 +407,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             position={[decalScale[0] / 2, -decalScale[1] / 2, 0.01]}
             name="decal-helper-handle"
             userData={{ isDecal: true }}
+            raycast={forceOnTopRaycast}
             onPointerDown={handleScaleDown}
             onPointerMove={handleScaleMove}
             onPointerUp={handleScaleUp}
@@ -407,11 +420,12 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             }}
           >
             <sphereGeometry args={[0.012, 16, 16]} />
-            <meshBasicMaterial color="#ffffff" depthTest={false} />
-            <mesh>
-              <sphereGeometry args={[0.006, 16, 16]} />
-              <meshBasicMaterial color="#4f46e5" depthTest={false} />
-            </mesh>
+            <meshBasicMaterial transparent opacity={0} depthTest={false} />
+            <Html pointerEvents="none" center>
+              <div className="flex items-center justify-center w-6 h-6 bg-indigo-600 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
+                <Scale className="w-3 h-3" />
+              </div>
+            </Html>
           </mesh>
 
           {/* Rotate Handle (Top Center) */}
@@ -419,6 +433,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             position={[0, decalScale[1] / 2 + 0.025 / (meshWorldScale.y || 1), 0.01]}
             name="decal-helper-handle"
             userData={{ isDecal: true }}
+            raycast={forceOnTopRaycast}
             onPointerDown={handleRotateDown}
             onPointerMove={handleRotateMove}
             onPointerUp={handleRotateUp}
@@ -431,11 +446,12 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             }}
           >
             <sphereGeometry args={[0.012, 16, 16]} />
-            <meshBasicMaterial color="#ffffff" depthTest={false} />
-            <mesh>
-              <sphereGeometry args={[0.006, 16, 16]} />
-              <meshBasicMaterial color="#10b981" depthTest={false} />
-            </mesh>
+            <meshBasicMaterial transparent opacity={0} depthTest={false} />
+            <Html pointerEvents="none" center>
+              <div className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
+                <RotateCw className="w-3 h-3" />
+              </div>
+            </Html>
           </mesh>
 
           {/* Delete Handle (Top Left) */}
@@ -443,6 +459,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             position={[-decalScale[0] / 2, decalScale[1] / 2, 0.01]}
             name="decal-helper-handle"
             userData={{ isDecal: true }}
+            raycast={forceOnTopRaycast}
             onPointerDown={handleDeleteClick}
             onPointerOver={(e) => {
               e.stopPropagation();
@@ -453,11 +470,12 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             }}
           >
             <sphereGeometry args={[0.012, 16, 16]} />
-            <meshBasicMaterial color="#ffffff" depthTest={false} />
-            <mesh>
-              <sphereGeometry args={[0.006, 16, 16]} />
-              <meshBasicMaterial color="#ef4444" depthTest={false} />
-            </mesh>
+            <meshBasicMaterial transparent opacity={0} depthTest={false} />
+            <Html pointerEvents="none" center>
+              <div className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
+                <Trash2 className="w-3 h-3" />
+              </div>
+            </Html>
           </mesh>
         </group>
       )}
@@ -631,7 +649,6 @@ export default function ShirtModel({
       let changed = false;
       const nextLayers = layers.map((layer) => {
         if (layer.locked) return layer;
-        if (layer.projectedForModel === modelPath) return layer;
 
         const mesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
         if (!mesh) return layer;
@@ -688,24 +705,40 @@ export default function ShirtModel({
           );
           const rotation = new THREE.Euler().setFromRotationMatrix(matrix, "YXZ");
           
-          changed = true;
-          return {
-            ...layer,
-            position: [scenePoint.x, scenePoint.y, scenePoint.z],
-            rotation: [rotation.x, rotation.y, layer.rotation[2] || 0],
-            projectedForModel: modelPath,
-            targetMeshName: targetMesh.name
-          };
+          // Check if coordinates have changed significantly, or if model changed
+          const posChanged = 
+            Math.abs(scenePoint.x - layer.position[0]) > 0.001 ||
+            Math.abs(scenePoint.y - layer.position[1]) > 0.001 ||
+            Math.abs(scenePoint.z - layer.position[2]) > 0.001;
+
+          const rotChanged =
+            Math.abs(rotation.x - layer.rotation[0]) > 0.01 ||
+            Math.abs(rotation.y - layer.rotation[1]) > 0.01;
+
+          const modelChanged = layer.projectedForModel !== modelPath;
+
+          if (posChanged || rotChanged || modelChanged) {
+            changed = true;
+            return {
+              ...layer,
+              position: [scenePoint.x, scenePoint.y, scenePoint.z],
+              rotation: [rotation.x, rotation.y, layer.rotation[2] || 0],
+              projectedForModel: modelPath,
+              targetMeshName: targetMesh.name
+            };
+          }
+          return layer;
         } else {
-          // If the raycast misses (e.g. geometry shifted slightly on style change),
-          // mark it as projected for the new model to prevent infinite retries.
-          // Since the coordinates are stored in scene group-space, they remain valid.
-          changed = true;
-          return {
-            ...layer,
-            projectedForModel: modelPath,
-            targetMeshName: mesh.name
-          };
+          // Raycast missed
+          if (layer.projectedForModel !== modelPath) {
+            changed = true;
+            return {
+              ...layer,
+              projectedForModel: modelPath,
+              targetMeshName: mesh.name
+            };
+          }
+          return layer;
         }
       });
       
@@ -847,68 +880,71 @@ export default function ShirtModel({
   };
 
   const handlePointerDown = (e) => {
-    e.stopPropagation();
-    
-    // 1. Check if we clicked directly on a decal to select it
+    // 1. Check if we clicked directly on a decal to select/drag it
     const decalIntersect = e.intersections?.find(
       (intersect) =>
         intersect.object &&
         (intersect.object.name === "decal" || intersect.object.userData?.isDecal)
     );
 
-    let targetLayerId = selectedLayerId;
     if (decalIntersect) {
+      // Clicked on a decal, stop propagation and handle selection/drag
+      e.stopPropagation();
+      
       const clickedLayerId = decalIntersect.object.userData?.layerId;
       if (clickedLayerId) {
         onSelectLayer(clickedLayerId);
-        targetLayerId = clickedLayerId;
+        
+        const activeLayerObj = layers.find((l) => l.id === clickedLayerId);
+        if (activeLayerObj && !activeLayerObj.locked) {
+          // Find intersection on the shirt mesh underneath
+          const intersection = e.intersections?.find(
+            (intersect) =>
+              intersect.object &&
+              intersect.object.name !== "decal" &&
+              intersect.object.name !== "decal-helper" &&
+              intersect.object.name !== "decal-helper-handle" &&
+              !intersect.object.userData?.isDecal
+          );
+          if (!intersection) return;
+
+          const mesh = intersection.object;
+          if (!mesh || !mesh.isMesh) return;
+
+          // Force update world matrices
+          rootScene.updateMatrixWorld(true);
+
+          // Compute active layer's current center in world space
+          const groupPos = new THREE.Vector3().fromArray(activeLayerObj.position);
+          const activeLayerWorldPoint = groupPos.clone().applyMatrix4(scene.matrixWorld);
+
+          // Calculate world offset from target center to intersection click point
+          const clickWorldPoint = intersection.point.clone();
+          dragStartWorldOffsetRef.current = new THREE.Vector3().subVectors(clickWorldPoint, activeLayerWorldPoint);
+          draggedLayerIdRef.current = clickedLayerId;
+
+          setIsDragging(true);
+          if (onInteractionStart) onInteractionStart();
+          e.target.setPointerCapture(e.pointerId);
+        }
       }
-    }
-
-    const activeLayerObj = layers.find((l) => l.id === targetLayerId);
-    if (targetLayerId && activeLayerObj && !activeLayerObj.locked) {
-      // 2. Find intersection on the shirt mesh underneath
-      const intersection = e.intersections?.find(
-        (intersect) =>
-          intersect.object &&
-          intersect.object.name !== "decal" &&
-          intersect.object.name !== "decal-helper" &&
-          intersect.object.name !== "decal-helper-handle" &&
-          !intersect.object.userData?.isDecal
-      );
-      if (!intersection) return;
-
-      const mesh = intersection.object;
-      if (!mesh || !mesh.isMesh) return;
-
-      // Force update world matrices
-      rootScene.updateMatrixWorld(true);
-
-      // 3. Compute active layer's current center in world space (it is in scene group-space)
-      const groupPos = new THREE.Vector3().fromArray(activeLayerObj.position);
-      const activeLayerWorldPoint = groupPos.clone().applyMatrix4(scene.matrixWorld);
-
-      // 4. Calculate world offset from target center to intersection click point
-      const clickWorldPoint = intersection.point.clone();
-      dragStartWorldOffsetRef.current = new THREE.Vector3().subVectors(clickWorldPoint, activeLayerWorldPoint);
-      draggedLayerIdRef.current = targetLayerId;
-
-      setIsDragging(true);
-      if (onInteractionStart) onInteractionStart();
-      e.target.setPointerCapture(e.pointerId);
+    } else {
+      // Clicked on the shirt but not on a decal.
+      // Do NOT stop propagation, do NOT start dragging.
+      // This allows OrbitControls to receive the events and rotate the shirt!
     }
   };
 
   const handlePointerMove = (e) => {
-    e.stopPropagation();
     if (isDragging && draggedLayerIdRef.current) {
+      e.stopPropagation();
       updateDecalFromDrag(e);
     }
   };
 
   const handlePointerUp = (e) => {
-    e.stopPropagation();
     if (isDragging) {
+      e.stopPropagation();
       setIsDragging(false);
       draggedLayerIdRef.current = null;
       dragStartWorldOffsetRef.current = null;
