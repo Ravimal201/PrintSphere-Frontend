@@ -185,6 +185,26 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     layer.visible
   ]);
 
+  useEffect(() => {
+    if (texture) {
+      const flipX = layer.flipX ?? false;
+      const flipY = layer.flipY ?? false;
+      
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.center.set(0.5, 0.5);
+      
+      // DecalGeometry defaults to mirroring horizontally, so default repeat.x is -1.
+      // flipX = true toggles horizontal mirror.
+      // flipY = true toggles vertical mirror.
+      const repeatX = flipX ? 1 : -1;
+      const repeatY = flipY ? -1 : 1;
+      
+      texture.repeat.set(repeatX, repeatY);
+      texture.needsUpdate = true;
+    }
+  }, [texture, layer.flipX, layer.flipY]);
+
   if (!layer.visible || !texture || !targetMesh?.current || !scene) return null;
 
   // Force update world matrices to avoid stale/identity matrix values
@@ -444,6 +464,22 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     </group>
   );
 }
+
+const fallbackLayer = {
+  id: "fallback-text-layer",
+  type: "text",
+  name: "Fallback Text",
+  text: "PrintSphere",
+  fontFamily: "Outfit",
+  color: "#4f46e5",
+  bold: true,
+  italic: false,
+  visible: true,
+  locked: true,
+  position: [0, 0.05, 0.16],
+  rotation: [0, 0, 0],
+  scale: [0.4, 0.12, 0.25]
+};
 
 export default function ShirtModel({
   modelPath = "/images/models/male normal t-shirt1.glb",
@@ -891,36 +927,54 @@ export default function ShirtModel({
       />
 
       {/* Render decals inside target mesh portals so they inherit their local coordinates */}
-      {meshLoaded && activeScene === scene && bodyMeshRef.current && layers.map((layer) => {
-        const targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
-        if (!targetMesh) return null;
-
-        // Double check that targetMesh belongs to the current scene
-        let isTargetInScene = false;
-        scene.traverse((c) => {
-          if (c === targetMesh) isTargetInScene = true;
-        });
-        if (!isTargetInScene) return null;
-
-        const meshRef = { current: targetMesh };
-        return (
-          <group key={layer.id}>
+      {meshLoaded && activeScene === scene && bodyMeshRef.current && (
+        layers.length === 0 ? (
+          <group key="fallback-group">
             {createPortal(
               <DecalItem
-                layer={layer}
-                isSelected={selectedLayerId === layer.id}
-                targetMesh={meshRef}
-                onUpdateLayers={onUpdateLayers}
-                onDeleteLayer={onDeleteLayer}
+                layer={fallbackLayer}
+                isSelected={false}
+                targetMesh={{ current: bodyMeshRef.current }}
+                onUpdateLayers={null}
+                onDeleteLayer={null}
                 scene={scene}
-                onInteractionStart={onInteractionStart}
-                onInteractionEnd={onInteractionEnd}
               />,
-              targetMesh
+              bodyMeshRef.current
             )}
           </group>
-        );
-      })}
+        ) : (
+          layers.map((layer) => {
+            const targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
+            if (!targetMesh) return null;
+
+            // Double check that targetMesh belongs to the current scene
+            let isTargetInScene = false;
+            scene.traverse((c) => {
+              if (c === targetMesh) isTargetInScene = true;
+            });
+            if (!isTargetInScene) return null;
+
+            const meshRef = { current: targetMesh };
+            return (
+              <group key={layer.id}>
+                {createPortal(
+                  <DecalItem
+                    layer={layer}
+                    isSelected={selectedLayerId === layer.id}
+                    targetMesh={meshRef}
+                    onUpdateLayers={onUpdateLayers}
+                    onDeleteLayer={onDeleteLayer}
+                    scene={scene}
+                    onInteractionStart={onInteractionStart}
+                    onInteractionEnd={onInteractionEnd}
+                  />,
+                  targetMesh
+                )}
+              </group>
+            );
+          })
+        )
+      )}
     </group>
   );
 }
