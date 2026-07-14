@@ -24,6 +24,7 @@ import {
   Move,
   RotateCw,
   Scale,
+  Maximize2,
   AlertCircle,
   CheckCircle,
   LogIn,
@@ -1119,7 +1120,7 @@ export default function DesignerPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                      <span className="flex items-center gap-1"><Scale className="h-3.5 w-3.5" /> Decal Size</span>
+                      <span className="flex items-center gap-1"><Maximize2 className="h-3.5 w-3.5" /> Decal Size</span>
                       <span>{Math.round(activeLayer.scale[0] * 100)}%</span>
                     </div>
                     <input
