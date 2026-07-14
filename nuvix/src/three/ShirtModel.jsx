@@ -4,7 +4,7 @@ import { useGLTF, Html } from "@react-three/drei";
 import { createPortal, useThree } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
-import { Scale, RotateCw, Trash2 } from "lucide-react";
+import { Maximize2, RotateCw, Trash2 } from "lucide-react";
 
 // Helper to convert vectors/eulers to arrays
 function vecToArray(vec = [0, 0, 0]) {
@@ -148,11 +148,24 @@ function SafeDecal({
 }
 
 // Sub-component to manage texture loading and rendering for each decal layer
-function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLayer, scene, onInteractionStart, onInteractionEnd }) {
-  const { scene: rootScene } = useThree();
+function DecalItem({
+  layer,
+  isSelected,
+  targetMesh,
+  onUpdateLayers,
+  onDeleteLayer,
+  scene,
+  onInteractionStart,
+  onInteractionEnd,
+  modelPath,
+  onSelectLayer
+}) {
+  const { scene: rootScene, camera, raycaster, gl } = useThree();
   const [texture, setTexture] = useState(null);
   const [isScaling, setIsScaling] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartWorldOffsetRef = useRef(null);
   const groupRef = useRef(null);
 
   useEffect(() => {
@@ -217,6 +230,163 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     }
   }, [texture, layer.flipX, layer.flipY]);
 
+  // Listen to mouse pointer events globally on the window to prevent lagging/losing focus
+  useEffect(() => {
+    if (!isDragging && !isScaling && !isRotating) return;
+
+    const handlePointerMove = (e) => {
+      if (!targetMesh?.current) return;
+      const mesh = targetMesh.current;
+
+      // Calculate NDC mouse coordinates
+      const canvas = gl.domElement;
+      const rect = canvas.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      const mouseVec = new THREE.Vector2(x, y);
+      raycaster.setFromCamera(mouseVec, camera);
+
+      if (isDragging) {
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        const validHit = intersects.find((hit) => {
+          const child = hit.object;
+          if (!child.isMesh || child.name === "decal" || child.name === "decal-helper" || child.userData?.isDecal) {
+            return false;
+          }
+          const nameLower = child.name.toLowerCase();
+          if (nameLower.includes("inside") || nameLower.includes("inner") || nameLower.includes("collar_in")) {
+            return false;
+          }
+          return true;
+        });
+
+        if (validHit) {
+          const hit = validHit;
+          const hitMesh = hit.object;
+
+          rootScene.updateMatrixWorld(true);
+
+          const targetDecalWorldPoint = hit.point.clone();
+          if (dragStartWorldOffsetRef.current) {
+            targetDecalWorldPoint.sub(dragStartWorldOffsetRef.current);
+          }
+          const scenePoint = scene.worldToLocal(targetDecalWorldPoint.clone());
+
+          let normal = hit.face?.normal || new THREE.Vector3(0, 0, 1);
+          const worldNormal = normal.clone().transformDirection(hitMesh.matrixWorld);
+          const sceneNormal = worldNormal.clone().transformDirection(scene.matrixWorld.clone().invert()).normalize();
+
+          let up = new THREE.Vector3(0, 1, 0);
+          if (Math.abs(sceneNormal.dot(up)) > 0.99) {
+            up.set(0, 0, 1);
+          }
+
+          const matrix = new THREE.Matrix4().lookAt(
+            new THREE.Vector3(0, 0, 0),
+            sceneNormal,
+            up
+          );
+          const rotation = new THREE.Euler().setFromRotationMatrix(matrix, "YXZ");
+
+          if (onUpdateLayers) {
+            onUpdateLayers((prev) =>
+              prev.map((l) => {
+                if (l.id === layer.id) {
+                  return {
+                    ...l,
+                    position: [scenePoint.x, scenePoint.y, scenePoint.z],
+                    rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
+                    projectedForModel: modelPath,
+                    targetMeshName: hitMesh.name
+                  };
+                }
+                return l;
+              })
+            );
+          }
+        }
+      } else if (isScaling || isRotating) {
+        if (!groupRef.current) return;
+
+        rootScene.updateMatrixWorld(true);
+
+        const decalWorldPos = new THREE.Vector3();
+        groupRef.current.getWorldPosition(decalWorldPos);
+
+        const decalWorldNormal = new THREE.Vector3(0, 0, 1);
+        decalWorldNormal.applyQuaternion(groupRef.current.getWorldQuaternion(new THREE.Quaternion()));
+
+        const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(decalWorldNormal, decalWorldPos);
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectionPoint);
+
+        const localPoint = groupRef.current.worldToLocal(intersectionPoint.clone());
+        const meshWorldScale = new THREE.Vector3();
+        mesh.getWorldScale(meshWorldScale);
+
+        if (isScaling) {
+          const newLocalScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
+          const aspect = layer.aspectRatio || (layer.scale[0] / layer.scale[1]) || 1;
+          const newLocalScaleY = newLocalScaleX / aspect;
+
+          const newGroupScaleX = newLocalScaleX * meshWorldScale.x;
+          const newGroupScaleY = newLocalScaleY * meshWorldScale.y;
+
+          if (onUpdateLayers) {
+            onUpdateLayers((prev) =>
+              prev.map((l) =>
+                l.id === layer.id
+                  ? { ...l, scale: [newGroupScaleX, newGroupScaleY, l.scale[2]] }
+                  : l
+              )
+            );
+          }
+        } else if (isRotating) {
+          const angle = Math.atan2(localPoint.x, localPoint.y);
+          if (onUpdateLayers) {
+            onUpdateLayers((prev) =>
+              prev.map((l) =>
+                l.id === layer.id
+                  ? { ...l, rotation: [l.rotation[0], l.rotation[1], -angle] }
+                  : l
+              )
+            );
+          }
+        }
+      }
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+      setIsScaling(false);
+      setIsRotating(false);
+      dragStartWorldOffsetRef.current = null;
+      if (onInteractionEnd) onInteractionEnd();
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [
+    isDragging,
+    isScaling,
+    isRotating,
+    camera,
+    raycaster,
+    gl,
+    scene,
+    rootScene,
+    layer,
+    modelPath,
+    onUpdateLayers,
+    onInteractionEnd,
+    targetMesh
+  ]);
+
   if (!layer.visible || !texture || !targetMesh?.current || !scene) return null;
 
   // Force update world matrices to avoid stale/identity matrix values
@@ -267,73 +437,12 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     e.stopPropagation();
     setIsScaling(true);
     if (onInteractionStart) onInteractionStart();
-    e.target.setPointerCapture(e.pointerId);
-  };
-
-  const handleScaleMove = (e) => {
-    e.stopPropagation();
-    if (!isScaling) return;
-    if (!groupRef.current) return;
-    
-    const localPoint = groupRef.current.worldToLocal(e.point.clone());
-    // Calculate new scale in mesh local space
-    const newLocalScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
-    const aspect = layer.aspectRatio || (layer.scale[0] / layer.scale[1]) || 1;
-    const newLocalScaleY = newLocalScaleX / aspect;
-
-    // Convert back to scene group scale space
-    const newGroupScaleX = newLocalScaleX * meshWorldScale.x;
-    const newGroupScaleY = newLocalScaleY * meshWorldScale.y;
-    
-    if (onUpdateLayers) {
-      onUpdateLayers((prev) =>
-        prev.map((l) =>
-          l.id === layer.id
-            ? { ...l, scale: [newGroupScaleX, newGroupScaleY, l.scale[2]] }
-            : l
-        )
-      );
-    }
-  };
-
-  const handleScaleUp = (e) => {
-    e.stopPropagation();
-    setIsScaling(false);
-    e.target.releasePointerCapture(e.pointerId);
-    if (onInteractionEnd) onInteractionEnd();
   };
 
   const handleRotateDown = (e) => {
     e.stopPropagation();
     setIsRotating(true);
     if (onInteractionStart) onInteractionStart();
-    e.target.setPointerCapture(e.pointerId);
-  };
-
-  const handleRotateMove = (e) => {
-    e.stopPropagation();
-    if (!isRotating) return;
-    if (!groupRef.current) return;
-    
-    const localPoint = groupRef.current.worldToLocal(e.point.clone());
-    const angle = Math.atan2(localPoint.x, localPoint.y);
-    
-    if (onUpdateLayers) {
-      onUpdateLayers((prev) =>
-        prev.map((l) =>
-          l.id === layer.id
-            ? { ...l, rotation: [l.rotation[0], l.rotation[1], -angle] }
-            : l
-        )
-      );
-    }
-  };
-
-  const handleRotateUp = (e) => {
-    e.stopPropagation();
-    setIsRotating(false);
-    e.target.releasePointerCapture(e.pointerId);
-    if (onInteractionEnd) onInteractionEnd();
   };
 
   const handleDeleteClick = (e) => {
@@ -347,6 +456,39 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
     }
   };
 
+  const handleDecalPointerDown = (e) => {
+    e.stopPropagation();
+    if (onSelectLayer) {
+      onSelectLayer(layer.id);
+    }
+    if (layer.locked) return;
+
+    const intersection = e.intersections?.find(
+      (intersect) =>
+        intersect.object &&
+        intersect.object.name !== "decal" &&
+        intersect.object.name !== "decal-helper" &&
+        intersect.object.name !== "decal-helper-handle" &&
+        intersect.object.name !== "decal-drag-plane" &&
+        !intersect.object.userData?.isDecal
+    );
+
+    const hitPoint = intersection ? intersection.point.clone() : null;
+
+    rootScene.updateMatrixWorld(true);
+
+    const groupPos = new THREE.Vector3().fromArray(layer.position);
+    const activeLayerWorldPoint = groupPos.clone().applyMatrix4(scene.matrixWorld);
+
+    if (hitPoint) {
+      dragStartWorldOffsetRef.current = new THREE.Vector3().subVectors(hitPoint, activeLayerWorldPoint);
+    } else {
+      dragStartWorldOffsetRef.current = new THREE.Vector3(0, 0, 0);
+    }
+
+    setIsDragging(true);
+    if (onInteractionStart) onInteractionStart();
+  };
   // Define points for a clean rectangular outline (no diagonal lines)
   const halfW = decalScale[0] / 2;
   const halfH = decalScale[1] / 2;
@@ -367,6 +509,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
         rotation={rotEuler}
         scale={decalScale}
         userData={{ isDecal: true, layerId: layer.id }}
+        onPointerDown={handleDecalPointerDown}
       >
         <meshStandardMaterial
           map={texture}
@@ -385,7 +528,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
           depthWrite={false}
         />
       </SafeDecal>
-
+ 
       {/* Interactive Bounding outline and control handles when selected */}
       {isSelected && (
         <group ref={groupRef} position={decalPos} rotation={rotEuler}>
@@ -402,6 +545,17 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             />
           </line>
 
+          {/* Invisible Drag Helper Plane (extends drag zone to the entire outline area when selected) */}
+          <mesh
+            name="decal-drag-plane"
+            userData={{ isDecal: true }}
+            position={[0, 0, 0.005]}
+            onPointerDown={handleDecalPointerDown}
+          >
+            <planeGeometry args={[decalScale[0], decalScale[1]]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+
           {/* Scale Handle (Bottom Right) */}
           <mesh
             position={[decalScale[0] / 2, -decalScale[1] / 2, 0.01]}
@@ -409,8 +563,6 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             userData={{ isDecal: true }}
             raycast={forceOnTopRaycast}
             onPointerDown={handleScaleDown}
-            onPointerMove={handleScaleMove}
-            onPointerUp={handleScaleUp}
             onPointerOver={(e) => {
               e.stopPropagation();
               document.body.style.cursor = "nwse-resize";
@@ -419,11 +571,11 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
               document.body.style.cursor = "auto";
             }}
           >
-            <sphereGeometry args={[0.012, 16, 16]} />
+            <sphereGeometry args={[0.03, 16, 16]} />
             <meshBasicMaterial transparent opacity={0} depthTest={false} />
             <Html pointerEvents="none" center>
               <div className="flex items-center justify-center w-6 h-6 bg-indigo-600 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
-                <Scale className="w-3 h-3" />
+                <Maximize2 className="w-3 h-3" />
               </div>
             </Html>
           </mesh>
@@ -435,8 +587,6 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
             userData={{ isDecal: true }}
             raycast={forceOnTopRaycast}
             onPointerDown={handleRotateDown}
-            onPointerMove={handleRotateMove}
-            onPointerUp={handleRotateUp}
             onPointerOver={(e) => {
               e.stopPropagation();
               document.body.style.cursor = "grab";
@@ -445,7 +595,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
               document.body.style.cursor = "auto";
             }}
           >
-            <sphereGeometry args={[0.012, 16, 16]} />
+            <sphereGeometry args={[0.03, 16, 16]} />
             <meshBasicMaterial transparent opacity={0} depthTest={false} />
             <Html pointerEvents="none" center>
               <div className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
@@ -469,7 +619,7 @@ function DecalItem({ layer, isSelected, targetMesh, onUpdateLayers, onDeleteLaye
               document.body.style.cursor = "auto";
             }}
           >
-            <sphereGeometry args={[0.012, 16, 16]} />
+            <sphereGeometry args={[0.03, 16, 16]} />
             <meshBasicMaterial transparent opacity={0} depthTest={false} />
             <Html pointerEvents="none" center>
               <div className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
@@ -515,9 +665,6 @@ export default function ShirtModel({
   const bodyMeshRef = useRef(null);
   const [meshLoaded, setMeshLoaded] = useState(false);
   const [activeScene, setActiveScene] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartWorldOffsetRef = useRef(null);
-  const draggedLayerIdRef = useRef(null);
   const rootGroupRef = useRef(null);
 
   // Center and normalize scale once when model loads
@@ -750,216 +897,10 @@ export default function ShirtModel({
 
   const activeLayer = layers.find((l) => l.id === selectedLayerId);
 
-  const updateDecalFromRaycast = (e) => {
-    if (!selectedLayerId || activeLayer?.locked) return;
-
-    // Filter out decal and decal helper meshes to get the actual model mesh underneath
-    const intersection = e.intersections?.find(
-      (intersect) =>
-        intersect.object &&
-        intersect.object.name !== "decal" &&
-        intersect.object.name !== "decal-helper" &&
-        intersect.object.name !== "decal-helper-handle" &&
-        !intersect.object.userData?.isDecal
-    );
-
-    if (!intersection) return;
-
-    const mesh = intersection.object;
-    if (!mesh || !mesh.isMesh) return;
-
-    // Force update world matrices
-    rootScene.updateMatrixWorld(true);
-
-    const point = intersection.point;
-    let normal = intersection.face?.normal;
-    if (!normal) return;
-
-    // 1. Convert world intersection point to scene group-space
-    const scenePoint = scene.worldToLocal(point.clone());
-
-    // 2. Transform normal from mesh local space to world space and then to scene local space
-    const worldNormal = normal.clone().transformDirection(mesh.matrixWorld);
-    const sceneNormal = worldNormal.clone().transformDirection(scene.matrixWorld.clone().invert()).normalize();
-
-    // 3. Compute lookAt rotation to project along surface normal relative to the scene group
-    let up = new THREE.Vector3(0, 1, 0);
-    if (Math.abs(sceneNormal.dot(up)) > 0.99) {
-      up.set(0, 0, 1);
-    }
-    const matrix = new THREE.Matrix4().lookAt(
-      new THREE.Vector3(0, 0, 0),
-      sceneNormal,
-      up
-    );
-    const rotation = new THREE.Euler().setFromRotationMatrix(matrix, "YXZ");
-
-    // 4. Update the layer parameters in State in scene group-space
-    onUpdateLayers((prev) =>
-      prev.map((l) => {
-        if (l.id === selectedLayerId) {
-          return {
-            ...l,
-            position: [scenePoint.x, scenePoint.y, scenePoint.z],
-            rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
-            projectedForModel: modelPath,
-            targetMeshName: mesh.name
-          };
-        }
-        return l;
-      })
-    );
-  };
-
-  const updateDecalFromDrag = (e) => {
-    if (!draggedLayerIdRef.current || !dragStartWorldOffsetRef.current) return;
-
-    const layerId = draggedLayerIdRef.current;
-    const activeLayerObj = layers.find((l) => l.id === layerId);
-    if (!activeLayerObj || activeLayerObj.locked) return;
-
-    // Filter out decal and decal helper meshes to get the actual model mesh underneath
-    const intersection = e.intersections?.find(
-      (intersect) =>
-        intersect.object &&
-        intersect.object.name !== "decal" &&
-        intersect.object.name !== "decal-helper" &&
-        intersect.object.name !== "decal-helper-handle" &&
-        !intersect.object.userData?.isDecal
-    );
-
-    if (!intersection) return;
-
-    const mesh = intersection.object;
-    if (!mesh || !mesh.isMesh) return;
-
-    // Force update world matrices
-    rootScene.updateMatrixWorld(true);
-
-    const currentWorldPoint = intersection.point.clone();
-    
-    // Calculate target decal center in world space using the world offset
-    const targetDecalWorldPoint = new THREE.Vector3().subVectors(currentWorldPoint, dragStartWorldOffsetRef.current);
-    
-    // Convert target world point to scene group-space
-    const scenePoint = scene.worldToLocal(targetDecalWorldPoint.clone());
-    
-    const normal = intersection.face?.normal;
-    if (!normal) return;
-
-    // Transform normal from mesh local space to world space and then to scene local space
-    const worldNormal = normal.clone().transformDirection(mesh.matrixWorld);
-    const sceneNormal = worldNormal.clone().transformDirection(scene.matrixWorld.clone().invert()).normalize();
-
-    // Compute lookAt rotation to project along surface normal relative to the scene group
-    let up = new THREE.Vector3(0, 1, 0);
-    if (Math.abs(sceneNormal.dot(up)) > 0.99) {
-      up.set(0, 0, 1);
-    }
-    const matrix = new THREE.Matrix4().lookAt(
-      new THREE.Vector3(0, 0, 0),
-      sceneNormal,
-      up
-    );
-    const rotation = new THREE.Euler().setFromRotationMatrix(matrix, "YXZ");
-
-    onUpdateLayers((prev) =>
-      prev.map((l) => {
-        if (l.id === layerId) {
-          return {
-            ...l,
-            position: [scenePoint.x, scenePoint.y, scenePoint.z],
-            rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
-            projectedForModel: modelPath,
-            targetMeshName: mesh.name
-          };
-        }
-        return l;
-      })
-    );
-  };
-
-  const handlePointerDown = (e) => {
-    // 1. Check if we clicked directly on a decal to select/drag it
-    const decalIntersect = e.intersections?.find(
-      (intersect) =>
-        intersect.object &&
-        (intersect.object.name === "decal" || intersect.object.userData?.isDecal)
-    );
-
-    if (decalIntersect) {
-      // Clicked on a decal, stop propagation and handle selection/drag
-      e.stopPropagation();
-      
-      const clickedLayerId = decalIntersect.object.userData?.layerId;
-      if (clickedLayerId) {
-        onSelectLayer(clickedLayerId);
-        
-        const activeLayerObj = layers.find((l) => l.id === clickedLayerId);
-        if (activeLayerObj && !activeLayerObj.locked) {
-          // Find intersection on the shirt mesh underneath
-          const intersection = e.intersections?.find(
-            (intersect) =>
-              intersect.object &&
-              intersect.object.name !== "decal" &&
-              intersect.object.name !== "decal-helper" &&
-              intersect.object.name !== "decal-helper-handle" &&
-              !intersect.object.userData?.isDecal
-          );
-          if (!intersection) return;
-
-          const mesh = intersection.object;
-          if (!mesh || !mesh.isMesh) return;
-
-          // Force update world matrices
-          rootScene.updateMatrixWorld(true);
-
-          // Compute active layer's current center in world space
-          const groupPos = new THREE.Vector3().fromArray(activeLayerObj.position);
-          const activeLayerWorldPoint = groupPos.clone().applyMatrix4(scene.matrixWorld);
-
-          // Calculate world offset from target center to intersection click point
-          const clickWorldPoint = intersection.point.clone();
-          dragStartWorldOffsetRef.current = new THREE.Vector3().subVectors(clickWorldPoint, activeLayerWorldPoint);
-          draggedLayerIdRef.current = clickedLayerId;
-
-          setIsDragging(true);
-          if (onInteractionStart) onInteractionStart();
-          e.target.setPointerCapture(e.pointerId);
-        }
-      }
-    } else {
-      // Clicked on the shirt but not on a decal.
-      // Do NOT stop propagation, do NOT start dragging.
-      // This allows OrbitControls to receive the events and rotate the shirt!
-    }
-  };
-
-  const handlePointerMove = (e) => {
-    if (isDragging && draggedLayerIdRef.current) {
-      e.stopPropagation();
-      updateDecalFromDrag(e);
-    }
-  };
-
-  const handlePointerUp = (e) => {
-    if (isDragging) {
-      e.stopPropagation();
-      setIsDragging(false);
-      draggedLayerIdRef.current = null;
-      dragStartWorldOffsetRef.current = null;
-      e.target.releasePointerCapture(e.pointerId);
-      if (onInteractionEnd) onInteractionEnd();
-    }
-  };
-
   return (
     <group ref={rootGroupRef}>
       <primitive
         object={scene}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
       />
 
       {/* Render decals inside target mesh portals so they inherit their local coordinates */}
@@ -974,6 +915,8 @@ export default function ShirtModel({
                 onUpdateLayers={null}
                 onDeleteLayer={null}
                 scene={scene}
+                modelPath={modelPath}
+                onSelectLayer={null}
               />,
               bodyMeshRef.current
             )}
@@ -1003,6 +946,8 @@ export default function ShirtModel({
                     scene={scene}
                     onInteractionStart={onInteractionStart}
                     onInteractionEnd={onInteractionEnd}
+                    modelPath={modelPath}
+                    onSelectLayer={onSelectLayer}
                   />,
                   targetMesh
                 )}
