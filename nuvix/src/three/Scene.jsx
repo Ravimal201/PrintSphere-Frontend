@@ -5,22 +5,16 @@ import { OrbitControls, Environment } from "@react-three/drei";
 import ShirtModel from "./ShirtModel";
 
 // Helper component to manage smooth turntable transitions and zoom changes
-function ViewManager({ activeSide, zoomLevel, groupRef }) {
+function ViewManager({ modelRotation, zoomLevel, groupRef }) {
   const { camera } = useThree();
 
   useFrame(() => {
     if (!groupRef.current) return;
 
-    // 1. Calculate target turntable rotation based on active view side
-    let targetY = 0;
-    if (activeSide === "back") targetY = Math.PI;
-    if (activeSide === "left") targetY = Math.PI / 2;
-    if (activeSide === "right") targetY = -Math.PI / 2;
-
-    // Smoothly spin the model to the target Y angle
+    // Smoothly spin the model to the target Y angle Y rotation
     groupRef.current.rotation.y = THREE.MathUtils.lerp(
       groupRef.current.rotation.y,
-      targetY,
+      modelRotation,
       0.08
     );
 
@@ -44,7 +38,8 @@ export default function Scene({
   selectedLayerId,
   onSelectLayer,
   onUpdateLayers,
-  onDeleteLayer
+  onDeleteLayer,
+  modelRotation = 0
 }) {
   const groupRef = useRef();
   const [isInteracting, setIsInteracting] = useState(false);
@@ -97,18 +92,16 @@ export default function Scene({
 
       {/* Smoothly controls camera zoom and turntable rotation */}
       <ViewManager
-        activeSide={activeSide}
+        modelRotation={modelRotation}
         zoomLevel={zoomLevel}
         groupRef={groupRef}
       />
 
       {/* Allow the user to manually rotate the shirt, but constrain angles for a premium experience */}
       <OrbitControls
-        enabled={!isInteracting}
+        enabled={false}
         enablePan={false}
         enableZoom={false}
-        minPolarAngle={Math.PI / 2.5}
-        maxPolarAngle={Math.PI / 1.7}
       />
     </Canvas>
   );

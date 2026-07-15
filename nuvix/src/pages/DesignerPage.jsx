@@ -324,6 +324,7 @@ export default function DesignerPage() {
   const [shirtType, setShirtType] = useState("Crew Neck");
   const [shirtMaterial, setShirtMaterial] = useState("180GSM");
   const [activeView, setActiveView] = useState("front");
+  const [modelRotation, setModelRotation] = useState(0); // in radians
   const [zoomLevel, setZoomLevel] = useState(0.85);
   const [showManagerSettings, setShowManagerSettings] = useState(false);
   const [pricingRules, setPricingRules] = useState({
@@ -446,6 +447,23 @@ export default function DesignerPage() {
     const nextPos = [...activeLayer.position];
     nextPos[axisIndex] = val;
     updateActiveLayer("position", nextPos);
+  };
+
+  const updateActiveViewFromAngle = (rad) => {
+    let angle = rad % (2 * Math.PI);
+    if (angle > Math.PI) angle -= 2 * Math.PI;
+    if (angle < -Math.PI) angle += 2 * Math.PI;
+
+    const diffFront = Math.abs(angle);
+    const diffBack = Math.min(Math.abs(angle - Math.PI), Math.abs(angle + Math.PI));
+    const diffLeft = Math.abs(angle - Math.PI / 2);
+    const diffRight = Math.abs(angle + Math.PI / 2);
+
+    const minDiff = Math.min(diffFront, diffBack, diffLeft, diffRight);
+    if (minDiff === diffFront) setActiveView("front");
+    else if (minDiff === diffBack) setActiveView("back");
+    else if (minDiff === diffLeft) setActiveView("left");
+    else if (minDiff === diffRight) setActiveView("right");
   };
 
   const deleteLayer = (id) => {
@@ -860,7 +878,13 @@ export default function DesignerPage() {
               {["front", "back", "left", "right"].map((view) => (
                 <button
                   key={view}
-                  onClick={() => setActiveView(view)}
+                  onClick={() => {
+                    setActiveView(view);
+                    if (view === "front") setModelRotation(0);
+                    else if (view === "back") setModelRotation(Math.PI);
+                    else if (view === "left") setModelRotation(Math.PI / 2);
+                    else if (view === "right") setModelRotation(-Math.PI / 2);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${activeView === view
                       ? "bg-indigo-600 text-white shadow-sm"
                       : "text-slate-500 hover:text-slate-800"
@@ -882,10 +906,12 @@ export default function DesignerPage() {
                 onSelectLayer={selectLayer}
                 onUpdateLayers={setLayers}
                 onDeleteLayer={deleteLayer}
+                modelRotation={modelRotation}
               />
             </div>
 
             <div className="flex flex-col gap-3 max-w-sm mx-auto w-full bg-white border p-4 rounded-2xl shadow-sm select-none z-10">
+              {/* View Zoom Control */}
               <div className="flex items-center justify-between text-xs font-bold text-slate-500">
                 <span className="flex items-center gap-1">
                   <ZoomIn className="h-3.5 w-3.5" /> View Zoom
@@ -918,12 +944,59 @@ export default function DesignerPage() {
                   onClick={() => {
                     setZoomLevel(0.85);
                     setActiveView("front");
+                    setModelRotation(0);
                   }}
                   className="p-1 rounded-lg border hover:bg-slate-50 text-slate-500"
                   title="Reset View"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
+              </div>
+
+              {/* Model Rotation Control Panel */}
+              <div className="border-t pt-2 mt-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500 mb-1.5">
+                  <span className="flex items-center gap-1">
+                    <RotateCw className="h-3.5 w-3.5" /> Model Rotation
+                  </span>
+                  <span>{Math.round((modelRotation * 180) / Math.PI)}°</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      const newRot = modelRotation - (15 * Math.PI) / 180;
+                      setModelRotation(newRot);
+                      updateActiveViewFromAngle(newRot);
+                    }}
+                    className="p-1 rounded-lg border hover:bg-slate-50 text-slate-600 font-bold"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="range"
+                    min="-180"
+                    max="180"
+                    step="5"
+                    value={Math.round((modelRotation * 180) / Math.PI)}
+                    onChange={(e) => {
+                      const deg = Number(e.target.value);
+                      const rad = (deg * Math.PI) / 180;
+                      setModelRotation(rad);
+                      updateActiveViewFromAngle(rad);
+                    }}
+                    className="flex-1 accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <button
+                    onClick={() => {
+                      const newRot = modelRotation + (15 * Math.PI) / 180;
+                      setModelRotation(newRot);
+                      updateActiveViewFromAngle(newRot);
+                    }}
+                    className="p-1 rounded-lg border hover:bg-slate-50 text-slate-600 font-bold"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             </div>
           </main>
