@@ -2,7 +2,7 @@ import { Layers, Maximize2, MoveDown, MoveUp, RotateCcw, RotateCw, Sparkles, Tru
 import { useRef, useState, useEffect } from "react";
 import Hero3DPreview from "./Hero3DPreview";
 
-export default function HeroSection() {
+export default function HeroSection({ isGuest = false }) {
   const heroRef = useRef(null);
   const rotationRef = useRef(null);
   const customizerRef = useRef(null);
@@ -57,6 +57,10 @@ export default function HeroSection() {
 
   const handleDesignClick = (e) => {
     if (e) e.preventDefault();
+    if (isGuest) {
+      window.location.href = "/login";
+      return;
+    }
     const token = localStorage.getItem("token");
     const isAuthenticated = token && token !== "null" && token !== "undefined";
     if (!isAuthenticated) {
@@ -67,6 +71,10 @@ export default function HeroSection() {
   };
 
   const handleAddText = () => {
+    if (isGuest) {
+      window.location.href = "/login";
+      return;
+    }
     const token = localStorage.getItem("token");
     const isAuthenticated = token && token !== "null" && token !== "undefined";
     if (!isAuthenticated) {

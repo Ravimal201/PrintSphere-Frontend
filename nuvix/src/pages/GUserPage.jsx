@@ -18,7 +18,7 @@ export default function GUserPage() {
         <main className="flex-1 overflow-auto p-8">
 
           <div className="mx-auto w-full max-w-screen-2xl">
-            <HeroSection />
+            <HeroSection isGuest={true} />
 
             {/* Cards */}
             <CardsSection />
