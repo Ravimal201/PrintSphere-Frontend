@@ -43,6 +43,15 @@ function SafeDecal({
   const [decalMesh, setDecalMesh] = useState(null);
   const [geometry, setGeometry] = useState(null);
 
+  // Manually remove decal from parent on unmount to ensure cleanup
+  useEffect(() => {
+    return () => {
+      if (decalMesh && decalMesh.parent) {
+        decalMesh.parent.remove(decalMesh);
+      }
+    };
+  }, [decalMesh]);
+
   useEffect(() => {
     if (!decalMesh) return;
 
@@ -387,6 +396,16 @@ function DecalItem({
     targetMesh
   ]);
 
+  // Clean up the handles group when deselected or unmounted
+  useEffect(() => {
+    const currentGroup = groupRef.current;
+    return () => {
+      if (currentGroup && currentGroup.parent) {
+        currentGroup.parent.remove(currentGroup);
+      }
+    };
+  }, [isSelected]);
+
   if (!layer.visible || !texture || !targetMesh?.current || !scene) return null;
 
   // Force update world matrices to avoid stale/identity matrix values
@@ -557,76 +576,58 @@ function DecalItem({
           </mesh>
 
           {/* Scale Handle (Bottom Right) */}
-          <mesh
-            position={[decalScale[0] / 2, -decalScale[1] / 2, 0.01]}
-            name="decal-helper-handle"
-            userData={{ isDecal: true }}
-            raycast={forceOnTopRaycast}
-            onPointerDown={handleScaleDown}
-            onPointerOver={(e) => {
-              e.stopPropagation();
-              document.body.style.cursor = "nwse-resize";
-            }}
-            onPointerOut={() => {
-              document.body.style.cursor = "auto";
-            }}
-          >
-            <sphereGeometry args={[0.03, 16, 16]} />
-            <meshBasicMaterial transparent opacity={0} depthTest={false} />
-            <Html pointerEvents="none" center>
-              <div className="flex items-center justify-center w-6 h-6 bg-indigo-600 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
+          <group position={[decalScale[0] / 2, -decalScale[1] / 2, 0.01]}>
+            <Html center>
+              <div
+                onPointerDown={handleScaleDown}
+                onPointerOver={() => {
+                  document.body.style.cursor = "nwse-resize";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "auto";
+                }}
+                className="flex items-center justify-center w-6 h-6 bg-indigo-600 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+              >
                 <Maximize2 className="w-3 h-3" />
               </div>
             </Html>
-          </mesh>
+          </group>
 
           {/* Rotate Handle (Top Center) */}
-          <mesh
-            position={[0, decalScale[1] / 2 + 0.025 / (meshWorldScale.y || 1), 0.01]}
-            name="decal-helper-handle"
-            userData={{ isDecal: true }}
-            raycast={forceOnTopRaycast}
-            onPointerDown={handleRotateDown}
-            onPointerOver={(e) => {
-              e.stopPropagation();
-              document.body.style.cursor = "grab";
-            }}
-            onPointerOut={() => {
-              document.body.style.cursor = "auto";
-            }}
-          >
-            <sphereGeometry args={[0.03, 16, 16]} />
-            <meshBasicMaterial transparent opacity={0} depthTest={false} />
-            <Html pointerEvents="none" center>
-              <div className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
+          <group position={[0, decalScale[1] / 2 + 0.025 / (meshWorldScale.y || 1), 0.01]}>
+            <Html center>
+              <div
+                onPointerDown={handleRotateDown}
+                onPointerOver={() => {
+                  document.body.style.cursor = "grab";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "auto";
+                }}
+                className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+              >
                 <RotateCw className="w-3 h-3" />
               </div>
             </Html>
-          </mesh>
+          </group>
 
           {/* Delete Handle (Top Left) */}
-          <mesh
-            position={[-decalScale[0] / 2, decalScale[1] / 2, 0.01]}
-            name="decal-helper-handle"
-            userData={{ isDecal: true }}
-            raycast={forceOnTopRaycast}
-            onPointerDown={handleDeleteClick}
-            onPointerOver={(e) => {
-              e.stopPropagation();
-              document.body.style.cursor = "pointer";
-            }}
-            onPointerOut={() => {
-              document.body.style.cursor = "auto";
-            }}
-          >
-            <sphereGeometry args={[0.03, 16, 16]} />
-            <meshBasicMaterial transparent opacity={0} depthTest={false} />
-            <Html pointerEvents="none" center>
-              <div className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none">
+          <group position={[-decalScale[0] / 2, decalScale[1] / 2, 0.01]}>
+            <Html center>
+              <div
+                onPointerDown={handleDeleteClick}
+                onPointerOver={() => {
+                  document.body.style.cursor = "pointer";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "auto";
+                }}
+                className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+              >
                 <Trash2 className="w-3 h-3" />
               </div>
             </Html>
-          </mesh>
+          </group>
         </group>
       )}
     </group>
@@ -906,56 +907,38 @@ export default function ShirtModel({
 
       {/* Render decals inside target mesh portals so they inherit their local coordinates */}
       {meshLoaded && activeScene === scene && bodyMeshRef.current && (
-        layers.length === 0 ? (
-          <group key="fallback-group">
-            {createPortal(
-              <DecalItem
-                layer={fallbackLayer}
-                isSelected={false}
-                targetMesh={{ current: bodyMeshRef.current }}
-                onUpdateLayers={null}
-                onDeleteLayer={null}
-                scene={scene}
-                modelPath={modelPath}
-                onSelectLayer={null}
-              />,
-              bodyMeshRef.current
-            )}
-          </group>
-        ) : (
-          layers.map((layer) => {
-            const targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
-            if (!targetMesh) return null;
+        layers.map((layer) => {
+          const targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
+          if (!targetMesh) return null;
 
-            // Double check that targetMesh belongs to the current scene
-            let isTargetInScene = false;
-            scene.traverse((c) => {
-              if (c === targetMesh) isTargetInScene = true;
-            });
-            if (!isTargetInScene) return null;
+          // Double check that targetMesh belongs to the current scene
+          let isTargetInScene = false;
+          scene.traverse((c) => {
+            if (c === targetMesh) isTargetInScene = true;
+          });
+          if (!isTargetInScene) return null;
 
-            const meshRef = { current: targetMesh };
-            return (
-              <group key={layer.id}>
-                {createPortal(
-                  <DecalItem
-                    layer={layer}
-                    isSelected={selectedLayerId === layer.id}
-                    targetMesh={meshRef}
-                    onUpdateLayers={onUpdateLayers}
-                    onDeleteLayer={onDeleteLayer}
-                    scene={scene}
-                    onInteractionStart={onInteractionStart}
-                    onInteractionEnd={onInteractionEnd}
-                    modelPath={modelPath}
-                    onSelectLayer={onSelectLayer}
-                  />,
-                  targetMesh
-                )}
-              </group>
-            );
-          })
-        )
+          const meshRef = { current: targetMesh };
+          return (
+            <group key={layer.id}>
+              {createPortal(
+                <DecalItem
+                  layer={layer}
+                  isSelected={selectedLayerId === layer.id}
+                  targetMesh={meshRef}
+                  onUpdateLayers={onUpdateLayers}
+                  onDeleteLayer={onDeleteLayer}
+                  scene={scene}
+                  onInteractionStart={onInteractionStart}
+                  onInteractionEnd={onInteractionEnd}
+                  modelPath={modelPath}
+                  onSelectLayer={onSelectLayer}
+                />,
+                targetMesh
+              )}
+            </group>
+          );
+        })
       )}
     </group>
   );
