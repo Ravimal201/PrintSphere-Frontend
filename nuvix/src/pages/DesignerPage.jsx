@@ -430,25 +430,6 @@ export default function DesignerPage() {
     };
   };
 
-  const updateActiveLayer = (field, value) => {
-    if (!selectedLayerId) return;
-    setLayers(
-      layers.map((l) => {
-        if (l.id === selectedLayerId) {
-          return { ...l, [field]: value };
-        }
-        return l;
-      })
-    );
-  };
-
-  const updateActiveLayerPosition = (axisIndex, val) => {
-    if (!activeLayer) return;
-    const nextPos = [...activeLayer.position];
-    nextPos[axisIndex] = val;
-    updateActiveLayer("position", nextPos);
-  };
-
   const updateActiveViewFromAngle = (rad) => {
     let angle = rad % (2 * Math.PI);
     if (angle > Math.PI) angle -= 2 * Math.PI;
@@ -467,11 +448,49 @@ export default function DesignerPage() {
   };
 
   const deleteLayer = (id) => {
-    setLayers(layers.filter((l) => l.id !== id));
+    setLayers(prev => prev.filter((l) => l.id !== id));
     if (selectedLayerId === id) {
       setSelectedLayerId(null);
       setRightTab("layers");
     }
+  };
+
+  const updateActiveLayer = (field, value) => {
+    if (!selectedLayerId) return;
+    setLayers(prev =>
+      prev.map((l) => {
+        if (l.id === selectedLayerId) {
+          return { ...l, [field]: value };
+        }
+        return l;
+      })
+    );
+  };
+
+  const updateActiveLayerPosition = (axis, value) => {
+    if (!selectedLayerId) return;
+    setLayers(prev =>
+      prev.map((l) => {
+        if (l.id === selectedLayerId) {
+          const newPos = [...l.position];
+          newPos[axis] = value;
+          return { ...l, position: newPos };
+        }
+        return l;
+      })
+    );
+  };
+
+  const toggleLayerVisibility = (id) => {
+    setLayers(prev =>
+      prev.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l))
+    );
+  };
+
+  const toggleLayerLock = (id) => {
+    setLayers(prev =>
+      prev.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l))
+    );
   };
 
   const duplicateLayer = (layer) => {
@@ -482,20 +501,8 @@ export default function DesignerPage() {
       name: `${layer.name} (Copy)`,
       position: [layer.position[0] + 0.05, layer.position[1] - 0.05, layer.position[2]]
     };
-    setLayers([...layers, duplicated]);
+    setLayers(prev => [...prev, duplicated]);
     selectLayer(id);
-  };
-
-  const toggleLayerVisibility = (id) => {
-    setLayers(
-      layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l))
-    );
-  };
-
-  const toggleLayerLock = (id) => {
-    setLayers(
-      layers.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l))
-    );
   };
 
   const getLayerPrintArea = (layer) => {
