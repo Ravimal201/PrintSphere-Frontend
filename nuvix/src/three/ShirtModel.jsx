@@ -801,13 +801,14 @@ export default function ShirtModel({
         const mesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
         if (!mesh) return layer;
 
-        // Project position from scene group-space onto the new mesh using a front-to-back raycast
+        // Project position from scene group-space onto the new mesh using a raycast from the outside towards the center
         const groupPos = new THREE.Vector3().fromArray(layer.position);
         
-        // Raycast from in front of the shirt group (Z=2) backwards (Z=-2) or vice versa depending on position
-        const isFront = groupPos.z >= 0;
-        const localOrigin = new THREE.Vector3(groupPos.x, groupPos.y, isFront ? 2.0 : -2.0);
-        const localDir = new THREE.Vector3(0, 0, isFront ? -1 : 1);
+        const dir = new THREE.Vector3(groupPos.x, 0, groupPos.z).normalize();
+        if (dir.lengthSq() === 0) dir.set(0, 0, 1);
+        
+        const localOrigin = new THREE.Vector3(dir.x * 2.0, groupPos.y, dir.z * 2.0);
+        const localDir = dir.clone().negate();
         
         const worldOrigin = localOrigin.clone().applyMatrix4(parentMatrix);
         const worldDir = localDir.clone().transformDirection(parentMatrix).normalize();

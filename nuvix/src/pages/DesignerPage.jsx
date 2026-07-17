@@ -351,8 +351,19 @@ export default function DesignerPage() {
 
   const activeLayer = layers.find((l) => l.id === selectedLayerId);
 
+  const getInitialPositionAndRotation = () => {
+    const theta = -modelRotation;
+    const x = 0.16 * Math.sin(theta);
+    const z = 0.16 * Math.cos(theta);
+    return {
+      position: [x, 0, z],
+      rotation: [0, theta, 0]
+    };
+  };
+
   const addTextLayer = () => {
     const id = `text-${Date.now()}`;
+    const { position, rotation } = getInitialPositionAndRotation();
     const newLayer = {
       id,
       type: "text",
@@ -364,8 +375,8 @@ export default function DesignerPage() {
       italic: false,
       visible: true,
       locked: false,
-      position: [0, 0, 0.16],
-      rotation: [0, 0, 0],
+      position,
+      rotation,
       scale: [0.3, 0.1, 0.25]
     };
     setLayers([...layers, newLayer]);
@@ -385,6 +396,7 @@ export default function DesignerPage() {
         const scaleY = 0.3 / aspect;
         
         const id = `img-${Date.now()}`;
+        const { position, rotation } = getInitialPositionAndRotation();
         const newLayer = {
           id,
           type: "image",
@@ -392,8 +404,8 @@ export default function DesignerPage() {
           url: reader.result,
           visible: true,
           locked: false,
-          position: [0, 0, 0.16],
-          rotation: [0, 0, 0],
+          position,
+          rotation,
           scale: [scaleX, scaleY, 0.25],
           aspectRatio: aspect
         };
@@ -413,6 +425,7 @@ export default function DesignerPage() {
       const scaleY = 0.3 / aspect;
 
       const id = `img-${Date.now()}`;
+      const { position, rotation } = getInitialPositionAndRotation();
       const newLayer = {
         id,
         type: "image",
@@ -420,8 +433,8 @@ export default function DesignerPage() {
         url,
         visible: true,
         locked: false,
-        position: [0, 0, 0.16],
-        rotation: [0, 0, 0],
+        position,
+        rotation,
         scale: [scaleX, scaleY, 0.25],
         aspectRatio: aspect
       };
