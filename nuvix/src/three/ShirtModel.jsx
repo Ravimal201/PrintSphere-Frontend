@@ -754,6 +754,11 @@ export default function ShirtModel({
 
       scene.traverse((child) => {
         if (child.isMesh) {
+          // Skip coloring decals or helpers
+          if (child.name === "decal" || child.name === "decal-helper" || child.name === "decal-drag-plane" || child.userData?.isDecal) {
+            return;
+          }
+
           // Color mesh
           if (child.material) {
             const mats = Array.isArray(child.material) ? child.material : [child.material];
