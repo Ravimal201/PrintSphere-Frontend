@@ -1266,7 +1266,23 @@ export default function DesignerPage() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                       <span className="flex items-center gap-1"><RotateCw className="h-3.5 w-3.5" /> Rotation</span>
-                      <span>{Math.round(activeLayer.rotation[2] * (180 / Math.PI))}°</span>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="-180"
+                          max="180"
+                          value={Math.round((activeLayer.rotation[2] || 0) * (180 / Math.PI))}
+                          onChange={(e) => {
+                            let deg = Number(e.target.value);
+                            if (deg < -180) deg = -180;
+                            if (deg > 180) deg = 180;
+                            const rad = deg * (Math.PI / 180);
+                            updateActiveLayer("rotation", [activeLayer.rotation[0], activeLayer.rotation[1], rad]);
+                          }}
+                          className="w-16 px-1.5 py-0.5 text-center text-xs font-bold border border-slate-200 rounded-lg focus:border-indigo-500 focus:outline-hidden bg-white text-slate-800"
+                        />
+                        <span>°</span>
+                      </div>
                     </div>
                     <input
                       type="range"

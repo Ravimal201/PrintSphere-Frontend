@@ -176,6 +176,8 @@ function DecalItem({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartWorldOffsetRef = useRef(null);
   const groupRef = useRef(null);
+  const dragStartRotationAngleRef = useRef(0);
+  const dragStartDecalRollRef = useRef(0);
 
   useEffect(() => {
     if (!layer.visible) return;
@@ -353,11 +355,13 @@ function DecalItem({
           }
         } else if (isRotating) {
           const angle = Math.atan2(localPoint.x, localPoint.y);
+          const deltaAngle = angle - dragStartRotationAngleRef.current;
+          const newRoll = dragStartDecalRollRef.current - deltaAngle;
           if (onUpdateLayers) {
             onUpdateLayers((prev) =>
               prev.map((l) =>
                 l.id === layer.id
-                  ? { ...l, rotation: [l.rotation[0], l.rotation[1], -angle] }
+                  ? { ...l, rotation: [l.rotation[0], l.rotation[1], newRoll] }
                   : l
               )
             );
@@ -462,6 +466,23 @@ function DecalItem({
     e.stopPropagation();
     setIsRotating(true);
     if (onInteractionStart) onInteractionStart();
+
+    if (groupRef.current) {
+      rootScene.updateMatrixWorld(true);
+      const decalWorldPos = new THREE.Vector3();
+      groupRef.current.getWorldPosition(decalWorldPos);
+
+      const decalWorldNormal = new THREE.Vector3(0, 0, 1);
+      decalWorldNormal.applyQuaternion(groupRef.current.getWorldQuaternion(new THREE.Quaternion()));
+
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(decalWorldNormal, decalWorldPos);
+      const intersectionPoint = new THREE.Vector3();
+      raycaster.ray.intersectPlane(plane, intersectionPoint);
+
+      const localPoint = groupRef.current.worldToLocal(intersectionPoint.clone());
+      dragStartRotationAngleRef.current = Math.atan2(localPoint.x, localPoint.y);
+      dragStartDecalRollRef.current = layer.rotation[2] || 0;
+    }
   };
 
   const handleDeleteClick = (e) => {
