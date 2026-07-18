@@ -127,7 +127,7 @@ export default function DesignerPage() {
     title: "",
     description: "",
     category: "",
-    basePrice: 15.00
+    basePrice: 1200
   });
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -700,6 +700,12 @@ export default function DesignerPage() {
                 if (isEmployee || isManager) {
                   setSubmitError("");
                   setSubmitSuccess("");
+                  setSubmitForm({
+                    title: "",
+                    description: "",
+                    category: selectedModel?.name || "",
+                    basePrice: Math.round(unitPrice)
+                  });
                   setShowSubmitModal(true);
                 } else {
                   handleSaveCustomerDesign();
@@ -1559,21 +1565,26 @@ export default function DesignerPage() {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Category</label>
-                <input
-                  type="text"
+                <select
                   required
                   value={submitForm.category}
                   onChange={(e) => setSubmitForm(prev => ({ ...prev, category: e.target.value }))}
-                  placeholder="e.g. Summer Collection"
-                  className="w-full px-3 py-2 border rounded-xl text-sm"
-                />
+                  className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                >
+                  <option value="" disabled>Select Category</option>
+                  {availableStyles.map((style) => (
+                    <option key={style.name} value={style.name}>
+                      {style.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Proposed Price ($)</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Proposed Price (Rs.)</label>
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
                   required
                   value={submitForm.basePrice}
                   onChange={(e) => setSubmitForm(prev => ({ ...prev, basePrice: parseFloat(e.target.value) || 0 }))}
