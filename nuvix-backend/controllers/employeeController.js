@@ -162,6 +162,14 @@ exports.submitProductConcept = async (req, res) => {
     res.status(201).json({ message: "Design concept submitted for manager approval", product });
   } catch (error) {
     console.error("Submit product concept error:", error);
+    try {
+      require("fs").appendFileSync(
+        require("path").join(__dirname, "..", "error_log.txt"),
+        `[${new Date().toISOString()}] Submit Product Concept Error:\n${error.stack || error}\nPayload:\n${JSON.stringify(req.body, null, 2)}\n\n`
+      );
+    } catch (fsErr) {
+      console.error("Failed to write to error_log.txt:", fsErr);
+    }
     res.status(500).json({ message: "Server error while submitting product concept" });
   }
 };
