@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
+import TShirt3DModal from "../components/TShirt3DModal";
 import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -12,6 +13,8 @@ export default function CartPage() {
   const [pricingRules, setPricingRules] = useState(null);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selected3DDesign, setSelected3DDesign] = useState(null);
+  const [is3DModalOpen, setIs3DModalOpen] = useState(false);
 
   useEffect(() => {
     // Load cart
@@ -224,6 +227,18 @@ export default function CartPage() {
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">
                               Size: {item.size} / Color: {item.color}
                             </p>
+                            {item.isCustom && (
+                              <button
+                                onClick={() => {
+                                  setSelected3DDesign(item);
+                                  setIs3DModalOpen(true);
+                                }}
+                                className="mt-1.5 px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 rounded-lg text-[9px] font-black text-indigo-700 transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-650 animate-pulse" />
+                                View 3D Preview
+                              </button>
+                            )}
                           </div>
                           
                           <div className="flex justify-between items-center mt-3">
@@ -299,6 +314,15 @@ export default function CartPage() {
       </div>
 
       <Footer withSidebarOffset />
+
+      <TShirt3DModal
+        isOpen={is3DModalOpen}
+        onClose={() => {
+          setIs3DModalOpen(false);
+          setSelected3DDesign(null);
+        }}
+        design={selected3DDesign}
+      />
     </div>
   );
 }

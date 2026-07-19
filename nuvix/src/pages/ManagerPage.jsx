@@ -7,6 +7,7 @@ import {
 import axios from "axios";
 import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
+import TShirt3DModal from "../components/TShirt3DModal";
 
 import { API_BASE_URL } from "../config/api";
 
@@ -85,6 +86,10 @@ export default function ManagerPage() {
   const [selectedSubmissionProduct, setSelectedSubmissionProduct] = useState(null);
   const [submissionSide, setSubmissionSide] = useState("front");
   const [submissionZoom, setSubmissionZoom] = useState(0.85);
+
+  // Manager 3D preview modal state for custom customer designs in orders
+  const [selected3DDesign, setSelected3DDesign] = useState(null);
+  const [is3DModalOpen, setIs3DModalOpen] = useState(false);
 
   // Assign employee & order status transitions
   const [assignLoading, setAssignLoading] = useState({});
@@ -938,6 +943,15 @@ export default function ManagerPage() {
                                           >
                                             <Download className="h-2.5 w-2.5" /> Download composite
                                           </a>
+                                          <button
+                                            onClick={() => {
+                                              setSelected3DDesign(item.designId);
+                                              setIs3DModalOpen(true);
+                                            }}
+                                            className="text-[9px] text-indigo-650 hover:underline flex items-center gap-0.5 mt-1 cursor-pointer font-bold"
+                                          >
+                                            <Sparkles className="h-2.5 w-2.5 text-indigo-600 animate-pulse" /> View in 3D Format
+                                          </button>
                                         </div>
                                       </div>
                                     )}
@@ -2036,6 +2050,14 @@ export default function ManagerPage() {
         </div>
       )}
 
+      <TShirt3DModal
+        isOpen={is3DModalOpen}
+        onClose={() => {
+          setIs3DModalOpen(false);
+          setSelected3DDesign(null);
+        }}
+        design={selected3DDesign}
+      />
     </div>
   );
 }
