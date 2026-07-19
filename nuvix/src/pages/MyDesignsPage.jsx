@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
+import TShirt3DModal from "../components/TShirt3DModal";
 import { Palette, Edit, AlertCircle } from "lucide-react";
 import axios from "axios";
 
@@ -12,6 +13,8 @@ export default function MyDesignsPage() {
   const [designs, setDesigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selected3DDesign, setSelected3DDesign] = useState(null);
+  const [is3DModalOpen, setIs3DModalOpen] = useState(false);
 
   useEffect(() => {
     fetchDesigns();
@@ -118,10 +121,20 @@ export default function MyDesignsPage() {
                     <div className="flex gap-2.5 pt-2 border-t border-slate-100">
                       <button
                         onClick={() => handleLoadDesign(design)}
-                        className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                        className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-655 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
                       >
                         <Edit className="h-3.5 w-3.5" />
                         Customize
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelected3DDesign(design);
+                          setIs3DModalOpen(true);
+                        }}
+                        className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                      >
+                        <Palette className="h-3.5 w-3.5 text-indigo-600" />
+                        View 3D
                       </button>
                     </div>
                   </div>
@@ -133,6 +146,15 @@ export default function MyDesignsPage() {
       </div>
 
       <Footer withSidebarOffset />
+
+      <TShirt3DModal
+        isOpen={is3DModalOpen}
+        onClose={() => {
+          setIs3DModalOpen(false);
+          setSelected3DDesign(null);
+        }}
+        design={selected3DDesign}
+      />
     </div>
   );
 }

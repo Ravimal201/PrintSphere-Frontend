@@ -39,7 +39,8 @@ export default function Scene({
   onSelectLayer,
   onUpdateLayers,
   onDeleteLayer,
-  modelRotation = 0
+  modelRotation = 0,
+  orbitEnabled = false
 }) {
   const groupRef = useRef();
   const [isInteracting, setIsInteracting] = useState(false);
@@ -99,7 +100,7 @@ export default function Scene({
 
       {/* Allow the user to manually rotate the shirt, but constrain angles for a premium experience */}
       <OrbitControls
-        enabled={false}
+        enabled={orbitEnabled}
         enablePan={false}
         enableZoom={false}
       />

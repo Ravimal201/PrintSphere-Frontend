@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
+import TShirt3DModal from "../components/TShirt3DModal";
 import { ShoppingBag, Calendar, MapPin, ShieldCheck, AlertCircle } from "lucide-react";
 import axios from "axios";
 
@@ -21,6 +22,8 @@ export default function MyOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selected3DDesign, setSelected3DDesign] = useState(null);
+  const [is3DModalOpen, setIs3DModalOpen] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -153,6 +156,18 @@ export default function MyOrdersPage() {
                                       <span>•</span>
                                       <span>Qty: {item.quantity}</span>
                                     </div>
+                                    {isCustom && item.designId && (
+                                      <button
+                                        onClick={() => {
+                                          setSelected3DDesign(item.designId);
+                                          setIs3DModalOpen(true);
+                                        }}
+                                        className="mt-1 flex items-center gap-1 text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-150 px-1.5 py-0.5 rounded-lg transition hover:bg-indigo-100 cursor-pointer"
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-650 animate-pulse" />
+                                        View 3D Design
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                                 <span className="font-extrabold text-slate-800 text-sm">Rs. {(item.price * item.quantity).toFixed(2)}</span>
@@ -210,6 +225,15 @@ export default function MyOrdersPage() {
       </div>
 
       <Footer withSidebarOffset />
+
+      <TShirt3DModal
+        isOpen={is3DModalOpen}
+        onClose={() => {
+          setIs3DModalOpen(false);
+          setSelected3DDesign(null);
+        }}
+        design={selected3DDesign}
+      />
     </div>
   );
 }
