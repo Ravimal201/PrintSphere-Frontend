@@ -180,7 +180,7 @@ function DecalItem({
   const dragStartDecalRollRef = useRef(0);
 
   useEffect(() => {
-    if (!layer.visible) return;
+    if (layer.visible === false) return;
 
     let active = true;
     let createdTexture = null;
@@ -410,7 +410,7 @@ function DecalItem({
     };
   }, [isSelected]);
 
-  if (!layer.visible || !texture || !targetMesh?.current || !scene) return null;
+  if (layer.visible === false || !texture || !targetMesh?.current || !scene) return null;
 
   // Force update world matrices to avoid stale/identity matrix values
   rootScene.updateMatrixWorld(true);
