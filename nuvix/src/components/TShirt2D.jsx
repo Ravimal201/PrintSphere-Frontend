@@ -30,10 +30,12 @@ const getColorValue = (colorStr) => {
   return colorMap[lower] || colorStr;
 };
 
-export default function TShirt2D({ color = "#ffffff", designUrl, className = "h-36 w-36" }) {
+export default function TShirt2D({ color = "#ffffff", designUrl, layers = [], className = "h-36 w-36" }) {
   const finalColor = getColorValue(color);
+  const visibleLayers = (layers || []).filter(l => l.visible !== false);
+  const hasLayers = visibleLayers.length > 0;
   // Determine if designUrl is a valid URL and not a default placeholder
-  const hasDesign = designUrl && designUrl !== "/images/dumyImage.png";
+  const hasDesign = !hasLayers && designUrl && designUrl !== "/images/dumyImage.png";
 
   return (
     <div className={`relative flex items-center justify-center ${className}`}>
@@ -75,7 +77,52 @@ export default function TShirt2D({ color = "#ffffff", designUrl, className = "h-
         />
       </svg>
 
-      {/* Decal Overlay on the chest area */}
+      {/* Render decal layers if provided */}
+      {hasLayers && (
+        <div 
+          className="absolute pointer-events-none select-none flex flex-col items-center justify-center overflow-hidden"
+          style={{
+            top: "28%",
+            left: "32%",
+            width: "36%",
+            height: "38%"
+          }}
+        >
+          {visibleLayers.map((layer, idx) => {
+            if (layer.type === "text") {
+              return (
+                <div
+                  key={layer.id || idx}
+                  className="truncate text-center max-w-full leading-tight drop-shadow-sm px-1 my-0.5"
+                  style={{
+                    fontFamily: layer.fontFamily || "Inter",
+                    color: layer.color || "#1e293b",
+                    fontWeight: layer.bold ? "bold" : "normal",
+                    fontStyle: layer.italic ? "italic" : "normal",
+                    fontSize: "11px"
+                  }}
+                >
+                  {layer.text || layer.name}
+                </div>
+              );
+            }
+            if (layer.url && layer.url !== "/images/dumyImage.png") {
+              return (
+                <img
+                  key={layer.id || idx}
+                  src={layer.url}
+                  alt={layer.name || "Decal"}
+                  className="max-w-full max-h-[70%] object-contain my-0.5"
+                  onError={(e) => { e.target.style.display = "none"; }}
+                />
+              );
+            }
+            return null;
+          })}
+        </div>
+      )}
+
+      {/* Fallback Single Decal Overlay on the chest area */}
       {hasDesign && (
         <div 
           className="absolute pointer-events-none select-none flex items-center justify-center overflow-hidden"
