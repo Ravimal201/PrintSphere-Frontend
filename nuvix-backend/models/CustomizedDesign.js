@@ -28,6 +28,25 @@ const LayerSchema = new mongoose.Schema({
   },
   // Image URL
   url: String,
+  // Layer visibility & lock state
+  visible: {
+    type: Boolean,
+    default: true
+  },
+  locked: {
+    type: Boolean,
+    default: false
+  },
+  flipX: {
+    type: Boolean,
+    default: false
+  },
+  flipY: {
+    type: Boolean,
+    default: false
+  },
+  targetMeshName: String,
+  projectedForModel: String,
   // 3D transform metrics (X, Y, Z coordinates and factors)
   position: {
     type: [Number],

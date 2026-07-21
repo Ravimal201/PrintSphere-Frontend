@@ -42,6 +42,7 @@ function SafeDecal({
 }) {
   const [decalMesh, setDecalMesh] = useState(null);
   const [geometry, setGeometry] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Manually remove decal from parent on unmount to ensure cleanup
   useEffect(() => {
@@ -59,6 +60,9 @@ function SafeDecal({
     if (!parent || !(parent instanceof THREE.Mesh)) {
       return;
     }
+
+    // Force matrix update on parent before calculating DecalGeometry
+    parent.updateMatrixWorld(true);
 
     // Save parent's matrixWorld and identity it for DecalGeometry calculation
     const matrixWorld = parent.matrixWorld.clone();
@@ -114,17 +118,33 @@ function SafeDecal({
     }
 
     let geom = null;
+    let timerId = null;
+
     try {
       geom = new DecalGeometry(parent, posVec, rotEuler, scaleVec);
-      setGeometry(geom);
+      
+      // If geometry generation resulted in zero triangles due to initial matrix timing, retry after 50ms
+      if (!geom.attributes.position || geom.attributes.position.count === 0) {
+        geom.dispose();
+        geom = null;
+        if (retryCount < 5) {
+          timerId = setTimeout(() => setRetryCount(c => c + 1), 50);
+        }
+      } else {
+        setGeometry(geom);
+      }
     } catch (err) {
       console.error("SafeDecal geometry generation failed:", err);
+      if (retryCount < 5) {
+        timerId = setTimeout(() => setRetryCount(c => c + 1), 50);
+      }
     }
 
     // Restore parent's matrixWorld
     parent.matrixWorld.copy(matrixWorld);
 
     return () => {
+      if (timerId) clearTimeout(timerId);
       setGeometry(null);
       if (geom) {
         geom.dispose();
@@ -133,6 +153,7 @@ function SafeDecal({
   }, [
     decalMesh,
     mesh,
+    retryCount,
     ...vecToArray(position),
     ...vecToArray(scale),
     ...vecToArray(rotation)
@@ -180,7 +201,7 @@ function DecalItem({
   const dragStartDecalRollRef = useRef(0);
 
   useEffect(() => {
-    if (!layer.visible) return;
+    if (layer.visible === false) return;
 
     let active = true;
     let createdTexture = null;
@@ -410,7 +431,7 @@ function DecalItem({
     };
   }, [isSelected]);
 
-  if (!layer.visible || !texture || !targetMesh?.current || !scene) return null;
+  if (layer.visible === false || !texture || !targetMesh?.current || !scene) return null;
 
   // Force update world matrices to avoid stale/identity matrix values
   rootScene.updateMatrixWorld(true);
@@ -817,8 +838,7 @@ export default function ShirtModel({
 
       // Force update all world matrices before raycasting
       rootScene.updateMatrixWorld(true);
-
-      const parentMatrix = rootGroupRef.current ? rootGroupRef.current.matrixWorld : scene.matrixWorld;
+      scene.updateMatrixWorld(true);
 
       let changed = false;
       const nextLayers = layers.map((layer) => {
@@ -830,23 +850,19 @@ export default function ShirtModel({
         // Project position from scene group-space onto the new mesh using a raycast from the outside towards the center
         const groupPos = new THREE.Vector3().fromArray(layer.position);
         
-        const dir = new THREE.Vector3(groupPos.x, 0, groupPos.z).normalize();
-        if (dir.lengthSq() === 0) dir.set(0, 0, 1);
-        
-        const localOrigin = new THREE.Vector3(dir.x * 2.0, groupPos.y, dir.z * 2.0);
-        const localDir = dir.clone().negate();
-        
-        const worldOrigin = localOrigin.clone().applyMatrix4(parentMatrix);
-        const worldDir = localDir.clone().transformDirection(parentMatrix).normalize();
-        
+        const zSign = groupPos.z >= 0 ? 1 : -1;
+        const rayOriginScene = new THREE.Vector3(groupPos.x, groupPos.y, zSign * 2.5);
+        const rayTargetScene = new THREE.Vector3(0, groupPos.y, 0);
+        const rayDirScene = new THREE.Vector3().subVectors(rayTargetScene, rayOriginScene).normalize();
+
+        const worldOrigin = rayOriginScene.clone().applyMatrix4(scene.matrixWorld);
+        const worldDir = rayDirScene.clone().transformDirection(scene.matrixWorld).normalize();
+
         const raycaster = new THREE.Raycaster();
         raycaster.set(worldOrigin, worldDir);
-        
-        // Raycast against the entire GLTF scene hierarchy to find any valid outer mesh intersection
-        const intersects = raycaster.intersectObjects(scene.children, true);
 
-        // Find the first intersection that is a mesh and not helper/decal/inner
-        const validHit = intersects.find((hit) => {
+        let intersects = raycaster.intersectObjects(scene.children, true);
+        let validHit = intersects.find((hit) => {
           const child = hit.object;
           if (!child.isMesh || child.name === "decal" || child.name === "decal-helper" || child.userData?.isDecal) {
             return false;
@@ -857,6 +873,25 @@ export default function ShirtModel({
           }
           return true;
         });
+
+        // Fallback raycast if initial ray missed
+        if (!validHit) {
+          const fallbackOrigin = new THREE.Vector3(0, groupPos.y, 2.5).applyMatrix4(scene.matrixWorld);
+          const fallbackDir = new THREE.Vector3(0, 0, -1).transformDirection(scene.matrixWorld).normalize();
+          raycaster.set(fallbackOrigin, fallbackDir);
+          intersects = raycaster.intersectObjects(scene.children, true);
+          validHit = intersects.find((hit) => {
+            const child = hit.object;
+            if (!child.isMesh || child.name === "decal" || child.name === "decal-helper" || child.userData?.isDecal) {
+              return false;
+            }
+            const nameLower = child.name.toLowerCase();
+            if (nameLower.includes("inside") || nameLower.includes("inner") || nameLower.includes("collar_in")) {
+              return false;
+            }
+            return true;
+          });
+        }
 
         if (validHit) {
           const hit = validHit;

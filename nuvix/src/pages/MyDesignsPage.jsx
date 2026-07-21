@@ -101,7 +101,7 @@ export default function MyDesignsPage() {
                   <div key={design._id} className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4">
                     {/* T-Shirt Preview Box */}
                     <div className="bg-slate-50 rounded-2xl p-4 flex items-center justify-center border border-slate-100 min-h-[180px]">
-                      <TShirt2D color={design.fabricColor} designUrl={design.thumbnailUrl} className="h-40 w-40" />
+                      <TShirt2D color={design.fabricColor} designUrl={design.thumbnailUrl} layers={design.layers} className="h-40 w-40" />
                     </div>
 
                     {/* Details */}

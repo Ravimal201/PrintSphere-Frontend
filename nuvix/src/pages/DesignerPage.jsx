@@ -184,7 +184,19 @@ export default function DesignerPage() {
       if (designToLoad) {
         try {
           const design = JSON.parse(designToLoad);
-          if (design.layers) setLayers(design.layers);
+          if (design.layers && Array.isArray(design.layers)) {
+            const normalizedLayers = design.layers.map((l) => ({
+              ...l,
+              visible: l.visible !== undefined ? Boolean(l.visible) : true,
+              locked: l.locked !== undefined ? Boolean(l.locked) : false,
+              flipX: Boolean(l.flipX),
+              flipY: Boolean(l.flipY),
+              position: Array.isArray(l.position) ? l.position : [0, 0, 0],
+              rotation: Array.isArray(l.rotation) ? l.rotation : [0, 0, 0],
+              scale: Array.isArray(l.scale) ? l.scale : [0.3, 0.3, 0.25]
+            }));
+            setLayers(normalizedLayers);
+          }
           if (design.fabricColor) setShirtColor(design.fabricColor);
           if (design.tShirtType) {
             const model = stylesList.find(m => m.name === design.tShirtType) ||
@@ -224,6 +236,40 @@ export default function DesignerPage() {
     loadAndFetch();
   }, []);
 
+  const generateDesignThumbnail = (layerList) => {
+    const visibleLayers = (layerList || []).filter(l => l.visible !== false);
+    const imgLayer = visibleLayers.find(l => (l.type === "image" || l.type === "logo") && l.url && l.url !== "/images/dumyImage.png");
+    if (imgLayer) return imgLayer.url;
+
+    const textLayer = visibleLayers.find(l => l.type === "text" && l.text);
+    if (textLayer) {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 512;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, 512, 256);
+          const fontStyle = [
+            textLayer.italic ? "italic" : "",
+            textLayer.bold ? "bold" : "",
+            "44px",
+            `"${textLayer.fontFamily || "Inter"}", sans-serif`
+          ].filter(Boolean).join(" ");
+          ctx.font = fontStyle;
+          ctx.fillStyle = textLayer.color || "#1e293b";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(textLayer.text, 256, 128);
+          return canvas.toDataURL("image/png");
+        }
+      } catch (err) {
+        console.error("Error creating text thumbnail:", err);
+      }
+    }
+    return "/images/dumyImage.png";
+  };
+
   const handleSubmitDesignConcept = async (e) => {
     e.preventDefault();
     setSubmitError("");
@@ -239,8 +285,7 @@ export default function DesignerPage() {
 
     const headers = { Authorization: `Bearer ${token}` };
 
-    const imageLayers = layers.filter(l => l.type === "image" || l.type === "logo");
-    const previewImages = imageLayers.map(l => l.url).filter(Boolean);
+    const thumb = generateDesignThumbnail(layers);
 
     const payload = {
       title: submitForm.title,
@@ -249,7 +294,7 @@ export default function DesignerPage() {
       basePrice: submitForm.basePrice,
       sizes: [selectedSize],
       colors: [shirtColor],
-      images: previewImages.length > 0 ? previewImages : ["/images/dumyImage.png"],
+      images: [thumb],
       modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
       defaultColor: shirtColor,
       layers: layers
@@ -293,9 +338,7 @@ export default function DesignerPage() {
       return;
     }
     const headers = { Authorization: `Bearer ${token}` };
-    const imageLayers = layers.filter(l => l.type === "image" || l.type === "logo");
-    const previewImages = imageLayers.map(l => l.url).filter(Boolean);
-    const thumbnailUrl = previewImages.length > 0 ? previewImages[0] : "/images/dumyImage.png";
+    const thumbnailUrl = generateDesignThumbnail(layers);
 
     const payload = {
       tShirtType: selectedModel?.name || "Crew Neck T-Shirt",
