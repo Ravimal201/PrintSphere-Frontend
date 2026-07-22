@@ -168,7 +168,7 @@ function SafeDecal({
       material-polygonOffset
       material-polygonOffsetFactor={polygonOffsetFactor}
       material-depthTest={depthTest}
-      material-map={map}
+      {...(map !== undefined ? { "material-map": map } : {})}
       {...props}
       userData={{ isDecal: true, ...props.userData }}
     >
@@ -201,35 +201,44 @@ function DecalItem({
   const dragStartDecalRollRef = useRef(0);
 
   useEffect(() => {
-    if (layer.visible === false) return;
+    if (layer.visible === false) {
+      setTexture(null);
+      return;
+    }
 
-    let active = true;
-    let createdTexture = null;
+    let isMounted = true;
 
     if (layer.type === "text") {
       const tex = createTextTexture(layer);
-      if (tex && active) {
-        createdTexture = tex;
+      if (isMounted) {
         setTexture(tex);
+      } else if (tex) {
+        tex.dispose();
       }
     } else {
       // Image or Logo layer
+      if (!layer.url) return;
       const loader = new THREE.TextureLoader();
-      loader.load(layer.url, (tex) => {
-        if (active) {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.needsUpdate = true;
-          createdTexture = tex;
-          setTexture(tex);
+      loader.load(
+        layer.url,
+        (loadedTex) => {
+          if (isMounted) {
+            loadedTex.colorSpace = THREE.SRGBColorSpace;
+            loadedTex.needsUpdate = true;
+            setTexture(loadedTex);
+          } else {
+            loadedTex.dispose();
+          }
+        },
+        undefined,
+        (err) => {
+          console.error("TextureLoader error for decal layer:", layer.url, err);
         }
-      });
+      );
     }
 
     return () => {
-      active = false;
-      if (createdTexture) {
-        createdTexture.dispose();
-      }
+      isMounted = false;
     };
   }, [
     layer.type,
@@ -569,13 +578,13 @@ function DecalItem({
         position={decalPos}
         rotation={rotEuler}
         scale={decalScale}
+        map={texture}
         userData={{ isDecal: true, layerId: layer.id }}
         onPointerDown={handleDecalPointerDown}
       >
         <meshStandardMaterial
           map={texture}
           transparent
-          alphaTest={0.05}
           polygonOffset
           polygonOffsetFactor={-10}
           polygonOffsetUnits={-10}

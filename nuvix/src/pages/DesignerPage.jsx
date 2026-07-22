@@ -431,20 +431,22 @@ export default function DesignerPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
+      const dataUrl = reader.result;
+      if (!dataUrl) return;
+
       const img = new Image();
-      img.src = reader.result;
       img.onload = () => {
-        const aspect = img.width / img.height;
+        const aspect = (img.width && img.height) ? (img.width / img.height) : 1;
         const scaleX = 0.3;
-        const scaleY = 0.3 / aspect;
-        
+        const scaleY = 0.3 / (aspect || 1);
+
         const id = `img-${Date.now()}`;
         const { position, rotation } = getInitialPositionAndRotation();
         const newLayer = {
           id,
           type: "image",
           name: file.name.substring(0, 15),
-          url: reader.result,
+          url: dataUrl,
           visible: true,
           locked: false,
           position,
@@ -452,20 +454,40 @@ export default function DesignerPage() {
           scale: [scaleX, scaleY, 0.25],
           aspectRatio: aspect
         };
-        setLayers([...layers, newLayer]);
+        setLayers((prev) => [...prev, newLayer]);
         selectLayer(id);
       };
+      img.onerror = (err) => {
+        console.error("Error loading uploaded image dimensions:", err);
+        const id = `img-${Date.now()}`;
+        const { position, rotation } = getInitialPositionAndRotation();
+        const newLayer = {
+          id,
+          type: "image",
+          name: file.name.substring(0, 15),
+          url: dataUrl,
+          visible: true,
+          locked: false,
+          position,
+          rotation,
+          scale: [0.3, 0.3, 0.25],
+          aspectRatio: 1
+        };
+        setLayers((prev) => [...prev, newLayer]);
+        selectLayer(id);
+      };
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
+    e.target.value = ""; // Reset input so same image can be re-uploaded if desired
   };
 
   const addPresetImage = (url, name) => {
     const img = new Image();
-    img.src = url;
     img.onload = () => {
-      const aspect = img.width / img.height;
+      const aspect = (img.width && img.height) ? (img.width / img.height) : 1;
       const scaleX = 0.3;
-      const scaleY = 0.3 / aspect;
+      const scaleY = 0.3 / (aspect || 1);
 
       const id = `img-${Date.now()}`;
       const { position, rotation } = getInitialPositionAndRotation();
@@ -481,9 +503,29 @@ export default function DesignerPage() {
         scale: [scaleX, scaleY, 0.25],
         aspectRatio: aspect
       };
-      setLayers([...layers, newLayer]);
+      setLayers((prev) => [...prev, newLayer]);
       selectLayer(id);
     };
+    img.onerror = (err) => {
+      console.error("Error loading preset image dimensions:", url, err);
+      const id = `img-${Date.now()}`;
+      const { position, rotation } = getInitialPositionAndRotation();
+      const newLayer = {
+        id,
+        type: "image",
+        name,
+        url,
+        visible: true,
+        locked: false,
+        position,
+        rotation,
+        scale: [0.3, 0.3, 0.25],
+        aspectRatio: 1
+      };
+      setLayers((prev) => [...prev, newLayer]);
+      selectLayer(id);
+    };
+    img.src = url;
   };
 
   const updateActiveViewFromAngle = (rad) => {
