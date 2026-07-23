@@ -164,11 +164,6 @@ function SafeDecal({
       ref={setDecalMesh}
       geometry={geometry || undefined}
       name="decal"
-      material-transparent
-      material-polygonOffset
-      material-polygonOffsetFactor={polygonOffsetFactor}
-      material-depthTest={depthTest}
-      {...(map !== undefined ? { "material-map": map } : {})}
       {...props}
       userData={{ isDecal: true, ...props.userData }}
     >
@@ -586,8 +581,8 @@ function DecalItem({
           map={texture}
           transparent
           polygonOffset
-          polygonOffsetFactor={-10}
-          polygonOffsetUnits={-10}
+          polygonOffsetFactor={-4}
+          polygonOffsetUnits={-4}
           normalMap={normalMap}
           normalScale={normalScale}
           roughnessMap={roughnessMap}
@@ -595,6 +590,7 @@ function DecalItem({
           roughness={roughness}
           metalness={metalness}
           side={THREE.DoubleSide}
+          depthTest={true}
           depthWrite={false}
         />
       </SafeDecal>
@@ -718,6 +714,8 @@ export default function ShirtModel({
   const [meshLoaded, setMeshLoaded] = useState(false);
   const [activeScene, setActiveScene] = useState(null);
   const rootGroupRef = useRef(null);
+  const modelCenterRef = useRef(new THREE.Vector3(0, 0, 0));
+  const modelSizeRef = useRef(new THREE.Vector3(1, 1, 1));
 
   // Center and normalize scale once when model loads
   useEffect(() => {
@@ -753,6 +751,9 @@ export default function ShirtModel({
       box.getSize(size);
       const center = new THREE.Vector3();
       box.getCenter(center);
+
+      modelCenterRef.current.copy(center);
+      modelSizeRef.current.copy(size);
 
       // Scale so max dimension is 2.2 units
       const maxDim = Math.max(size.x, size.y, size.z);
@@ -849,6 +850,10 @@ export default function ShirtModel({
       rootScene.updateMatrixWorld(true);
       scene.updateMatrixWorld(true);
 
+      const center = modelCenterRef.current;
+      const size = modelSizeRef.current;
+      const chestY = center.y + (size.y > 0 ? size.y * 0.05 : 0);
+
       let changed = false;
       const nextLayers = layers.map((layer) => {
         if (layer.locked) return layer;
@@ -859,9 +864,13 @@ export default function ShirtModel({
         // Project position from scene group-space onto the new mesh using a raycast from the outside towards the center
         const groupPos = new THREE.Vector3().fromArray(layer.position);
         
+        // Target Y for raycasting: if layer position Y is near 0 or unprojected for current model, use chestY
+        const targetY = (Math.abs(groupPos.y) < 0.01 || layer.projectedForModel !== modelPath) ? chestY : groupPos.y;
+        const targetX = groupPos.x !== 0 ? groupPos.x : center.x;
+
         const zSign = groupPos.z >= 0 ? 1 : -1;
-        const rayOriginScene = new THREE.Vector3(groupPos.x, groupPos.y, zSign * 2.5);
-        const rayTargetScene = new THREE.Vector3(0, groupPos.y, 0);
+        const rayOriginScene = new THREE.Vector3(targetX, targetY, center.z + zSign * 2.5);
+        const rayTargetScene = new THREE.Vector3(center.x, targetY, center.z);
         const rayDirScene = new THREE.Vector3().subVectors(rayTargetScene, rayOriginScene).normalize();
 
         const worldOrigin = rayOriginScene.clone().applyMatrix4(scene.matrixWorld);
@@ -883,9 +892,9 @@ export default function ShirtModel({
           return true;
         });
 
-        // Fallback raycast if initial ray missed
+        // Fallback raycast straight at chest center if initial ray missed
         if (!validHit) {
-          const fallbackOrigin = new THREE.Vector3(0, groupPos.y, 2.5).applyMatrix4(scene.matrixWorld);
+          const fallbackOrigin = new THREE.Vector3(center.x, chestY, center.z + 2.5).applyMatrix4(scene.matrixWorld);
           const fallbackDir = new THREE.Vector3(0, 0, -1).transformDirection(scene.matrixWorld).normalize();
           raycaster.set(fallbackOrigin, fallbackDir);
           intersects = raycaster.intersectObjects(scene.children, true);
