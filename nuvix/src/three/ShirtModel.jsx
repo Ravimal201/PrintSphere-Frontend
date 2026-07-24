@@ -194,6 +194,10 @@ function DecalItem({
   const groupRef = useRef(null);
   const dragStartRotationAngleRef = useRef(0);
   const dragStartDecalRollRef = useRef(0);
+  const dragStartPlaneRef = useRef(null);
+  const dragStartWorldPosRef = useRef(null);
+  const dragStartBasisXRef = useRef(null);
+  const dragStartBasisYRef = useRef(null);
 
   useEffect(() => {
     if (layer.visible === false) {
@@ -379,17 +383,33 @@ function DecalItem({
             );
           }
         } else if (isRotating) {
-          const angle = Math.atan2(localPoint.x, localPoint.y);
-          const deltaAngle = angle - dragStartRotationAngleRef.current;
-          const newRoll = dragStartDecalRollRef.current - deltaAngle;
-          if (onUpdateLayers) {
-            onUpdateLayers((prev) =>
-              prev.map((l) =>
-                l.id === layer.id
-                  ? { ...l, rotation: [l.rotation[0], l.rotation[1], newRoll] }
-                  : l
-              )
-            );
+          if (
+            dragStartPlaneRef.current &&
+            dragStartWorldPosRef.current &&
+            dragStartBasisXRef.current &&
+            dragStartBasisYRef.current
+          ) {
+            const intersectionPoint = new THREE.Vector3();
+            if (raycaster.ray.intersectPlane(dragStartPlaneRef.current, intersectionPoint)) {
+              const vec = intersectionPoint.clone().sub(dragStartWorldPosRef.current);
+              const x = vec.dot(dragStartBasisXRef.current);
+              const y = vec.dot(dragStartBasisYRef.current);
+
+              const angle = Math.atan2(x, y);
+              const deltaAngle = angle - dragStartRotationAngleRef.current;
+              const rawRoll = dragStartDecalRollRef.current - deltaAngle;
+              const newRoll = Math.atan2(Math.sin(rawRoll), Math.cos(rawRoll));
+
+              if (onUpdateLayers) {
+                onUpdateLayers((prev) =>
+                  prev.map((l) =>
+                    l.id === layer.id
+                      ? { ...l, rotation: [l.rotation[0], l.rotation[1], newRoll] }
+                      : l
+                  )
+                );
+              }
+            }
           }
         }
       }
@@ -400,6 +420,10 @@ function DecalItem({
       setIsScaling(false);
       setIsRotating(false);
       dragStartWorldOffsetRef.current = null;
+      dragStartPlaneRef.current = null;
+      dragStartWorldPosRef.current = null;
+      dragStartBasisXRef.current = null;
+      dragStartBasisYRef.current = null;
       if (onInteractionEnd) onInteractionEnd();
     };
 
@@ -496,16 +520,27 @@ function DecalItem({
       rootScene.updateMatrixWorld(true);
       const decalWorldPos = new THREE.Vector3();
       groupRef.current.getWorldPosition(decalWorldPos);
+      dragStartWorldPosRef.current = decalWorldPos;
 
-      const decalWorldNormal = new THREE.Vector3(0, 0, 1);
-      decalWorldNormal.applyQuaternion(groupRef.current.getWorldQuaternion(new THREE.Quaternion()));
+      const groupQuat = groupRef.current.getWorldQuaternion(new THREE.Quaternion());
+      const decalWorldNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(groupQuat);
 
       const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(decalWorldNormal, decalWorldPos);
+      dragStartPlaneRef.current = plane;
+
+      const basisX = new THREE.Vector3(1, 0, 0).applyQuaternion(groupQuat);
+      const basisY = new THREE.Vector3(0, 1, 0).applyQuaternion(groupQuat);
+      dragStartBasisXRef.current = basisX;
+      dragStartBasisYRef.current = basisY;
+
       const intersectionPoint = new THREE.Vector3();
       raycaster.ray.intersectPlane(plane, intersectionPoint);
 
-      const localPoint = groupRef.current.worldToLocal(intersectionPoint.clone());
-      dragStartRotationAngleRef.current = Math.atan2(localPoint.x, localPoint.y);
+      const vec = intersectionPoint.clone().sub(decalWorldPos);
+      const x = vec.dot(basisX);
+      const y = vec.dot(basisY);
+
+      dragStartRotationAngleRef.current = Math.atan2(x, y);
       dragStartDecalRollRef.current = layer.rotation[2] || 0;
     }
   };
@@ -857,6 +892,8 @@ export default function ShirtModel({
       let changed = false;
       const nextLayers = layers.map((layer) => {
         if (layer.locked) return layer;
+        // Skip heavy raycasting if layer is already projected for this model
+        if (layer.projectedForModel === modelPath) return layer;
 
         const mesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
         if (!mesh) return layer;
