@@ -1,8 +1,18 @@
 const mongoose = require("mongoose");
+const path = require("path");
+
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is not defined in nuvix-backend/config/.env");
+    }
+
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 10000
+    });
     console.log("MongoDB Connected");
 
     // Seed Default Admin Account
