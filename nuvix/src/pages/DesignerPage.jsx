@@ -1355,39 +1355,72 @@ export default function DesignerPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                      <span className="flex items-center gap-1"><RotateCw className="h-3.5 w-3.5" /> Rotation</span>
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min="-180"
-                          max="180"
-                          value={Math.round((activeLayer.rotation[2] || 0) * (180 / Math.PI))}
-                          onChange={(e) => {
-                            let deg = Number(e.target.value);
-                            if (deg < -180) deg = -180;
-                            if (deg > 180) deg = 180;
-                            const rad = deg * (Math.PI / 180);
-                            updateActiveLayer("rotation", [activeLayer.rotation[0], activeLayer.rotation[1], rad]);
-                          }}
-                          className="w-16 px-1.5 py-0.5 text-center text-xs font-bold border border-slate-200 rounded-lg focus:border-indigo-500 focus:outline-hidden bg-white text-slate-800"
-                        />
-                        <span>°</span>
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min="-180"
-                      max="180"
-                      step="2"
-                      value={activeLayer.rotation[2] * (180 / Math.PI)}
-                      onChange={(e) => {
-                        const deg = Number(e.target.value);
-                        const rad = deg * (Math.PI / 180);
-                        updateActiveLayer("rotation", [activeLayer.rotation[0], activeLayer.rotation[1], rad]);
-                      }}
-                      className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-                    />
+                    {(() => {
+                      const rad = activeLayer.rotation?.[2] || 0;
+                      const rawDeg = Math.round((rad * 180) / Math.PI);
+                      const currentDeg = ((((rawDeg + 180) % 360) + 360) % 360) - 180;
+                      return (
+                        <>
+                          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                            <span className="flex items-center gap-1"><RotateCw className="h-3.5 w-3.5" /> Rotation</span>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="-180"
+                                max="180"
+                                value={currentDeg}
+                                onChange={(e) => {
+                                  let deg = Number(e.target.value);
+                                  if (isNaN(deg)) deg = 0;
+                                  if (deg < -180) deg = -180;
+                                  if (deg > 180) deg = 180;
+                                  const newRad = deg * (Math.PI / 180);
+                                  updateActiveLayer("rotation", [activeLayer.rotation[0], activeLayer.rotation[1], newRad]);
+                                }}
+                                className="w-16 px-1.5 py-0.5 text-center text-xs font-bold border border-slate-200 rounded-lg focus:border-indigo-500 focus:outline-hidden bg-white text-slate-800"
+                              />
+                              <span>°</span>
+                            </div>
+                          </div>
+                          <input
+                            type="range"
+                            min="-180"
+                            max="180"
+                            step="1"
+                            value={currentDeg}
+                            onChange={(e) => {
+                              const deg = Number(e.target.value);
+                              const newRad = deg * (Math.PI / 180);
+                              updateActiveLayer("rotation", [activeLayer.rotation[0], activeLayer.rotation[1], newRad]);
+                            }}
+                            className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <div className="grid grid-cols-4 gap-1 pt-1">
+                            {[-90, 0, 90, 180].map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => {
+                                  const presetRad = preset * (Math.PI / 180);
+                                  updateActiveLayer("rotation", [
+                                    activeLayer.rotation[0],
+                                    activeLayer.rotation[1],
+                                    presetRad
+                                  ]);
+                                }}
+                                className={`py-1 text-[10px] font-semibold rounded-md border transition-colors ${
+                                  currentDeg === preset
+                                    ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-bold"
+                                    : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                                }`}
+                              >
+                                {preset > 0 ? `+${preset}°` : `${preset}°`}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
