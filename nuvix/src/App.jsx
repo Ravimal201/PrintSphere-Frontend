@@ -15,6 +15,8 @@ import SupportPage from "./pages/SupportPage";
 import AboutUsPage from "./pages/AboutUsPage";
 import ContactUsPage from "./pages/ContactUsPage";
 import CartPage from "./pages/CartPage";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancel from "./pages/PaymentCancel";
 
 function App() {
   const path = window.location.pathname;
@@ -74,6 +76,14 @@ function App() {
 
   if (path === "/cart") {
     return <CartPage />;
+  }
+
+  if (path === "/payment/success" || path.startsWith("/payment/success")) {
+    return <PaymentSuccess />;
+  }
+
+  if (path === "/payment/cancel" || path.startsWith("/payment/cancel")) {
+    return <PaymentCancel />;
   }
 
   if (path === "/my-designs") {

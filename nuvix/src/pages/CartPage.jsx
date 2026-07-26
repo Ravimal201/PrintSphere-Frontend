@@ -141,16 +141,29 @@ export default function CartPage() {
         shippingAddress: userAddress
       };
 
-      await axios.post(`${API_BASE_URL}/auth/orders`, orderPayload, { headers });
+      const orderRes = await axios.post(`${API_BASE_URL}/auth/orders`, orderPayload, { headers });
+      const orderId = orderRes.data.order._id;
+
+      // Initiate Stripe Sandbox checkout session
+      const sessionRes = await axios.post(
+        `${API_BASE_URL}/payment/create-checkout-session`,
+        { orderId, gateway: "stripe" },
+        { headers }
+      );
+
       setCheckoutSuccess(true);
       saveCart([]); // Clear cart
-      setTimeout(() => {
-        setCheckoutSuccess(false);
+      
+      if (sessionRes.data && sessionRes.data.url) {
+        // Redirect to Stripe checkout screen
+        window.location.href = sessionRes.data.url;
+      } else {
         window.location.href = "/my-orders";
-      }, 2000);
+      }
     } catch (err) {
       console.error("Checkout order error:", err);
-      alert(err.response?.data?.message || "Failed to process checkout. Please try again.");
+      const errMsg = err.response?.data?.message || err.message || "Failed to process checkout. Please try again.";
+      alert(errMsg);
     }
   };
 

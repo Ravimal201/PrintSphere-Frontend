@@ -252,11 +252,10 @@ exports.createOrder = async (req, res) => {
       complexityFee: complexityFee || 0,
       totalCost,
       shippingAddress,
-      paymentStatus: "Paid",
-      orderStatus: "Processing", // default to processing after checkout
+      paymentStatus: "Pending",
+      orderStatus: "Pending Payment",
       timeline: [
-        { status: "Pending Payment", note: "Order placed by customer" },
-        { status: "Processing", note: "Payment verified, order sent to printing queue" }
+        { status: "Pending Payment", note: "Order placed by customer. Awaiting online payment confirmation." }
       ]
     });
 

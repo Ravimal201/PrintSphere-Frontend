@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
 import { verifyPaymentSuccess } from "../services/paymentService";
 import { CheckCircle2, ShoppingBag, ArrowRight, Loader2 } from "lucide-react";
 
@@ -13,9 +12,7 @@ import { CheckCircle2, ShoppingBag, ArrowRight, Loader2 } from "lucide-react";
  * - Continue Shopping button
  */
 export default function PaymentSuccess() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-
+  const searchParams = new URLSearchParams(window.location.search);
   const sessionId = searchParams.get("session_id");
   const orderId = searchParams.get("order_id");
 
@@ -121,7 +118,7 @@ export default function PaymentSuccess() {
 
         {/* Continue Shopping Button */}
         <button
-          onClick={() => navigate("/store")}
+          onClick={() => window.location.href = "/store"}
           className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/25 transition duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98 text-sm"
         >
           <ShoppingBag className="h-4 w-4" />
