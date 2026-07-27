@@ -385,7 +385,7 @@ export default function DesignerPage() {
   const [layers, setLayers] = useState([]);
 
   const [selectedLayerId, setSelectedLayerId] = useState(null);
-  const [quantity, setQuantity] = useState(2);
+  const [quantity, setQuantity] = useState(1);
 
   const selectLayer = (id) => {
     setSelectedLayerId(id);
