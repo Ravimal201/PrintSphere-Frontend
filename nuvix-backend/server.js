@@ -8,6 +8,15 @@ const connectDB = require("./config/db");
 
 const app = express();
 
+// Stripe Webhook mounted before express.json() to preserve the raw binary request body required for signature verification
+app.post(
+  "/api/payment/webhook",
+  express.raw({ type: "application/json" }),
+  (req, res, next) => {
+    require("./controllers/paymentController").handleWebhook(req, res, next);
+  }
+);
+
 // Middleware
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -24,6 +33,7 @@ require("./models/Inventory");
 require("./models/PricingRules");
 require("./models/CustomizedDesign");
 require("./models/Notification");
+require("./models/Payment");
 
 // Route Imports
 const authRoutes = require("./routes/authRoutes");
@@ -31,6 +41,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const managerRoutes = require("./routes/managerRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 // Mount API Endpoints
 app.use("/api/auth", authRoutes);
@@ -38,6 +49,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/manager", managerRoutes);
 app.use("/api/employee", employeeRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Test Connection Endpoint
 app.get("/api/health", (req, res) => {

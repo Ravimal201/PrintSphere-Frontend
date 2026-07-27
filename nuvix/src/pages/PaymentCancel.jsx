@@ -1,5 +1,4 @@
 import React from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
 import PaymentButton from "../components/PaymentButton";
 import { AlertTriangle, RotateCcw, ArrowLeft } from "lucide-react";
 
@@ -11,8 +10,7 @@ import { AlertTriangle, RotateCcw, ArrowLeft } from "lucide-react";
  * - Return to Cart button
  */
 export default function PaymentCancel() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
   const orderId = searchParams.get("order_id");
 
   return (
@@ -53,7 +51,7 @@ export default function PaymentCancel() {
             </PaymentButton>
           ) : (
             <button
-              onClick={() => navigate("/designer")}
+              onClick={() => window.location.href = "/designer"}
               className="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
             >
               <RotateCcw className="h-4 w-4" />
@@ -62,7 +60,7 @@ export default function PaymentCancel() {
           )}
 
           <button
-            onClick={() => navigate("/store")}
+            onClick={() => window.location.href = "/store"}
             className="w-full py-3 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs transition flex items-center justify-center gap-2 cursor-pointer"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
