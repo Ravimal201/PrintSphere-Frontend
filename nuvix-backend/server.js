@@ -1,9 +1,10 @@
 const express = require("express");
 const path = require("path");
-const connectDB = require("./config/db");
 
-// Load Environment variables from the custom config path
+// Load Environment variables from the custom config path before other startup code
 require("dotenv").config({ path: path.join(__dirname, "config", ".env") });
+
+const connectDB = require("./config/db");
 
 const app = express();
 
@@ -24,9 +25,6 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 const cors = require("cors");
 app.use(cors());
 
-// Connect to MongoDB Database
-connectDB();
-
 // Register all Mongoose models globally
 require("./models/User");
 require("./models/Product");
@@ -36,7 +34,6 @@ require("./models/PricingRules");
 require("./models/CustomizedDesign");
 require("./models/Notification");
 require("./models/Payment");
-
 
 // Route Imports
 const authRoutes = require("./routes/authRoutes");
@@ -64,8 +61,19 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Start listening
+// Connect to MongoDB Database and only start listening after successful connection
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();

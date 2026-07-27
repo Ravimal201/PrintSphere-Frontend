@@ -15,8 +15,11 @@
     "express": "^4.21.1",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^7.3.0",
+   Nusara
     "mongoose": "^8.8.1",
     "stripe": "^22.3.2"
+
+     main
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

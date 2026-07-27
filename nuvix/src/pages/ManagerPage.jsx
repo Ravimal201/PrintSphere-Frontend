@@ -1,8 +1,26 @@
 import { useState, useEffect } from "react";
 import {
-  BarChart3, ShoppingCart, Layers, Inbox, Settings, LogOut,
-  Loader2, AlertCircle, CheckCircle, TrendingUp, Sparkles, Plus,
-  Edit2, Trash2, Check, X, ShieldAlert, Award, FileText, ChevronRight, Download
+  BarChart3,
+  ShoppingCart,
+  Layers,
+  Inbox,
+  Settings,
+  LogOut,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  TrendingUp,
+  Sparkles,
+  Plus,
+  Edit2,
+  Trash2,
+  Check,
+  X,
+  ShieldAlert,
+  Award,
+  FileText,
+  ChevronRight,
+  Download,
 } from "lucide-react";
 import axios from "axios";
 import Scene from "../three/Scene";
@@ -27,12 +45,12 @@ export default function ManagerPage() {
     path: "",
     gsmPrices: [
       { gsm: "180GSM", price: 1200 },
-      { gsm: "220GSM", price: 1500 }
+      { gsm: "220GSM", price: 1500 },
     ],
     colors: [
       { name: "White", value: "#ffffff" },
-      { name: "Black", value: "#111827" }
-    ]
+      { name: "Black", value: "#111827" },
+    ],
   });
   const [newGsmName, setNewGsmName] = useState("");
   const [newGsmPrice, setNewGsmPrice] = useState("");
@@ -62,7 +80,7 @@ export default function ManagerPage() {
     images: [],
     modelPath: "/images/models/male normal t-shirt1.glb",
     defaultColor: "#ffffff",
-    status: "Active"
+    status: "Active",
   });
   const [productError, setProductError] = useState("");
   const [productSuccess, setProductSuccess] = useState("");
@@ -70,20 +88,23 @@ export default function ManagerPage() {
 
   // Pricing rules inputs
   const [pricingForm, setPricingForm] = useState({
-    baseRates: { crewNeck: 12.00, vNeck: 14.00, polo: 18.00 },
-    materialPremiums: { cotton: 0.00, polyester: 1.50, organicCotton: 3.00 },
+    baseRates: { crewNeck: 12.0, vNeck: 14.0, polo: 18.0 },
+    materialPremiums: { cotton: 0.0, polyester: 1.5, organicCotton: 3.0 },
     costPerSqIn: 0.02,
-    complexityFeePerLayer: 1.00,
-    volumeDiscount: { thresholdQty: 5, discountPercentage: 10 }
+    complexityFeePerLayer: 1.0,
+    volumeDiscount: { thresholdQty: 5, discountPercentage: 10 },
   });
   const [pricingSuccess, setPricingSuccess] = useState(false);
   const [pricingError, setPricingError] = useState("");
 
   // Restock states
   const [restockQuantities, setRestockQuantities] = useState({});
+  const [editingThresholdId, setEditingThresholdId] = useState(null);
+  const [thresholdInputs, setThresholdInputs] = useState({});
 
   // Manager 3D preview modal state for pending submissions
-  const [selectedSubmissionProduct, setSelectedSubmissionProduct] = useState(null);
+  const [selectedSubmissionProduct, setSelectedSubmissionProduct] =
+    useState(null);
   const [submissionSide, setSubmissionSide] = useState("front");
   const [submissionZoom, setSubmissionZoom] = useState(0.85);
 
@@ -136,13 +157,20 @@ export default function ManagerPage() {
 
     try {
       // Fetch concurrently
-      const [ordersRes, productsRes, inventoryRes, pricingRes, employeesRes, stylesRes] = await Promise.all([
+      const [
+        ordersRes,
+        productsRes,
+        inventoryRes,
+        pricingRes,
+        employeesRes,
+        stylesRes,
+      ] = await Promise.all([
         axios.get(`${API_BASE_URL}/manager/orders`, { headers }),
         axios.get(`${API_BASE_URL}/manager/products`, { headers }),
         axios.get(`${API_BASE_URL}/manager/inventory`, { headers }),
         axios.get(`${API_BASE_URL}/manager/pricing-rules`, { headers }),
         axios.get(`${API_BASE_URL}/manager/employees`, { headers }),
-        axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers })
+        axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers }),
       ]);
 
       setOrders(ordersRes.data);
@@ -154,11 +182,22 @@ export default function ManagerPage() {
 
       if (pricingRes.data) {
         setPricingForm({
-          baseRates: pricingRes.data.baseRates || { crewNeck: 12.00, vNeck: 14.00, polo: 18.00 },
-          materialPremiums: pricingRes.data.materialPremiums || { cotton: 0.00, polyester: 1.50, organicCotton: 3.00 },
+          baseRates: pricingRes.data.baseRates || {
+            crewNeck: 12.0,
+            vNeck: 14.0,
+            polo: 18.0,
+          },
+          materialPremiums: pricingRes.data.materialPremiums || {
+            cotton: 0.0,
+            polyester: 1.5,
+            organicCotton: 3.0,
+          },
           costPerSqIn: pricingRes.data.costPerSqIn ?? 0.02,
-          complexityFeePerLayer: pricingRes.data.complexityFeePerLayer ?? 1.00,
-          volumeDiscount: pricingRes.data.volumeDiscount || { thresholdQty: 5, discountPercentage: 10 }
+          complexityFeePerLayer: pricingRes.data.complexityFeePerLayer ?? 1.0,
+          volumeDiscount: pricingRes.data.volumeDiscount || {
+            thresholdQty: 5,
+            discountPercentage: 10,
+          },
         });
       }
     } catch (err) {
@@ -181,20 +220,22 @@ export default function ManagerPage() {
     const note = orderNotes[orderId] || `Status updated to ${status}`;
 
     try {
-      setAssignLoading(prev => ({ ...prev, [orderId]: true }));
+      setAssignLoading((prev) => ({ ...prev, [orderId]: true }));
       const response = await axios.put(
         `${API_BASE_URL}/manager/orders/${orderId}/status`,
         { status, note },
-        { headers }
+        { headers },
       );
 
-      setOrders(prev => prev.map(o => o._id === orderId ? response.data.order : o));
-      setOrderNotes(prev => ({ ...prev, [orderId]: "" }));
+      setOrders((prev) =>
+        prev.map((o) => (o._id === orderId ? response.data.order : o)),
+      );
+      setOrderNotes((prev) => ({ ...prev, [orderId]: "" }));
     } catch (err) {
       console.error("Update status error:", err);
       alert(err.response?.data?.message || "Failed to update order status");
     } finally {
-      setAssignLoading(prev => ({ ...prev, [orderId]: false }));
+      setAssignLoading((prev) => ({ ...prev, [orderId]: false }));
     }
   };
 
@@ -204,21 +245,23 @@ export default function ManagerPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      setAssignLoading(prev => ({ ...prev, [orderId]: true }));
+      setAssignLoading((prev) => ({ ...prev, [orderId]: true }));
       const response = await axios.put(
         `${API_BASE_URL}/manager/orders/${orderId}/status`,
         { assignedEmployeeId: employeeId, note: `Assigned employee tasks.` },
-        { headers }
+        { headers },
       );
 
       // Refresh order list
-      const updatedOrders = await axios.get(`${API_BASE_URL}/manager/orders`, { headers });
+      const updatedOrders = await axios.get(`${API_BASE_URL}/manager/orders`, {
+        headers,
+      });
       setOrders(updatedOrders.data);
     } catch (err) {
       console.error("Assign employee error:", err);
       alert("Failed to assign employee");
     } finally {
-      setAssignLoading(prev => ({ ...prev, [orderId]: false }));
+      setAssignLoading((prev) => ({ ...prev, [orderId]: false }));
     }
   };
 
@@ -232,11 +275,13 @@ export default function ManagerPage() {
       const res = await axios.put(
         `${API_BASE_URL}/manager/products/${id}/approve`,
         { action },
-        { headers }
+        { headers },
       );
       alert(res.data.message);
       // reload products
-      const productsRes = await axios.get(`${API_BASE_URL}/manager/products`, { headers });
+      const productsRes = await axios.get(`${API_BASE_URL}/manager/products`, {
+        headers,
+      });
       setProducts(productsRes.data);
     } catch (err) {
       console.error("Draft action error:", err);
@@ -259,21 +304,21 @@ export default function ManagerPage() {
         await axios.put(
           `${API_BASE_URL}/manager/products/${editingProduct._id}`,
           productForm,
-          { headers }
+          { headers },
         );
         setProductSuccess("Product updated successfully!");
       } else {
         // Create Product
-        await axios.post(
-          `${API_BASE_URL}/manager/products`,
-          productForm,
-          { headers }
-        );
+        await axios.post(`${API_BASE_URL}/manager/products`, productForm, {
+          headers,
+        });
         setProductSuccess("Product created successfully!");
       }
 
       // Reload
-      const productsRes = await axios.get(`${API_BASE_URL}/manager/products`, { headers });
+      const productsRes = await axios.get(`${API_BASE_URL}/manager/products`, {
+        headers,
+      });
       setProducts(productsRes.data);
 
       setTimeout(() => {
@@ -281,7 +326,6 @@ export default function ManagerPage() {
         setEditingProduct(null);
         resetProductForm();
       }, 1200);
-
     } catch (err) {
       console.error("Save product error:", err);
       setProductError(err.response?.data?.message || "Failed to save product.");
@@ -291,13 +335,14 @@ export default function ManagerPage() {
   };
 
   const handleDeleteProduct = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
+    if (!window.confirm("Are you sure you want to delete this product?"))
+      return;
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
       await axios.delete(`${API_BASE_URL}/manager/products/${id}`, { headers });
-      setProducts(prev => prev.filter(p => p._id !== id));
+      setProducts((prev) => prev.filter((p) => p._id !== id));
     } catch (err) {
       console.error("Delete product error:", err);
       alert("Failed to delete product");
@@ -309,9 +354,9 @@ export default function ManagerPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
-      setProductForm(prev => ({
+      setProductForm((prev) => ({
         ...prev,
-        images: [reader.result]
+        images: [reader.result],
       }));
     };
     reader.readAsDataURL(file);
@@ -330,7 +375,7 @@ export default function ManagerPage() {
       images: product.images || [],
       modelPath: product.modelPath || "/images/models/male normal t-shirt1.glb",
       defaultColor: product.defaultColor || "#ffffff",
-      status: product.status || "Active"
+      status: product.status || "Active",
     });
     setShowProductModal(true);
   };
@@ -347,7 +392,7 @@ export default function ManagerPage() {
       images: [],
       modelPath: "/images/models/male normal t-shirt1.glb",
       defaultColor: "#ffffff",
-      status: "Active"
+      status: "Active",
     });
     setProductError("");
     setProductSuccess("");
@@ -364,7 +409,11 @@ export default function ManagerPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      const res = await axios.put(`${API_BASE_URL}/manager/pricing-rules`, pricingForm, { headers });
+      const res = await axios.put(
+        `${API_BASE_URL}/manager/pricing-rules`,
+        pricingForm,
+        { headers },
+      );
       setPricingRules(res.data.rules);
       setPricingSuccess(true);
       setTimeout(() => setPricingSuccess(false), 2000);
@@ -377,9 +426,9 @@ export default function ManagerPage() {
   // ================= INVENTORY CONTROL =================
 
   const handleRestockQuantity = async (itemId) => {
-    const restockVal = parseInt(restockQuantities[itemId]);
-    if (isNaN(restockVal) || restockVal <= 0) {
-      alert("Please enter a valid positive number");
+    const restockVal = Number(restockQuantities[itemId]);
+    if (Number.isNaN(restockVal)) {
+      alert("Please enter a valid number");
       return;
     }
 
@@ -387,21 +436,65 @@ export default function ManagerPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      const item = inventory.find(i => i._id === itemId);
-      const newQty = (item.quantity || 0) + restockVal;
+      const item = inventory.find((i) => i._id === itemId);
+      const currentQty = item?.quantity ?? 0;
+      const newQty = currentQty + restockVal;
+
+      if (newQty < 0) {
+        alert("Stock is insufficient to remove that quantity");
+        return;
+      }
 
       const res = await axios.put(
         `${API_BASE_URL}/manager/inventory/${itemId}`,
         { quantity: newQty },
-        { headers }
+        { headers },
       );
 
-      setInventory(prev => prev.map(i => i._id === itemId ? res.data.item : i));
-      setRestockQuantities(prev => ({ ...prev, [itemId]: "" }));
-      alert("Stock updated successfully!");
+      setInventory((prev) =>
+        prev.map((i) => (i._id === itemId ? res.data.item : i)),
+      );
+      setRestockQuantities((prev) => ({ ...prev, [itemId]: "" }));
+      alert(
+        restockVal < 0
+          ? "Stock removed successfully!"
+          : "Stock added successfully!",
+      );
     } catch (err) {
       console.error("Restock error:", err);
-      alert("Failed to update inventory quantity");
+      alert(
+        err.response?.data?.message || "Failed to update inventory quantity",
+      );
+    }
+  };
+
+  const handleUpdateMinThreshold = async (itemId) => {
+    const thresholdValue = Number(thresholdInputs[itemId]);
+    if (Number.isNaN(thresholdValue) || thresholdValue < 0) {
+      alert("Please enter a valid minimum threshold");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    try {
+      const res = await axios.put(
+        `${API_BASE_URL}/manager/inventory/${itemId}`,
+        { minThreshold: thresholdValue },
+        { headers },
+      );
+
+      setInventory((prev) =>
+        prev.map((i) => (i._id === itemId ? res.data.item : i)),
+      );
+      setEditingThresholdId(null);
+      alert("Minimum threshold updated successfully!");
+    } catch (err) {
+      console.error("Threshold update error:", err);
+      alert(
+        err.response?.data?.message || "Failed to update minimum threshold",
+      );
     }
   };
 
@@ -425,7 +518,7 @@ export default function ManagerPage() {
       const res = await axios.put(
         `${API_BASE_URL}/auth/change-password`,
         { currentPassword, newPassword },
-        { headers }
+        { headers },
       );
       setPassSuccess(res.data.message || "Password updated successfully!");
       setCurrentPassword("");
@@ -452,14 +545,20 @@ export default function ManagerPage() {
       name: styleForm.name,
       path: styleForm.path,
       gsmPrices: styleForm.gsmPrices,
-      colors: styleForm.colors
+      colors: styleForm.colors,
     };
 
     try {
       if (editingStyle) {
-        await axios.put(`${API_BASE_URL}/manager/tshirt-styles/${editingStyle._id}`, payload, { headers });
+        await axios.put(
+          `${API_BASE_URL}/manager/tshirt-styles/${editingStyle._id}`,
+          payload,
+          { headers },
+        );
       } else {
-        await axios.post(`${API_BASE_URL}/manager/tshirt-styles`, payload, { headers });
+        await axios.post(`${API_BASE_URL}/manager/tshirt-styles`, payload, {
+          headers,
+        });
       }
       setShowStyleModal(false);
       setEditingStyle(null);
@@ -468,15 +567,18 @@ export default function ManagerPage() {
         path: "",
         gsmPrices: [
           { gsm: "180GSM", price: 1200 },
-          { gsm: "220GSM", price: 1500 }
+          { gsm: "220GSM", price: 1500 },
         ],
         colors: [
           { name: "White", value: "#ffffff" },
-          { name: "Black", value: "#111827" }
-        ]
+          { name: "Black", value: "#111827" },
+        ],
       });
       // Re-fetch
-      const stylesRes = await axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers });
+      const stylesRes = await axios.get(
+        `${API_BASE_URL}/manager/tshirt-styles`,
+        { headers },
+      );
       setStyles(stylesRes.data);
     } catch (err) {
       console.error("Save style error:", err);
@@ -491,8 +593,13 @@ export default function ManagerPage() {
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
     try {
-      await axios.delete(`${API_BASE_URL}/manager/tshirt-styles/${styleId}`, { headers });
-      const stylesRes = await axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers });
+      await axios.delete(`${API_BASE_URL}/manager/tshirt-styles/${styleId}`, {
+        headers,
+      });
+      const stylesRes = await axios.get(
+        `${API_BASE_URL}/manager/tshirt-styles`,
+        { headers },
+      );
       setStyles(stylesRes.data);
     } catch (err) {
       console.error("Delete style error:", err);
@@ -501,16 +608,28 @@ export default function ManagerPage() {
   };
 
   // Helper selectors / values
-  const pendingDrafts = products.filter(p => !p.isApproved && p.status === "Draft");
-  const lowStockItems = inventory.filter(item => item.quantity <= item.minThreshold);
-  const activeOrdersCount = orders.filter(o => o.orderStatus !== "Completed" && o.orderStatus !== "Cancelled" && o.orderStatus !== "Shipped").length;
+  const pendingDrafts = products.filter(
+    (p) => !p.isApproved && p.status === "Draft",
+  );
+  const lowStockItems = inventory.filter(
+    (item) => item.quantity <= item.minThreshold,
+  );
+  const activeOrdersCount = orders.filter(
+    (o) =>
+      o.orderStatus !== "Completed" &&
+      o.orderStatus !== "Cancelled" &&
+      o.orderStatus !== "Shipped",
+  ).length;
   const totalRevenue = orders
-    .filter(o => o.paymentStatus === "Paid")
+    .filter((o) => o.paymentStatus === "Paid")
     .reduce((sum, o) => sum + (o.totalCost || 0), 0);
 
   const getSubmissionLayers = () => {
     if (!selectedSubmissionProduct) return [];
-    if (selectedSubmissionProduct.layers && selectedSubmissionProduct.layers.length > 0) {
+    if (
+      selectedSubmissionProduct.layers &&
+      selectedSubmissionProduct.layers.length > 0
+    ) {
       return selectedSubmissionProduct.layers;
     }
     return [
@@ -522,20 +641,26 @@ export default function ManagerPage() {
         locked: true,
         position: [0, 0.1, 0.15],
         rotation: [0, 0, 0],
-        scale: [0.35, 0.35, 0.35]
-      }
+        scale: [0.35, 0.35, 0.35],
+      },
     ];
   };
 
   const getSubmissionModelPath = () => {
-    if (!selectedSubmissionProduct) return "/images/models/male normal t-shirt1.glb";
+    if (!selectedSubmissionProduct)
+      return "/images/models/male normal t-shirt1.glb";
     if (selectedSubmissionProduct.modelPath) {
       return selectedSubmissionProduct.modelPath;
     }
     const title = (selectedSubmissionProduct.title || "").toLowerCase();
     const category = (selectedSubmissionProduct.category || "").toLowerCase();
 
-    if (title.includes("female") || title.includes("women") || category.includes("female") || category.includes("women")) {
+    if (
+      title.includes("female") ||
+      title.includes("women") ||
+      category.includes("female") ||
+      category.includes("women")
+    ) {
       return "/images/models/female normal t-shirt.glb";
     }
     if (title.includes("long sleeve") || category.includes("long sleeve")) {
@@ -562,7 +687,6 @@ export default function ManagerPage() {
 
   return (
     <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
-
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
         <div>
@@ -571,28 +695,34 @@ export default function ManagerPage() {
               M
             </div>
             <div>
-              <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
-              <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold">Manager Desk</span>
+              <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">
+                PrintSphere
+              </h1>
+              <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold">
+                Manager Desk
+              </span>
             </div>
           </div>
 
           <nav className="p-4 space-y-1">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "overview"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "overview"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+              }`}
             >
               <BarChart3 className="h-4.5 w-4.5" />
               Dashboard Overview
             </button>
             <button
               onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "orders"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "orders"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+              }`}
             >
               <span className="flex items-center gap-3.5">
                 <ShoppingCart className="h-4.5 w-4.5" />
@@ -606,10 +736,11 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("products")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "products"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "products"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+              }`}
             >
               <span className="flex items-center gap-3.5">
                 <Layers className="h-4.5 w-4.5" />
@@ -623,20 +754,22 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("pricing")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "pricing"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "pricing"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+              }`}
             >
               <Sparkles className="h-4.5 w-4.5" />
               Pricing Rules
             </button>
             <button
               onClick={() => setActiveTab("inventory")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inventory"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "inventory"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+              }`}
             >
               <span className="flex items-center gap-3.5">
                 <Inbox className="h-4.5 w-4.5" />
@@ -650,20 +783,22 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("styles")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "styles"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "styles"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+              }`}
             >
               <Layers className="h-4.5 w-4.5" />
               T-Shirt Styles
             </button>
             <button
               onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "settings"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "settings"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+              }`}
             >
               <Settings className="h-4.5 w-4.5" />
               Settings & Security
@@ -671,7 +806,7 @@ export default function ManagerPage() {
 
             <div className="pt-4 border-t border-slate-800">
               <button
-                onClick={() => window.location.href = '/customer-home'}
+                onClick={() => (window.location.href = "/customer-home")}
                 className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold hover:bg-slate-800 hover:text-slate-200 transition"
               >
                 <Award className="h-4.5 w-4.5" />
@@ -684,7 +819,9 @@ export default function ManagerPage() {
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center gap-2 mb-3 px-2">
             <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Logged as Manager</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+              Logged as Manager
+            </span>
           </div>
           <button
             onClick={handleLogout}
@@ -698,29 +835,40 @@ export default function ManagerPage() {
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8">
-
         {/* Statistics Widgets */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Settled Revenue</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">Rs. {totalRevenue.toFixed(2)}</p>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">
+              Settled Revenue
+            </span>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              Rs. {totalRevenue.toFixed(2)}
+            </p>
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold">
               <TrendingUp className="h-3.5 w-3.5" />
               <span>Paid transactions verified</span>
             </div>
           </div>
           <div className="bg-white border rounded-3xl p-6 shadow-sm relative">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Active Fulfillment</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">{activeOrdersCount} orders</p>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">
+              Active Fulfillment
+            </span>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              {activeOrdersCount} orders
+            </p>
             <div className="flex items-center gap-1.5 text-xs text-indigo-600 mt-2 font-bold">
               <ShoppingCart className="h-3.5 w-3.5" />
               <span>Pending processing & print</span>
             </div>
           </div>
           <div className="bg-white border rounded-3xl p-6 shadow-sm relative">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Stock Alert Levels</span>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">
+              Stock Alert Levels
+            </span>
             <p className="text-2xl font-black text-slate-900 mt-1">
-              {lowStockItems.length === 0 ? "Perfect" : `${lowStockItems.length} Low`}
+              {lowStockItems.length === 0
+                ? "Perfect"
+                : `${lowStockItems.length} Low`}
             </p>
             <div className="flex items-center gap-1.5 text-xs mt-2 font-bold">
               {lowStockItems.length > 0 ? (
@@ -735,8 +883,12 @@ export default function ManagerPage() {
             </div>
           </div>
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Catalog Products</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">{products.length} published</p>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">
+              Catalog Products
+            </span>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              {products.length} published
+            </p>
             <div className="flex items-center gap-1.5 text-xs text-indigo-600 mt-2 font-bold">
               <Layers className="h-3.5 w-3.5" />
               <span>{pendingDrafts.length} employee submissions</span>
@@ -760,13 +912,31 @@ export default function ManagerPage() {
                 Live Shop Operations & Active Pipeline
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 py-2">
-                {["Pending Payment", "Processing", "Printing", "Completed", "Shipped", "Cancelled"].map((status, index) => {
-                  const count = orders.filter(o => o.orderStatus === status).length;
+                {[
+                  "Pending Payment",
+                  "Processing",
+                  "Printing",
+                  "Completed",
+                  "Shipped",
+                  "Cancelled",
+                ].map((status, index) => {
+                  const count = orders.filter(
+                    (o) => o.orderStatus === status,
+                  ).length;
                   return (
-                    <div key={status} className="border border-slate-100 rounded-2xl p-4 text-center bg-slate-50/50">
-                      <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">{status}</span>
-                      <p className="text-xl font-black text-slate-900 mt-1">{count}</p>
-                      <span className="text-[9px] text-slate-400 block mt-0.5">Stage {index + 1}</span>
+                    <div
+                      key={status}
+                      className="border border-slate-100 rounded-2xl p-4 text-center bg-slate-50/50"
+                    >
+                      <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                        {status}
+                      </span>
+                      <p className="text-xl font-black text-slate-900 mt-1">
+                        {count}
+                      </p>
+                      <span className="text-[9px] text-slate-400 block mt-0.5">
+                        Stage {index + 1}
+                      </span>
                     </div>
                   );
                 })}
@@ -782,23 +952,34 @@ export default function ManagerPage() {
                 </h3>
                 {lowStockItems.length === 0 ? (
                   <div className="text-center py-10">
-                    <p className="text-sm text-slate-500 font-semibold">No predictive low-stock warnings triggered.</p>
+                    <p className="text-sm text-slate-500 font-semibold">
+                      No predictive low-stock warnings triggered.
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                    {lowStockItems.map(item => (
-                      <div key={item._id} className="flex items-center justify-between border rounded-2xl p-4 hover:bg-slate-50 transition">
+                    {lowStockItems.map((item) => (
+                      <div
+                        key={item._id}
+                        className="flex items-center justify-between border rounded-2xl p-4 hover:bg-slate-50 transition"
+                      >
                         <div>
-                          <p className="text-sm font-bold text-slate-900">{item.itemType}</p>
+                          <p className="text-sm font-bold text-slate-900">
+                            {item.itemType}
+                          </p>
                           <p className="text-[11px] text-slate-500">
-                            {item.tShirtType ? `${item.tShirtType} — ${item.color} (${item.size})` : `Attributes: ${item.color || "None"}`}
+                            {item.tShirtType
+                              ? `${item.tShirtType} — ${item.color} (${item.size})`
+                              : `Attributes: ${item.color || "None"}`}
                           </p>
                         </div>
                         <div className="text-right">
                           <span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-full text-[10px] font-black">
                             {item.quantity} units left
                           </span>
-                          <p className="text-[9px] text-slate-400 mt-1">Min threshold: {item.minThreshold}</p>
+                          <p className="text-[9px] text-slate-400 mt-1">
+                            Min threshold: {item.minThreshold}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -814,12 +995,17 @@ export default function ManagerPage() {
                 </h3>
                 {pendingDrafts.length === 0 ? (
                   <div className="text-center py-10">
-                    <p className="text-sm text-slate-500 font-semibold">All employee submissions approved & active.</p>
+                    <p className="text-sm text-slate-500 font-semibold">
+                      All employee submissions approved & active.
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                    {pendingDrafts.map(draft => (
-                      <div key={draft._id} className="flex items-center justify-between border rounded-2xl p-4 hover:bg-slate-50 transition">
+                    {pendingDrafts.map((draft) => (
+                      <div
+                        key={draft._id}
+                        className="flex items-center justify-between border rounded-2xl p-4 hover:bg-slate-50 transition"
+                      >
                         <div className="flex items-center gap-4">
                           <TShirt2D
                             color={draft.colors?.[0]}
@@ -827,8 +1013,13 @@ export default function ManagerPage() {
                             className="h-16 w-16 bg-slate-50 border rounded-xl shrink-0"
                           />
                           <div>
-                            <p className="text-sm font-bold text-slate-900">{draft.title}</p>
-                            <p className="text-[11px] text-slate-500">{draft.category} — Rs. {draft.basePrice.toFixed(2)}</p>
+                            <p className="text-sm font-bold text-slate-900">
+                              {draft.title}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              {draft.category} — Rs.{" "}
+                              {draft.basePrice.toFixed(2)}
+                            </p>
                             {draft.createdBy && (
                               <span className="text-[9px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-block">
                                 By {draft.createdBy.name || "Employee"}
@@ -849,14 +1040,18 @@ export default function ManagerPage() {
                             <span>View 3D</span>
                           </button>
                           <button
-                            onClick={() => handleApproveProductDraft(draft._id, "approve")}
+                            onClick={() =>
+                              handleApproveProductDraft(draft._id, "approve")
+                            }
                             className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition shadow-sm"
                             title="Approve & Publish"
                           >
                             <Check className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleApproveProductDraft(draft._id, "reject")}
+                            onClick={() =>
+                              handleApproveProductDraft(draft._id, "reject")
+                            }
                             className="p-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition shadow-sm"
                             title="Reject"
                           >
@@ -882,31 +1077,57 @@ export default function ManagerPage() {
 
             {orders.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-sm text-slate-500 font-semibold">No customer orders found in the database.</p>
+                <p className="text-sm text-slate-500 font-semibold">
+                  No customer orders found in the database.
+                </p>
               </div>
             ) : (
               <div className="space-y-6">
                 {orders.map((order) => (
-                  <div key={order._id} className="border rounded-2xl p-5 hover:border-indigo-200 transition bg-slate-50/20">
+                  <div
+                    key={order._id}
+                    className="border rounded-2xl p-5 hover:border-indigo-200 transition bg-slate-50/20"
+                  >
                     {/* Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-dashed">
                       <div>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-slate-500">Order ID: ...{order._id.slice(-8)}</span>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.paymentStatus === "Paid" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                            }`}>
+                          <span className="text-xs font-bold text-slate-500">
+                            Order ID: ...{order._id.slice(-8)}
+                          </span>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              order.paymentStatus === "Paid"
+                                ? "bg-emerald-50 text-emerald-600"
+                                : "bg-amber-50 text-amber-600"
+                            }`}
+                          >
                             {order.paymentStatus}
                           </span>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.orderStatus === "Completed" ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-700"
-                            }`}>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              order.orderStatus === "Completed"
+                                ? "bg-indigo-50 text-indigo-600"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
                             {order.orderStatus}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">Customer: {order.guestEmail || order.customerId?.email || "Unknown"}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Customer:{" "}
+                          {order.guestEmail ||
+                            order.customerId?.email ||
+                            "Unknown"}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-black text-slate-900">Rs. {(order.totalCost || 0).toFixed(2)}</p>
-                        <p className="text-[10px] text-slate-400">{new Date(order.createdAt).toLocaleDateString()}</p>
+                        <p className="text-lg font-black text-slate-900">
+                          Rs. {(order.totalCost || 0).toFixed(2)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {new Date(order.createdAt).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
 
@@ -915,75 +1136,108 @@ export default function ManagerPage() {
                       {/* Items */}
                       <div className="space-y-4">
                         <div>
-                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">Order Items</h4>
+                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                            Order Items
+                          </h4>
                           <div className="space-y-3">
                             {order.items.map((item, idx) => (
-                              <div key={idx} className="bg-white p-3 border rounded-xl shadow-xs text-xs">
-                                <p className="font-bold text-slate-900">{item.itemType} T-shirt (x{item.quantity})</p>
-                                <p className="text-slate-500 text-[10px] mt-0.5">{item.material} / {item.size} / {item.color}</p>
+                              <div
+                                key={idx}
+                                className="bg-white p-3 border rounded-xl shadow-xs text-xs"
+                              >
+                                <p className="font-bold text-slate-900">
+                                  {item.itemType} T-shirt (x{item.quantity})
+                                </p>
+                                <p className="text-slate-500 text-[10px] mt-0.5">
+                                  {item.material} / {item.size} / {item.color}
+                                </p>
 
-                                {item.itemType === "Customized" && item.designId && (
-                                  <div className="mt-2 pt-2 border-t space-y-2">
-                                    {item.designId.thumbnailUrl && (
-                                      <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
-                                        <img
-                                          src={item.designId.thumbnailUrl}
-                                          alt="Preview"
-                                          className="h-10 w-10 object-contain bg-white rounded border"
-                                          onError={(e) => e.target.src = "/images/dumyImage.png"}
-                                        />
-                                        <div>
-                                          <p className="text-[10px] font-bold text-slate-900">Custom design thumbnail</p>
-                                          <a
-                                            href={item.designId.thumbnailUrl}
-                                            download
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="text-[9px] text-indigo-600 hover:underline flex items-center gap-0.5 mt-0.5"
-                                          >
-                                            <Download className="h-2.5 w-2.5" /> Download composite
-                                          </a>
-                                          <button
-                                            onClick={() => {
-                                              setSelected3DDesign(item.designId);
-                                              setIs3DModalOpen(true);
-                                            }}
-                                            className="text-[9px] text-indigo-650 hover:underline flex items-center gap-0.5 mt-1 cursor-pointer font-bold"
-                                          >
-                                            <Sparkles className="h-2.5 w-2.5 text-indigo-600 animate-pulse" /> View in 3D Format
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Logo layers */}
-                                    {(() => {
-                                      const imgLayers = (item.designId.layers || []).filter(l => l.type === "image" || l.type === "logo");
-                                      if (imgLayers.length > 0) {
-                                        return (
-                                          <div className="space-y-1 mt-2">
-                                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Logo/Decal Assets:</p>
-                                            {imgLayers.map((layer, lIdx) => (
-                                              <div key={lIdx} className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg text-[10px]">
-                                                <span className="truncate max-w-[120px] font-semibold">{layer.name || `Asset ${lIdx + 1}`}</span>
-                                                <a
-                                                  href={layer.url}
-                                                  download
-                                                  target="_blank"
-                                                  rel="noreferrer"
-                                                  className="text-indigo-600 hover:underline"
-                                                >
-                                                  Download
-                                                </a>
-                                              </div>
-                                            ))}
+                                {item.itemType === "Customized" &&
+                                  item.designId && (
+                                    <div className="mt-2 pt-2 border-t space-y-2">
+                                      {item.designId.thumbnailUrl && (
+                                        <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
+                                          <img
+                                            src={item.designId.thumbnailUrl}
+                                            alt="Preview"
+                                            className="h-10 w-10 object-contain bg-white rounded border"
+                                            onError={(e) =>
+                                              (e.target.src =
+                                                "/images/dumyImage.png")
+                                            }
+                                          />
+                                          <div>
+                                            <p className="text-[10px] font-bold text-slate-900">
+                                              Custom design thumbnail
+                                            </p>
+                                            <a
+                                              href={item.designId.thumbnailUrl}
+                                              download
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="text-[9px] text-indigo-600 hover:underline flex items-center gap-0.5 mt-0.5"
+                                            >
+                                              <Download className="h-2.5 w-2.5" />{" "}
+                                              Download composite
+                                            </a>
+                                            <button
+                                              onClick={() => {
+                                                setSelected3DDesign(
+                                                  item.designId,
+                                                );
+                                                setIs3DModalOpen(true);
+                                              }}
+                                              className="text-[9px] text-indigo-650 hover:underline flex items-center gap-0.5 mt-1 cursor-pointer font-bold"
+                                            >
+                                              <Sparkles className="h-2.5 w-2.5 text-indigo-600 animate-pulse" />{" "}
+                                              View in 3D Format
+                                            </button>
                                           </div>
+                                        </div>
+                                      )}
+
+                                      {/* Logo layers */}
+                                      {(() => {
+                                        const imgLayers = (
+                                          item.designId.layers || []
+                                        ).filter(
+                                          (l) =>
+                                            l.type === "image" ||
+                                            l.type === "logo",
                                         );
-                                      }
-                                      return null;
-                                    })()}
-                                  </div>
-                                )}
+                                        if (imgLayers.length > 0) {
+                                          return (
+                                            <div className="space-y-1 mt-2">
+                                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
+                                                Logo/Decal Assets:
+                                              </p>
+                                              {imgLayers.map((layer, lIdx) => (
+                                                <div
+                                                  key={lIdx}
+                                                  className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg text-[10px]"
+                                                >
+                                                  <span className="truncate max-w-[120px] font-semibold">
+                                                    {layer.name ||
+                                                      `Asset ${lIdx + 1}`}
+                                                  </span>
+                                                  <a
+                                                    href={layer.url}
+                                                    download
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-indigo-600 hover:underline"
+                                                  >
+                                                    Download
+                                                  </a>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
+                                    </div>
+                                  )}
                               </div>
                             ))}
                           </div>
@@ -992,28 +1246,42 @@ export default function ManagerPage() {
 
                       {/* Ship Address */}
                       <div>
-                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">Shipping Destination</h4>
+                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                          Shipping Destination
+                        </h4>
                         {order.shippingAddress ? (
                           <p className="text-xs text-slate-600 leading-relaxed">
-                            {order.shippingAddress.street}, {order.shippingAddress.city}, {order.shippingAddress.country}
+                            {order.shippingAddress.street},{" "}
+                            {order.shippingAddress.city},{" "}
+                            {order.shippingAddress.country}
                           </p>
                         ) : (
-                          <p className="text-xs text-slate-400">Address not specified</p>
+                          <p className="text-xs text-slate-400">
+                            Address not specified
+                          </p>
                         )}
                       </div>
 
                       {/* Assignments */}
                       <div>
-                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">Assign Printing Staff</h4>
+                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                          Assign Printing Staff
+                        </h4>
                         <div className="space-y-3">
                           <select
-                            onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
+                            onChange={(e) =>
+                              handleAssignEmployee(order._id, e.target.value)
+                            }
                             value={order.assignedEmployee?._id || ""}
                             className="w-full text-xs border rounded-xl px-2 py-1.5 bg-white font-bold"
                           >
-                            <option value="">-- Click to assign staff --</option>
-                            {employees.map(emp => (
-                              <option key={emp._id} value={emp._id}>{emp.name}</option>
+                            <option value="">
+                              -- Click to assign staff --
+                            </option>
+                            {employees.map((emp) => (
+                              <option key={emp._id} value={emp._id}>
+                                {emp.name}
+                              </option>
                             ))}
                           </select>
                           {order.assignedEmployee && (
@@ -1032,20 +1300,34 @@ export default function ManagerPage() {
                           type="text"
                           placeholder="Optional timeline update note..."
                           value={orderNotes[order._id] || ""}
-                          onChange={(e) => setOrderNotes(prev => ({ ...prev, [order._id]: e.target.value }))}
+                          onChange={(e) =>
+                            setOrderNotes((prev) => ({
+                              ...prev,
+                              [order._id]: e.target.value,
+                            }))
+                          }
                           className="w-full text-xs border rounded-xl px-3 py-2 bg-white"
                         />
                       </div>
                       <div className="flex flex-wrap gap-1">
-                        {["Processing", "Printing", "Completed", "Shipped", "Cancelled"].map(st => (
+                        {[
+                          "Processing",
+                          "Printing",
+                          "Completed",
+                          "Shipped",
+                          "Cancelled",
+                        ].map((st) => (
                           <button
                             key={st}
                             disabled={assignLoading[order._id]}
-                            onClick={() => handleUpdateOrderStatus(order._id, st)}
-                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${order.orderStatus === st
+                            onClick={() =>
+                              handleUpdateOrderStatus(order._id, st)
+                            }
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${
+                              order.orderStatus === st
                                 ? "bg-indigo-600 text-white"
                                 : "bg-white border text-slate-700 hover:bg-slate-50"
-                              }`}
+                            }`}
                           >
                             {st}
                           </button>
@@ -1062,7 +1344,6 @@ export default function ManagerPage() {
         {/* ================= TAB 3: PRODUCT CATALOG ================= */}
         {activeTab === "products" && (
           <div className="space-y-8">
-
             {/* Catalog Grid */}
             <div className="bg-white border rounded-3xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-6">
@@ -1087,7 +1368,9 @@ export default function ManagerPage() {
 
               {products.length === 0 ? (
                 <div className="text-center py-16">
-                  <p className="text-sm text-slate-500 font-semibold">No catalog products loaded.</p>
+                  <p className="text-sm text-slate-500 font-semibold">
+                    No catalog products loaded.
+                  </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1105,7 +1388,10 @@ export default function ManagerPage() {
                     </thead>
                     <tbody>
                       {products.map((p) => (
-                        <tr key={p._id} className="border-b last:border-b-0 hover:bg-slate-50/50 transition">
+                        <tr
+                          key={p._id}
+                          className="border-b last:border-b-0 hover:bg-slate-50/50 transition"
+                        >
                           <td className="py-4 font-bold text-slate-900">
                             <div className="flex items-center gap-3">
                               <TShirt2D
@@ -1123,8 +1409,12 @@ export default function ManagerPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 text-xs text-slate-600">{p.category}</td>
-                          <td className="py-4 text-xs font-bold text-slate-900">Rs. {(p.basePrice || 0).toFixed(2)}</td>
+                          <td className="py-4 text-xs text-slate-600">
+                            {p.category}
+                          </td>
+                          <td className="py-4 text-xs font-bold text-slate-900">
+                            Rs. {(p.basePrice || 0).toFixed(2)}
+                          </td>
                           <td className="py-4 text-xs">
                             {p.discount > 0 ? (
                               <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-bold">
@@ -1134,10 +1424,17 @@ export default function ManagerPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-4 text-xs text-slate-500">{(p.sizes || []).join(", ")}</td>
+                          <td className="py-4 text-xs text-slate-500">
+                            {(p.sizes || []).join(", ")}
+                          </td>
                           <td className="py-4 text-xs">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${p.status === "Active" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600"
-                              }`}>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                p.status === "Active"
+                                  ? "bg-emerald-50 text-emerald-600"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
                               {p.status}
                             </span>
                           </td>
@@ -1170,16 +1467,29 @@ export default function ManagerPage() {
                   <div className="bg-slate-950 text-white px-5 py-4 flex items-center justify-between">
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300">
-                        {editingProduct ? "Edit Product Details" : "Create New Store Product"}
+                        {editingProduct
+                          ? "Edit Product Details"
+                          : "Create New Store Product"}
                       </h3>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Manager Catalog Administration</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Manager Catalog Administration
+                      </p>
                     </div>
-                    <button onClick={() => { setShowProductModal(false); setEditingProduct(null); }} className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                    <button
+                      onClick={() => {
+                        setShowProductModal(false);
+                        setEditingProduct(null);
+                      }}
+                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                    >
                       <X className="h-4.5 w-4.5" />
                     </button>
                   </div>
 
-                  <form onSubmit={handleSaveProduct} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                  <form
+                    onSubmit={handleSaveProduct}
+                    className="p-5 space-y-4 max-h-[75vh] overflow-y-auto"
+                  >
                     {productError && (
                       <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
                         <AlertCircle className="h-4 w-4 shrink-0" />
@@ -1194,35 +1504,56 @@ export default function ManagerPage() {
                     )}
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Product Title</label>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                        Product Title
+                      </label>
                       <input
                         type="text"
                         required
                         value={productForm.title}
-                        onChange={(e) => setProductForm(prev => ({ ...prev, title: e.target.value }))}
+                        onChange={(e) =>
+                          setProductForm((prev) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }))
+                        }
                         placeholder="e.g. Classic Organic T-shirt"
                         className="w-full px-3 py-2 border rounded-xl text-sm"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Description</label>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                        Description
+                      </label>
                       <textarea
                         required
                         value={productForm.description}
-                        onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
+                        onChange={(e) =>
+                          setProductForm((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
                         placeholder="Explain item features..."
                         className="w-full px-3 py-2 border rounded-xl text-sm h-16"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Category</label>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                        Category
+                      </label>
                       <input
                         type="text"
                         required
                         value={productForm.category}
-                        onChange={(e) => setProductForm(prev => ({ ...prev, category: e.target.value }))}
+                        onChange={(e) =>
+                          setProductForm((prev) => ({
+                            ...prev,
+                            category: e.target.value,
+                          }))
+                        }
                         placeholder="e.g. Summer Collection"
                         className="w-full px-3 py-2 border rounded-xl text-sm"
                       />
@@ -1230,24 +1561,38 @@ export default function ManagerPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Base Price (Rs.)</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Base Price (Rs.)
+                        </label>
                         <input
                           type="number"
                           step="0.01"
                           required
                           value={productForm.basePrice}
-                          onChange={(e) => setProductForm(prev => ({ ...prev, basePrice: parseFloat(e.target.value) || 0 }))}
+                          onChange={(e) =>
+                            setProductForm((prev) => ({
+                              ...prev,
+                              basePrice: parseFloat(e.target.value) || 0,
+                            }))
+                          }
                           className="w-full px-3 py-2 border rounded-xl text-sm"
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Discount (%)</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Discount (%)
+                        </label>
                         <input
                           type="number"
                           max="100"
                           min="0"
                           value={productForm.discount}
-                          onChange={(e) => setProductForm(prev => ({ ...prev, discount: parseInt(e.target.value) || 0 }))}
+                          onChange={(e) =>
+                            setProductForm((prev) => ({
+                              ...prev,
+                              discount: parseInt(e.target.value) || 0,
+                            }))
+                          }
                           className="w-full px-3 py-2 border rounded-xl text-sm"
                         />
                       </div>
@@ -1255,10 +1600,17 @@ export default function ManagerPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Status</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Status
+                        </label>
                         <select
                           value={productForm.status}
-                          onChange={(e) => setProductForm(prev => ({ ...prev, status: e.target.value }))}
+                          onChange={(e) =>
+                            setProductForm((prev) => ({
+                              ...prev,
+                              status: e.target.value,
+                            }))
+                          }
                           className="w-full px-3 py-2 border rounded-xl text-sm"
                         >
                           <option value="Active">Active</option>
@@ -1268,42 +1620,75 @@ export default function ManagerPage() {
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">3D T-Shirt Cut Style</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          3D T-Shirt Cut Style
+                        </label>
                         <select
                           value={productForm.modelPath}
-                          onChange={(e) => setProductForm(prev => ({ ...prev, modelPath: e.target.value }))}
+                          onChange={(e) =>
+                            setProductForm((prev) => ({
+                              ...prev,
+                              modelPath: e.target.value,
+                            }))
+                          }
                           className="w-full px-3 py-2 border rounded-xl text-sm"
                         >
-                          <option value="/images/models/male normal t-shirt1.glb">Men's T-Shirt</option>
-                          <option value="/images/models/female normal t-shirt.glb">Women's T-Shirt</option>
-                          <option value="/images/models/long_sleeve_t-_shirt.glb">Long Sleeve Shirt</option>
-                          <option value="/images/models/oversized t-sdirt1.glb">Oversized T-Shirt</option>
-                          <option value="/images/models/t_shirt_hoodie.glb">Hoodie</option>
+                          <option value="/images/models/male normal t-shirt1.glb">
+                            Men's T-Shirt
+                          </option>
+                          <option value="/images/models/female normal t-shirt.glb">
+                            Women's T-Shirt
+                          </option>
+                          <option value="/images/models/long_sleeve_t-_shirt.glb">
+                            Long Sleeve Shirt
+                          </option>
+                          <option value="/images/models/oversized t-sdirt1.glb">
+                            Oversized T-Shirt
+                          </option>
+                          <option value="/images/models/t_shirt_hoodie.glb">
+                            Hoodie
+                          </option>
                         </select>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Default Color</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Default Color
+                        </label>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
                             value={productForm.defaultColor}
-                            onChange={(e) => setProductForm(prev => ({ ...prev, defaultColor: e.target.value, colors: [e.target.value] }))}
+                            onChange={(e) =>
+                              setProductForm((prev) => ({
+                                ...prev,
+                                defaultColor: e.target.value,
+                                colors: [e.target.value],
+                              }))
+                            }
                             className="h-8 w-10 border rounded-lg p-0 bg-transparent cursor-pointer shrink-0"
                           />
                           <input
                             type="text"
                             value={productForm.defaultColor}
-                            onChange={(e) => setProductForm(prev => ({ ...prev, defaultColor: e.target.value, colors: [e.target.value] }))}
+                            onChange={(e) =>
+                              setProductForm((prev) => ({
+                                ...prev,
+                                defaultColor: e.target.value,
+                                colors: [e.target.value],
+                              }))
+                            }
                             className="w-full px-3 py-1.5 border rounded-xl text-xs"
                           />
                         </div>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Product Image (Mockup)</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Product Image (Mockup)
+                        </label>
                         <input
                           type="file"
                           accept="image/*"
@@ -1314,12 +1699,19 @@ export default function ManagerPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Or Image URL</label>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                        Or Image URL
+                      </label>
                       <input
                         type="text"
                         placeholder="e.g. /images/dumyImage.png or Base64 string..."
                         value={productForm.images?.[0] || ""}
-                        onChange={(e) => setProductForm(prev => ({ ...prev, images: [e.target.value] }))}
+                        onChange={(e) =>
+                          setProductForm((prev) => ({
+                            ...prev,
+                            images: [e.target.value],
+                          }))
+                        }
                         className="w-full px-3 py-2 border rounded-xl text-xs"
                       />
                     </div>
@@ -1327,7 +1719,10 @@ export default function ManagerPage() {
                     <div className="flex justify-end gap-2 pt-2 border-t mt-4">
                       <button
                         type="button"
-                        onClick={() => { setShowProductModal(false); setEditingProduct(null); }}
+                        onClick={() => {
+                          setShowProductModal(false);
+                          setEditingProduct(null);
+                        }}
                         className="px-4 py-2 border rounded-xl text-xs font-bold hover:bg-slate-50 transition"
                       >
                         Cancel
@@ -1371,46 +1766,71 @@ export default function ManagerPage() {
 
               {/* Formulas and Coefficients */}
               <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Printing parameters</h4>
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                  Printing parameters
+                </h4>
                 <div>
-                  <label className="text-[10px] text-slate-500 font-bold uppercase">Printing Cost per Sq. Inch (Rs.)</label>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase">
+                    Printing Cost per Sq. Inch (Rs.)
+                  </label>
                   <input
                     type="number"
                     step="0.001"
                     className="w-full px-3 py-2 border rounded-xl text-sm mt-1 max-w-xs"
                     value={pricingForm.costPerSqIn}
-                    onChange={(e) => setPricingForm(prev => ({ ...prev, costPerSqIn: parseFloat(e.target.value) || 0 }))}
+                    onChange={(e) =>
+                      setPricingForm((prev) => ({
+                        ...prev,
+                        costPerSqIn: parseFloat(e.target.value) || 0,
+                      }))
+                    }
                   />
                 </div>
               </div>
 
               {/* Volume Discount */}
               <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Volume Discounts & threshold</h4>
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                  Volume Discounts & threshold
+                </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Quantity Threshold</label>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase">
+                      Quantity Threshold
+                    </label>
                     <input
                       type="number"
                       className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
                       value={pricingForm.volumeDiscount.thresholdQty}
-                      onChange={(e) => setPricingForm(prev => ({
-                        ...prev,
-                        volumeDiscount: { ...prev.volumeDiscount, thresholdQty: parseInt(e.target.value) || 0 }
-                      }))}
+                      onChange={(e) =>
+                        setPricingForm((prev) => ({
+                          ...prev,
+                          volumeDiscount: {
+                            ...prev.volumeDiscount,
+                            thresholdQty: parseInt(e.target.value) || 0,
+                          },
+                        }))
+                      }
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase">Discount percentage (%)</label>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase">
+                      Discount percentage (%)
+                    </label>
                     <input
                       type="number"
                       max="100"
                       className="w-full px-3 py-2 border rounded-xl text-sm mt-1"
                       value={pricingForm.volumeDiscount.discountPercentage}
-                      onChange={(e) => setPricingForm(prev => ({
-                        ...prev,
-                        volumeDiscount: { ...prev.volumeDiscount, discountPercentage: parseInt(e.target.value) || 0 }
-                      }))}
+                      onChange={(e) =>
+                        setPricingForm((prev) => ({
+                          ...prev,
+                          volumeDiscount: {
+                            ...prev.volumeDiscount,
+                            discountPercentage: parseInt(e.target.value) || 0,
+                          },
+                        }))
+                      }
                     />
                   </div>
                 </div>
@@ -1438,7 +1858,9 @@ export default function ManagerPage() {
 
             {inventory.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-sm text-slate-500 font-semibold">No inventory records configured.</p>
+                <p className="text-sm text-slate-500 font-semibold">
+                  No inventory records configured.
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1458,21 +1880,84 @@ export default function ManagerPage() {
                     {inventory.map((item) => {
                       const isLow = item.quantity <= item.minThreshold;
                       return (
-                        <tr key={item._id} className="border-b last:border-b-0 hover:bg-slate-50/50 transition">
-                          <td className="py-4 font-bold text-slate-900">{item.itemType}</td>
+                        <tr
+                          key={item._id}
+                          className="border-b last:border-b-0 hover:bg-slate-50/50 transition"
+                        >
+                          <td className="py-4 font-bold text-slate-900">
+                            {item.itemType}
+                          </td>
                           <td className="py-4 text-xs text-slate-600">
-                            {item.tShirtType || "Generic consumable"} {item.material ? `(${item.material})` : ""}
+                            {item.tShirtType || "Generic consumable"}{" "}
+                            {item.material ? `(${item.material})` : ""}
                           </td>
                           <td className="py-4 text-xs text-slate-500">
-                            {item.size || item.color ? `${item.color || ""} ${item.size || ""}` : "—"}
+                            {item.size || item.color
+                              ? `${item.color || ""} ${item.size || ""}`
+                              : "—"}
                           </td>
-                          <td className="py-4 text-xs font-bold text-slate-900">{item.quantity} units</td>
-                          <td className="py-4 text-xs text-slate-400">{item.minThreshold} units</td>
+                          <td className="py-4 text-xs font-bold text-slate-900">
+                            {item.quantity} units
+                          </td>
+                          <td className="py-4 text-xs text-slate-400">
+                            {editingThresholdId === item._id ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={
+                                    thresholdInputs[item._id] ??
+                                    item.minThreshold
+                                  }
+                                  onChange={(e) =>
+                                    setThresholdInputs((prev) => ({
+                                      ...prev,
+                                      [item._id]: e.target.value,
+                                    }))
+                                  }
+                                  className="w-16 px-2 py-1 text-xs border rounded-xl text-center"
+                                />
+                                <button
+                                  onClick={() =>
+                                    handleUpdateMinThreshold(item._id)
+                                  }
+                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setEditingThresholdId(null)}
+                                  className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span>{item.minThreshold} units</span>
+                                <button
+                                  onClick={() => {
+                                    setEditingThresholdId(item._id);
+                                    setThresholdInputs((prev) => ({
+                                      ...prev,
+                                      [item._id]: item.minThreshold,
+                                    }));
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-[10px] font-bold"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            )}
+                          </td>
                           <td className="py-4 text-xs">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isLow
-                                ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
-                                : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                              }`}>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                isLow
+                                  ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
+                                  : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                              }`}
+                            >
                               {isLow ? "Low stock" : "In Stock"}
                             </span>
                           </td>
@@ -1482,17 +1967,27 @@ export default function ManagerPage() {
                                 type="number"
                                 placeholder="+ Qty"
                                 value={restockQuantities[item._id] || ""}
-                                onChange={(e) => setRestockQuantities(prev => ({
-                                  ...prev,
-                                  [item._id]: e.target.value
-                                }))}
+                                onChange={(e) =>
+                                  setRestockQuantities((prev) => ({
+                                    ...prev,
+                                    [item._id]: e.target.value,
+                                  }))
+                                }
                                 className="w-16 px-2 py-1 text-xs border rounded-xl text-center"
                               />
                               <button
                                 onClick={() => handleRestockQuantity(item._id)}
                                 className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-bold transition"
                               >
-                                Add
+                                {(() => {
+                                  const value = Number(
+                                    restockQuantities[item._id] ?? "",
+                                  );
+                                  if (!Number.isNaN(value) && value < 0) {
+                                    return "Remove";
+                                  }
+                                  return "Add";
+                                })()}
                               </button>
                             </div>
                           </td>
@@ -1522,12 +2017,12 @@ export default function ManagerPage() {
                     path: "",
                     gsmPrices: [
                       { gsm: "180GSM", price: 1200 },
-                      { gsm: "220GSM", price: 1500 }
+                      { gsm: "220GSM", price: 1500 },
                     ],
                     colors: [
                       { name: "White", value: "#ffffff" },
-                      { name: "Black", value: "#111827" }
-                    ]
+                      { name: "Black", value: "#111827" },
+                    ],
                   });
                   setShowStyleModal(true);
                 }}
@@ -1540,38 +2035,62 @@ export default function ManagerPage() {
 
             {styles.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-sm text-slate-500 font-semibold">No T-Shirt styles configured.</p>
+                <p className="text-sm text-slate-500 font-semibold">
+                  No T-Shirt styles configured.
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {styles.map((style) => (
-                  <div key={style._id} className="border rounded-2xl p-5 hover:shadow-md transition bg-slate-50/50 flex flex-col justify-between">
+                  <div
+                    key={style._id}
+                    className="border rounded-2xl p-5 hover:shadow-md transition bg-slate-50/50 flex flex-col justify-between"
+                  >
                     <div>
                       <div className="flex items-center justify-between border-b pb-3 mb-3">
                         <div>
-                          <h4 className="font-bold text-slate-900 text-base">{style.name}</h4>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">{style.type || "Crew Neck"}</span>
+                          <h4 className="font-bold text-slate-900 text-base">
+                            {style.name}
+                          </h4>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase">
+                            {style.type || "Crew Neck"}
+                          </span>
                         </div>
                       </div>
                       <p className="text-[10px] text-slate-400 font-mono break-all mb-3.5">
-                        Model Path: <span className="text-slate-600 font-semibold">{style.path}</span>
+                        Model Path:{" "}
+                        <span className="text-slate-600 font-semibold">
+                          {style.path}
+                        </span>
                       </p>
                       <div className="mb-3.5">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1.5">Weights & Pricing</span>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1.5">
+                          Weights & Pricing
+                        </span>
                         <div className="flex flex-col gap-1.5">
                           {(style.gsmPrices && style.gsmPrices.length > 0
                             ? style.gsmPrices
-                            : (style.gsms || []).map(g => ({ gsm: g, price: style.price || 1200 }))
+                            : (style.gsms || []).map((g) => ({
+                                gsm: g,
+                                price: style.price || 1200,
+                              }))
                           ).map((gp, i) => (
-                            <div key={i} className="flex justify-between items-center text-[11px] font-semibold text-slate-700 bg-white border px-2.5 py-1.5 rounded-xl shadow-2xs">
+                            <div
+                              key={i}
+                              className="flex justify-between items-center text-[11px] font-semibold text-slate-700 bg-white border px-2.5 py-1.5 rounded-xl shadow-2xs"
+                            >
                               <span>{gp.gsm}</span>
-                              <span className="text-indigo-650 font-bold">Rs. {(gp.price || 0).toFixed(2)}</span>
+                              <span className="text-indigo-650 font-bold">
+                                Rs. {(gp.price || 0).toFixed(2)}
+                              </span>
                             </div>
                           ))}
                         </div>
                       </div>
                       <div className="mb-3.5">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1">Colors ({style.colors?.length || 0})</span>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
+                          Colors ({style.colors?.length || 0})
+                        </span>
                         <div className="flex flex-wrap gap-2">
                           {(style.colors || []).map((color, i) => (
                             <div
@@ -1596,10 +2115,14 @@ export default function ManagerPage() {
                           setStyleForm({
                             name: style.name,
                             path: style.path,
-                            gsmPrices: style.gsmPrices && style.gsmPrices.length > 0
-                              ? style.gsmPrices
-                              : (style.gsms || []).map(g => ({ gsm: g, price: style.price || 1200 })),
-                            colors: style.colors || []
+                            gsmPrices:
+                              style.gsmPrices && style.gsmPrices.length > 0
+                                ? style.gsmPrices
+                                : (style.gsms || []).map((g) => ({
+                                    gsm: g,
+                                    price: style.price || 1200,
+                                  })),
+                            colors: style.colors || [],
                           });
                           setShowStyleModal(true);
                         }}
@@ -1650,7 +2173,9 @@ export default function ManagerPage() {
               )}
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Current Password</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                  Current Password
+                </label>
                 <input
                   type="password"
                   required
@@ -1662,7 +2187,9 @@ export default function ManagerPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">New Password</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                  New Password
+                </label>
                 <input
                   type="password"
                   required
@@ -1674,7 +2201,9 @@ export default function ManagerPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Confirm New Password</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                  Confirm New Password
+                </label>
                 <input
                   type="password"
                   required
@@ -1697,14 +2226,12 @@ export default function ManagerPage() {
             </form>
           </div>
         )}
-
       </div>
 
       {/* Manager interactive 3D review modal */}
       {selectedSubmissionProduct && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[600px] select-none text-slate-800">
-
             {/* Left 3D Panel */}
             <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-6 border-b md:border-b-0 md:border-r">
               <div className="absolute top-4 left-4 z-10">
@@ -1719,10 +2246,11 @@ export default function ManagerPage() {
                   <button
                     key={side}
                     onClick={() => setSubmissionSide(side)}
-                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${submissionSide === side
+                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${
+                      submissionSide === side
                         ? "bg-purple-600 border-purple-600 text-white"
                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
+                    }`}
                   >
                     {side}
                   </button>
@@ -1733,26 +2261,32 @@ export default function ManagerPage() {
               <div className="w-full h-full min-h-[280px] md:min-h-0 flex-1">
                 <Scene
                   modelPath={getSubmissionModelPath()}
-                  shirtColor={selectedSubmissionProduct.colors?.[0] || "#ffffff"}
+                  shirtColor={
+                    selectedSubmissionProduct.colors?.[0] || "#ffffff"
+                  }
                   activeSide={submissionSide}
                   zoomLevel={submissionZoom}
                   layers={getSubmissionLayers()}
                   selectedLayerId={null}
-                  onSelectLayer={() => { }}
-                  onUpdateLayers={() => { }}
+                  onSelectLayer={() => {}}
+                  onUpdateLayers={() => {}}
                 />
               </div>
 
               {/* Zoom control */}
               <div className="flex items-center gap-3 bg-white/80 backdrop-blur-xs border rounded-2xl px-4 py-2 self-center z-10 shadow-xs">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Zoom</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">
+                  Zoom
+                </span>
                 <input
                   type="range"
                   min="0.5"
                   max="1.5"
                   step="0.05"
                   value={submissionZoom}
-                  onChange={(e) => setSubmissionZoom(parseFloat(e.target.value))}
+                  onChange={(e) =>
+                    setSubmissionZoom(parseFloat(e.target.value))
+                  }
                   className="w-28 accent-purple-600 h-1 bg-slate-200 rounded-lg appearance-none"
                 />
               </div>
@@ -1780,30 +2314,44 @@ export default function ManagerPage() {
 
                 <div className="pb-4 border-b">
                   <span className="text-2xl font-black text-slate-955">
-                    Proposed Price: Rs. {selectedSubmissionProduct.basePrice.toFixed(2)}
+                    Proposed Price: Rs.{" "}
+                    {selectedSubmissionProduct.basePrice.toFixed(2)}
                   </span>
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Description</span>
-                  <p className="text-xs text-slate-600 leading-relaxed">{selectedSubmissionProduct.description}</p>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Description
+                  </span>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {selectedSubmissionProduct.description}
+                  </p>
                 </div>
 
                 {selectedSubmissionProduct.createdBy && (
                   <div className="p-3 bg-purple-50 rounded-2xl border border-purple-100 flex items-center gap-2">
                     <Award className="h-4.5 w-4.5 text-purple-600 shrink-0" />
                     <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block">Designer</span>
-                      <span className="text-xs font-bold text-purple-800">{selectedSubmissionProduct.createdBy.name || "Employee"}</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block">
+                        Designer
+                      </span>
+                      <span className="text-xs font-bold text-purple-800">
+                        {selectedSubmissionProduct.createdBy.name || "Employee"}
+                      </span>
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sizes Included</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Sizes Included
+                  </span>
                   <div className="flex gap-1.5 flex-wrap">
                     {selectedSubmissionProduct.sizes?.map((sz) => (
-                      <span key={sz} className="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">
+                      <span
+                        key={sz}
+                        className="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs"
+                      >
                         {sz}
                       </span>
                     ))}
@@ -1811,7 +2359,9 @@ export default function ManagerPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fabric Colors</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Fabric Colors
+                  </span>
                   <div className="flex gap-2">
                     {selectedSubmissionProduct.colors?.map((col) => (
                       <span
@@ -1829,7 +2379,10 @@ export default function ManagerPage() {
               <div className="mt-8 pt-4 border-t flex flex-col gap-2">
                 <button
                   onClick={() => {
-                    handleApproveProductDraft(selectedSubmissionProduct._id, "approve");
+                    handleApproveProductDraft(
+                      selectedSubmissionProduct._id,
+                      "approve",
+                    );
                     setSelectedSubmissionProduct(null);
                   }}
                   className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
@@ -1839,7 +2392,10 @@ export default function ManagerPage() {
                 </button>
                 <button
                   onClick={() => {
-                    handleApproveProductDraft(selectedSubmissionProduct._id, "reject");
+                    handleApproveProductDraft(
+                      selectedSubmissionProduct._id,
+                      "reject",
+                    );
                     setSelectedSubmissionProduct(null);
                   }}
                   className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
@@ -1849,7 +2405,6 @@ export default function ManagerPage() {
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       )}
@@ -1859,17 +2414,25 @@ export default function ManagerPage() {
           <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-sm uppercase tracking-wider">
-                {editingStyle ? `Edit Style: ${editingStyle.name}` : "Add New T-Shirt Style"}
+                {editingStyle
+                  ? `Edit Style: ${editingStyle.name}`
+                  : "Add New T-Shirt Style"}
               </h3>
               <button
-                onClick={() => { setShowStyleModal(false); setEditingStyle(null); }}
+                onClick={() => {
+                  setShowStyleModal(false);
+                  setEditingStyle(null);
+                }}
                 className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveStyle} className="p-6 space-y-4 overflow-y-auto flex-1">
+            <form
+              onSubmit={handleSaveStyle}
+              className="p-6 space-y-4 overflow-y-auto flex-1"
+            >
               {stylesError && (
                 <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl text-xs font-semibold">
                   {stylesError}
@@ -1877,31 +2440,41 @@ export default function ManagerPage() {
               )}
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Style Name</label>
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                  Style Name
+                </label>
                 <input
                   type="text"
                   required
                   value={styleForm.name}
-                  onChange={(e) => setStyleForm(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setStyleForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
                   placeholder="e.g. V-Neck Fitted T-Shirt"
                   className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">3D GLTF Model File Path</label>
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                  3D GLTF Model File Path
+                </label>
                 <input
                   type="text"
                   required
                   value={styleForm.path}
-                  onChange={(e) => setStyleForm(prev => ({ ...prev, path: e.target.value }))}
+                  onChange={(e) =>
+                    setStyleForm((prev) => ({ ...prev, path: e.target.value }))
+                  }
                   placeholder="e.g. /images/models/v_neck.glb"
                   className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 font-mono"
                 />
               </div>
 
               <div className="border-t pt-4">
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">Configure GSM Weights & Prices</label>
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">
+                  Configure GSM Weights & Prices
+                </label>
 
                 <div className="flex gap-2 mb-3">
                   <input
@@ -1923,14 +2496,22 @@ export default function ManagerPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (!newGsmName.trim()) return alert("Please type a GSM name.");
+                      if (!newGsmName.trim())
+                        return alert("Please type a GSM name.");
                       if (!newGsmPrice) return alert("Please type a price.");
-                      setStyleForm(prev => ({
+                      setStyleForm((prev) => ({
                         ...prev,
                         gsmPrices: [
-                          ...prev.gsmPrices.filter(gp => gp.gsm.toLowerCase() !== newGsmName.trim().toLowerCase()),
-                          { gsm: newGsmName.trim(), price: Number(newGsmPrice) }
-                        ]
+                          ...prev.gsmPrices.filter(
+                            (gp) =>
+                              gp.gsm.toLowerCase() !==
+                              newGsmName.trim().toLowerCase(),
+                          ),
+                          {
+                            gsm: newGsmName.trim(),
+                            price: Number(newGsmPrice),
+                          },
+                        ],
                       }));
                       setNewGsmName("");
                       setNewGsmPrice("");
@@ -1943,19 +2524,30 @@ export default function ManagerPage() {
 
                 <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
                   {styleForm.gsmPrices.length === 0 ? (
-                    <p className="text-[10px] text-slate-400 font-semibold p-2">No GSM prices added yet.</p>
+                    <p className="text-[10px] text-slate-400 font-semibold p-2">
+                      No GSM prices added yet.
+                    </p>
                   ) : (
                     styleForm.gsmPrices.map((gp, i) => (
-                      <div key={i} className="flex items-center justify-between bg-white border rounded-xl px-3 py-1.5 text-xs shadow-2xs">
-                        <span className="font-semibold text-slate-700">{gp.gsm}</span>
+                      <div
+                        key={i}
+                        className="flex items-center justify-between bg-white border rounded-xl px-3 py-1.5 text-xs shadow-2xs"
+                      >
+                        <span className="font-semibold text-slate-700">
+                          {gp.gsm}
+                        </span>
                         <div className="flex items-center gap-3">
-                          <span className="font-black text-slate-900">Rs. {gp.price.toFixed(2)}</span>
+                          <span className="font-black text-slate-900">
+                            Rs. {gp.price.toFixed(2)}
+                          </span>
                           <button
                             type="button"
                             onClick={() => {
-                              setStyleForm(prev => ({
+                              setStyleForm((prev) => ({
                                 ...prev,
-                                gsmPrices: prev.gsmPrices.filter((_, idx) => idx !== i)
+                                gsmPrices: prev.gsmPrices.filter(
+                                  (_, idx) => idx !== i,
+                                ),
                               }));
                             }}
                             className="text-rose-500 hover:text-rose-700 transition"
@@ -1970,29 +2562,42 @@ export default function ManagerPage() {
               </div>
 
               <div className="border-t pt-4">
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">Configure Allowed Brand Colors</label>
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">
+                  Configure Allowed Brand Colors
+                </label>
 
                 <div className="flex gap-2 mb-3">
                   <input
                     type="text"
                     placeholder="Color name (e.g. Royal Blue)"
                     value={newColor.name}
-                    onChange={(e) => setNewColor(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) =>
+                      setNewColor((prev) => ({ ...prev, name: e.target.value }))
+                    }
                     className="flex-1 px-3 py-2 border rounded-xl text-xs font-semibold"
                   />
                   <input
                     type="color"
                     value={newColor.value}
-                    onChange={(e) => setNewColor(prev => ({ ...prev, value: e.target.value }))}
+                    onChange={(e) =>
+                      setNewColor((prev) => ({
+                        ...prev,
+                        value: e.target.value,
+                      }))
+                    }
                     className="h-8 w-12 p-0.5 border rounded-xl cursor-pointer bg-white shrink-0"
                   />
                   <button
                     type="button"
                     onClick={() => {
-                      if (!newColor.name.trim()) return alert("Please type a color name.");
-                      setStyleForm(prev => ({
+                      if (!newColor.name.trim())
+                        return alert("Please type a color name.");
+                      setStyleForm((prev) => ({
                         ...prev,
-                        colors: [...prev.colors, { name: newColor.name.trim(), value: newColor.value }]
+                        colors: [
+                          ...prev.colors,
+                          { name: newColor.name.trim(), value: newColor.value },
+                        ],
                       }));
                       setNewColor({ name: "", value: "#ffffff" });
                     }}
@@ -2004,18 +2609,28 @@ export default function ManagerPage() {
 
                 <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
                   {styleForm.colors.length === 0 ? (
-                    <p className="text-[10px] text-slate-400 font-semibold p-2">No colors added yet.</p>
+                    <p className="text-[10px] text-slate-400 font-semibold p-2">
+                      No colors added yet.
+                    </p>
                   ) : (
                     styleForm.colors.map((color, i) => (
-                      <div key={i} className="flex items-center gap-1.5 bg-white border rounded-full px-2.5 py-1 text-xs shadow-2xs">
-                        <span className="h-3.5 w-3.5 rounded-full border border-slate-200" style={{ backgroundColor: color.value }} />
-                        <span className="font-semibold text-slate-700">{color.name}</span>
+                      <div
+                        key={i}
+                        className="flex items-center gap-1.5 bg-white border rounded-full px-2.5 py-1 text-xs shadow-2xs"
+                      >
+                        <span
+                          className="h-3.5 w-3.5 rounded-full border border-slate-200"
+                          style={{ backgroundColor: color.value }}
+                        />
+                        <span className="font-semibold text-slate-700">
+                          {color.name}
+                        </span>
                         <button
                           type="button"
                           onClick={() => {
-                            setStyleForm(prev => ({
+                            setStyleForm((prev) => ({
                               ...prev,
-                              colors: prev.colors.filter((_, idx) => idx !== i)
+                              colors: prev.colors.filter((_, idx) => idx !== i),
                             }));
                           }}
                           className="text-slate-400 hover:text-rose-500 font-bold ml-1 text-[10px] shrink-0"
@@ -2031,7 +2646,10 @@ export default function ManagerPage() {
               <div className="border-t pt-4 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => { setShowStyleModal(false); setEditingStyle(null); }}
+                  onClick={() => {
+                    setShowStyleModal(false);
+                    setEditingStyle(null);
+                  }}
                   className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
                 >
                   Cancel
@@ -2041,7 +2659,9 @@ export default function ManagerPage() {
                   disabled={stylesLoading}
                   className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  {stylesLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {stylesLoading && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  )}
                   {editingStyle ? "Save Changes" : "Create Style"}
                 </button>
               </div>
