@@ -10,18 +10,19 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_placeholder";
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "whsec_placeholder";
 
-let stripe = null;
+// Using stripeInstance locally to prevent variable collision with global/library type declarations
+let stripeInstance = null;
 try {
-  stripe = new Stripe(stripeSecretKey, {
+  stripeInstance = new Stripe(stripeSecretKey, {
     apiVersion: "2023-10-16"
   });
 } catch (err) {
   console.warn("Stripe SDK initialization warning:", err.message);
-  stripe = null;
+  stripeInstance = null;
 }
 
 module.exports = {
-  stripe,
+  stripe: stripeInstance,
   stripeSecretKey,
   webhookSecret,
   currency: (process.env.PAYMENT_CURRENCY || "lkr").toLowerCase()
