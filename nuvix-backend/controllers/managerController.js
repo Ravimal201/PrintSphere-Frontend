@@ -115,10 +115,28 @@ exports.updateStock = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { quantity } = req.body;
+    const { quantity, minThreshold } = req.body;
+    const updateData = {};
+
+    if (typeof quantity !== "undefined") {
+      if (quantity < 0) {
+        return res.status(400).json({ message: "Stock cannot go below zero" });
+      }
+      updateData.quantity = quantity;
+      updateData.lastRestocked = new Date();
+    }
+
+    if (typeof minThreshold !== "undefined") {
+      updateData.minThreshold = minThreshold;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "No update fields provided" });
+    }
+
     const updated = await Inventory.findByIdAndUpdate(
       req.params.id,
-      { quantity, lastRestocked: new Date() },
+      updateData,
       { new: true }
     );
 
