@@ -18,6 +18,27 @@ export default function PaymentButton({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const loadPayHereScript = () => {
+    return new Promise((resolve, reject) => {
+      if (window.payhere) {
+        resolve(true);
+        return;
+      }
+      const existingScript = document.querySelector('script[src="https://www.payhere.lk/lib/payhere.js"]');
+      if (existingScript) {
+        existingScript.onload = () => resolve(true);
+        existingScript.onerror = () => reject(new Error("Failed to load PayHere SDK"));
+        return;
+      }
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src = "https://www.payhere.lk/lib/payhere.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => reject(new Error("Failed to load PayHere SDK"));
+      document.body.appendChild(script);
+    });
+  };
+
   const handlePayment = async () => {
     if (!orderId) {
       const err = "Order ID is missing. Please create an order first.";
@@ -30,13 +51,49 @@ export default function PaymentButton({
     setErrorMessage("");
 
     try {
-      const data = await createCheckoutSession(orderId, gateway);
-      if (data && data.url) {
-        if (onSuccess) onSuccess(data);
-        // Redirect customer to Stripe Checkout Sandbox URL
-        window.location.href = data.url;
+      if (gateway.toLowerCase() === "payhere") {
+        // 1. Dynamically load PayHere JS SDK script
+        await loadPayHereScript();
+
+        // 2. Call backend to generate hash and parameter payload
+        const data = await createCheckoutSession(orderId, "payhere");
+        if (data && data.payhereParams) {
+          // 3. Register PayHere event callbacks
+          window.payhere.onCompleted = function (completedOrderId) {
+            console.log("PayHere Checkout Completed. Order ID: " + completedOrderId);
+            if (onSuccess) onSuccess(data);
+            // Redirect to success URL
+            window.location.href = data.payhereParams.return_url || `/payment/success?order_id=${completedOrderId}&gateway=payhere`;
+          };
+
+          window.payhere.onDismissed = function () {
+            console.log("PayHere Checkout Dismissed");
+            // Redirect to cancel URL
+            window.location.href = data.payhereParams.cancel_url || `/payment/cancel?order_id=${orderId}`;
+          };
+
+          window.payhere.onError = function (error) {
+            console.error("PayHere Checkout Error: ", error);
+            setErrorMessage(error || "Payment popup encountered an error.");
+            setLoading(false);
+            if (onError) onError(error);
+          };
+
+          // 4. Trigger PayHere Onsite Checkout popup
+          window.payhere.startPayment(data.payhereParams);
+        } else {
+          throw new Error("PayHere payment parameters were not returned by backend");
+        }
       } else {
-        throw new Error("Payment checkout URL was not returned by gateway");
+        // Stripe integration fallback
+        const data = await createCheckoutSession(orderId, "stripe");
+        if (data && data.url) {
+          if (onSuccess) onSuccess(data);
+          // Redirect customer to Stripe Checkout Sandbox URL
+          window.location.href = data.url;
+        } else {
+          throw new Error("Payment checkout URL was not returned by gateway");
+        }
       }
     } catch (err) {
       const msg = err.message || err.error || "Failed to initiate payment checkout. Please try again.";
@@ -44,6 +101,13 @@ export default function PaymentButton({
       setLoading(false);
       if (onError) onError(msg);
     }
+  };
+
+  const getLoadingText = () => {
+    if (gateway.toLowerCase() === "payhere") {
+      return "Opening PayHere...";
+    }
+    return "Redirecting to Stripe...";
   };
 
   return (
@@ -59,13 +123,13 @@ export default function PaymentButton({
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin text-white" />
-            <span>Redirecting to Stripe...</span>
+            <span>{getLoadingText()}</span>
           </>
         ) : (
           children || (
             <>
               <CreditCard className="h-4 w-4 text-white" />
-              <span>Pay Now {amount ? `(Rs. ${Number(amount).toFixed(2)})` : ""}</span>
+              <span>Pay with {gateway.toLowerCase() === "payhere" ? "PayHere" : "Card"} {amount ? `(Rs. ${Number(amount).toFixed(2)})` : ""}</span>
             </>
           )
         )}

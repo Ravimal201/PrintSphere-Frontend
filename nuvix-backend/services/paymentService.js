@@ -115,11 +115,58 @@ class StripeGatewayStrategy extends BasePaymentGateway {
  * PayHere Sandbox Strategy (Placeholder for future gateway extension)
  */
 class PayHereGatewayStrategy extends BasePaymentGateway {
-  async createCheckoutSession(params) {
-    throw new Error("PayHere gateway strategy is ready to be configured.");
+  constructor() {
+    super();
+    const payhereConfig = require("../config/payhere");
+    this.merchantId = payhereConfig.merchantId;
+    this.merchantSecret = payhereConfig.merchantSecret;
+    this.isSandbox = payhereConfig.isSandbox;
+    this.defaultCurrency = payhereConfig.defaultCurrency;
+    this.generateCheckoutHash = payhereConfig.generateCheckoutHash;
+    this.verifyCallbackSignature = payhereConfig.verifyCallbackSignature;
   }
+
+  async createCheckoutSession({ order, customer, frontendUrl }) {
+    const hash = this.generateCheckoutHash(order._id.toString(), order.totalCost, this.defaultCurrency);
+    const amountStr = Number(order.totalCost).toFixed(2);
+    const itemsName = order.items && order.items.length > 0
+      ? order.items.map(i => i.selectedSize ? `T-Shirt (${i.selectedSize})` : "T-Shirt").join(", ")
+      : `Order #${order._id.toString().substring(18)}`;
+
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+
+    const payhereParams = {
+      sandbox: this.isSandbox,
+      merchant_id: this.merchantId,
+      return_url: `${frontendUrl}/payment/success?order_id=${order._id}&gateway=payhere`,
+      cancel_url: `${frontendUrl}/payment/cancel?order_id=${order._id}`,
+      notify_url: `${backendUrl}/api/payment/payhere-webhook`,
+      order_id: order._id.toString(),
+      items: itemsName.substring(0, 255),
+      amount: amountStr,
+      currency: this.defaultCurrency,
+      hash: hash,
+      first_name: customer?.firstName || "Guest",
+      last_name: customer?.lastName || "Customer",
+      email: customer?.email || order.guestEmail || "guest@example.com",
+      phone: customer?.phone || "0771234567",
+      address: order.shippingAddress?.street || "No. 1, Galle Road",
+      city: order.shippingAddress?.city || "Colombo",
+      country: order.shippingAddress?.country || "Sri Lanka"
+    };
+
+    return {
+      gateway: "PayHere",
+      sessionId: order._id.toString(),
+      paymentIntentId: null,
+      url: null,
+      payhereParams: payhereParams,
+      rawSession: payhereParams
+    };
+  }
+
   async verifyWebhook(rawBody, signature) {
-    throw new Error("PayHere webhook verification is ready to be configured.");
+    return this.verifyCallbackSignature(rawBody);
   }
 }
 
@@ -161,19 +208,22 @@ class PaymentService {
 
     // Create or update initial Payment record in Pending status
     let payment = await Payment.findOne({ orderId: order._id });
+    const paymentCurrency = (sessionData.payhereParams?.currency || "lkr").toLowerCase();
     if (!payment) {
       payment = new Payment({
         orderId: order._id,
         customerId: order.customerId?._id || null,
         stripeSessionId: sessionData.sessionId,
         amount: order.totalCost,
-        currency: "lkr",
+        currency: paymentCurrency,
         paymentMethod: sessionData.gateway,
         paymentStatus: "Pending",
         gatewayResponse: sessionData.rawSession || {}
       });
     } else {
       payment.stripeSessionId = sessionData.sessionId;
+      payment.paymentMethod = sessionData.gateway;
+      payment.currency = paymentCurrency;
       payment.paymentStatus = "Pending";
       payment.gatewayResponse = sessionData.rawSession || {};
     }
@@ -203,6 +253,70 @@ class PaymentService {
   }
 
   /**
+   * Process PayHere Status Webhook Notifications
+   */
+  async processPayHereWebhook(body) {
+    const payhereConfig = require("../config/payhere");
+    
+    // 1. Verify Callback Signature
+    const isValid = payhereConfig.verifyCallbackSignature(body);
+    if (!isValid) {
+      throw new Error("PayHere webhook signature verification failed");
+    }
+
+    const statusCode = Number(body.status_code);
+    const orderId = body.order_id;
+    const paymentId = body.payment_id;
+
+    if (statusCode === 2) {
+      // Payment successful - fulfill order
+      return await this.verifyAndFulfillPayment(paymentId, orderId, body, "PayHere");
+    } else {
+      // Handle other status states
+      const order = await Order.findById(orderId);
+      if (order) {
+        let payment = await Payment.findOne({ orderId: order._id });
+        const statusMap = {
+          "0": "Pending",
+          "-1": "Cancelled",
+          "-2": "Failed",
+          "-3": "Refunded"
+        };
+        const mappedStatus = statusMap[body.status_code] || "Failed";
+        
+        if (!payment) {
+          payment = new Payment({
+            orderId: order._id,
+            customerId: order.customerId || null,
+            stripeSessionId: paymentId || "N/A",
+            amount: order.totalCost,
+            currency: (body.payhere_currency || "lkr").toLowerCase(),
+            paymentMethod: "PayHere",
+            paymentStatus: mappedStatus,
+            gatewayResponse: body
+          });
+        } else {
+          payment.paymentStatus = mappedStatus;
+          payment.gatewayResponse = body;
+        }
+        await payment.save();
+
+        if (mappedStatus === "Failed" || mappedStatus === "Cancelled") {
+          order.paymentStatus = "Failed";
+          if (!order.timeline) order.timeline = [];
+          order.timeline.push({
+            status: "Cancelled",
+            note: `PayHere payment failed or cancelled with status code: ${body.status_code}. Message: ${body.status_message}`,
+            timestamp: new Date()
+          });
+          await order.save();
+        }
+      }
+      return { status: "processed", statusCode };
+    }
+  }
+
+  /**
    * Steps 3-7: Fulfill Order & Payment:
    * 1. Verify Stripe payment
    * 2. Save payment details
@@ -212,7 +326,7 @@ class PaymentService {
    * 6. Create production workflow entry
    * 7. Return success response
    */
-  async verifyAndFulfillPayment(sessionId, orderId, rawSessionData = null) {
+  async verifyAndFulfillPayment(sessionId, orderId, rawSessionData = null, paymentMethod = "Stripe") {
     let order = null;
     if (orderId) {
       order = await Order.findById(orderId);
@@ -226,7 +340,7 @@ class PaymentService {
     }
 
     // Attempt retrieval from Stripe if raw session data not provided and not a mock session
-    if (!rawSessionData && sessionId && !sessionId.startsWith("mock_stripe_session_")) {
+    if (paymentMethod === "Stripe" && !rawSessionData && sessionId && !sessionId.startsWith("mock_stripe_session_")) {
       const stripeStrategy = new StripeGatewayStrategy();
       try {
         rawSessionData = await stripeStrategy.retrieveSession(sessionId);
@@ -237,23 +351,30 @@ class PaymentService {
 
     // 1. Verify Payment Record
     let payment = await Payment.findOne({ orderId: order._id });
+    const paymentCurrency = (rawSessionData?.payhere_currency || rawSessionData?.currency || "lkr").toLowerCase();
     if (!payment) {
       payment = new Payment({
         orderId: order._id,
         customerId: order.customerId || null,
         stripeSessionId: sessionId || "N/A",
         amount: order.totalCost,
-        currency: "lkr",
-        paymentMethod: "Stripe",
+        currency: paymentCurrency,
+        paymentMethod: paymentMethod,
         paymentStatus: "Paid"
       });
     }
 
-    payment.stripeSessionId = sessionId || payment.stripeSessionId;
-    if (rawSessionData?.payment_intent) {
-      payment.stripePaymentIntentId = typeof rawSessionData.payment_intent === "string"
-        ? rawSessionData.payment_intent
-        : rawSessionData.payment_intent.id;
+    payment.paymentMethod = paymentMethod;
+    if (paymentMethod === "PayHere") {
+      payment.stripeSessionId = sessionId || payment.stripeSessionId;
+      payment.stripePaymentIntentId = rawSessionData?.payment_id || sessionId || null;
+    } else {
+      payment.stripeSessionId = sessionId || payment.stripeSessionId;
+      if (rawSessionData?.payment_intent) {
+        payment.stripePaymentIntentId = typeof rawSessionData.payment_intent === "string"
+          ? rawSessionData.payment_intent
+          : rawSessionData.payment_intent.id;
+      }
     }
     payment.paymentStatus = "Paid";
     payment.paidAt = payment.paidAt || new Date();
@@ -275,7 +396,7 @@ class PaymentService {
 
     // 6. Create Production Workflow
     if (isFirstTimeConfirmation) {
-      await this.createProductionWorkflow(order);
+      await this.createProductionWorkflow(order, paymentMethod);
     } else {
       await order.save();
     }
@@ -323,12 +444,12 @@ class PaymentService {
   /**
    * Helper: Step 6 - Create Production Workflow Timeline
    */
-  async createProductionWorkflow(order) {
+  async createProductionWorkflow(order, paymentMethod = "Stripe") {
     try {
       if (!order.timeline) order.timeline = [];
       order.timeline.push({
         status: "Processing",
-        note: "Stripe payment verified successfully. Order confirmed and dispatched to 3D printing production workflow.",
+        note: `${paymentMethod} payment verified successfully. Order confirmed and dispatched to 3D printing production workflow.`,
         timestamp: new Date()
       });
       await order.save();

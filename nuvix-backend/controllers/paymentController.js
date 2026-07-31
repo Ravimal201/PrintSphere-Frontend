@@ -46,6 +46,18 @@ exports.handleWebhook = async (req, res) => {
   }
 };
 
+// POST /api/payment/payhere-webhook
+exports.handlePayHereWebhook = async (req, res) => {
+  try {
+    console.log("PayHere webhook notification received:", req.body);
+    const result = await paymentService.processPayHereWebhook(req.body);
+    return res.status(200).json({ received: true, success: true, ...result });
+  } catch (error) {
+    console.error("handlePayHereWebhook Controller Error:", error.message);
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 // GET /api/payment/success
 exports.paymentSuccess = async (req, res) => {
   try {
