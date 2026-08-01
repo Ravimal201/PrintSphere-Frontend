@@ -4,6 +4,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
+import PaymentButton from "../components/PaymentButton";
 import { ShoppingBag, Calendar, MapPin, ShieldCheck, AlertCircle } from "lucide-react";
 import axios from "axios";
 
@@ -115,10 +116,21 @@ export default function MyOrdersPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {order.paymentStatus === "Pending" && (
+                          <div className="w-24">
+                            <PaymentButton
+                              orderId={order._id}
+                              amount={order.totalCost}
+                              className="w-full py-1.5 px-3 bg-amber-500 hover:bg-amber-600 active:scale-98 text-white rounded-lg font-bold text-[10px] shadow-sm transition-all flex items-center justify-center cursor-pointer"
+                            >
+                              <span>Pay Now</span>
+                            </PaymentButton>
+                          </div>
+                        )}
                         <span className={`px-2.5 py-1 rounded-full border text-xs font-bold ${statusColors[order.orderStatus] || "bg-slate-100 text-slate-700 border-slate-200"}`}>
                           {order.orderStatus}
                         </span>
-                        <span className="px-2.5 py-1 rounded-full border border-emerald-100 bg-emerald-50 text-emerald-700 text-xs font-bold flex items-center gap-1">
+                        <span className={`px-2.5 py-1 rounded-full border text-xs font-bold flex items-center gap-1 ${order.paymentStatus === "Paid" ? "border-emerald-100 bg-emerald-50 text-emerald-700" : "border-amber-100 bg-amber-50 text-amber-700"}`}>
                           <ShieldCheck className="h-3.5 w-3.5" />
                           {order.paymentStatus}
                         </span>

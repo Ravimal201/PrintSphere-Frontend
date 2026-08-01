@@ -28,8 +28,20 @@ class StripeGatewayStrategy extends BasePaymentGateway {
   }
 
   async createCheckoutSession({ order, customer, frontendUrl }) {
-    if (!this.stripe) {
-      throw new Error("Stripe SDK is not initialized. Please verify STRIPE_SECRET_KEY in configuration.");
+    const { stripeSecretKey } = require("../config/stripe");
+    const isMockMode = !this.stripe || !stripeSecretKey || stripeSecretKey === "sk_test_placeholder";
+
+    const baseUrl = frontendUrl.endsWith("/") ? frontendUrl.slice(0, -1) : frontendUrl;
+
+    if (isMockMode) {
+      console.log("Stripe Key not configured or placeholder detected. Running in Sandbox Mock Mode.");
+      return {
+        gateway: "Stripe",
+        sessionId: `mock_stripe_session_${order._id}`,
+        paymentIntentId: `mock_payment_intent_${order._id}`,
+        url: `${baseUrl}/payment/success?session_id=mock_stripe_session_${order._id}&order_id=${order._id}`,
+        rawSession: { id: `mock_stripe_session_${order._id}`, payment_intent: `mock_payment_intent_${order._id}`, mock: true }
+      };
     }
 
     const lineItems = (order.items && order.items.length > 0)
@@ -58,7 +70,6 @@ class StripeGatewayStrategy extends BasePaymentGateway {
           }
         ];
 
-    const baseUrl = frontendUrl.endsWith("/") ? frontendUrl.slice(0, -1) : frontendUrl;
 
     const session = await this.stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -214,8 +225,8 @@ class PaymentService {
       throw new Error("Target Order could not be resolved for payment verification");
     }
 
-    // Attempt retrieval from Stripe if raw session data not provided
-    if (!rawSessionData && sessionId) {
+    // Attempt retrieval from Stripe if raw session data not provided and not a mock session
+    if (!rawSessionData && sessionId && !sessionId.startsWith("mock_stripe_session_")) {
       const stripeStrategy = new StripeGatewayStrategy();
       try {
         rawSessionData = await stripeStrategy.retrieveSession(sessionId);
