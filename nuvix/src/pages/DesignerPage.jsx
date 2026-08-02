@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Scene from "../three/Scene";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -30,7 +30,9 @@ import {
   LogIn,
   LogOut,
   FlipHorizontal,
-  FlipVertical
+  FlipVertical,
+  Undo2,
+  Redo2
 } from "lucide-react";
 
 const shirtColors = [
@@ -384,6 +386,164 @@ export default function DesignerPage() {
 
   const [layers, setLayers] = useState([]);
 
+  // --- Undo / Redo History State ---
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isUndoingRedoingRef = useRef(false);
+  const debounceTimerRef = useRef(null);
+  const isInitializedRef = useRef(false);
+
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const historyIndexRef = useRef(historyIndex);
+  historyIndexRef.current = historyIndex;
+
+  const saveSnapshot = (instant = false) => {
+    if (isUndoingRedoingRef.current) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const commit = () => {
+      if (isUndoingRedoingRef.current) return;
+      const snap = {
+        layers: JSON.parse(JSON.stringify(layers)),
+        shirtColor,
+        selectedModelPath: selectedModel?.path || null,
+        shirtMaterial,
+        selectedSize
+      };
+
+      const currIdx = historyIndexRef.current;
+      const currList = historyRef.current;
+      const currentSnap = currList[currIdx];
+
+      if (currentSnap && JSON.stringify(currentSnap) === JSON.stringify(snap)) {
+        return;
+      }
+
+      const nextList = currList.slice(0, currIdx + 1);
+      nextList.push(snap);
+      if (nextList.length > 50) nextList.shift();
+
+      const nextIdx = nextList.length - 1;
+      setHistory(nextList);
+      setHistoryIndex(nextIdx);
+    };
+
+    if (instant) {
+      commit();
+    } else {
+      debounceTimerRef.current = setTimeout(commit, 300);
+    }
+  };
+
+  useEffect(() => {
+    if (!isInitializedRef.current) {
+      if (selectedModel) {
+        isInitializedRef.current = true;
+        saveSnapshot(true);
+      }
+      return;
+    }
+    saveSnapshot(false);
+  }, [layers, shirtColor, selectedModel?.path, shirtMaterial, selectedSize]);
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  const handleUndo = () => {
+    if (!canUndo) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const targetIdx = historyIndex - 1;
+    const targetSnap = history[targetIdx];
+    if (!targetSnap) return;
+
+    isUndoingRedoingRef.current = true;
+
+    setLayers(targetSnap.layers);
+    setShirtColor(targetSnap.shirtColor);
+    if (targetSnap.selectedModelPath) {
+      const model = availableStyles.find(m => m.path === targetSnap.selectedModelPath);
+      if (model) {
+        setSelectedModel(model);
+        setShirtType(model.type);
+      }
+    }
+    setShirtMaterial(targetSnap.shirtMaterial);
+    setSelectedSize(targetSnap.selectedSize);
+
+    setHistoryIndex(targetIdx);
+
+    setTimeout(() => {
+      isUndoingRedoingRef.current = false;
+    }, 100);
+  };
+
+  const handleRedo = () => {
+    if (!canRedo) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const targetIdx = historyIndex + 1;
+    const targetSnap = history[targetIdx];
+    if (!targetSnap) return;
+
+    isUndoingRedoingRef.current = true;
+
+    setLayers(targetSnap.layers);
+    setShirtColor(targetSnap.shirtColor);
+    if (targetSnap.selectedModelPath) {
+      const model = availableStyles.find(m => m.path === targetSnap.selectedModelPath);
+      if (model) {
+        setSelectedModel(model);
+        setShirtType(model.type);
+      }
+    }
+    setShirtMaterial(targetSnap.shirtMaterial);
+    setSelectedSize(targetSnap.selectedSize);
+
+    setHistoryIndex(targetIdx);
+
+    setTimeout(() => {
+      isUndoingRedoingRef.current = false;
+    }, 100);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea" || document.activeElement?.isContentEditable) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else {
+          e.preventDefault();
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [historyIndex, history]);
   const [selectedLayerId, setSelectedLayerId] = useState(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -776,6 +936,7 @@ export default function DesignerPage() {
           </div>
 
           <div className="flex items-center gap-6">
+
             <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-700 font-bold text-xs">
               <ShoppingBag className="h-3.5 w-3.5" />
               <span>Cart ({quantity})</span>
@@ -1004,6 +1165,26 @@ export default function DesignerPage() {
                   {view}
                 </button>
               ))}
+            </div>
+
+            {/* Canvas Quick Undo / Redo Controls */}
+            <div className="absolute top-8 right-8 flex items-center gap-1 bg-white/80 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none">
+              <button
+                onClick={handleUndo}
+                disabled={!canUndo}
+                className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={!canRedo}
+                className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo2 className="h-4 w-4" />
+              </button>
             </div>
 
             <div className="flex-1 flex items-center justify-center min-h-0 relative">
