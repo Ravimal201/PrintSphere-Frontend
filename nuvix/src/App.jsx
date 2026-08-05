@@ -14,6 +14,7 @@ import MyOrdersPage from "./pages/MyOrdersPage";
 import SupportPage from "./pages/SupportPage";
 import AboutUsPage from "./pages/AboutUsPage";
 import ContactUsPage from "./pages/ContactUsPage";
+import HowItWorksPage from "./pages/HowItWorksPage";
 import CartPage from "./pages/CartPage";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
@@ -116,6 +117,10 @@ function App() {
 
   if (path === "/contact") {
     return <ContactUsPage />;
+  }
+
+  if (path === "/how-it-works" || path === "/how-is-work") {
+    return <HowItWorksPage />;
   }
 
   return <GUserPage />;
