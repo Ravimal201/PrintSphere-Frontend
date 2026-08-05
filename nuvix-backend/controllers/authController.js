@@ -286,7 +286,8 @@ exports.getRecommendations = async (req, res) => {
       let totalUserActivityCount = 0;
 
       allActivities.forEach(act => {
-        const isTargetUser = act.userId && act.userId.toString() === currentUserId;
+        const isTargetUser = (currentUserId && act.userId && act.userId.toString() === currentUserId) ||
+                             (currentSessionId && act.sessionId && act.sessionId === currentSessionId);
 
         if (isTargetUser) {
           totalUserActivityCount++;
@@ -310,12 +311,16 @@ exports.getRecommendations = async (req, res) => {
         }
       });
 
-      const totalPurchases = Object.keys(userPurchasedMap).length;
-      if (totalUserActivityCount > 0 || totalPurchases > 0) {
-        hasUserActivity = true;
-      }
+      // Collect all product IDs that the user directly interacted with
+      const userInteractedProductIds = new Set([
+        ...Object.keys(userPurchasedMap),
+        ...Object.keys(userCartMap),
+        ...Object.keys(userViewMap),
+      ]);
 
-      if (hasUserActivity) {
+      if (userInteractedProductIds.size > 0) {
+        hasUserActivity = true;
+
         // --- COLLABORATIVE FILTERING (Similar Users' Behavior) ---
         const userInteractionSets = {};
         allActivities.forEach(act => {
@@ -355,10 +360,13 @@ exports.getRecommendations = async (req, res) => {
         }
 
         // --- SCORE PRODUCTS FOR PERSONALIZED TAB ---
+        // Only score products that the user has directly interacted with
         const personalizedScored = [];
 
         products.forEach(p => {
           const pId = p._id.toString();
+          if (!userInteractedProductIds.has(pId)) return;
+
           const pTitle = (p.title || "").toLowerCase();
           const pCategory = p.category || "";
 
@@ -386,7 +394,7 @@ exports.getRecommendations = async (req, res) => {
             if (!primaryReason) primaryReason = "Product you've viewed";
           }
 
-          // 4. Searched Products (Weight: 8)
+          // 4. Searched Products boost (Weight: 8)
           let searchMatched = false;
           userSearchedTerms.forEach(term => {
             if (term && (pTitle.includes(term) || pCategory.toLowerCase().includes(term))) {
@@ -395,26 +403,23 @@ exports.getRecommendations = async (req, res) => {
           });
           if (searchMatched) {
             score += 8;
-            if (!primaryReason) primaryReason = "Matches your searches";
           }
 
-          // 5. Frequently Browsed Categories (Weight: 4 per interaction)
+          // 5. Category affinity boost (Weight: 2)
           const catCount = userCategoryCounts[pCategory] || 0;
           if (catCount > 0) {
-            score += catCount * 4;
-            if (!primaryReason) primaryReason = `Frequently browsed: ${pCategory}`;
+            score += catCount * 2;
           }
 
-          // 6. Collaborative Filtering (Similar users' behavior)
+          // 6. Collaborative Filtering boost
           const collabScore = similarUserProductsMap[pId] || 0;
           if (collabScore > 0) {
             score += collabScore;
-            if (!primaryReason) primaryReason = "Recommended based on similar users";
           }
 
           if (score > 0) {
             const pObj = p.toObject();
-            pObj.recommendationReason = primaryReason;
+            pObj.recommendationReason = primaryReason || "Activity related product";
             personalizedScored.push({
               product: pObj,
               personalScore: score
@@ -423,6 +428,7 @@ exports.getRecommendations = async (req, res) => {
         });
 
         personalizedScored.sort((a, b) => b.personalScore - a.personalScore);
+        // Returns 1 item after 1st distinct product activity, 2 after 2nd, 3 after 3rd, 4 after 4th, and top 4 when exceeding 4
         frequentlyOrdered = personalizedScored.slice(0, 4).map(item => item.product);
       }
     }
