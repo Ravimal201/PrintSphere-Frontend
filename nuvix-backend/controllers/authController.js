@@ -6,6 +6,7 @@ const Order = require("../models/Order");
 const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const TShirtStyle = require("../models/TShirtStyle");
+const UserActivity = require("../models/UserActivity");
 const { createNotification } = require("../utils/notificationHelper");
 
 // JWT Secret Key fallback
@@ -159,38 +160,271 @@ exports.getStoreProducts = async (req, res) => {
   }
 };
 
-// @desc    Get recommended products (popular & frequently ordered)
+// @desc    Track user activity event (view, search, cart add, purchase)
+// @route   POST /api/auth/activity
+exports.trackUserActivity = async (req, res) => {
+  try {
+    const { action, productId, category, searchTerm, sessionId } = req.body;
+    let userId = null;
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.id;
+      } catch (err) {
+        // Token invalid or expired, continue as guest
+      }
+    }
+
+    if (!action) {
+      return res.status(400).json({ message: "Action is required" });
+    }
+
+    await UserActivity.create({
+      userId: userId || undefined,
+      sessionId: sessionId || undefined,
+      action,
+      productId: productId || undefined,
+      category: category || undefined,
+      searchTerm: searchTerm ? searchTerm.trim().toLowerCase() : undefined
+    });
+
+    res.status(201).json({ success: true });
+  } catch (error) {
+    console.error("Track user activity error:", error);
+    res.status(500).json({ message: "Server error tracking activity" });
+  }
+};
+
+// @desc    Get recommended products (popular & frequently ordered based on activity)
 // @route   GET /api/auth/recommendations
 exports.getRecommendations = async (req, res) => {
   try {
     const products = await Product.find({ isApproved: true, status: "Active" }).populate("createdBy", "name");
     const orders = await Order.find();
+    const allActivities = await UserActivity.find().sort({ createdAt: -1 }).limit(5000);
 
-    const orderCounts = {};
+    // Identify user / session from Auth header or Query parameters
+    let currentUserId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        currentUserId = decoded.id ? decoded.id.toString() : null;
+      } catch (err) {
+        // Guest user
+      }
+    }
+    const currentSessionId = req.query.sessionId || req.body.sessionId || null;
+
+    // --- 1. GLOBAL POPULARITY SCORING (For all users) ---
+    const globalOrderCounts = {};
     orders.forEach(order => {
       order.items.forEach(item => {
         if (item.productId) {
           const prodId = item.productId.toString();
-          orderCounts[prodId] = (orderCounts[prodId] || 0) + item.quantity;
+          globalOrderCounts[prodId] = (globalOrderCounts[prodId] || 0) + item.quantity;
         }
       });
     });
 
-    const frequentlyOrdered = [...products].sort((a, b) => {
-      const countA = orderCounts[a._id.toString()] || 0;
-      const countB = orderCounts[b._id.toString()] || 0;
-      return countB - countA;
+    const globalCartCounts = {};
+    const globalViewCounts = {};
+
+    allActivities.forEach(act => {
+      if (act.productId) {
+        const pId = act.productId.toString();
+        if (act.action === "ADD_TO_CART") {
+          globalCartCounts[pId] = (globalCartCounts[pId] || 0) + 1;
+        } else if (act.action === "VIEW_PRODUCT") {
+          globalViewCounts[pId] = (globalViewCounts[pId] || 0) + 1;
+        }
+      }
     });
 
-    const popular = [...products].sort((a, b) => {
-      const scoreA = (orderCounts[a._id.toString()] || 0) * 1.5 + (a.discount || 0);
-      const scoreB = (orderCounts[b._id.toString()] || 0) * 1.5 + (b.discount || 0);
-      return scoreB - scoreA;
+    const popularScored = products.map(p => {
+      const pId = p._id.toString();
+      const purchases = globalOrderCounts[pId] || 0;
+      const cartAdds = globalCartCounts[pId] || 0;
+      const views = globalViewCounts[pId] || 0;
+      const discountBonus = (p.discount || 0) * 0.5;
+
+      const globalScore = (purchases * 10) + (cartAdds * 5) + (views * 2) + discountBonus;
+      return {
+        product: p,
+        globalScore
+      };
     });
+
+    popularScored.sort((a, b) => b.globalScore - a.globalScore);
+    const popularProducts = popularScored.slice(0, 6).map(item => item.product);
+
+    // --- 2. PERSONALIZED RECOMMENDATIONS (User Activity + Collaborative Filtering) ---
+    // Extract current user/session interactions
+    const userPurchasedMap = {};
+    if (currentUserId) {
+      orders.forEach(order => {
+        if (order.customer && order.customer.toString() === currentUserId) {
+          order.items.forEach(item => {
+            if (item.productId) {
+              const pId = item.productId.toString();
+              userPurchasedMap[pId] = (userPurchasedMap[pId] || 0) + item.quantity;
+            }
+          });
+        }
+      });
+    }
+
+    const userCartMap = {};
+    const userViewMap = {};
+    const userSearchedTerms = [];
+    const userCategoryCounts = {};
+
+    allActivities.forEach(act => {
+      const isTargetUser = (currentUserId && act.userId && act.userId.toString() === currentUserId) ||
+                           (currentSessionId && act.sessionId && act.sessionId === currentSessionId);
+
+      if (isTargetUser) {
+        if (act.productId) {
+          const pId = act.productId.toString();
+          if (act.action === "ADD_TO_CART") {
+            userCartMap[pId] = (userCartMap[pId] || 0) + 1;
+          } else if (act.action === "VIEW_PRODUCT") {
+            userViewMap[pId] = (userViewMap[pId] || 0) + 1;
+          }
+        }
+
+        if (act.category) {
+          const cat = act.category;
+          userCategoryCounts[cat] = (userCategoryCounts[cat] || 0) + 1;
+        }
+
+        if (act.action === "SEARCH_PRODUCT" && act.searchTerm) {
+          userSearchedTerms.push(act.searchTerm.toLowerCase());
+        }
+      }
+    });
+
+    // --- COLLABORATIVE FILTERING (Similar Users' Behavior) ---
+    // Group activity by user ID
+    const userInteractionSets = {};
+    allActivities.forEach(act => {
+      if (act.userId && act.productId) {
+        const uId = act.userId.toString();
+        if (!userInteractionSets[uId]) {
+          userInteractionSets[uId] = new Set();
+        }
+        userInteractionSets[uId].add(act.productId.toString());
+      }
+    });
+
+    const targetUserSet = currentUserId && userInteractionSets[currentUserId] ? userInteractionSets[currentUserId] : new Set();
+    const similarUserProductsMap = {};
+
+    if (currentUserId && targetUserSet.size > 0) {
+      Object.keys(userInteractionSets).forEach(otherUserId => {
+        if (otherUserId !== currentUserId) {
+          const otherSet = userInteractionSets[otherUserId];
+          // Compute Jaccard Similarity: |Intersection| / |Union|
+          let intersectionSize = 0;
+          targetUserSet.forEach(pId => {
+            if (otherSet.has(pId)) intersectionSize++;
+          });
+
+          const unionSize = new Set([...targetUserSet, ...otherSet]).size;
+          const similarity = unionSize > 0 ? intersectionSize / unionSize : 0;
+
+          if (similarity > 0) {
+            otherSet.forEach(pId => {
+              if (!targetUserSet.has(pId)) { // Products target user hasn't interacted with yet
+                similarUserProductsMap[pId] = (similarUserProductsMap[pId] || 0) + (similarity * 10);
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // --- SCORE PRODUCTS FOR PERSONALIZED TAB ---
+    const personalizedScored = products.map(p => {
+      const pId = p._id.toString();
+      const pTitle = (p.title || "").toLowerCase();
+      const pCategory = p.category || "";
+
+      let score = 0;
+      let primaryReason = "";
+
+      // 1. Previous Purchases (Weight: 15)
+      const userPurchases = userPurchasedMap[pId] || 0;
+      if (userPurchases > 0) {
+        score += userPurchases * 15;
+        if (!primaryReason) primaryReason = "Previous Purchase";
+      }
+
+      // 2. Added to Cart (Weight: 10)
+      const userCartAdds = userCartMap[pId] || 0;
+      if (userCartAdds > 0) {
+        score += userCartAdds * 10;
+        if (!primaryReason) primaryReason = "Items added to your cart";
+      }
+
+      // 3. Viewed Products (Weight: 6)
+      const userViews = userViewMap[pId] || 0;
+      if (userViews > 0) {
+        score += userViews * 6;
+        if (!primaryReason) primaryReason = "Product you've viewed";
+      }
+
+      // 4. Searched Products (Weight: 8)
+      let searchMatched = false;
+      userSearchedTerms.forEach(term => {
+        if (term && (pTitle.includes(term) || pCategory.toLowerCase().includes(term))) {
+          searchMatched = true;
+        }
+      });
+      if (searchMatched) {
+        score += 8;
+        if (!primaryReason) primaryReason = "Matches your searches";
+      }
+
+      // 5. Frequently Browsed Categories (Weight: 4 per interaction)
+      const catCount = userCategoryCounts[pCategory] || 0;
+      if (catCount > 0) {
+        score += catCount * 4;
+        if (!primaryReason) primaryReason = `Frequently browsed: ${pCategory}`;
+      }
+
+      // 6. Collaborative Filtering (Similar users' behavior)
+      const collabScore = similarUserProductsMap[pId] || 0;
+      if (collabScore > 0) {
+        score += collabScore;
+        if (!primaryReason) primaryReason = "Recommended based on similar users";
+      }
+
+      // Fallback for new / inactive users: use global popularity score
+      if (score === 0) {
+        const globalRank = popularScored.find(item => item.product._id.toString() === pId);
+        score = (globalRank ? globalRank.globalScore : 0) * 0.1;
+        primaryReason = "Recommended for you";
+      }
+
+      const pObj = p.toObject();
+      pObj.recommendationReason = primaryReason;
+      return {
+        product: pObj,
+        personalScore: score
+      };
+    });
+
+    personalizedScored.sort((a, b) => b.personalScore - a.personalScore);
+    const frequentlyOrdered = personalizedScored.slice(0, 6).map(item => item.product);
 
     res.json({
-      popular: popular.slice(0, 4),
-      frequentlyOrdered: frequentlyOrdered.slice(0, 4)
+      popular: popularProducts,
+      frequentlyOrdered: frequentlyOrdered
     });
   } catch (error) {
     console.error("Fetch recommendations error:", error);

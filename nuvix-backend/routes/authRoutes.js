@@ -6,6 +6,7 @@ const {
   changePassword, 
   getStoreProducts, 
   getRecommendations, 
+  trackUserActivity,
   getActivePricingRules,
   createOrder,
   getCustomerOrders,
@@ -19,6 +20,7 @@ router.post("/login", loginUser);
 router.put("/change-password", changePassword);
 router.get("/products", getStoreProducts);
 router.get("/recommendations", getRecommendations);
+router.post("/activity", trackUserActivity);
 router.get("/pricing-rules", getActivePricingRules);
 router.get("/tshirt-styles", getTShirtStylesPublic);
 

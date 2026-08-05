@@ -34,6 +34,7 @@ require("./models/PricingRules");
 require("./models/CustomizedDesign");
 require("./models/Notification");
 require("./models/Payment");
+require("./models/UserActivity");
 
 // Route Imports
 const authRoutes = require("./routes/authRoutes");

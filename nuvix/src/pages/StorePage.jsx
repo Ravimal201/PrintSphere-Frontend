@@ -26,6 +26,33 @@ import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
 import { API_BASE_URL } from "../config/api";
 
+const getOrCreateSessionId = () => {
+  let sessionId = localStorage.getItem("printsphere_session_id");
+  if (!sessionId) {
+    sessionId = "sess_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
+    localStorage.setItem("printsphere_session_id", sessionId);
+  }
+  return sessionId;
+};
+
+const logUserActivity = async (actionData) => {
+  try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const sessionId = getOrCreateSessionId();
+    await axios.post(
+      `${API_BASE_URL}/auth/activity`,
+      {
+        ...actionData,
+        sessionId,
+      },
+      { headers }
+    );
+  } catch (err) {
+    console.error("Activity logging error:", err);
+  }
+};
+
 export default function StorePage() {
   const isManagerPreview =
     new URLSearchParams(window.location.search).get("preview") === "manager";
@@ -69,8 +96,27 @@ export default function StorePage() {
       setModalQty(1);
       setModalSide("front");
       setModalZoom(0.85);
+
+      if (selected3DProduct._id) {
+        logUserActivity({
+          action: "VIEW_PRODUCT",
+          productId: selected3DProduct._id,
+          category: selected3DProduct.category,
+        });
+      }
     }
   }, [selected3DProduct]);
+
+  useEffect(() => {
+    if (!searchTerm.trim()) return;
+    const timer = setTimeout(() => {
+      logUserActivity({
+        action: "SEARCH_PRODUCT",
+        searchTerm: searchTerm.trim(),
+      });
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const getModalLayers = () => {
     if (!selected3DProduct) return [];
@@ -148,6 +194,14 @@ export default function StorePage() {
       saveCart([...cart, cartItem]);
     }
 
+    if (product && product._id) {
+      logUserActivity({
+        action: "ADD_TO_CART",
+        productId: product._id,
+        category: product.category,
+      });
+    }
+
     setIsCartOpen(true);
   };
 
@@ -168,9 +222,13 @@ export default function StorePage() {
   const fetchStoreData = async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const sessionId = getOrCreateSessionId();
+
       const [productsRes, recomRes, pricingRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/auth/products`),
-        axios.get(`${API_BASE_URL}/auth/recommendations`),
+        axios.get(`${API_BASE_URL}/auth/recommendations?sessionId=${sessionId}`, { headers }),
         axios.get(`${API_BASE_URL}/auth/pricing-rules`),
       ]);
 
@@ -230,6 +288,14 @@ export default function StorePage() {
         image: product.images?.[0] || "/images/dumyImage.png",
       };
       saveCart([...cart, cartItem]);
+    }
+
+    if (product && product._id) {
+      logUserActivity({
+        action: "ADD_TO_CART",
+        productId: product._id,
+        category: product.category,
+      });
     }
 
     // Open cart drawer immediately
@@ -340,6 +406,17 @@ export default function StorePage() {
         { orderId, gateway: "stripe" },
         { headers },
       );
+
+      // Track purchase activity
+      cart.forEach((item) => {
+        if (item.productId) {
+          logUserActivity({
+            action: "PURCHASE",
+            productId: item.productId,
+            category: item.category,
+          });
+        }
+      });
 
       setCheckoutSuccess(true);
       saveCart([]); // Clear cart
@@ -679,21 +756,21 @@ export default function StorePage() {
                         return (
                           <div
                             key={p._id}
-                            className="bg-white border rounded-2xl p-3 shadow-xs hover:border-indigo-150 transition flex items-center gap-3 cursor-pointer"
+                            className="bg-white border rounded-2xl p-3 shadow-xs hover:border-amber-200 transition flex items-center gap-3 cursor-pointer group"
                             onClick={() => setSelected3DProduct(p)}
                           >
                             <TShirt2D
                               color={p.colors?.[0]}
                               designUrl={p.images?.[0]}
-                              className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0"
+                              className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0 group-hover:scale-105 transition"
                             />
                             <div className="min-w-0 flex-1">
-                              <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">
+                              <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-amber-600 transition">
                                 {p.title}
                               </h4>
-                              <p className="text-[10px] text-slate-400 mt-0.5">
-                                {p.category}
-                              </p>
+                              <span className="text-[9px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full inline-block mt-0.5 truncate max-w-full">
+                                Popular Choice
+                              </span>
                               <div className="flex justify-between items-center mt-1">
                                 <span className="text-xs font-black text-slate-955">
                                   Rs. {finalPrice.toFixed(2)}
@@ -730,21 +807,21 @@ export default function StorePage() {
                         return (
                           <div
                             key={p._id}
-                            className="bg-white border rounded-2xl p-3 shadow-xs hover:border-indigo-150 transition flex items-center gap-3 cursor-pointer"
+                            className="bg-white border rounded-2xl p-3 shadow-xs hover:border-indigo-200 transition flex items-center gap-3 cursor-pointer group"
                             onClick={() => setSelected3DProduct(p)}
                           >
                             <TShirt2D
                               color={p.colors?.[0]}
                               designUrl={p.images?.[0]}
-                              className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0"
+                              className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0 group-hover:scale-105 transition"
                             />
                             <div className="min-w-0 flex-1">
-                              <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">
+                              <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-indigo-600 transition">
                                 {p.title}
                               </h4>
-                              <p className="text-[10px] text-slate-400 mt-0.5">
-                                {p.category}
-                              </p>
+                              <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full inline-block mt-0.5 truncate max-w-full">
+                                {p.recommendationReason || "Recommended for you"}
+                              </span>
                               <div className="flex justify-between items-center mt-1">
                                 <span className="text-xs font-black text-slate-955">
                                   Rs. {finalPrice.toFixed(2)}
