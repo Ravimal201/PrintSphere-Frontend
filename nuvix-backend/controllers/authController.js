@@ -260,12 +260,14 @@ exports.getRecommendations = async (req, res) => {
     });
 
     popularScored.sort((a, b) => b.globalScore - a.globalScore);
-    const popularProducts = popularScored.slice(0, 6).map(item => item.product);
+    const popularProducts = popularScored.slice(0, 4).map(item => item.product);
 
-    // --- 2. PERSONALIZED RECOMMENDATIONS (User Activity + Collaborative Filtering) ---
-    // Extract current user/session interactions
-    const userPurchasedMap = {};
+    // --- 2. PERSONALIZED RECOMMENDATIONS (Logged-In User Activity + Collaborative Filtering) ---
+    let frequentlyOrdered = [];
+    let hasUserActivity = false;
+
     if (currentUserId) {
+      const userPurchasedMap = {};
       orders.forEach(order => {
         if (order.customer && order.customer.toString() === currentUserId) {
           order.items.forEach(item => {
@@ -276,155 +278,160 @@ exports.getRecommendations = async (req, res) => {
           });
         }
       });
-    }
 
-    const userCartMap = {};
-    const userViewMap = {};
-    const userSearchedTerms = [];
-    const userCategoryCounts = {};
+      const userCartMap = {};
+      const userViewMap = {};
+      const userSearchedTerms = [];
+      const userCategoryCounts = {};
+      let totalUserActivityCount = 0;
 
-    allActivities.forEach(act => {
-      const isTargetUser = (currentUserId && act.userId && act.userId.toString() === currentUserId) ||
-                           (currentSessionId && act.sessionId && act.sessionId === currentSessionId);
+      allActivities.forEach(act => {
+        const isTargetUser = act.userId && act.userId.toString() === currentUserId;
 
-      if (isTargetUser) {
-        if (act.productId) {
-          const pId = act.productId.toString();
-          if (act.action === "ADD_TO_CART") {
-            userCartMap[pId] = (userCartMap[pId] || 0) + 1;
-          } else if (act.action === "VIEW_PRODUCT") {
-            userViewMap[pId] = (userViewMap[pId] || 0) + 1;
+        if (isTargetUser) {
+          totalUserActivityCount++;
+          if (act.productId) {
+            const pId = act.productId.toString();
+            if (act.action === "ADD_TO_CART") {
+              userCartMap[pId] = (userCartMap[pId] || 0) + 1;
+            } else if (act.action === "VIEW_PRODUCT") {
+              userViewMap[pId] = (userViewMap[pId] || 0) + 1;
+            }
+          }
+
+          if (act.category) {
+            const cat = act.category;
+            userCategoryCounts[cat] = (userCategoryCounts[cat] || 0) + 1;
+          }
+
+          if (act.action === "SEARCH_PRODUCT" && act.searchTerm) {
+            userSearchedTerms.push(act.searchTerm.toLowerCase());
           }
         }
+      });
 
-        if (act.category) {
-          const cat = act.category;
-          userCategoryCounts[cat] = (userCategoryCounts[cat] || 0) + 1;
-        }
-
-        if (act.action === "SEARCH_PRODUCT" && act.searchTerm) {
-          userSearchedTerms.push(act.searchTerm.toLowerCase());
-        }
+      const totalPurchases = Object.keys(userPurchasedMap).length;
+      if (totalUserActivityCount > 0 || totalPurchases > 0) {
+        hasUserActivity = true;
       }
-    });
 
-    // --- COLLABORATIVE FILTERING (Similar Users' Behavior) ---
-    // Group activity by user ID
-    const userInteractionSets = {};
-    allActivities.forEach(act => {
-      if (act.userId && act.productId) {
-        const uId = act.userId.toString();
-        if (!userInteractionSets[uId]) {
-          userInteractionSets[uId] = new Set();
-        }
-        userInteractionSets[uId].add(act.productId.toString());
-      }
-    });
+      if (hasUserActivity) {
+        // --- COLLABORATIVE FILTERING (Similar Users' Behavior) ---
+        const userInteractionSets = {};
+        allActivities.forEach(act => {
+          if (act.userId && act.productId) {
+            const uId = act.userId.toString();
+            if (!userInteractionSets[uId]) {
+              userInteractionSets[uId] = new Set();
+            }
+            userInteractionSets[uId].add(act.productId.toString());
+          }
+        });
 
-    const targetUserSet = currentUserId && userInteractionSets[currentUserId] ? userInteractionSets[currentUserId] : new Set();
-    const similarUserProductsMap = {};
+        const targetUserSet = userInteractionSets[currentUserId] || new Set();
+        const similarUserProductsMap = {};
 
-    if (currentUserId && targetUserSet.size > 0) {
-      Object.keys(userInteractionSets).forEach(otherUserId => {
-        if (otherUserId !== currentUserId) {
-          const otherSet = userInteractionSets[otherUserId];
-          // Compute Jaccard Similarity: |Intersection| / |Union|
-          let intersectionSize = 0;
-          targetUserSet.forEach(pId => {
-            if (otherSet.has(pId)) intersectionSize++;
-          });
+        if (targetUserSet.size > 0) {
+          Object.keys(userInteractionSets).forEach(otherUserId => {
+            if (otherUserId !== currentUserId) {
+              const otherSet = userInteractionSets[otherUserId];
+              let intersectionSize = 0;
+              targetUserSet.forEach(pId => {
+                if (otherSet.has(pId)) intersectionSize++;
+              });
 
-          const unionSize = new Set([...targetUserSet, ...otherSet]).size;
-          const similarity = unionSize > 0 ? intersectionSize / unionSize : 0;
+              const unionSize = new Set([...targetUserSet, ...otherSet]).size;
+              const similarity = unionSize > 0 ? intersectionSize / unionSize : 0;
 
-          if (similarity > 0) {
-            otherSet.forEach(pId => {
-              if (!targetUserSet.has(pId)) { // Products target user hasn't interacted with yet
-                similarUserProductsMap[pId] = (similarUserProductsMap[pId] || 0) + (similarity * 10);
+              if (similarity > 0) {
+                otherSet.forEach(pId => {
+                  if (!targetUserSet.has(pId)) {
+                    similarUserProductsMap[pId] = (similarUserProductsMap[pId] || 0) + (similarity * 10);
+                  }
+                });
               }
+            }
+          });
+        }
+
+        // --- SCORE PRODUCTS FOR PERSONALIZED TAB ---
+        const personalizedScored = [];
+
+        products.forEach(p => {
+          const pId = p._id.toString();
+          const pTitle = (p.title || "").toLowerCase();
+          const pCategory = p.category || "";
+
+          let score = 0;
+          let primaryReason = "";
+
+          // 1. Previous Purchases (Weight: 15)
+          const userPurchases = userPurchasedMap[pId] || 0;
+          if (userPurchases > 0) {
+            score += userPurchases * 15;
+            if (!primaryReason) primaryReason = "Previous Purchase";
+          }
+
+          // 2. Added to Cart (Weight: 10)
+          const userCartAdds = userCartMap[pId] || 0;
+          if (userCartAdds > 0) {
+            score += userCartAdds * 10;
+            if (!primaryReason) primaryReason = "Items added to your cart";
+          }
+
+          // 3. Viewed Products (Weight: 6)
+          const userViews = userViewMap[pId] || 0;
+          if (userViews > 0) {
+            score += userViews * 6;
+            if (!primaryReason) primaryReason = "Product you've viewed";
+          }
+
+          // 4. Searched Products (Weight: 8)
+          let searchMatched = false;
+          userSearchedTerms.forEach(term => {
+            if (term && (pTitle.includes(term) || pCategory.toLowerCase().includes(term))) {
+              searchMatched = true;
+            }
+          });
+          if (searchMatched) {
+            score += 8;
+            if (!primaryReason) primaryReason = "Matches your searches";
+          }
+
+          // 5. Frequently Browsed Categories (Weight: 4 per interaction)
+          const catCount = userCategoryCounts[pCategory] || 0;
+          if (catCount > 0) {
+            score += catCount * 4;
+            if (!primaryReason) primaryReason = `Frequently browsed: ${pCategory}`;
+          }
+
+          // 6. Collaborative Filtering (Similar users' behavior)
+          const collabScore = similarUserProductsMap[pId] || 0;
+          if (collabScore > 0) {
+            score += collabScore;
+            if (!primaryReason) primaryReason = "Recommended based on similar users";
+          }
+
+          if (score > 0) {
+            const pObj = p.toObject();
+            pObj.recommendationReason = primaryReason;
+            personalizedScored.push({
+              product: pObj,
+              personalScore: score
             });
           }
-        }
-      });
+        });
+
+        personalizedScored.sort((a, b) => b.personalScore - a.personalScore);
+        frequentlyOrdered = personalizedScored.slice(0, 4).map(item => item.product);
+      }
     }
-
-    // --- SCORE PRODUCTS FOR PERSONALIZED TAB ---
-    const personalizedScored = products.map(p => {
-      const pId = p._id.toString();
-      const pTitle = (p.title || "").toLowerCase();
-      const pCategory = p.category || "";
-
-      let score = 0;
-      let primaryReason = "";
-
-      // 1. Previous Purchases (Weight: 15)
-      const userPurchases = userPurchasedMap[pId] || 0;
-      if (userPurchases > 0) {
-        score += userPurchases * 15;
-        if (!primaryReason) primaryReason = "Previous Purchase";
-      }
-
-      // 2. Added to Cart (Weight: 10)
-      const userCartAdds = userCartMap[pId] || 0;
-      if (userCartAdds > 0) {
-        score += userCartAdds * 10;
-        if (!primaryReason) primaryReason = "Items added to your cart";
-      }
-
-      // 3. Viewed Products (Weight: 6)
-      const userViews = userViewMap[pId] || 0;
-      if (userViews > 0) {
-        score += userViews * 6;
-        if (!primaryReason) primaryReason = "Product you've viewed";
-      }
-
-      // 4. Searched Products (Weight: 8)
-      let searchMatched = false;
-      userSearchedTerms.forEach(term => {
-        if (term && (pTitle.includes(term) || pCategory.toLowerCase().includes(term))) {
-          searchMatched = true;
-        }
-      });
-      if (searchMatched) {
-        score += 8;
-        if (!primaryReason) primaryReason = "Matches your searches";
-      }
-
-      // 5. Frequently Browsed Categories (Weight: 4 per interaction)
-      const catCount = userCategoryCounts[pCategory] || 0;
-      if (catCount > 0) {
-        score += catCount * 4;
-        if (!primaryReason) primaryReason = `Frequently browsed: ${pCategory}`;
-      }
-
-      // 6. Collaborative Filtering (Similar users' behavior)
-      const collabScore = similarUserProductsMap[pId] || 0;
-      if (collabScore > 0) {
-        score += collabScore;
-        if (!primaryReason) primaryReason = "Recommended based on similar users";
-      }
-
-      // Fallback for new / inactive users: use global popularity score
-      if (score === 0) {
-        const globalRank = popularScored.find(item => item.product._id.toString() === pId);
-        score = (globalRank ? globalRank.globalScore : 0) * 0.1;
-        primaryReason = "Recommended for you";
-      }
-
-      const pObj = p.toObject();
-      pObj.recommendationReason = primaryReason;
-      return {
-        product: pObj,
-        personalScore: score
-      };
-    });
-
-    personalizedScored.sort((a, b) => b.personalScore - a.personalScore);
-    const frequentlyOrdered = personalizedScored.slice(0, 6).map(item => item.product);
 
     res.json({
       popular: popularProducts,
-      frequentlyOrdered: frequentlyOrdered
+      frequentlyOrdered: frequentlyOrdered,
+      isLoggedIn: !!currentUserId,
+      hasUserActivity: hasUserActivity
     });
   } catch (error) {
     console.error("Fetch recommendations error:", error);
