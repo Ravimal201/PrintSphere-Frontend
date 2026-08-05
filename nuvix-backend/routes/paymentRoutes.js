@@ -12,6 +12,9 @@ router.get("/success", paymentController.paymentSuccess);
 // GET /api/payment/cancel
 router.get("/cancel", paymentController.paymentCancel);
 
+// POST /api/payment/payhere-webhook
+router.post("/payhere-webhook", paymentController.handlePayHereWebhook);
+
 // GET /api/payment/:paymentId
 router.get("/:paymentId", paymentController.getPaymentById);
 

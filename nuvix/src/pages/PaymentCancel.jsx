@@ -28,7 +28,7 @@ export default function PaymentCancel() {
           </span>
           <h1 className="text-2xl font-black text-slate-900 mt-2">Payment Cancelled</h1>
           <p className="text-xs text-slate-500 font-semibold mt-1">
-            Your Stripe checkout session was cancelled. No charges were made to your account.
+            Your checkout session was cancelled. No charges were made to your account.
           </p>
         </div>
 

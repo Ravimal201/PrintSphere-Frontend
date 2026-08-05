@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Scene from "../three/Scene";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -30,7 +30,9 @@ import {
   LogIn,
   LogOut,
   FlipHorizontal,
-  FlipVertical
+  FlipVertical,
+  Undo2,
+  Redo2
 } from "lucide-react";
 
 const shirtColors = [
@@ -383,7 +385,192 @@ export default function DesignerPage() {
   });
 
   const [layers, setLayers] = useState([]);
+  const [userImages, setUserImages] = useState([]);
 
+  const saveUserImagesToStorage = (imagesList, user = currentUser) => {
+    const userId = user?.id || user?._id || "guest";
+    const storageKey = `printsphere_user_images_${userId}`;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(imagesList));
+    } catch (err) {
+      console.error("Error saving user images to localStorage:", err);
+    }
+  };
+
+  useEffect(() => {
+    const userId = currentUser?.id || currentUser?._id || "guest";
+    const storageKey = `printsphere_user_images_${userId}`;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        setUserImages(JSON.parse(saved));
+      } catch (err) {
+        console.error("Error parsing saved user images:", err);
+      }
+    } else {
+      setUserImages([]);
+    }
+  }, [currentUser]);
+
+
+  // --- Undo / Redo History State ---
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isUndoingRedoingRef = useRef(false);
+  const debounceTimerRef = useRef(null);
+  const isInitializedRef = useRef(false);
+
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const historyIndexRef = useRef(historyIndex);
+  historyIndexRef.current = historyIndex;
+
+  const saveSnapshot = (instant = false) => {
+    if (isUndoingRedoingRef.current) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const commit = () => {
+      if (isUndoingRedoingRef.current) return;
+      const snap = {
+        layers: JSON.parse(JSON.stringify(layers)),
+        shirtColor,
+        selectedModelPath: selectedModel?.path || null,
+        shirtMaterial,
+        selectedSize
+      };
+
+      const currIdx = historyIndexRef.current;
+      const currList = historyRef.current;
+      const currentSnap = currList[currIdx];
+
+      if (currentSnap && JSON.stringify(currentSnap) === JSON.stringify(snap)) {
+        return;
+      }
+
+      const nextList = currList.slice(0, currIdx + 1);
+      nextList.push(snap);
+      if (nextList.length > 50) nextList.shift();
+
+      const nextIdx = nextList.length - 1;
+      setHistory(nextList);
+      setHistoryIndex(nextIdx);
+    };
+
+    if (instant) {
+      commit();
+    } else {
+      debounceTimerRef.current = setTimeout(commit, 300);
+    }
+  };
+
+  useEffect(() => {
+    if (!isInitializedRef.current) {
+      if (selectedModel) {
+        isInitializedRef.current = true;
+        saveSnapshot(true);
+      }
+      return;
+    }
+    saveSnapshot(false);
+  }, [layers, shirtColor, selectedModel?.path, shirtMaterial, selectedSize]);
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  const handleUndo = () => {
+    if (!canUndo) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const targetIdx = historyIndex - 1;
+    const targetSnap = history[targetIdx];
+    if (!targetSnap) return;
+
+    isUndoingRedoingRef.current = true;
+
+    setLayers(targetSnap.layers);
+    setShirtColor(targetSnap.shirtColor);
+    if (targetSnap.selectedModelPath) {
+      const model = availableStyles.find(m => m.path === targetSnap.selectedModelPath);
+      if (model) {
+        setSelectedModel(model);
+        setShirtType(model.type);
+      }
+    }
+    setShirtMaterial(targetSnap.shirtMaterial);
+    setSelectedSize(targetSnap.selectedSize);
+
+    setHistoryIndex(targetIdx);
+
+    setTimeout(() => {
+      isUndoingRedoingRef.current = false;
+    }, 100);
+  };
+
+  const handleRedo = () => {
+    if (!canRedo) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const targetIdx = historyIndex + 1;
+    const targetSnap = history[targetIdx];
+    if (!targetSnap) return;
+
+    isUndoingRedoingRef.current = true;
+
+    setLayers(targetSnap.layers);
+    setShirtColor(targetSnap.shirtColor);
+    if (targetSnap.selectedModelPath) {
+      const model = availableStyles.find(m => m.path === targetSnap.selectedModelPath);
+      if (model) {
+        setSelectedModel(model);
+        setShirtType(model.type);
+      }
+    }
+    setShirtMaterial(targetSnap.shirtMaterial);
+    setSelectedSize(targetSnap.selectedSize);
+
+    setHistoryIndex(targetIdx);
+
+    setTimeout(() => {
+      isUndoingRedoingRef.current = false;
+    }, 100);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea" || document.activeElement?.isContentEditable) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else {
+          e.preventDefault();
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [historyIndex, history]);
   const [selectedLayerId, setSelectedLayerId] = useState(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -434,6 +621,21 @@ export default function DesignerPage() {
       const dataUrl = reader.result;
       if (!dataUrl) return;
 
+      const imageName = file.name.substring(0, 15);
+      const newImportedImg = {
+        id: `user-img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: imageName,
+        url: dataUrl,
+        timestamp: Date.now()
+      };
+
+      setUserImages((prev) => {
+        const filtered = prev.filter((img) => img.url !== dataUrl);
+        const updated = [newImportedImg, ...filtered];
+        saveUserImagesToStorage(updated);
+        return updated;
+      });
+
       const img = new Image();
       img.onload = () => {
         const aspect = (img.width && img.height) ? (img.width / img.height) : 1;
@@ -445,7 +647,7 @@ export default function DesignerPage() {
         const newLayer = {
           id,
           type: "image",
-          name: file.name.substring(0, 15),
+          name: imageName,
           url: dataUrl,
           visible: true,
           locked: false,
@@ -464,7 +666,7 @@ export default function DesignerPage() {
         const newLayer = {
           id,
           type: "image",
-          name: file.name.substring(0, 15),
+          name: imageName,
           url: dataUrl,
           visible: true,
           locked: false,
@@ -480,6 +682,23 @@ export default function DesignerPage() {
     };
     reader.readAsDataURL(file);
     e.target.value = ""; // Reset input so same image can be re-uploaded if desired
+  };
+
+  const handleRemoveUserImage = (imageId) => {
+    setUserImages((prev) => {
+      const updated = prev.filter((img) => img.id !== imageId);
+      saveUserImagesToStorage(updated);
+      return updated;
+    });
+  };
+
+  const handleClearAllUserImages = () => {
+    if (window.confirm("Are you sure you want to clear all uploaded images from your library?")) {
+      setUserImages([]);
+      const userId = currentUser?.id || currentUser?._id || "guest";
+      const storageKey = `printsphere_user_images_${userId}`;
+      localStorage.removeItem(storageKey);
+    }
   };
 
   const addPresetImage = (url, name) => {
@@ -776,6 +995,7 @@ export default function DesignerPage() {
           </div>
 
           <div className="flex items-center gap-6">
+
             <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-700 font-bold text-xs">
               <ShoppingBag className="h-3.5 w-3.5" />
               <span>Cart ({quantity})</span>
@@ -858,13 +1078,70 @@ export default function DesignerPage() {
                 </div>
 
                 <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      My Uploaded Images ({userImages.length})
+                    </h3>
+                    {userImages.length > 0 && (
+                      <button
+                        onClick={handleClearAllUserImages}
+                        className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold transition cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+                  {userImages.length === 0 ? (
+                    <div className="p-4 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                      <Upload className="h-5 w-5 text-slate-300 mx-auto mb-1" />
+                      <p className="text-xs text-slate-400 font-medium">No uploaded images yet</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Use "Upload Image" above to import graphics into your library for easy reuse.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {userImages.map((img) => (
+                        <div
+                          key={img.id}
+                          className="relative group p-2 border border-slate-200 rounded-xl hover:border-indigo-500 bg-white transition flex flex-col items-center gap-1.5 shadow-xs"
+                        >
+                          <button
+                            onClick={() => addPresetImage(img.url, img.name)}
+                            className="w-full flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
+                            title="Click to add to T-shirt canvas"
+                          >
+                            <img
+                              src={img.url}
+                              alt={img.name}
+                              className="h-14 w-full object-contain bg-slate-50 rounded-lg p-1 border border-slate-100"
+                            />
+                            <span className="text-[10px] font-bold text-center text-slate-700 line-clamp-1 w-full px-1">
+                              {img.name}
+                            </span>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveUserImage(img.id);
+                            }}
+                            className="absolute top-1 right-1 h-6 w-6 rounded-full bg-slate-900/80 hover:bg-rose-600 text-white flex items-center justify-center transition opacity-0 group-hover:opacity-100 shadow-md cursor-pointer"
+                            title="Remove image from library"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Presets & Logos</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {presetLogos.map((logo) => (
                       <button
                         key={logo.name}
                         onClick={() => addPresetImage(logo.url, logo.name)}
-                        className="p-2 border rounded-xl hover:border-indigo-500 hover:bg-slate-50 transition flex flex-col items-center gap-2"
+                        className="p-2 border rounded-xl hover:border-indigo-500 hover:bg-slate-50 transition flex flex-col items-center gap-2 cursor-pointer"
                       >
                         <img src={logo.url} alt={logo.name} className="h-12 w-12 object-contain bg-slate-50 rounded p-1" />
                         <span className="text-[10px] font-bold text-center text-slate-500 line-clamp-1">{logo.name}</span>
@@ -1004,6 +1281,26 @@ export default function DesignerPage() {
                   {view}
                 </button>
               ))}
+            </div>
+
+            {/* Canvas Quick Undo / Redo Controls */}
+            <div className="absolute top-8 right-8 flex items-center gap-1 bg-white/80 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none">
+              <button
+                onClick={handleUndo}
+                disabled={!canUndo}
+                className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={!canRedo}
+                className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo2 className="h-4 w-4" />
+              </button>
             </div>
 
             <div className="flex-1 flex items-center justify-center min-h-0 relative">
