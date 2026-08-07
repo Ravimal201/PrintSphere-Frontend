@@ -35,7 +35,7 @@ const getOrCreateSessionId = () => {
   return sessionId;
 };
 
-const logUserActivity = async (actionData) => {
+const logUserActivity = async (actionData, onLogged) => {
   try {
     const token = localStorage.getItem("token");
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -48,6 +48,7 @@ const logUserActivity = async (actionData) => {
       },
       { headers }
     );
+    if (onLogged) onLogged();
   } catch (err) {
     console.error("Activity logging error:", err);
   }
@@ -64,6 +65,8 @@ export default function StorePage() {
   // Recommendations state
   const [popularProducts, setPopularProducts] = useState([]);
   const [frequentlyOrdered, setFrequentlyOrdered] = useState([]);
+  const [isLoggedInUser, setIsLoggedInUser] = useState(false);
+  const [hasUserActivity, setHasUserActivity] = useState(false);
 
   // Active pricing rules for volume discounts
   const [pricingRules, setPricingRules] = useState(null);
@@ -98,11 +101,14 @@ export default function StorePage() {
       setModalZoom(0.85);
 
       if (selected3DProduct._id) {
-        logUserActivity({
-          action: "VIEW_PRODUCT",
-          productId: selected3DProduct._id,
-          category: selected3DProduct.category,
-        });
+        logUserActivity(
+          {
+            action: "VIEW_PRODUCT",
+            productId: selected3DProduct._id,
+            category: selected3DProduct.category,
+          },
+          fetchRecommendationsOnly
+        );
       }
     }
   }, [selected3DProduct]);
@@ -110,10 +116,13 @@ export default function StorePage() {
   useEffect(() => {
     if (!searchTerm.trim()) return;
     const timer = setTimeout(() => {
-      logUserActivity({
-        action: "SEARCH_PRODUCT",
-        searchTerm: searchTerm.trim(),
-      });
+      logUserActivity(
+        {
+          action: "SEARCH_PRODUCT",
+          searchTerm: searchTerm.trim(),
+        },
+        fetchRecommendationsOnly
+      );
     }, 1200);
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -219,6 +228,24 @@ export default function StorePage() {
     fetchStoreData();
   }, []);
 
+  const fetchRecommendationsOnly = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const sessionId = getOrCreateSessionId();
+      const recomRes = await axios.get(
+        `${API_BASE_URL}/auth/recommendations?sessionId=${sessionId}`,
+        { headers }
+      );
+      setPopularProducts(recomRes.data.popular || []);
+      setFrequentlyOrdered(recomRes.data.frequentlyOrdered || []);
+      setIsLoggedInUser(!!recomRes.data.isLoggedIn || !!token);
+      setHasUserActivity(!!recomRes.data.hasUserActivity);
+    } catch (err) {
+      console.error("Fetch recommendations error:", err);
+    }
+  };
+
   const fetchStoreData = async () => {
     setLoading(true);
     try {
@@ -235,6 +262,8 @@ export default function StorePage() {
       setProducts(productsRes.data);
       setPopularProducts(recomRes.data.popular || []);
       setFrequentlyOrdered(recomRes.data.frequentlyOrdered || []);
+      setIsLoggedInUser(!!recomRes.data.isLoggedIn || !!token);
+      setHasUserActivity(!!recomRes.data.hasUserActivity);
       setPricingRules(pricingRes.data);
 
       // Calculate max price from products to set default slider
@@ -291,11 +320,14 @@ export default function StorePage() {
     }
 
     if (product && product._id) {
-      logUserActivity({
-        action: "ADD_TO_CART",
-        productId: product._id,
-        category: product.category,
-      });
+      logUserActivity(
+        {
+          action: "ADD_TO_CART",
+          productId: product._id,
+          category: product.category,
+        },
+        fetchRecommendationsOnly
+      );
     }
 
     // Open cart drawer immediately
@@ -750,7 +782,7 @@ export default function StorePage() {
                       Popular Choices & Highly Recommended
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                      {popularProducts.map((p) => {
+                      {popularProducts.slice(0, 4).map((p) => {
                         const finalPrice =
                           p.basePrice * (1 - (p.discount || 0) / 100);
                         return (
@@ -793,54 +825,70 @@ export default function StorePage() {
                   </div>
                 )}
 
-                {/* Frequently Ordered recommendations */}
-                {frequentlyOrdered.length > 0 && (
+                {/* Frequently Ordered recommendations (Only for Logged-In Users) */}
+                {isLoggedInUser && (
                   <div>
                     <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                       <Star className="h-4.5 w-4.5 text-indigo-500" />
                       Frequently Ordered Items based on Activity
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                      {frequentlyOrdered.map((p) => {
-                        const finalPrice =
-                          p.basePrice * (1 - (p.discount || 0) / 100);
-                        return (
-                          <div
-                            key={p._id}
-                            className="bg-white border rounded-2xl p-3 shadow-xs hover:border-indigo-200 transition flex items-center gap-3 cursor-pointer group"
-                            onClick={() => setSelected3DProduct(p)}
-                          >
-                            <TShirt2D
-                              color={p.colors?.[0]}
-                              designUrl={p.images?.[0]}
-                              className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0 group-hover:scale-105 transition"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-indigo-600 transition">
-                                {p.title}
-                              </h4>
-                              <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full inline-block mt-0.5 truncate max-w-full">
-                                {p.recommendationReason || "Recommended for you"}
-                              </span>
-                              <div className="flex justify-between items-center mt-1">
-                                <span className="text-xs font-black text-slate-955">
-                                  Rs. {finalPrice.toFixed(2)}
+
+                    {frequentlyOrdered.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                        {frequentlyOrdered.slice(0, 4).map((p) => {
+                          const finalPrice =
+                            p.basePrice * (1 - (p.discount || 0) / 100);
+                          return (
+                            <div
+                              key={p._id}
+                              className="bg-white border rounded-2xl p-3 shadow-xs hover:border-indigo-200 transition flex items-center gap-3 cursor-pointer group"
+                              onClick={() => setSelected3DProduct(p)}
+                            >
+                              <TShirt2D
+                                color={p.colors?.[0]}
+                                designUrl={p.images?.[0]}
+                                className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0 group-hover:scale-105 transition"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-indigo-600 transition">
+                                  {p.title}
+                                </h4>
+                                <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full inline-block mt-0.5 truncate max-w-full">
+                                  {p.recommendationReason || "Recommended for you"}
                                 </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelected3DProduct(p);
-                                  }}
-                                  className="text-[9px] font-black text-indigo-600 hover:underline"
-                                >
-                                  + Details
-                                </button>
+                                <div className="flex justify-between items-center mt-1">
+                                  <span className="text-xs font-black text-slate-955">
+                                    Rs. {finalPrice.toFixed(2)}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelected3DProduct(p);
+                                    }}
+                                    className="text-[9px] font-black text-indigo-600 hover:underline"
+                                  >
+                                    + Details
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Fresh user state (No activity yet) */
+                      <div className="bg-gradient-to-r from-indigo-50/80 via-purple-50/50 to-indigo-50/80 border border-indigo-100/80 rounded-2xl p-6 text-center shadow-xs">
+                        <div className="mx-auto w-12 h-12 bg-indigo-600/10 rounded-full flex items-center justify-center mb-2.5">
+                          <Sparkles className="h-6 w-6 text-indigo-600 animate-bounce" />
+                        </div>
+                        <h4 className="text-sm font-extrabold text-slate-900">
+                          We are studying your fashion preferences!
+                        </h4>
+                        <p className="text-[11px] text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                          Start exploring catalog products, searching your favorite styles, viewing 3D previews, or adding items to your cart. Your personalized activity feed will dynamically update here based on your unique behavior!
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

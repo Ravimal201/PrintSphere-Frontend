@@ -95,7 +95,9 @@ exports.loginUser = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        phone: user.phone,
+        address: user.address
       }
     });
   } catch (error) {
@@ -260,12 +262,14 @@ exports.getRecommendations = async (req, res) => {
     });
 
     popularScored.sort((a, b) => b.globalScore - a.globalScore);
-    const popularProducts = popularScored.slice(0, 6).map(item => item.product);
+    const popularProducts = popularScored.slice(0, 4).map(item => item.product);
 
-    // --- 2. PERSONALIZED RECOMMENDATIONS (User Activity + Collaborative Filtering) ---
-    // Extract current user/session interactions
-    const userPurchasedMap = {};
+    // --- 2. PERSONALIZED RECOMMENDATIONS (Logged-In User Activity + Collaborative Filtering) ---
+    let frequentlyOrdered = [];
+    let hasUserActivity = false;
+
     if (currentUserId) {
+      const userPurchasedMap = {};
       orders.forEach(order => {
         if (order.customer && order.customer.toString() === currentUserId) {
           order.items.forEach(item => {
@@ -276,155 +280,166 @@ exports.getRecommendations = async (req, res) => {
           });
         }
       });
-    }
 
-    const userCartMap = {};
-    const userViewMap = {};
-    const userSearchedTerms = [];
-    const userCategoryCounts = {};
+      const userCartMap = {};
+      const userViewMap = {};
+      const userSearchedTerms = [];
+      const userCategoryCounts = {};
+      let totalUserActivityCount = 0;
 
-    allActivities.forEach(act => {
-      const isTargetUser = (currentUserId && act.userId && act.userId.toString() === currentUserId) ||
-                           (currentSessionId && act.sessionId && act.sessionId === currentSessionId);
+      allActivities.forEach(act => {
+        const isTargetUser = (currentUserId && act.userId && act.userId.toString() === currentUserId) ||
+                             (currentSessionId && act.sessionId && act.sessionId === currentSessionId);
 
-      if (isTargetUser) {
-        if (act.productId) {
-          const pId = act.productId.toString();
-          if (act.action === "ADD_TO_CART") {
-            userCartMap[pId] = (userCartMap[pId] || 0) + 1;
-          } else if (act.action === "VIEW_PRODUCT") {
-            userViewMap[pId] = (userViewMap[pId] || 0) + 1;
+        if (isTargetUser) {
+          totalUserActivityCount++;
+          if (act.productId) {
+            const pId = act.productId.toString();
+            if (act.action === "ADD_TO_CART") {
+              userCartMap[pId] = (userCartMap[pId] || 0) + 1;
+            } else if (act.action === "VIEW_PRODUCT") {
+              userViewMap[pId] = (userViewMap[pId] || 0) + 1;
+            }
+          }
+
+          if (act.category) {
+            const cat = act.category;
+            userCategoryCounts[cat] = (userCategoryCounts[cat] || 0) + 1;
+          }
+
+          if (act.action === "SEARCH_PRODUCT" && act.searchTerm) {
+            userSearchedTerms.push(act.searchTerm.toLowerCase());
           }
         }
+      });
 
-        if (act.category) {
-          const cat = act.category;
-          userCategoryCounts[cat] = (userCategoryCounts[cat] || 0) + 1;
-        }
+      // Collect all product IDs that the user directly interacted with
+      const userInteractedProductIds = new Set([
+        ...Object.keys(userPurchasedMap),
+        ...Object.keys(userCartMap),
+        ...Object.keys(userViewMap),
+      ]);
 
-        if (act.action === "SEARCH_PRODUCT" && act.searchTerm) {
-          userSearchedTerms.push(act.searchTerm.toLowerCase());
-        }
-      }
-    });
+      if (userInteractedProductIds.size > 0) {
+        hasUserActivity = true;
 
-    // --- COLLABORATIVE FILTERING (Similar Users' Behavior) ---
-    // Group activity by user ID
-    const userInteractionSets = {};
-    allActivities.forEach(act => {
-      if (act.userId && act.productId) {
-        const uId = act.userId.toString();
-        if (!userInteractionSets[uId]) {
-          userInteractionSets[uId] = new Set();
-        }
-        userInteractionSets[uId].add(act.productId.toString());
-      }
-    });
+        // --- COLLABORATIVE FILTERING (Similar Users' Behavior) ---
+        const userInteractionSets = {};
+        allActivities.forEach(act => {
+          if (act.userId && act.productId) {
+            const uId = act.userId.toString();
+            if (!userInteractionSets[uId]) {
+              userInteractionSets[uId] = new Set();
+            }
+            userInteractionSets[uId].add(act.productId.toString());
+          }
+        });
 
-    const targetUserSet = currentUserId && userInteractionSets[currentUserId] ? userInteractionSets[currentUserId] : new Set();
-    const similarUserProductsMap = {};
+        const targetUserSet = userInteractionSets[currentUserId] || new Set();
+        const similarUserProductsMap = {};
 
-    if (currentUserId && targetUserSet.size > 0) {
-      Object.keys(userInteractionSets).forEach(otherUserId => {
-        if (otherUserId !== currentUserId) {
-          const otherSet = userInteractionSets[otherUserId];
-          // Compute Jaccard Similarity: |Intersection| / |Union|
-          let intersectionSize = 0;
-          targetUserSet.forEach(pId => {
-            if (otherSet.has(pId)) intersectionSize++;
-          });
+        if (targetUserSet.size > 0) {
+          Object.keys(userInteractionSets).forEach(otherUserId => {
+            if (otherUserId !== currentUserId) {
+              const otherSet = userInteractionSets[otherUserId];
+              let intersectionSize = 0;
+              targetUserSet.forEach(pId => {
+                if (otherSet.has(pId)) intersectionSize++;
+              });
 
-          const unionSize = new Set([...targetUserSet, ...otherSet]).size;
-          const similarity = unionSize > 0 ? intersectionSize / unionSize : 0;
+              const unionSize = new Set([...targetUserSet, ...otherSet]).size;
+              const similarity = unionSize > 0 ? intersectionSize / unionSize : 0;
 
-          if (similarity > 0) {
-            otherSet.forEach(pId => {
-              if (!targetUserSet.has(pId)) { // Products target user hasn't interacted with yet
-                similarUserProductsMap[pId] = (similarUserProductsMap[pId] || 0) + (similarity * 10);
+              if (similarity > 0) {
+                otherSet.forEach(pId => {
+                  if (!targetUserSet.has(pId)) {
+                    similarUserProductsMap[pId] = (similarUserProductsMap[pId] || 0) + (similarity * 10);
+                  }
+                });
               }
+            }
+          });
+        }
+
+        // --- SCORE PRODUCTS FOR PERSONALIZED TAB ---
+        // Only score products that the user has directly interacted with
+        const personalizedScored = [];
+
+        products.forEach(p => {
+          const pId = p._id.toString();
+          if (!userInteractedProductIds.has(pId)) return;
+
+          const pTitle = (p.title || "").toLowerCase();
+          const pCategory = p.category || "";
+
+          let score = 0;
+          let primaryReason = "";
+
+          // 1. Previous Purchases (Weight: 15)
+          const userPurchases = userPurchasedMap[pId] || 0;
+          if (userPurchases > 0) {
+            score += userPurchases * 15;
+            if (!primaryReason) primaryReason = "Previous Purchase";
+          }
+
+          // 2. Added to Cart (Weight: 10)
+          const userCartAdds = userCartMap[pId] || 0;
+          if (userCartAdds > 0) {
+            score += userCartAdds * 10;
+            if (!primaryReason) primaryReason = "Items added to your cart";
+          }
+
+          // 3. Viewed Products (Weight: 6)
+          const userViews = userViewMap[pId] || 0;
+          if (userViews > 0) {
+            score += userViews * 6;
+            if (!primaryReason) primaryReason = "Product you've viewed";
+          }
+
+          // 4. Searched Products boost (Weight: 8)
+          let searchMatched = false;
+          userSearchedTerms.forEach(term => {
+            if (term && (pTitle.includes(term) || pCategory.toLowerCase().includes(term))) {
+              searchMatched = true;
+            }
+          });
+          if (searchMatched) {
+            score += 8;
+          }
+
+          // 5. Category affinity boost (Weight: 2)
+          const catCount = userCategoryCounts[pCategory] || 0;
+          if (catCount > 0) {
+            score += catCount * 2;
+          }
+
+          // 6. Collaborative Filtering boost
+          const collabScore = similarUserProductsMap[pId] || 0;
+          if (collabScore > 0) {
+            score += collabScore;
+          }
+
+          if (score > 0) {
+            const pObj = p.toObject();
+            pObj.recommendationReason = primaryReason || "Activity related product";
+            personalizedScored.push({
+              product: pObj,
+              personalScore: score
             });
           }
-        }
-      });
+        });
+
+        personalizedScored.sort((a, b) => b.personalScore - a.personalScore);
+        // Returns 1 item after 1st distinct product activity, 2 after 2nd, 3 after 3rd, 4 after 4th, and top 4 when exceeding 4
+        frequentlyOrdered = personalizedScored.slice(0, 4).map(item => item.product);
+      }
     }
-
-    // --- SCORE PRODUCTS FOR PERSONALIZED TAB ---
-    const personalizedScored = products.map(p => {
-      const pId = p._id.toString();
-      const pTitle = (p.title || "").toLowerCase();
-      const pCategory = p.category || "";
-
-      let score = 0;
-      let primaryReason = "";
-
-      // 1. Previous Purchases (Weight: 15)
-      const userPurchases = userPurchasedMap[pId] || 0;
-      if (userPurchases > 0) {
-        score += userPurchases * 15;
-        if (!primaryReason) primaryReason = "Previous Purchase";
-      }
-
-      // 2. Added to Cart (Weight: 10)
-      const userCartAdds = userCartMap[pId] || 0;
-      if (userCartAdds > 0) {
-        score += userCartAdds * 10;
-        if (!primaryReason) primaryReason = "Items added to your cart";
-      }
-
-      // 3. Viewed Products (Weight: 6)
-      const userViews = userViewMap[pId] || 0;
-      if (userViews > 0) {
-        score += userViews * 6;
-        if (!primaryReason) primaryReason = "Product you've viewed";
-      }
-
-      // 4. Searched Products (Weight: 8)
-      let searchMatched = false;
-      userSearchedTerms.forEach(term => {
-        if (term && (pTitle.includes(term) || pCategory.toLowerCase().includes(term))) {
-          searchMatched = true;
-        }
-      });
-      if (searchMatched) {
-        score += 8;
-        if (!primaryReason) primaryReason = "Matches your searches";
-      }
-
-      // 5. Frequently Browsed Categories (Weight: 4 per interaction)
-      const catCount = userCategoryCounts[pCategory] || 0;
-      if (catCount > 0) {
-        score += catCount * 4;
-        if (!primaryReason) primaryReason = `Frequently browsed: ${pCategory}`;
-      }
-
-      // 6. Collaborative Filtering (Similar users' behavior)
-      const collabScore = similarUserProductsMap[pId] || 0;
-      if (collabScore > 0) {
-        score += collabScore;
-        if (!primaryReason) primaryReason = "Recommended based on similar users";
-      }
-
-      // Fallback for new / inactive users: use global popularity score
-      if (score === 0) {
-        const globalRank = popularScored.find(item => item.product._id.toString() === pId);
-        score = (globalRank ? globalRank.globalScore : 0) * 0.1;
-        primaryReason = "Recommended for you";
-      }
-
-      const pObj = p.toObject();
-      pObj.recommendationReason = primaryReason;
-      return {
-        product: pObj,
-        personalScore: score
-      };
-    });
-
-    personalizedScored.sort((a, b) => b.personalScore - a.personalScore);
-    const frequentlyOrdered = personalizedScored.slice(0, 6).map(item => item.product);
 
     res.json({
       popular: popularProducts,
-      frequentlyOrdered: frequentlyOrdered
+      frequentlyOrdered: frequentlyOrdered,
+      isLoggedIn: !!currentUserId,
+      hasUserActivity: hasUserActivity
     });
   } catch (error) {
     console.error("Fetch recommendations error:", error);
@@ -604,5 +619,121 @@ exports.getTShirtStylesPublic = async (req, res) => {
   } catch (error) {
     console.error("Get public tshirt styles error:", error);
     res.status(500).json({ message: "Server error while fetching tshirt styles" });
+  }
+};
+
+// @desc    Get logged in user profile
+// @route   GET /api/auth/profile
+exports.getUserProfile = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const user = await User.findById(decoded.id).select("-passwordHash");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error("Get user profile error:", error);
+    res.status(500).json({ message: "Server error while fetching profile" });
+  }
+};
+
+// @desc    Update logged in user profile / delivery address
+// @route   PUT /api/auth/profile
+exports.updateUserProfile = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { phone, address, syncOrders } = req.body;
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (phone !== undefined) user.phone = phone;
+    if (address !== undefined) {
+      user.address = {
+        street: address.street || "",
+        city: address.city || "",
+        state: address.state || "",
+        zipCode: address.zipCode || "",
+        country: address.country || "Sri Lanka"
+      };
+    }
+
+    await user.save();
+
+    // Optionally sync default shipping address to user's orders
+    if (syncOrders || syncOrders === undefined) {
+      const newAddr = {
+        street: user.address?.street || "",
+        city: user.address?.city || "",
+        state: user.address?.state || "",
+        zipCode: user.address?.zipCode || "",
+        country: user.address?.country || "Sri Lanka"
+      };
+      await Order.updateMany(
+        { customerId: decoded.id },
+        { $set: { shippingAddress: newAddr } }
+      );
+    }
+
+    res.json({
+      message: "Delivery details updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        address: user.address
+      }
+    });
+  } catch (error) {
+    console.error("Update user profile error:", error);
+    res.status(500).json({ message: "Server error while updating profile" });
+  }
+};
+
+// @desc    Update delivery address for a specific order
+// @route   PUT /api/auth/orders/:orderId/address
+exports.updateOrderAddress = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { orderId } = req.params;
+    const { street, city, state, zipCode, country } = req.body;
+
+    const order = await Order.findOne({ _id: orderId, customerId: decoded.id });
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    order.shippingAddress = {
+      street: street || "",
+      city: city || "",
+      state: state || "",
+      zipCode: zipCode || "",
+      country: country || "Sri Lanka"
+    };
+
+    await order.save();
+
+    res.json({ message: "Order delivery address updated successfully", order });
+  } catch (error) {
+    console.error("Update order address error:", error);
+    res.status(500).json({ message: "Server error while updating order address" });
   }
 };
