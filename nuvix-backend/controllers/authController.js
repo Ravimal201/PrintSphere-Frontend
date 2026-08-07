@@ -95,7 +95,9 @@ exports.loginUser = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        phone: user.phone,
+        address: user.address
       }
     });
   } catch (error) {
@@ -617,5 +619,121 @@ exports.getTShirtStylesPublic = async (req, res) => {
   } catch (error) {
     console.error("Get public tshirt styles error:", error);
     res.status(500).json({ message: "Server error while fetching tshirt styles" });
+  }
+};
+
+// @desc    Get logged in user profile
+// @route   GET /api/auth/profile
+exports.getUserProfile = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const user = await User.findById(decoded.id).select("-passwordHash");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error("Get user profile error:", error);
+    res.status(500).json({ message: "Server error while fetching profile" });
+  }
+};
+
+// @desc    Update logged in user profile / delivery address
+// @route   PUT /api/auth/profile
+exports.updateUserProfile = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { phone, address, syncOrders } = req.body;
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (phone !== undefined) user.phone = phone;
+    if (address !== undefined) {
+      user.address = {
+        street: address.street || "",
+        city: address.city || "",
+        state: address.state || "",
+        zipCode: address.zipCode || "",
+        country: address.country || "Sri Lanka"
+      };
+    }
+
+    await user.save();
+
+    // Optionally sync default shipping address to user's orders
+    if (syncOrders || syncOrders === undefined) {
+      const newAddr = {
+        street: user.address?.street || "",
+        city: user.address?.city || "",
+        state: user.address?.state || "",
+        zipCode: user.address?.zipCode || "",
+        country: user.address?.country || "Sri Lanka"
+      };
+      await Order.updateMany(
+        { customerId: decoded.id },
+        { $set: { shippingAddress: newAddr } }
+      );
+    }
+
+    res.json({
+      message: "Delivery details updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        address: user.address
+      }
+    });
+  } catch (error) {
+    console.error("Update user profile error:", error);
+    res.status(500).json({ message: "Server error while updating profile" });
+  }
+};
+
+// @desc    Update delivery address for a specific order
+// @route   PUT /api/auth/orders/:orderId/address
+exports.updateOrderAddress = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { orderId } = req.params;
+    const { street, city, state, zipCode, country } = req.body;
+
+    const order = await Order.findOne({ _id: orderId, customerId: decoded.id });
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    order.shippingAddress = {
+      street: street || "",
+      city: city || "",
+      state: state || "",
+      zipCode: zipCode || "",
+      country: country || "Sri Lanka"
+    };
+
+    await order.save();
+
+    res.json({ message: "Order delivery address updated successfully", order });
+  } catch (error) {
+    console.error("Update order address error:", error);
+    res.status(500).json({ message: "Server error while updating order address" });
   }
 };
