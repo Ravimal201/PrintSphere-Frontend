@@ -1683,6 +1683,48 @@ export default function ManagerPage() {
                       </div>
                     </div>
 
+                    {/* Available Sizes Checkboxes */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                        <span>Available Sizes</span>
+                        <span className="text-[9px] text-indigo-600 font-normal">
+                          Selected: {(productForm.sizes || []).join(", ") || "None"}
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2 pt-0.5">
+                        {["S", "M", "L", "XL", "XXL"].map((size) => {
+                          const isSelected = (productForm.sizes || []).includes(size);
+                          return (
+                            <label
+                              key={size}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
+                                isSelected
+                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
+                                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setProductForm((prev) => {
+                                    const currentSizes = prev.sizes || [];
+                                    const updatedSizes = checked
+                                      ? [...currentSizes, size]
+                                      : currentSizes.filter((s) => s !== size);
+                                    return { ...prev, sizes: updatedSizes };
+                                  });
+                                }}
+                                className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              />
+                              <span>{size}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
