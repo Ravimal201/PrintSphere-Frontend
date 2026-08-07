@@ -339,8 +339,12 @@ class PaymentService {
       throw new Error("Target Order could not be resolved for payment verification");
     }
 
+    // 1. Verify Payment Record and resolve gateway
+    let payment = await Payment.findOne({ orderId: order._id });
+    const resolvedPaymentMethod = payment ? payment.paymentMethod : paymentMethod;
+
     // Attempt retrieval from Stripe if raw session data not provided and not a mock session
-    if (paymentMethod === "Stripe" && !rawSessionData && sessionId && !sessionId.startsWith("mock_stripe_session_")) {
+    if (resolvedPaymentMethod === "Stripe" && !rawSessionData && sessionId && !sessionId.startsWith("mock_stripe_session_")) {
       const stripeStrategy = new StripeGatewayStrategy();
       try {
         rawSessionData = await stripeStrategy.retrieveSession(sessionId);
@@ -349,8 +353,6 @@ class PaymentService {
       }
     }
 
-    // 1. Verify Payment Record
-    let payment = await Payment.findOne({ orderId: order._id });
     const paymentCurrency = (rawSessionData?.payhere_currency || rawSessionData?.currency || "lkr").toLowerCase();
     if (!payment) {
       payment = new Payment({
@@ -359,15 +361,15 @@ class PaymentService {
         stripeSessionId: sessionId || "N/A",
         amount: order.totalCost,
         currency: paymentCurrency,
-        paymentMethod: paymentMethod,
+        paymentMethod: resolvedPaymentMethod,
         paymentStatus: "Paid"
       });
     }
 
-    payment.paymentMethod = paymentMethod;
-    if (paymentMethod === "PayHere") {
-      payment.stripeSessionId = sessionId || payment.stripeSessionId;
-      payment.stripePaymentIntentId = rawSessionData?.payment_id || sessionId || null;
+    payment.paymentMethod = resolvedPaymentMethod;
+    if (resolvedPaymentMethod === "PayHere") {
+      payment.stripeSessionId = sessionId || payment.stripeSessionId || "payhere_success";
+      payment.stripePaymentIntentId = rawSessionData?.payment_id || sessionId || payment.stripePaymentIntentId || "payhere_success";
     } else {
       payment.stripeSessionId = sessionId || payment.stripeSessionId;
       if (rawSessionData?.payment_intent) {
@@ -396,7 +398,7 @@ class PaymentService {
 
     // 6. Create Production Workflow
     if (isFirstTimeConfirmation) {
-      await this.createProductionWorkflow(order, paymentMethod);
+      await this.createProductionWorkflow(order, resolvedPaymentMethod);
     } else {
       await order.save();
     }
