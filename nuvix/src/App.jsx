@@ -16,11 +16,22 @@ import AboutUsPage from "./pages/AboutUsPage";
 import ContactUsPage from "./pages/ContactUsPage";
 import HowItWorksPage from "./pages/HowItWorksPage";
 import CartPage from "./pages/CartPage";
+import PaymentPage from "./pages/PaymentPage";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
 
 function App() {
   const path = window.location.pathname;
+
+  if (path === "/payment" || path.startsWith("/payment?") || path === "/payment/checkout") {
+    const token = localStorage.getItem("token");
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
+      window.location.href = "/login?redirect=/payment";
+      return null;
+    }
+    return <PaymentPage />;
+  }
 
   if (path === "/login") {
     return <LoginPage />;

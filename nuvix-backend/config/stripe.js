@@ -1,4 +1,3 @@
-const Stripe = require("stripe");
 const path = require("path");
 
 // Load environment variables from backend config path
@@ -10,9 +9,10 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_placeholder";
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "whsec_placeholder";
 
-// Using stripeInstance locally to prevent variable collision with global/library type declarations
+// Safely require and initialize Stripe SDK
 let stripeInstance = null;
 try {
+  const Stripe = require("stripe");
   stripeInstance = new Stripe(stripeSecretKey, {
     apiVersion: "2023-10-16"
   });

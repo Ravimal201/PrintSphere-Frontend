@@ -97,7 +97,8 @@ exports.loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         phone: user.phone,
-        address: user.address
+        address: user.address,
+        savedPaymentMethod: user.savedPaymentMethod
       }
     });
   } catch (error) {
@@ -735,5 +736,52 @@ exports.updateOrderAddress = async (req, res) => {
   } catch (error) {
     console.error("Update order address error:", error);
     res.status(500).json({ message: "Server error while updating order address" });
+  }
+};
+
+// @desc    Update user saved payment method
+// @route   PUT /api/auth/payment-method
+exports.updateUserPaymentMethod = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { methodType, cardholderName, cardNumber, expiryDate, brand } = req.body;
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const cardLast4 = cardNumber ? cardNumber.replace(/\s/g, "").slice(-4) : user.savedPaymentMethod?.cardLast4 || "4242";
+
+    user.savedPaymentMethod = {
+      methodType: methodType || "card",
+      cardholderName: cardholderName || user.name,
+      cardLast4,
+      expiryDate: expiryDate || "12/28",
+      brand: brand || "VISA"
+    };
+
+    await user.save();
+
+    res.json({
+      message: "Payment method updated successfully",
+      savedPaymentMethod: user.savedPaymentMethod,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        address: user.address,
+        savedPaymentMethod: user.savedPaymentMethod
+      }
+    });
+  } catch (error) {
+    console.error("Update user payment method error:", error);
+    res.status(500).json({ message: "Server error while saving payment method" });
   }
 };

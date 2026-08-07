@@ -51,52 +51,11 @@ export default function PaymentButton({
     setErrorMessage("");
 
     try {
-      if (gateway.toLowerCase() === "payhere") {
-        // 1. Dynamically load PayHere JS SDK script
-        await loadPayHereScript();
-
-        // 2. Call backend to generate hash and parameter payload
-        const data = await createCheckoutSession(orderId, "payhere");
-        if (data && data.payhereParams) {
-          // 3. Register PayHere event callbacks
-          window.payhere.onCompleted = function (completedOrderId) {
-            console.log("PayHere Checkout Completed. Order ID: " + completedOrderId);
-            if (onSuccess) onSuccess(data);
-            // Redirect to success URL
-            window.location.href = data.payhereParams.return_url || `/payment/success?order_id=${completedOrderId}&gateway=payhere`;
-          };
-
-          window.payhere.onDismissed = function () {
-            console.log("PayHere Checkout Dismissed");
-            // Redirect to cancel URL
-            window.location.href = data.payhereParams.cancel_url || `/payment/cancel?order_id=${orderId}`;
-          };
-
-          window.payhere.onError = function (error) {
-            console.error("PayHere Checkout Error: ", error);
-            setErrorMessage(error || "Payment popup encountered an error.");
-            setLoading(false);
-            if (onError) onError(error);
-          };
-
-          // 4. Trigger PayHere Onsite Checkout popup
-          window.payhere.startPayment(data.payhereParams);
-        } else {
-          throw new Error("PayHere payment parameters were not returned by backend");
-        }
-      } else {
-        // Stripe integration fallback
-        const data = await createCheckoutSession(orderId, "stripe");
-        if (data && data.url) {
-          if (onSuccess) onSuccess(data);
-          // Redirect customer to Stripe Checkout Sandbox URL
-          window.location.href = data.url;
-        } else {
-          throw new Error("Payment checkout URL was not returned by gateway");
-        }
-      }
+      // Save pending order ID and redirect to Payment Portal page
+      localStorage.setItem("printsphere_pending_order_id", orderId);
+      window.location.href = `/payment?order_id=${orderId}`;
     } catch (err) {
-      const msg = err.message || err.error || "Failed to initiate payment checkout. Please try again.";
+      const msg = err.message || err.error || "Failed to navigate to payment portal.";
       setErrorMessage(msg);
       setLoading(false);
       if (onError) onError(msg);
