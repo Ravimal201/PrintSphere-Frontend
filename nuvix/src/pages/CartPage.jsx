@@ -4,7 +4,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle } from "lucide-react";
+import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle, Loader2 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 
@@ -15,6 +15,29 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [selected3DDesign, setSelected3DDesign] = useState(null);
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
+  const [selectedGateway, setSelectedGateway] = useState("stripe");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const loadPayHereScript = () => {
+    return new Promise((resolve, reject) => {
+      if (window.payhere) {
+        resolve(true);
+        return;
+      }
+      const existingScript = document.querySelector('script[src="https://www.payhere.lk/lib/payhere.js"]');
+      if (existingScript) {
+        existingScript.onload = () => resolve(true);
+        existingScript.onerror = () => reject(new Error("Failed to load PayHere SDK"));
+        return;
+      }
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src = "https://www.payhere.lk/lib/payhere.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => reject(new Error("Failed to load PayHere SDK"));
+      document.body.appendChild(script);
+    });
+  };
 
   useEffect(() => {
     // Load cart
@@ -100,6 +123,7 @@ export default function CartPage() {
     }
 
     try {
+      setCheckoutLoading(true);
       const resolvedItems = [];
       for (const item of cart) {
         if (item.isCustom || item.designId?.startsWith("custom-")) {
@@ -144,26 +168,60 @@ export default function CartPage() {
       const orderRes = await axios.post(`${API_BASE_URL}/auth/orders`, orderPayload, { headers });
       const orderId = orderRes.data.order._id;
 
-      // Initiate Stripe Sandbox checkout session
-      const sessionRes = await axios.post(
-        `${API_BASE_URL}/payment/create-checkout-session`,
-        { orderId, gateway: "stripe" },
-        { headers }
-      );
+      if (selectedGateway === "payhere") {
+        await loadPayHereScript();
 
-      setCheckoutSuccess(true);
-      saveCart([]); // Clear cart
-      
-      if (sessionRes.data && sessionRes.data.url) {
-        // Redirect to Stripe checkout screen
-        window.location.href = sessionRes.data.url;
+        const sessionRes = await axios.post(
+          `${API_BASE_URL}/payment/create-checkout-session`,
+          { orderId, gateway: "payhere" },
+          { headers }
+        );
+
+        if (sessionRes.data && sessionRes.data.payhereParams) {
+          saveCart([]); // Clear cart
+          setCheckoutSuccess(true);
+
+          window.payhere.onCompleted = function (completedOrderId) {
+            console.log("PayHere Checkout Completed. Order ID: " + completedOrderId);
+            window.location.href = `/payment/success?order_id=${completedOrderId}&gateway=payhere`;
+          };
+
+          window.payhere.onDismissed = function () {
+            console.log("PayHere Checkout Dismissed");
+            window.location.href = `/payment/cancel?order_id=${orderId}&gateway=payhere`;
+          };
+
+          window.payhere.onError = function (error) {
+            console.error("PayHere Checkout Error: ", error);
+            alert("PayHere Checkout Error: " + error);
+            setCheckoutLoading(false);
+          };
+
+          window.payhere.startPayment(sessionRes.data.payhereParams);
+        } else {
+          throw new Error("PayHere payment parameters were not returned by backend");
+        }
       } else {
-        window.location.href = "/my-orders";
+        const sessionRes = await axios.post(
+          `${API_BASE_URL}/payment/create-checkout-session`,
+          { orderId, gateway: "stripe" },
+          { headers }
+        );
+
+        saveCart([]); // Clear cart
+        setCheckoutSuccess(true);
+
+        if (sessionRes.data && sessionRes.data.url) {
+          window.location.href = sessionRes.data.url;
+        } else {
+          window.location.href = "/my-orders";
+        }
       }
     } catch (err) {
       console.error("Checkout order error:", err);
       const errMsg = err.response?.data?.message || err.message || "Failed to process checkout. Please try again.";
       alert(errMsg);
+      setCheckoutLoading(false);
     }
   };
 
@@ -312,11 +370,46 @@ export default function CartPage() {
                       </div>
                     </div>
 
+                    {/* Payment Gateway Selector */}
+                    <div className="space-y-2 pt-3 border-t select-none">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                        Choose Payment Method
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGateway("stripe")}
+                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
+                            selectedGateway === "stripe"
+                              ? "border-indigo-650 bg-indigo-50/30 text-indigo-750 font-extrabold shadow-sm"
+                              : "border-slate-100 hover:border-slate-200 text-slate-500 hover:bg-slate-50/50"
+                          }`}
+                        >
+                          <span className="text-xs font-bold">Stripe Card</span>
+                          <span className="text-[9px] text-slate-400 mt-0.5 font-medium">Credit / Debit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGateway("payhere")}
+                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
+                            selectedGateway === "payhere"
+                              ? "border-indigo-650 bg-indigo-50/30 text-indigo-750 font-extrabold shadow-sm"
+                              : "border-slate-100 hover:border-slate-200 text-slate-500 hover:bg-slate-50/50"
+                          }`}
+                        >
+                          <span className="text-xs font-bold">PayHere</span>
+                          <span className="text-[9px] text-emerald-600 mt-0.5 font-bold">Sandbox Mode</span>
+                        </button>
+                      </div>
+                    </div>
+
                     <button
                       onClick={handleCheckout}
-                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-4"
+                      disabled={checkoutLoading}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-4 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      Proceed to Checkout
+                      {checkoutLoading && <Loader2 className="h-4 w-4 animate-spin text-white" />}
+                      {checkoutLoading ? "Processing Checkout..." : "Proceed to Checkout"}
                     </button>
                   </div>
                 </div>

@@ -117,14 +117,27 @@ export default function MyOrdersPage() {
 
                       <div className="flex items-center gap-2">
                         {order.paymentStatus === "Pending" && (
-                          <div className="w-24">
-                            <PaymentButton
-                              orderId={order._id}
-                              amount={order.totalCost}
-                              className="w-full py-1.5 px-3 bg-amber-500 hover:bg-amber-600 active:scale-98 text-white rounded-lg font-bold text-[10px] shadow-sm transition-all flex items-center justify-center cursor-pointer"
-                            >
-                              <span>Pay Now</span>
-                            </PaymentButton>
+                          <div className="flex gap-2 items-center">
+                            <div className="w-24">
+                              <PaymentButton
+                                orderId={order._id}
+                                amount={order.totalCost}
+                                gateway="stripe"
+                                className="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-lg font-bold text-[10px] shadow-sm transition-all flex items-center justify-center cursor-pointer"
+                              >
+                                <span>Pay Stripe</span>
+                              </PaymentButton>
+                            </div>
+                            <div className="w-24">
+                              <PaymentButton
+                                orderId={order._id}
+                                amount={order.totalCost}
+                                gateway="payhere"
+                                className="w-full py-1.5 px-3 bg-amber-500 hover:bg-amber-600 active:scale-98 text-white rounded-lg font-bold text-[10px] shadow-sm transition-all flex items-center justify-center cursor-pointer"
+                              >
+                                <span>Pay PayHere</span>
+                              </PaymentButton>
+                            </div>
                           </div>
                         )}
                         <span className={`px-2.5 py-1 rounded-full border text-xs font-bold ${statusColors[order.orderStatus] || "bg-slate-100 text-slate-700 border-slate-200"}`}>
