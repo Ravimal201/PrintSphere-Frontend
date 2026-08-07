@@ -12,7 +12,21 @@ exports.createCheckoutSession = async (req, res) => {
       return res.status(400).json({ success: false, message: "Order ID is required" });
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
+    let frontendUrl = process.env.FRONTEND_URL;
+    if (!frontendUrl) {
+      const referer = req.get("referer");
+      if (referer) {
+        try {
+          frontendUrl = new URL(referer).origin;
+        } catch (e) {
+          // fallback
+        }
+      }
+    }
+    if (!frontendUrl) {
+      frontendUrl = `${req.protocol}://${req.get("host")}`;
+    }
+
     const result = await paymentService.createCheckoutSession(orderId, gateway, frontendUrl);
 
     return res.status(200).json({
