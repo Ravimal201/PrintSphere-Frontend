@@ -15,7 +15,8 @@ const {
   getTShirtStylesPublic,
   getUserProfile,
   updateUserProfile,
-  updateOrderAddress
+  updateOrderAddress,
+  updateUserPaymentMethod
 } = require("../controllers/authController");
 
 router.post("/register", registerCustomer);
@@ -23,6 +24,7 @@ router.post("/login", loginUser);
 router.put("/change-password", changePassword);
 router.get("/profile", getUserProfile);
 router.put("/profile", updateUserProfile);
+router.put("/payment-method", updateUserPaymentMethod);
 router.get("/products", getStoreProducts);
 router.get("/recommendations", getRecommendations);
 router.post("/activity", trackUserActivity);
@@ -37,4 +39,5 @@ router.post("/designs", saveCustomerDesign);
 router.get("/designs", getCustomerDesigns);
 
 module.exports = router;
+
 
