@@ -20,7 +20,8 @@ exports.createCheckoutSession = async (req, res) => {
       message: "Payment checkout session created successfully",
       url: result.url,
       sessionId: result.sessionId,
-      orderId: orderId
+      orderId: orderId,
+      payhereParams: result.payhereParams
     });
   } catch (error) {
     console.error("createCheckoutSession Controller Error:", error);
