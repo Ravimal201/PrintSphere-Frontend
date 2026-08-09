@@ -30,7 +30,7 @@ const PaymentSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["Stripe", "PayHere", "Card", "CashOnDelivery"],
+      enum: ["Stripe", "PayHere", "Card", "CashOnDelivery", "PaymentAccount"],
       default: "Stripe"
     },
     paymentStatus: {

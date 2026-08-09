@@ -4,9 +4,10 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle, Loader2, MapPin, X, CreditCard, ShieldCheck, Edit3, Lock, Building, Truck } from "lucide-react";
+import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle, Loader2, Wallet } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
+import { processAccountPayment } from "../services/paymentService";
 
 export default function CartPage() {
   const [cart, setCart] = useState([]);
@@ -16,6 +17,13 @@ export default function CartPage() {
   const [selected3DDesign, setSelected3DDesign] = useState(null);
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [accountDetails, setAccountDetails] = useState({
+    provider: "",
+    accountType: "Bank Account",
+    accountNumber: "",
+    holderName: "",
+    pin: ""
+  });
 
   // Pop-up Checkout Modal & Address / Payment State
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -323,12 +331,40 @@ export default function CartPage() {
       const orderRes = await axios.post(`${API_BASE_URL}/auth/orders`, orderPayload, { headers });
       const orderId = orderRes.data.order._id;
 
-      // 5. Simulate payment verification & authorize payment in backend DB
-      await new Promise(res => setTimeout(res, 1200));
-      await axios.get(
-        `${API_BASE_URL}/payment/success?session_id=direct_${selectedGateway}_${orderId}&order_id=${orderId}`,
-        { headers }
-      );
+      if (selectedGateway === "paymentaccount") {
+        if (!accountDetails.provider || !accountDetails.accountNumber || !accountDetails.holderName) {
+          alert("Please fill in all payment account details.");
+          setCheckoutLoading(false);
+          return;
+        }
+
+        await processAccountPayment(orderId, accountDetails);
+        saveCart([]); // Clear cart
+        setCheckoutSuccess(true);
+        window.location.href = `/payment/success?order_id=${orderId}&gateway=paymentaccount`;
+      } else if (selectedGateway === "payhere") {
+        await loadPayHereScript();
+
+        const sessionRes = await axios.post(
+          `${API_BASE_URL}/payment/create-checkout-session`,
+          { orderId, gateway: "payhere" },
+          { headers }
+        );
+
+        if (sessionRes.data && sessionRes.data.payhereParams) {
+          saveCart([]); // Clear cart
+          setCheckoutSuccess(true);
+
+          window.payhere.onCompleted = function (completedOrderId) {
+            console.log("PayHere Checkout Completed. Order ID: " + completedOrderId);
+            window.location.href = `/payment/success?order_id=${completedOrderId}&gateway=payhere`;
+          };
+
+          window.payhere.onDismissed = function () {
+            console.log("PayHere Checkout Dismissed");
+            window.location.href = `/payment/cancel?order_id=${orderId}&gateway=payhere`;
+          };
+
 
       // 6. Clear cart & redirect to payment success confirmation page
       saveCart([]);
@@ -491,6 +527,125 @@ export default function CartPage() {
                         <span className="text-indigo-650 font-black">Rs. {cartTotal.toFixed(2)}</span>
                       </div>
                     </div>
+
+                    {/* Payment Gateway Selector */}
+                    <div className="space-y-3 pt-3 border-t select-none">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                        Choose Payment Method
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGateway("stripe")}
+                          className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
+                            selectedGateway === "stripe"
+                              ? "border-indigo-650 bg-indigo-50/30 text-indigo-750 font-extrabold shadow-sm"
+                              : "border-slate-100 hover:border-slate-200 text-slate-500 hover:bg-slate-50/50"
+                          }`}
+                        >
+                          <span className="text-[11px] font-bold">Stripe Card</span>
+                          <span className="text-[8px] text-slate-400 mt-0.5 font-medium">Credit / Debit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGateway("payhere")}
+                          className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
+                            selectedGateway === "payhere"
+                              ? "border-indigo-650 bg-indigo-50/30 text-indigo-750 font-extrabold shadow-sm"
+                              : "border-slate-100 hover:border-slate-200 text-slate-500 hover:bg-slate-50/50"
+                          }`}
+                        >
+                          <span className="text-[11px] font-bold">PayHere</span>
+                          <span className="text-[8px] text-emerald-600 mt-0.5 font-bold">Sandbox</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGateway("paymentaccount")}
+                          className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
+                            selectedGateway === "paymentaccount"
+                              ? "border-indigo-650 bg-indigo-50/30 text-indigo-750 font-extrabold shadow-sm"
+                              : "border-slate-100 hover:border-slate-200 text-slate-500 hover:bg-slate-50/50"
+                          }`}
+                        >
+                          <span className="text-[11px] font-bold flex items-center gap-0.5">
+                            <Wallet className="h-3.5 w-3.5 text-indigo-600" />
+                            Account
+                          </span>
+                          <span className="text-[8px] text-slate-400 mt-0.5 font-medium">Any Account</span>
+                        </button>
+                      </div>
+
+                      {selectedGateway === "paymentaccount" && (
+                        <div className="mt-3 p-3 border border-indigo-100 bg-indigo-50/10 rounded-2xl space-y-2.5 transition-all text-left">
+                          <span className="text-[10px] font-extrabold text-indigo-900 block mb-1">
+                            Enter Payment Account Details
+                          </span>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-400 block mb-1">PROVIDER NAME</label>
+                              <input
+                                type="text"
+                                placeholder="Commercial Bank, PayPal..."
+                                value={accountDetails.provider}
+                                onChange={(e) => setAccountDetails({...accountDetails, provider: e.target.value})}
+                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-400 block mb-1">ACCOUNT TYPE</label>
+                              <select
+                                value={accountDetails.accountType}
+                                onChange={(e) => setAccountDetails({...accountDetails, accountType: e.target.value})}
+                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:border-indigo-500"
+                              >
+                                <option value="Bank Account">Bank Account</option>
+                                <option value="Mobile Wallet">Mobile Wallet</option>
+                                <option value="Card">Card</option>
+                                <option value="Digital Account">Digital Account</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-400 block mb-1">ACCOUNT NUMBER / ID</label>
+                            <input
+                              type="text"
+                              placeholder="Enter account or wallet number"
+                              value={accountDetails.accountNumber}
+                              onChange={(e) => setAccountDetails({...accountDetails, accountNumber: e.target.value})}
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-400 block mb-1">ACCOUNT HOLDER NAME</label>
+                            <input
+                              type="text"
+                              placeholder="Enter account holder's name"
+                              value={accountDetails.holderName}
+                              onChange={(e) => setAccountDetails({...accountDetails, holderName: e.target.value})}
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-400 block mb-1">SECURITY PIN / PASSWORD</label>
+                            <input
+                              type="password"
+                              placeholder="Enter PIN or password (simulated)"
+                              value={accountDetails.pin}
+                              onChange={(e) => setAccountDetails({...accountDetails, pin: e.target.value})}
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
 
                     <button
                       onClick={handleOpenCheckoutModal}

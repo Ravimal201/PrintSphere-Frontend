@@ -130,3 +130,31 @@ exports.getPaymentById = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// POST /api/payment/process-account-payment
+exports.processAccountPayment = async (req, res) => {
+  try {
+    const { orderId, accountDetails } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: "Order ID is required" });
+    }
+    if (!accountDetails || !accountDetails.accountNumber || !accountDetails.provider || !accountDetails.holderName) {
+      return res.status(400).json({ success: false, message: "Missing account details fields" });
+    }
+
+    const result = await paymentService.processAccountPayment(orderId, accountDetails);
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment processed successfully",
+      payment: result.payment,
+      order: result.order
+    });
+  } catch (error) {
+    console.error("processAccountPayment Controller Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to process payment account payment"
+    });
+  }
+};
