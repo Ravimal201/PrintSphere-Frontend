@@ -6,6 +6,9 @@ const paymentController = require("../controllers/paymentController");
 // POST /api/payment/create-checkout-session
 router.post("/create-checkout-session", paymentController.createCheckoutSession);
 
+// POST /api/payment/process-account-payment
+router.post("/process-account-payment", paymentController.processAccountPayment);
+
 // GET /api/payment/success
 router.get("/success", paymentController.paymentSuccess);
 

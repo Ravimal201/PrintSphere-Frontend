@@ -56,3 +56,25 @@ export const getPaymentDetails = async (paymentId) => {
     throw error.response?.data || error;
   }
 };
+
+/**
+ * Processes payment from any custom payment account
+ * @param {string} orderId 
+ * @param {Object} accountDetails 
+ */
+export const processAccountPayment = async (orderId, accountDetails) => {
+  try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const response = await axios.post(
+      `${BASE_URL}/payment/process-account-payment`,
+      { orderId, accountDetails },
+      { headers }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error processing payment account payment:", error);
+    throw error.response?.data || error;
+  }
+};
