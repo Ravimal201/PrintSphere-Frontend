@@ -123,6 +123,7 @@ export default function ManagerPage() {
   const [passError, setPassError] = useState("");
   const [passSuccess, setPassSuccess] = useState("");
   const [passLoading, setPassLoading] = useState(false);
+  const [showStorePreview, setShowStorePreview] = useState(false);
 
   // Check auth
   useEffect(() => {
@@ -806,11 +807,18 @@ export default function ManagerPage() {
 
             <div className="pt-4 border-t border-slate-800">
               <button
-                onClick={() => (window.location.href = "/customer-home")}
-                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold hover:bg-slate-800 hover:text-slate-200 transition"
+                onClick={() => {
+                  setActiveTab("store-preview");
+                  setShowStorePreview(true);
+                }}
+                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                  activeTab === "store-preview"
+                    ? "bg-indigo-600 text-white shadow-lg"
+                    : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
               >
                 <Award className="h-4.5 w-4.5" />
-                Preview Storefront
+                Store Preview
               </button>
             </div>
           </nav>
@@ -895,6 +903,29 @@ export default function ManagerPage() {
             </div>
           </div>
         </div>
+
+        {activeTab === "store-preview" && (
+          <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950">
+                  Store Preview
+                </h3>
+                <p className="text-sm text-slate-500">
+                  This preview shows the store page only while the manager
+                  dashboard stays visible.
+                </p>
+              </div>
+            </div>
+            <div className="h-[75vh] min-h-[600px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+              <iframe
+                src={`${window.location.origin}/store?preview=manager`}
+                title="Store Preview"
+                className="h-full w-full border-0"
+              />
+            </div>
+          </div>
+        )}
 
         {dataLoading && (
           <div className="mb-6 flex items-center justify-center gap-2 p-3 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold rounded-2xl">
@@ -1649,6 +1680,48 @@ export default function ManagerPage() {
                             Hoodie
                           </option>
                         </select>
+                      </div>
+                    </div>
+
+                    {/* Available Sizes Checkboxes */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                        <span>Available Sizes</span>
+                        <span className="text-[9px] text-indigo-600 font-normal">
+                          Selected: {(productForm.sizes || []).join(", ") || "None"}
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2 pt-0.5">
+                        {["S", "M", "L", "XL", "XXL"].map((size) => {
+                          const isSelected = (productForm.sizes || []).includes(size);
+                          return (
+                            <label
+                              key={size}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
+                                isSelected
+                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
+                                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setProductForm((prev) => {
+                                    const currentSizes = prev.sizes || [];
+                                    const updatedSizes = checked
+                                      ? [...currentSizes, size]
+                                      : currentSizes.filter((s) => s !== size);
+                                    return { ...prev, sizes: updatedSizes };
+                                  });
+                                }}
+                                className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              />
+                              <span>{size}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
 

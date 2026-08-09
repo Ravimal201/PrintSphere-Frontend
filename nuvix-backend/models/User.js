@@ -33,6 +33,13 @@ const UserSchema = new mongoose.Schema(
       zipCode: String,
       country: String
     },
+    savedPaymentMethod: {
+      methodType: { type: String, enum: ["card", "payhere", "cod"], default: "card" },
+      cardholderName: String,
+      cardLast4: String,
+      expiryDate: String,
+      brand: String
+    },
     savedDesigns: [
       {
         type: mongoose.Schema.Types.ObjectId,

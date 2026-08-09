@@ -16,7 +16,6 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [selected3DDesign, setSelected3DDesign] = useState(null);
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
-  const [selectedGateway, setSelectedGateway] = useState("stripe");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [accountDetails, setAccountDetails] = useState({
     provider: "",
@@ -24,6 +23,31 @@ export default function CartPage() {
     accountNumber: "",
     holderName: "",
     pin: ""
+  });
+
+  // Pop-up Checkout Modal & Address / Payment State
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [isEditingPaymentMethod, setIsEditingPaymentMethod] = useState(false);
+  const [selectedGateway, setSelectedGateway] = useState("card"); // 'card', 'payhere', 'cod'
+
+  // Forms
+  const [addressForm, setAddressForm] = useState({
+    street: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: "Sri Lanka",
+    phone: ""
+  });
+
+  const [cardForm, setCardForm] = useState({
+    cardholderName: "",
+    cardNumber: "",
+    expiryDate: "",
+    cvv: "",
+    saveCard: true
   });
 
   const loadPayHereScript = () => {
@@ -53,6 +77,26 @@ export default function CartPage() {
     if (savedCart) {
       try {
         setCart(JSON.parse(savedCart));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Load local user profile
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const parsed = JSON.parse(userStr);
+        setUser(parsed);
+        setAddressForm({
+          street: parsed.address?.street || "",
+          city: parsed.address?.city || "",
+          state: parsed.address?.state || "",
+          zipCode: parsed.address?.zipCode || "",
+          country: parsed.address?.country || "Sri Lanka",
+          phone: parsed.phone || ""
+        });
+        setCardForm(prev => ({ ...prev, cardholderName: parsed.name || "" }));
       } catch (e) {
         console.error(e);
       }
@@ -104,34 +148,144 @@ export default function CartPage() {
 
   const cartTotal = cartSubtotal - volumeDiscountAmount;
 
-  const handleCheckout = async () => {
+  // Open Checkout Popup Window
+  const handleOpenCheckoutModal = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       alert("Please log in to complete your checkout.");
       window.location.href = "/login?redirect=/cart";
       return;
     }
-    const headers = { Authorization: `Bearer ${token}` };
 
-    let userAddress = { street: "", city: "", country: "Sri Lanka" };
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const parsedUser = JSON.parse(userStr);
-        if (parsedUser.address) {
-          userAddress = {
-            street: parsedUser.address.street || "",
-            city: parsedUser.address.city || "",
-            country: parsedUser.address.country || "Sri Lanka"
-          };
+    // Refresh user profile from backend
+    try {
+      const profileRes = await axios.get(`${API_BASE_URL}/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (profileRes.data) {
+        setUser(profileRes.data);
+        localStorage.setItem("user", JSON.stringify(profileRes.data));
+        setAddressForm({
+          street: profileRes.data.address?.street || "",
+          city: profileRes.data.address?.city || "",
+          state: profileRes.data.address?.state || "",
+          zipCode: profileRes.data.address?.zipCode || "",
+          country: profileRes.data.address?.country || "Sri Lanka",
+          phone: profileRes.data.phone || ""
+        });
+        setCardForm(prev => ({ ...prev, cardholderName: profileRes.data.name || "" }));
+        
+        // If user has a saved payment method, show saved method view by default
+        if (profileRes.data.savedPaymentMethod && profileRes.data.savedPaymentMethod.cardLast4) {
+          setIsEditingPaymentMethod(false);
+          setSelectedGateway(profileRes.data.savedPaymentMethod.methodType || "card");
+        } else {
+          setIsEditingPaymentMethod(true);
         }
-      } catch (e) {
-        console.error("Failed to parse user for address:", e);
+      }
+    } catch (e) {
+      console.error("Fetch profile in cart error:", e);
+      setIsEditingPaymentMethod(true);
+    }
+
+    setIsEditingAddress(false);
+    setIsCheckoutModalOpen(true);
+  };
+
+  // Card Number Formatter
+  const handleCardNumberChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+    const formatted = raw.replace(/(\d{4})/g, "$1 ").trim();
+    setCardForm({ ...cardForm, cardNumber: formatted });
+  };
+
+  // Expiry Date Formatter (MM/YY)
+  const handleExpiryChange = (e) => {
+    let raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+    if (raw.length >= 3) {
+      raw = `${raw.slice(0, 2)}/${raw.slice(2)}`;
+    }
+    setCardForm({ ...cardForm, expiryDate: raw });
+  };
+
+  // Card Brand Detector
+  const getCardBrand = () => {
+    const num = cardForm.cardNumber.replace(/\s/g, "");
+    if (num.startsWith("4")) return "VISA";
+    if (/^5[1-5]/.test(num)) return "MASTERCARD";
+    if (/^3[47]/.test(num)) return "AMEX";
+    return "CARD";
+  };
+
+  // Confirm Order & Process Payment directly from Popup Window
+  const handleConfirmCheckout = async (e) => {
+    if (e) e.preventDefault();
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    // Validate payment inputs if user is entering a new card
+    if (selectedGateway === "card" && isEditingPaymentMethod) {
+      const cleanNum = cardForm.cardNumber.replace(/\s/g, "");
+      if (cleanNum.length < 16) {
+        alert("Please enter a valid 16-digit credit/debit card number.");
+        return;
+      }
+      if (!cardForm.expiryDate || cardForm.expiryDate.length < 5) {
+        alert("Please enter a valid expiry date (MM/YY).");
+        return;
+      }
+      if (!cardForm.cvv || cardForm.cvv.length < 3) {
+        alert("Please enter a valid CVV code.");
+        return;
       }
     }
 
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const shippingAddress = {
+      street: addressForm.street || "",
+      city: addressForm.city || "",
+      state: addressForm.state || "",
+      zipCode: addressForm.zipCode || "",
+      country: addressForm.country || "Sri Lanka"
+    };
+
     try {
       setCheckoutLoading(true);
+
+      // 1. Update user delivery address on backend if updated
+      if (addressForm.street || addressForm.city) {
+        try {
+          await axios.put(`${API_BASE_URL}/auth/profile`, {
+            phone: addressForm.phone,
+            address: shippingAddress
+          }, { headers });
+        } catch (e) {
+          console.error("Update profile address error:", e);
+        }
+      }
+
+      // 2. Save user payment method on backend if requested
+      if (selectedGateway === "card" && isEditingPaymentMethod && cardForm.saveCard) {
+        try {
+          const pmRes = await axios.put(`${API_BASE_URL}/auth/payment-method`, {
+            methodType: "card",
+            cardholderName: cardForm.cardholderName,
+            cardNumber: cardForm.cardNumber,
+            expiryDate: cardForm.expiryDate,
+            brand: getCardBrand()
+          }, { headers });
+          if (pmRes.data?.user) {
+            setUser(pmRes.data.user);
+            localStorage.setItem("user", JSON.stringify(pmRes.data.user));
+          }
+        } catch (e) {
+          console.error("Save payment method error:", e);
+        }
+      }
+
+      // 3. Resolve custom designs and items
       const resolvedItems = [];
       for (const item of cart) {
         if (item.isCustom || item.designId?.startsWith("custom-")) {
@@ -164,13 +318,14 @@ export default function CartPage() {
         }
       }
 
+      // 4. Create order in backend DB
       const orderPayload = {
         items: resolvedItems,
         subtotal: cartSubtotal,
         printCost: 0,
         complexityFee: 0,
         totalCost: cartTotal,
-        shippingAddress: userAddress
+        shippingAddress
       };
 
       const orderRes = await axios.post(`${API_BASE_URL}/auth/orders`, orderPayload, { headers });
@@ -210,32 +365,13 @@ export default function CartPage() {
             window.location.href = `/payment/cancel?order_id=${orderId}&gateway=payhere`;
           };
 
-          window.payhere.onError = function (error) {
-            console.error("PayHere Checkout Error: ", error);
-            alert("PayHere Checkout Error: " + error);
-            setCheckoutLoading(false);
-          };
 
-          window.payhere.startPayment(sessionRes.data.payhereParams);
-        } else {
-          throw new Error("PayHere payment parameters were not returned by backend");
-        }
-      } else {
-        const sessionRes = await axios.post(
-          `${API_BASE_URL}/payment/create-checkout-session`,
-          { orderId, gateway: "stripe" },
-          { headers }
-        );
+      // 6. Clear cart & redirect to payment success confirmation page
+      saveCart([]);
+      setIsCheckoutModalOpen(false);
+      setCheckoutSuccess(true);
+      window.location.href = `/payment/success?order_id=${orderId}&gateway=${selectedGateway}`;
 
-        saveCart([]); // Clear cart
-        setCheckoutSuccess(true);
-
-        if (sessionRes.data && sessionRes.data.url) {
-          window.location.href = sessionRes.data.url;
-        } else {
-          window.location.href = "/my-orders";
-        }
-      }
     } catch (err) {
       console.error("Checkout order error:", err);
       const errMsg = err.response?.data?.message || err.message || "Failed to process checkout. Please try again.";
@@ -243,6 +379,9 @@ export default function CartPage() {
       setCheckoutLoading(false);
     }
   };
+
+  const hasAddress = Boolean(addressForm.street || addressForm.city || user?.address?.street);
+  const hasSavedPaymentMethod = Boolean(user?.savedPaymentMethod?.cardLast4);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col text-slate-800 font-sans">
@@ -263,9 +402,9 @@ export default function CartPage() {
             </div>
 
             {checkoutSuccess && (
-              <div className="flex items-center gap-2.5 p-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-sm font-bold">
+              <div className="flex items-center gap-2.5 p-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-sm font-bold animate-fade-in shadow-sm">
                 <CheckCircle className="h-5 w-5 shrink-0" />
-                <span>Order placed successfully! Redirecting to your orders...</span>
+                <span>Order placed and paid successfully! Redirecting...</span>
               </div>
             )}
 
@@ -337,14 +476,14 @@ export default function CartPage() {
                             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 rounded-xl px-1.5 py-0.5">
                               <button
                                 onClick={() => handleUpdateQuantity(item.cartKey, -1)}
-                                className="p-1 text-slate-500 hover:text-indigo-650 transition"
+                                className="p-1 text-slate-500 hover:text-indigo-650 transition cursor-pointer"
                               >
                                 <Minus className="h-3 w-3" />
                               </button>
                               <span className="text-xs font-bold min-w-[1.25rem] text-center">{item.quantity}</span>
                               <button
                                 onClick={() => handleUpdateQuantity(item.cartKey, 1)}
-                                className="p-1 text-slate-500 hover:text-indigo-650 transition"
+                                className="p-1 text-slate-500 hover:text-indigo-650 transition cursor-pointer"
                               >
                                 <Plus className="h-3 w-3" />
                               </button>
@@ -507,13 +646,13 @@ export default function CartPage() {
                       )}
                     </div>
 
+
                     <button
-                      onClick={handleCheckout}
-                      disabled={checkoutLoading}
-                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-4 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                      onClick={handleOpenCheckoutModal}
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-4 flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      {checkoutLoading && <Loader2 className="h-4 w-4 animate-spin text-white" />}
-                      {checkoutLoading ? "Processing Checkout..." : "Proceed to Checkout"}
+                      <CreditCard className="h-4 w-4" />
+                      <span>Proceed to Checkout</span>
                     </button>
                   </div>
                 </div>
@@ -525,6 +664,376 @@ export default function CartPage() {
 
       <Footer withSidebarOffset />
 
+      {/* Interactive Checkout & Payment Pop-up Window */}
+      {isCheckoutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-6 max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-indigo-600">
+                  <CreditCard className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-lg">Checkout Order Preview</h3>
+                  <p className="text-xs text-slate-500">Review your custom designs, delivery details & payment method</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCheckoutModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Section 1: Items & T-Shirt Design Preview */}
+            <div className="space-y-3">
+              <h4 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                Order Items & Designs ({cart.length})
+              </h4>
+              <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                {cart.map((item) => (
+                  <div key={item.cartKey} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-150 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="h-14 w-14 bg-white border border-slate-200 rounded-xl flex items-center justify-center p-1 shrink-0">
+                        <TShirt2D color={item.color} designUrl={item.image} className="h-11 w-11" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <h5 className="font-extrabold text-slate-900 text-xs capitalize">{item.title}</h5>
+                        <div className="text-[10px] text-slate-500 font-semibold uppercase flex items-center gap-2">
+                          <span>Size: {item.size}</span>
+                          <span>•</span>
+                          <span>Color: {item.color}</span>
+                          <span>•</span>
+                          <span>Qty: {item.quantity}</span>
+                        </div>
+                        {item.isCustom && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelected3DDesign(item);
+                              setIs3DModalOpen(true);
+                            }}
+                            className="mt-1 flex items-center gap-1 text-[9px] font-black text-indigo-700 bg-indigo-100/70 border border-indigo-200 px-2 py-0.5 rounded-lg hover:bg-indigo-200 transition cursor-pointer"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-650 animate-pulse" />
+                            View 3D T-Shirt Design
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <span className="font-black text-slate-900 text-sm">
+                      Rs. {(item.basePrice * (1 - (item.discount / 100)) * item.quantity).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Section 2: Delivery Details */}
+            <div className="space-y-3 bg-slate-50 border border-slate-150 rounded-2xl p-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+                  Delivery Details
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingAddress(!isEditingAddress)}
+                  className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-white border border-indigo-150 px-2.5 py-1 rounded-xl shadow-2xs hover:bg-indigo-50 transition cursor-pointer"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  <span>{isEditingAddress ? "Done" : (hasAddress ? "Edit Address" : "Set Address")}</span>
+                </button>
+              </div>
+
+              {isEditingAddress ? (
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Street Address</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 123 Main Street"
+                      value={addressForm.street}
+                      onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-semibold text-slate-800"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">City</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Colombo"
+                        value={addressForm.city}
+                        onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-semibold text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Phone</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. +94 77 123 4567"
+                        value={addressForm.phone}
+                        onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-semibold text-slate-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : hasAddress ? (
+                <div className="text-xs text-slate-700 font-semibold space-y-0.5">
+                  <p>{[addressForm.street, addressForm.city, addressForm.state, addressForm.zipCode, addressForm.country || "Sri Lanka"].filter(Boolean).join(", ")}</p>
+                  {addressForm.phone && <p className="text-slate-500 text-[11px]">Contact Phone: {addressForm.phone}</p>}
+                </div>
+              ) : (
+                <p className="text-xs text-amber-600 font-semibold italic">
+                  No delivery address set. Click "Set Address" above to enter your shipping details.
+                </p>
+              )}
+            </div>
+
+            {/* Section 3: Dynamic Payment Method Details */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <CreditCard className="h-3.5 w-3.5 text-indigo-600" />
+                  Payment Method Details
+                </h4>
+                {hasSavedPaymentMethod && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPaymentMethod(!isEditingPaymentMethod)}
+                    className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-white border border-indigo-150 px-2.5 py-1 rounded-xl shadow-2xs hover:bg-indigo-50 transition cursor-pointer"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span>{isEditingPaymentMethod ? "Use Saved Card" : "Edit / Change Payment Method"}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Case A: Saved Payment Method View */}
+              {hasSavedPaymentMethod && !isEditingPaymentMethod ? (
+                <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 shadow-md flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-white/10 border border-white/20 rounded-xl text-amber-400 font-black text-xs">
+                      {user.savedPaymentMethod.brand || "VISA"}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-bold tracking-wider">
+                          •••• •••• •••• {user.savedPaymentMethod.cardLast4 || "4242"}
+                        </span>
+                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md text-[9px] font-extrabold uppercase">
+                          Saved
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-300 font-medium mt-0.5">
+                        Cardholder: {user.savedPaymentMethod.cardholderName || user.name} | Expires: {user.savedPaymentMethod.expiryDate || "12/28"}
+                      </p>
+                    </div>
+                  </div>
+                  <ShieldCheck className="h-6 w-6 text-emerald-400 shrink-0" />
+                </div>
+              ) : (
+                /* Case B: First Time or Edit Payment Method */
+                <div className="space-y-4 bg-slate-50 border border-slate-150 rounded-2xl p-4">
+                  {/* Selector Tabs */}
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGateway("card")}
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
+                        selectedGateway === "card"
+                          ? "border-indigo-600 bg-white text-indigo-700 font-extrabold shadow-2xs"
+                          : "border-slate-200 text-slate-500 hover:bg-white"
+                      }`}
+                    >
+                      <CreditCard className="h-4 w-4 mb-0.5 text-indigo-600" />
+                      <span className="text-[11px] font-bold">Credit / Debit Card</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGateway("payhere")}
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
+                        selectedGateway === "payhere"
+                          ? "border-indigo-600 bg-white text-indigo-700 font-extrabold shadow-2xs"
+                          : "border-slate-200 text-slate-500 hover:bg-white"
+                      }`}
+                    >
+                      <Building className="h-4 w-4 mb-0.5 text-indigo-600" />
+                      <span className="text-[11px] font-bold">PayHere Portal</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGateway("cod")}
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
+                        selectedGateway === "cod"
+                          ? "border-indigo-600 bg-white text-indigo-700 font-extrabold shadow-2xs"
+                          : "border-slate-200 text-slate-500 hover:bg-white"
+                      }`}
+                    >
+                      <Truck className="h-4 w-4 mb-0.5 text-slate-600" />
+                      <span className="text-[11px] font-bold">Pay on Delivery</span>
+                    </button>
+                  </div>
+
+                  {/* Card Form Inputs */}
+                  {selectedGateway === "card" && (
+                    <div className="space-y-3 pt-2 text-xs font-semibold text-slate-700">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Cardholder Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Sachinthaka Ravimal"
+                          value={cardForm.cardholderName}
+                          onChange={(e) => setCardForm({ ...cardForm, cardholderName: e.target.value })}
+                          className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Card Number *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            required
+                            placeholder="4111 2222 3333 4444"
+                            maxLength={19}
+                            value={cardForm.cardNumber}
+                            onChange={handleCardNumberChange}
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-800 font-mono"
+                          />
+                          <span className="absolute right-3 top-2 text-[10px] font-extrabold text-indigo-600">
+                            {getCardBrand()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                            Expiry Date (MM/YY) *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="MM/YY"
+                            maxLength={5}
+                            value={cardForm.expiryDate}
+                            onChange={handleExpiryChange}
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-800 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                            CVC / CVV *
+                          </label>
+                          <input
+                            type="password"
+                            required
+                            placeholder="123"
+                            maxLength={4}
+                            value={cardForm.cvv}
+                            onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "") })}
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-800 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="checkbox"
+                          id="saveCard"
+                          checked={cardForm.saveCard}
+                          onChange={(e) => setCardForm({ ...cardForm, saveCard: e.target.checked })}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <label htmlFor="saveCard" className="text-[11px] font-semibold text-slate-600">
+                          Save payment method for future orders
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedGateway === "payhere" && (
+                    <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs text-indigo-900">
+                      <p className="font-bold">PayHere Gateway Selected</p>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        Supports Sampath Vishwa, Commercial Bank, HNB & eZ Cash online banking.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedGateway === "cod" && (
+                    <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-800">
+                      <p className="font-bold">Pay on Delivery Selected</p>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        Pay cash directly to courier upon delivery at your shipping address.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Total Cost & Confirm Action */}
+            <div className="pt-4 border-t border-slate-100 space-y-4">
+              <div className="flex justify-between items-center bg-slate-900 text-white rounded-2xl p-4">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Amount Payable</span>
+                  <span className="text-xl font-black">Rs. {cartTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>256-bit SSL Protected</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCheckoutModalOpen(false)}
+                  className="px-5 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCheckout}
+                  disabled={checkoutLoading}
+                  className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {checkoutLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      <span>Processing Payment...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4" />
+                      <span>Confirm & Pay Rs. {cartTotal.toFixed(2)}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 3D T-Shirt Viewer Modal */}
       <TShirt3DModal
         isOpen={is3DModalOpen}
         onClose={() => {
