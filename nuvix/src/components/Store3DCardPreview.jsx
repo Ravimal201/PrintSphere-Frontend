@@ -37,14 +37,24 @@ function SnapshotCapturer({ onCapture }) {
   return null;
 }
 
-export default function Store3DCardPreview({ product, activeColor, onClick }) {
-  const [viewAngle, setViewAngle] = useState("front"); // "front", "back", "side"
+export default function Store3DCardPreview({
+  product,
+  activeColor,
+  onClick,
+  showControls = true,
+  hideBadge = false,
+  className = "",
+  fixedView = "front",
+}) {
+  const [internalViewAngle, setInternalViewAngle] = useState(fixedView || "front");
   const [isHovered, setIsHovered] = useState(false);
+
+  const viewAngle = showControls ? internalViewAngle : (fixedView || "front");
 
   const getModelPath = () => {
     if (!product) return "/images/models/male normal t-shirt1.glb";
     if (product.modelPath) return product.modelPath;
-    const title = (product.title || "").toLowerCase();
+    const title = (product.title || product.tShirtType || "").toLowerCase();
     const category = (product.category || "").toLowerCase();
 
     if (
@@ -72,7 +82,7 @@ export default function Store3DCardPreview({ product, activeColor, onClick }) {
     if (product.layers && product.layers.length > 0) {
       return product.layers;
     }
-    const designImg = product.images?.[0];
+    const designImg = product.images?.[0] || product.thumbnailUrl || product.designUrl;
     if (designImg) {
       return [
         {
@@ -90,9 +100,9 @@ export default function Store3DCardPreview({ product, activeColor, onClick }) {
     return [];
   };
 
-  const shirtColor = activeColor || product.colors?.[0] || "#ffffff";
-  const designImg = product.images?.[0];
-  const productId = product._id || product.id || product.title || "prod";
+  const shirtColor = activeColor || product?.fabricColor || product?.colors?.[0] || "#ffffff";
+  const designImg = product?.images?.[0] || product?.thumbnailUrl;
+  const productId = product?._id || product?.id || product?.title || "prod";
   const cacheKey = `${productId}_${shirtColor}_${viewAngle}_${designImg || ""}`;
 
   const [snapshotUrl, setSnapshotUrl] = useState(() => snapshotCache.get(cacheKey) || null);
@@ -122,48 +132,53 @@ export default function Store3DCardPreview({ product, activeColor, onClick }) {
     rotationY = Math.PI / 2;
   }
 
+  const defaultClasses = "relative rounded-2xl bg-gradient-to-b from-slate-50 via-slate-100/60 to-slate-100 h-52 w-full overflow-hidden border border-slate-200/80 cursor-pointer group/card select-none shadow-2xs hover:border-indigo-300 transition duration-300 flex items-center justify-center p-3";
+  const finalContainerClasses = className ? `relative overflow-hidden flex items-center justify-center select-none ${className}` : defaultClasses;
+
   return (
     <div
-      className="relative rounded-2xl bg-gradient-to-b from-slate-50 via-slate-100/60 to-slate-100 h-52 w-full overflow-hidden border border-slate-200/80 cursor-pointer group/card select-none shadow-2xs hover:border-indigo-300 transition duration-300 flex items-center justify-center p-3"
+      className={finalContainerClasses}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
     >
       {/* 3 View Buttons Overlay at top of card on hover */}
-      <div
-        className={`absolute top-2.5 inset-x-0 z-30 flex justify-center items-center transition-all duration-300 ${
-          isHovered
-            ? "opacity-100 translate-y-0 pointer-events-auto"
-            : "opacity-0 -translate-y-2 pointer-events-none"
-        }`}
-      >
-        <div className="bg-slate-900/85 backdrop-blur-md px-1.5 py-1 rounded-xl shadow-lg flex items-center gap-1 border border-white/15">
-          {[
-            { id: "front", label: "Front" },
-            { id: "back", label: "Back" },
-            { id: "side", label: "Side" },
-          ].map((view) => {
-            const isActive = viewAngle === view.id;
-            return (
-              <button
-                key={view.id}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setViewAngle(view.id);
-                }}
-                className={`px-2.5 py-0.5 text-[10px] font-black uppercase rounded-lg transition-all duration-150 cursor-pointer ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "text-slate-300 hover:text-white hover:bg-white/15"
-                }`}
-              >
-                {view.label}
-              </button>
-            );
-          })}
+      {showControls && (
+        <div
+          className={`absolute top-2.5 inset-x-0 z-30 flex justify-center items-center transition-all duration-300 ${
+            isHovered
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 -translate-y-2 pointer-events-none"
+          }`}
+        >
+          <div className="bg-slate-900/85 backdrop-blur-md px-1.5 py-1 rounded-xl shadow-lg flex items-center gap-1 border border-white/15">
+            {[
+              { id: "front", label: "Front" },
+              { id: "back", label: "Back" },
+              { id: "side", label: "Side" },
+            ].map((view) => {
+              const isActive = viewAngle === view.id;
+              return (
+                <button
+                  key={view.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInternalViewAngle(view.id);
+                  }}
+                  className={`px-2.5 py-0.5 text-[10px] font-black uppercase rounded-lg transition-all duration-150 cursor-pointer ${
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "text-slate-300 hover:text-white hover:bg-white/15"
+                  }`}
+                >
+                  {view.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Render Frozen 3D Image Snapshot when captured */}
       {snapshotUrl ? (
@@ -221,12 +236,14 @@ export default function Store3DCardPreview({ product, activeColor, onClick }) {
       )}
 
       {/* View Badge Tag */}
-      <div className="absolute bottom-2 right-2 z-10 pointer-events-none">
-        <span className="px-2 py-0.5 bg-slate-900/60 backdrop-blur-xs text-slate-200 text-[9px] font-bold rounded-md uppercase tracking-wider border border-white/10 flex items-center gap-1 shadow-xs">
-          <ImageIcon className="h-2.5 w-2.5 text-indigo-400" />
-          3D PREVIEW • {viewAngle.toUpperCase()}
-        </span>
-      </div>
+      {!hideBadge && (
+        <div className="absolute bottom-2 right-2 z-10 pointer-events-none">
+          <span className="px-2 py-0.5 bg-slate-900/60 backdrop-blur-xs text-slate-200 text-[9px] font-bold rounded-md uppercase tracking-wider border border-white/10 flex items-center gap-1 shadow-xs">
+            <ImageIcon className="h-2.5 w-2.5 text-indigo-400" />
+            3D PREVIEW • {viewAngle.toUpperCase()}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
