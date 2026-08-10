@@ -365,13 +365,15 @@ export default function CartPage() {
             window.location.href = `/payment/cancel?order_id=${orderId}&gateway=payhere`;
           };
 
-
-      // 6. Clear cart & redirect to payment success confirmation page
-      saveCart([]);
-      setIsCheckoutModalOpen(false);
-      setCheckoutSuccess(true);
-      window.location.href = `/payment/success?order_id=${orderId}&gateway=${selectedGateway}`;
-
+          window.payhere.startPayment(sessionRes.data.payhereParams);
+        }
+      } else {
+        // 6. Clear cart & redirect to payment success confirmation page
+        saveCart([]);
+        setIsCheckoutModalOpen(false);
+        setCheckoutSuccess(true);
+        window.location.href = `/payment/success?order_id=${orderId}&gateway=${selectedGateway}`;
+      }
     } catch (err) {
       console.error("Checkout order error:", err);
       const errMsg = err.response?.data?.message || err.message || "Failed to process checkout. Please try again.";
