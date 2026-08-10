@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
+import Store3DCardPreview from "../components/Store3DCardPreview";
 import TShirt3DModal from "../components/TShirt3DModal";
 import PaymentButton from "../components/PaymentButton";
 import { ShoppingBag, Calendar, MapPin, ShieldCheck, AlertCircle, Edit3, Plus, CheckCircle, X, Phone } from "lucide-react";
@@ -366,15 +367,42 @@ export default function MyOrdersPage() {
                             const color = isCustom ? item.designId?.fabricColor : item.selectedColor;
                             const material = isCustom ? item.designId?.material : "Standard cotton";
 
+                            const productData = isCustom
+                              ? {
+                                  _id: item.designId?._id || `custom-${idx}`,
+                                  title: item.designId?.tShirtType || "Custom T-Shirt",
+                                  tShirtType: item.designId?.tShirtType,
+                                  modelPath: item.designId?.modelPath,
+                                  fabricColor: item.designId?.fabricColor || color,
+                                  layers: item.designId?.layers,
+                                  thumbnailUrl: item.designId?.thumbnailUrl || image,
+                                  images: image ? [image] : [],
+                                  colors: [color || "#ffffff"],
+                                }
+                              : (item.productId
+                                  ? {
+                                      ...item.productId,
+                                      colors: item.productId.colors?.length ? item.productId.colors : [color || "#ffffff"],
+                                    }
+                                  : {
+                                      _id: item._id || `store-${idx}`,
+                                      title: name,
+                                      images: image ? [image] : [],
+                                      colors: [color || "#ffffff"],
+                                    });
+
                             return (
                               <div key={idx} className="flex gap-4 py-3.5 first:pt-0 last:pb-0 items-center justify-between">
                                 <div className="flex gap-4 items-center">
-                                  <div className="h-16 w-16 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center p-1.5 shrink-0">
-                                    {isCustom ? (
-                                      <TShirt2D color={color} designUrl={image} className="h-12 w-12" />
-                                    ) : (
-                                      <img src={image} className="max-h-full max-w-full object-contain rounded" alt="Item preview" />
-                                    )}
+                                  <div className="h-20 w-20 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-center p-1 shrink-0 overflow-hidden relative shadow-2xs">
+                                    <Store3DCardPreview
+                                      product={productData}
+                                      activeColor={color}
+                                      showControls={false}
+                                      hideBadge={true}
+                                      fixedView="front"
+                                      className="h-full w-full !p-0.5 bg-transparent !border-0 !shadow-none cursor-default"
+                                    />
                                   </div>
                                   <div className="space-y-0.5">
                                     <h5 className="font-extrabold text-slate-900 text-sm capitalize">{name}</h5>

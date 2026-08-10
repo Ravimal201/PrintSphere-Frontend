@@ -1,12 +1,28 @@
-import { useRef, useState, Suspense } from "react";
+import { useRef, useState, useEffect, Suspense } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
 import ShirtModel from "./ShirtModel";
 
 // Helper component to manage smooth turntable transitions and zoom changes
-function ViewManager({ modelRotation, zoomLevel, groupRef }) {
+function ViewManager({ modelRotation, activeSide, zoomLevel, groupRef, controlsRef }) {
   const { camera } = useThree();
+  const prevRotationRef = useRef(modelRotation);
+  const prevActiveSideRef = useRef(activeSide);
+
+  // Reset OrbitControls camera angle to default front position whenever a view preset button is clicked
+  useEffect(() => {
+    if (
+      prevRotationRef.current !== modelRotation ||
+      prevActiveSideRef.current !== activeSide
+    ) {
+      if (controlsRef.current) {
+        controlsRef.current.reset();
+      }
+      prevRotationRef.current = modelRotation;
+      prevActiveSideRef.current = activeSide;
+    }
+  }, [modelRotation, activeSide, controlsRef]);
 
   useFrame(() => {
     if (!groupRef.current) return;
@@ -18,9 +34,9 @@ function ViewManager({ modelRotation, zoomLevel, groupRef }) {
       0.08
     );
 
-    // 2. Smoothly adjust camera distance based on zoom level slider
+    // Smoothly adjust camera distance based on zoom level slider
     const baseDistance = 3.8;
-    const targetDistance = baseDistance / zoomLevel;
+    const targetDistance = baseDistance / (zoomLevel || 0.85);
     const currentDistance = camera.position.length();
     const newDistance = THREE.MathUtils.lerp(currentDistance, targetDistance, 0.08);
     camera.position.setLength(newDistance);
@@ -43,6 +59,7 @@ export default function Scene({
   orbitEnabled = false
 }) {
   const groupRef = useRef();
+  const controlsRef = useRef();
   const [isInteracting, setIsInteracting] = useState(false);
 
   return (
@@ -94,12 +111,16 @@ export default function Scene({
       {/* Smoothly controls camera zoom and turntable rotation */}
       <ViewManager
         modelRotation={modelRotation}
+        activeSide={activeSide}
         zoomLevel={zoomLevel}
         groupRef={groupRef}
+        controlsRef={controlsRef}
       />
 
       {/* Allow the user to manually rotate the shirt, but constrain angles for a premium experience */}
       <OrbitControls
+        ref={controlsRef}
+        makeDefault
         enabled={orbitEnabled}
         enablePan={false}
         enableZoom={false}
