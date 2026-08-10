@@ -158,3 +158,31 @@ exports.processAccountPayment = async (req, res) => {
     });
   }
 };
+
+// POST /api/payment/process-card-payment
+exports.processCardPayment = async (req, res) => {
+  try {
+    const { orderId, cardDetails } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: "Order ID is required" });
+    }
+    if (!cardDetails || !cardDetails.cardNumber || !cardDetails.cardholderName || !cardDetails.expiryDate || !cardDetails.cvv) {
+      return res.status(400).json({ success: false, message: "Missing credit card details fields" });
+    }
+
+    const result = await paymentService.processCardPayment(orderId, cardDetails);
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment processed successfully",
+      payment: result.payment,
+      order: result.order
+    });
+  } catch (error) {
+    console.error("processCardPayment Controller Error:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to process card payment"
+    });
+  }
+};

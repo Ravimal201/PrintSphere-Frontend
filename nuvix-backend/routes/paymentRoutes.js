@@ -9,6 +9,9 @@ router.post("/create-checkout-session", paymentController.createCheckoutSession)
 // POST /api/payment/process-account-payment
 router.post("/process-account-payment", paymentController.processAccountPayment);
 
+// POST /api/payment/process-card-payment
+router.post("/process-card-payment", paymentController.processCardPayment);
+
 // GET /api/payment/success
 router.get("/success", paymentController.paymentSuccess);
 

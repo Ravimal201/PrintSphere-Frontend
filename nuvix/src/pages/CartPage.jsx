@@ -7,7 +7,7 @@ import TShirt3DModal from "../components/TShirt3DModal";
 import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle, Loader2, Wallet } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
-import { processAccountPayment } from "../services/paymentService";
+import { processAccountPayment, processCardPayment } from "../services/paymentService";
 
 export default function CartPage() {
   const [cart, setCart] = useState([]);
@@ -365,13 +365,49 @@ export default function CartPage() {
             window.location.href = `/payment/cancel?order_id=${orderId}&gateway=payhere`;
           };
 
+          window.payhere.onError = function (error) {
+            console.error("PayHere Checkout Error: ", error);
+            alert("PayHere Checkout Error: " + error);
+            setCheckoutLoading(false);
+          };
 
-      // 6. Clear cart & redirect to payment success confirmation page
-      saveCart([]);
-      setIsCheckoutModalOpen(false);
-      setCheckoutSuccess(true);
-      window.location.href = `/payment/success?order_id=${orderId}&gateway=${selectedGateway}`;
+          window.payhere.startPayment(sessionRes.data.payhereParams);
+        } else {
+          throw new Error("PayHere payment parameters were not returned by backend");
+        }
+      } else if (selectedGateway === "card") {
+        let cardDetailsPayload;
+        if (hasSavedPaymentMethod && !isEditingPaymentMethod) {
+          cardDetailsPayload = {
+            cardNumber: "411122223333" + user.savedPaymentMethod.cardLast4, // mock full card number from last4
+            cardholderName: user.savedPaymentMethod.cardholderName || user.name,
+            expiryDate: user.savedPaymentMethod.expiryDate || "12/28",
+            cvv: "123",
+            brand: user.savedPaymentMethod.brand
+          };
+        } else {
+          cardDetailsPayload = {
+            cardNumber: cardForm.cardNumber,
+            cardholderName: cardForm.cardholderName,
+            expiryDate: cardForm.expiryDate,
+            cvv: cardForm.cvv,
+            brand: getCardBrand()
+          };
+        }
 
+        await processCardPayment(orderId, cardDetailsPayload);
+
+        saveCart([]); // Clear cart
+        setIsCheckoutModalOpen(false);
+        setCheckoutSuccess(true);
+        window.location.href = `/payment/success?order_id=${orderId}&gateway=card`;
+      } else {
+        // Fallback for COD or other payment methods
+        saveCart([]);
+        setIsCheckoutModalOpen(false);
+        setCheckoutSuccess(true);
+        window.location.href = `/payment/success?order_id=${orderId}&gateway=${selectedGateway}`;
+      }
     } catch (err) {
       console.error("Checkout order error:", err);
       const errMsg = err.response?.data?.message || err.message || "Failed to process checkout. Please try again.";
