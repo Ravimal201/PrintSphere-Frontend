@@ -105,7 +105,9 @@ export default function PaymentSuccess() {
           <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200/60">
             <span className="font-bold text-slate-400 uppercase tracking-wider">Payment Method</span>
             <span className="font-extrabold text-slate-800 capitalize">
-              {paymentData?.paymentMethod || (gateway.toLowerCase() === "payhere" ? "PayHere Checkout" : "Stripe Sandbox Card")}
+              {paymentData?.paymentMethod === "PaymentAccount"
+                ? "Payment Account"
+                : (paymentData?.paymentMethod || (gateway.toLowerCase() === "payhere" ? "PayHere Checkout" : gateway.toLowerCase() === "paymentaccount" ? "Payment Account" : "Stripe Sandbox Card"))}
             </span>
           </div>
 

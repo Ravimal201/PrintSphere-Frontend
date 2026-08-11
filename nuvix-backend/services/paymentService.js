@@ -370,6 +370,9 @@ class PaymentService {
     if (resolvedPaymentMethod === "PayHere") {
       payment.stripeSessionId = sessionId || payment.stripeSessionId || "payhere_success";
       payment.stripePaymentIntentId = rawSessionData?.payment_id || sessionId || payment.stripePaymentIntentId || "payhere_success";
+    } else if (resolvedPaymentMethod === "PaymentAccount") {
+      payment.stripeSessionId = sessionId || payment.stripeSessionId || `acct_session_${order._id}`;
+      payment.stripePaymentIntentId = rawSessionData?.paymentIntentId || sessionId || payment.stripePaymentIntentId || `acct_intent_${order._id}`;
     } else {
       payment.stripeSessionId = sessionId || payment.stripeSessionId;
       if (rawSessionData?.payment_intent) {
@@ -458,6 +461,52 @@ class PaymentService {
     } catch (err) {
       console.error("Error creating production workflow entry:", err.message);
     }
+  }
+
+  /**
+   * Process custom payment account checkout immediately
+   */
+  async processAccountPayment(orderId, accountDetails) {
+    const order = await Order.findById(orderId).populate("customerId");
+    if (!order) {
+      throw new Error("Order not found");
+    }
+
+    const sessionId = `acct_session_${order._id}_${Date.now()}`;
+    const paymentIntentId = `acct_intent_${order._id}_${Date.now()}`;
+
+    // Create or update Payment record
+    let payment = await Payment.findOne({ orderId: order._id });
+    if (!payment) {
+      payment = new Payment({
+        orderId: order._id,
+        customerId: order.customerId?._id || null,
+        stripeSessionId: sessionId,
+        stripePaymentIntentId: paymentIntentId,
+        amount: order.totalCost,
+        currency: "lkr",
+        paymentMethod: "PaymentAccount",
+        paymentStatus: "Pending",
+        gatewayResponse: { accountDetails }
+      });
+    } else {
+      payment.stripeSessionId = sessionId;
+      payment.stripePaymentIntentId = paymentIntentId;
+      payment.paymentMethod = "PaymentAccount";
+      payment.paymentStatus = "Pending";
+      payment.gatewayResponse = { accountDetails };
+    }
+    await payment.save();
+
+    // Now fulfill the payment using our verifyAndFulfillPayment helper
+    const rawSessionData = {
+      currency: "lkr",
+      paymentIntentId,
+      accountDetails,
+      processedAt: new Date()
+    };
+
+    return await this.verifyAndFulfillPayment(sessionId, order._id, rawSessionData, "PaymentAccount");
   }
 
   /**
