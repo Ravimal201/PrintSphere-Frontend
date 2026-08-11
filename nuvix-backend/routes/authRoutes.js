@@ -24,6 +24,7 @@ router.post("/login", loginUser);
 router.put("/change-password", changePassword);
 router.get("/profile", getUserProfile);
 router.put("/profile", updateUserProfile);
+router.put("/update-profile", updateUserProfile);
 router.put("/payment-method", updateUserPaymentMethod);
 router.get("/products", getStoreProducts);
 router.get("/recommendations", getRecommendations);

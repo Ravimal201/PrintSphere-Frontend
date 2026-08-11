@@ -17,6 +17,11 @@ import {
   ShoppingBag,
   Loader2,
   CheckCircle,
+  RotateCw,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+  RefreshCw,
 } from "lucide-react";
 import axios from "axios";
 import Navbar from "../components/Navbar/RNavbar";
@@ -24,6 +29,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
+import Store3DCardPreview from "../components/Store3DCardPreview";
 import { API_BASE_URL } from "../config/api";
 
 const getOrCreateSessionId = () => {
@@ -91,6 +97,8 @@ export default function StorePage() {
   const [modalQty, setModalQty] = useState(1);
   const [modalSide, setModalSide] = useState("front");
   const [modalZoom, setModalZoom] = useState(0.85);
+  const [modalRotation, setModalRotation] = useState(0);
+  const [modalAutoRotate, setModalAutoRotate] = useState(false);
 
   useEffect(() => {
     if (selected3DProduct) {
@@ -99,6 +107,8 @@ export default function StorePage() {
       setModalQty(1);
       setModalSide("front");
       setModalZoom(0.85);
+      setModalRotation(0);
+      setModalAutoRotate(false);
 
       if (selected3DProduct._id) {
         logUserActivity(
@@ -685,18 +695,15 @@ export default function StorePage() {
                         className="group bg-white border rounded-3xl p-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition duration-200 flex flex-col justify-between"
                       >
                         <div>
-                          {/* Image (2D T-Shirt Preview) */}
-                          <div
-                            className="relative rounded-2xl bg-slate-50 h-48 flex items-center justify-center overflow-hidden mb-4 border cursor-pointer"
-                            onClick={() => setSelected3DProduct(p)}
-                          >
-                            <TShirt2D
-                              color={p.colors?.[0]}
-                              designUrl={p.images?.[0]}
-                              className="h-36 w-36 group-hover:scale-105 transition duration-300"
+                          {/* 3D T-Shirt Card Preview with Front/Back/Side hover controls */}
+                          <div className="relative mb-4">
+                            <Store3DCardPreview
+                              product={p}
+                              activeColor={selectedColor !== "All" ? selectedColor : p.colors?.[0]}
+                              onClick={() => setSelected3DProduct(p)}
                             />
                             {hasDiscount && (
-                              <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase shadow-xs z-10">
+                              <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase shadow-xs z-20 pointer-events-none">
                                 {p.discount}% Off
                               </span>
                             )}
@@ -1046,11 +1053,45 @@ export default function StorePage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[600px] select-none">
             {/* Left 3D Canvas Panel */}
-            <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-6 border-b md:border-b-0 md:border-r">
-              <div className="absolute top-4 left-4 z-10">
-                <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-wider">
-                  Interactive 3D Preview
+            <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-5 border-b md:border-b-0 md:border-r">
+              {/* Top Left info badge */}
+              <div className="absolute top-4 left-4 z-20 flex flex-col gap-1 pointer-events-none">
+                <span className="px-3 py-1 bg-indigo-50/90 backdrop-blur-md border border-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-2xs">
+                  <Sparkles className="h-3 w-3 text-indigo-600 animate-pulse" />
+                  Interactive 3D Viewer
                 </span>
+                <span className="text-[10px] text-slate-400 font-bold pl-1">
+                  Drag to rotate • Wheel to zoom
+                </span>
+              </div>
+
+              {/* Top Right View Angle Preset buttons */}
+              <div className="absolute top-4 right-4 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-md p-1 rounded-xl border border-slate-200 shadow-xs">
+                {[
+                  { id: "front", label: "Front", rot: 0 },
+                  { id: "side", label: "Side", rot: Math.PI / 2 },
+                  { id: "back", label: "Back", rot: Math.PI },
+                ].map((view) => {
+                  const isActive = modalSide === view.id && !modalAutoRotate;
+                  return (
+                    <button
+                      key={view.id}
+                      type="button"
+                      onClick={() => {
+                        setModalSide(view.id);
+                        setModalRotation(view.rot);
+                        setModalAutoRotate(false);
+                      }}
+                      className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {view.label}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* 3D canvas container */}
@@ -1064,23 +1105,113 @@ export default function StorePage() {
                   selectedLayerId={null}
                   onSelectLayer={() => {}}
                   onUpdateLayers={() => {}}
+                  modelRotation={modalRotation}
+                  orbitEnabled={true}
+                  autoRotate={modalAutoRotate}
                 />
               </div>
 
-              {/* Zoom control slider */}
-              <div className="flex items-center gap-3 bg-white/80 backdrop-blur-xs border rounded-2xl px-4 py-2 self-center z-10 shadow-xs">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">
-                  Zoom
-                </span>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="1.5"
-                  step="0.05"
-                  value={modalZoom}
-                  onChange={(e) => setModalZoom(parseFloat(e.target.value))}
-                  className="w-28 accent-indigo-600 h-1 bg-slate-200 rounded-lg appearance-none"
-                />
+              {/* Controls Toolbar (Adjustable Zoom & Rotation Controls) */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-2.5 z-20 shadow-md">
+                {/* Zoom Controls */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider pl-1">
+                    Zoom
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setModalZoom((prev) => Math.max(0.5, parseFloat((prev - 0.1).toFixed(2))))}
+                    className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-indigo-600 rounded-lg transition border border-slate-200 cursor-pointer"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="h-3.5 w-3.5" />
+                  </button>
+
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="1.5"
+                    step="0.05"
+                    value={modalZoom}
+                    onChange={(e) => setModalZoom(parseFloat(e.target.value))}
+                    className="w-20 accent-indigo-600 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setModalZoom((prev) => Math.min(1.5, parseFloat((prev + 0.1).toFixed(2))))}
+                    className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-indigo-600 rounded-lg transition border border-slate-200 cursor-pointer"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="h-3.5 w-3.5" />
+                  </button>
+
+                  <span className="text-[10px] font-black text-slate-800 min-w-[2.2rem] text-center">
+                    {Math.round(modalZoom * 100)}%
+                  </span>
+                </div>
+
+                {/* Divider */}
+                <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+                {/* Rotate Controls */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                    Rotate
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalRotation((prev) => prev - Math.PI / 4);
+                      setModalAutoRotate(false);
+                    }}
+                    className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-indigo-600 rounded-lg transition border border-slate-200 cursor-pointer flex items-center gap-1 text-[10px] font-bold"
+                    title="Rotate Left 45°"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalRotation((prev) => prev + Math.PI / 4);
+                      setModalAutoRotate(false);
+                    }}
+                    className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-indigo-600 rounded-lg transition border border-slate-200 cursor-pointer flex items-center gap-1 text-[10px] font-bold"
+                    title="Rotate Right 45°"
+                  >
+                    <RotateCw className="h-3.5 w-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalAutoRotate((prev) => !prev)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black border transition flex items-center gap-1 cursor-pointer ${
+                      modalAutoRotate
+                        ? "bg-indigo-600 text-white border-indigo-700 shadow-xs"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                    title="Toggle Auto 360° Spin"
+                  >
+                    <RotateCw className={`h-3 w-3 ${modalAutoRotate ? "animate-spin" : ""}`} />
+                    <span>{modalAutoRotate ? "Spinning" : "Auto-Rotate"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalSide("front");
+                      setModalRotation(0);
+                      setModalZoom(0.85);
+                      setModalAutoRotate(false);
+                    }}
+                    className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-lg transition border border-slate-200 cursor-pointer"
+                    title="Reset 3D View"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
 
