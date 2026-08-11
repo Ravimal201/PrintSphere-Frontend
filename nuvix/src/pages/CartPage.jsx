@@ -305,6 +305,13 @@ export default function CartPage() {
       saveCart([]);
       setIsCheckoutModalOpen(false);
       window.location.href = `/payment?order_id=${orderId}`;
+    } catch (err) {
+      console.error("Checkout order error:", err);
+      const errMsg = err.response?.data?.message || err.message || "Failed to create order for checkout. Please try again.";
+      alert(errMsg);
+      setCheckoutLoading(false);
+    }
+  };
 
 
   const hasAddress = Boolean(addressForm.street || addressForm.city || user?.address?.street);
