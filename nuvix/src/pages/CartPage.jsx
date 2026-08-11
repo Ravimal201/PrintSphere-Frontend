@@ -217,28 +217,15 @@ export default function CartPage() {
     return "CARD";
   };
 
-  // Confirm Order & Process Payment directly from Popup Window
+  // Confirm Order & Redirect to Payment Interface
   const handleConfirmCheckout = async (e) => {
     if (e) e.preventDefault();
 
     const token = localStorage.getItem("token");
-    if (!token) return;
-
-    // Validate payment inputs if user is entering a new card
-    if (selectedGateway === "card" && isEditingPaymentMethod) {
-      const cleanNum = cardForm.cardNumber.replace(/\s/g, "");
-      if (cleanNum.length < 16) {
-        alert("Please enter a valid 16-digit credit/debit card number.");
-        return;
-      }
-      if (!cardForm.expiryDate || cardForm.expiryDate.length < 5) {
-        alert("Please enter a valid expiry date (MM/YY).");
-        return;
-      }
-      if (!cardForm.cvv || cardForm.cvv.length < 3) {
-        alert("Please enter a valid CVV code.");
-        return;
-      }
+    if (!token) {
+      alert("Please log in to complete your checkout.");
+      window.location.href = "/login?redirect=/cart";
+      return;
     }
 
     const headers = { Authorization: `Bearer ${token}` };
@@ -254,7 +241,7 @@ export default function CartPage() {
     try {
       setCheckoutLoading(true);
 
-      // 1. Update user delivery address on backend if updated
+      // 1. Update user delivery address on backend if provided
       if (addressForm.street || addressForm.city) {
         try {
           await axios.put(`${API_BASE_URL}/auth/profile`, {
@@ -266,26 +253,7 @@ export default function CartPage() {
         }
       }
 
-      // 2. Save user payment method on backend if requested
-      if (selectedGateway === "card" && isEditingPaymentMethod && cardForm.saveCard) {
-        try {
-          const pmRes = await axios.put(`${API_BASE_URL}/auth/payment-method`, {
-            methodType: "card",
-            cardholderName: cardForm.cardholderName,
-            cardNumber: cardForm.cardNumber,
-            expiryDate: cardForm.expiryDate,
-            brand: getCardBrand()
-          }, { headers });
-          if (pmRes.data?.user) {
-            setUser(pmRes.data.user);
-            localStorage.setItem("user", JSON.stringify(pmRes.data.user));
-          }
-        } catch (e) {
-          console.error("Save payment method error:", e);
-        }
-      }
-
-      // 3. Resolve custom designs and items
+      // 2. Resolve custom designs and items
       const resolvedItems = [];
       for (const item of cart) {
         if (item.isCustom || item.designId?.startsWith("custom-")) {
@@ -318,7 +286,7 @@ export default function CartPage() {
         }
       }
 
-      // 4. Create order in backend DB
+      // 3. Create order in backend DB with Pending Payment status
       const orderPayload = {
         items: resolvedItems,
         subtotal: cartSubtotal,
@@ -331,86 +299,14 @@ export default function CartPage() {
       const orderRes = await axios.post(`${API_BASE_URL}/auth/orders`, orderPayload, { headers });
       const orderId = orderRes.data.order._id;
 
-      if (selectedGateway === "paymentaccount") {
-        if (!accountDetails.provider || !accountDetails.accountNumber || !accountDetails.holderName) {
-          alert("Please fill in all payment account details.");
-          setCheckoutLoading(false);
-          return;
-        }
-
-        await processAccountPayment(orderId, accountDetails);
-        saveCart([]); // Clear cart
-        setCheckoutSuccess(true);
-        window.location.href = `/payment/success?order_id=${orderId}&gateway=paymentaccount`;
-      } else if (selectedGateway === "payhere") {
-        await loadPayHereScript();
-
-        const sessionRes = await axios.post(
-          `${API_BASE_URL}/payment/create-checkout-session`,
-          { orderId, gateway: "payhere" },
-          { headers }
-        );
-
-        if (sessionRes.data && sessionRes.data.payhereParams) {
-          saveCart([]); // Clear cart
-          setCheckoutSuccess(true);
-
-          window.payhere.onCompleted = function (completedOrderId) {
-            console.log("PayHere Checkout Completed. Order ID: " + completedOrderId);
-            window.location.href = `/payment/success?order_id=${completedOrderId}&gateway=payhere`;
-          };
-
-          window.payhere.onDismissed = function () {
-            console.log("PayHere Checkout Dismissed");
-            window.location.href = `/payment/cancel?order_id=${orderId}&gateway=payhere`;
-          };
-
-          window.payhere.onError = function (error) {
-            console.error("PayHere Checkout Error: ", error);
-            alert("PayHere Checkout Error: " + error);
-            setCheckoutLoading(false);
-          };
-
-          window.payhere.startPayment(sessionRes.data.payhereParams);
-        } else {
-          throw new Error("PayHere payment parameters were not returned by backend");
-        }
-      } else if (selectedGateway === "card") {
-        let cardDetailsPayload;
-        if (hasSavedPaymentMethod && !isEditingPaymentMethod) {
-          cardDetailsPayload = {
-            cardNumber: "411122223333" + user.savedPaymentMethod.cardLast4, // mock full card number from last4
-            cardholderName: user.savedPaymentMethod.cardholderName || user.name,
-            expiryDate: user.savedPaymentMethod.expiryDate || "12/28",
-            cvv: "123",
-            brand: user.savedPaymentMethod.brand
-          };
-        } else {
-          cardDetailsPayload = {
-            cardNumber: cardForm.cardNumber,
-            cardholderName: cardForm.cardholderName,
-            expiryDate: cardForm.expiryDate,
-            cvv: cardForm.cvv,
-            brand: getCardBrand()
-          };
-        }
-
-        await processCardPayment(orderId, cardDetailsPayload);
-
-        saveCart([]); // Clear cart
-        setIsCheckoutModalOpen(false);
-        setCheckoutSuccess(true);
-        window.location.href = `/payment/success?order_id=${orderId}&gateway=card`;
-      } else {
-        // Fallback for COD or other payment methods
-        saveCart([]);
-        setIsCheckoutModalOpen(false);
-        setCheckoutSuccess(true);
-        window.location.href = `/payment/success?order_id=${orderId}&gateway=${selectedGateway}`;
-      }
+      // 4. Save pending order ID, clear cart, and navigate to Payment Interface
+      localStorage.setItem("printsphere_pending_order_id", orderId);
+      saveCart([]);
+      setIsCheckoutModalOpen(false);
+      window.location.href = `/payment?order_id=${orderId}`;
     } catch (err) {
       console.error("Checkout order error:", err);
-      const errMsg = err.response?.data?.message || err.message || "Failed to process checkout. Please try again.";
+      const errMsg = err.response?.data?.message || err.message || "Failed to create order for checkout. Please try again.";
       alert(errMsg);
       setCheckoutLoading(false);
     }
@@ -564,125 +460,6 @@ export default function CartPage() {
                       </div>
                     </div>
 
-                    {/* Payment Gateway Selector */}
-                    <div className="space-y-3 pt-3 border-t select-none">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                        Choose Payment Method
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedGateway("stripe")}
-                          className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
-                            selectedGateway === "stripe"
-                              ? "border-indigo-650 bg-indigo-50/30 text-indigo-750 font-extrabold shadow-sm"
-                              : "border-slate-100 hover:border-slate-200 text-slate-500 hover:bg-slate-50/50"
-                          }`}
-                        >
-                          <span className="text-[11px] font-bold">Stripe Card</span>
-                          <span className="text-[8px] text-slate-400 mt-0.5 font-medium">Credit / Debit</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedGateway("payhere")}
-                          className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
-                            selectedGateway === "payhere"
-                              ? "border-indigo-650 bg-indigo-50/30 text-indigo-750 font-extrabold shadow-sm"
-                              : "border-slate-100 hover:border-slate-200 text-slate-500 hover:bg-slate-50/50"
-                          }`}
-                        >
-                          <span className="text-[11px] font-bold">PayHere</span>
-                          <span className="text-[8px] text-emerald-600 mt-0.5 font-bold">Sandbox</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedGateway("paymentaccount")}
-                          className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
-                            selectedGateway === "paymentaccount"
-                              ? "border-indigo-650 bg-indigo-50/30 text-indigo-750 font-extrabold shadow-sm"
-                              : "border-slate-100 hover:border-slate-200 text-slate-500 hover:bg-slate-50/50"
-                          }`}
-                        >
-                          <span className="text-[11px] font-bold flex items-center gap-0.5">
-                            <Wallet className="h-3.5 w-3.5 text-indigo-600" />
-                            Account
-                          </span>
-                          <span className="text-[8px] text-slate-400 mt-0.5 font-medium">Any Account</span>
-                        </button>
-                      </div>
-
-                      {selectedGateway === "paymentaccount" && (
-                        <div className="mt-3 p-3 border border-indigo-100 bg-indigo-50/10 rounded-2xl space-y-2.5 transition-all text-left">
-                          <span className="text-[10px] font-extrabold text-indigo-900 block mb-1">
-                            Enter Payment Account Details
-                          </span>
-                          
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[9px] font-bold text-slate-400 block mb-1">PROVIDER NAME</label>
-                              <input
-                                type="text"
-                                placeholder="Commercial Bank, PayPal..."
-                                value={accountDetails.provider}
-                                onChange={(e) => setAccountDetails({...accountDetails, provider: e.target.value})}
-                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[9px] font-bold text-slate-400 block mb-1">ACCOUNT TYPE</label>
-                              <select
-                                value={accountDetails.accountType}
-                                onChange={(e) => setAccountDetails({...accountDetails, accountType: e.target.value})}
-                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:border-indigo-500"
-                              >
-                                <option value="Bank Account">Bank Account</option>
-                                <option value="Mobile Wallet">Mobile Wallet</option>
-                                <option value="Card">Card</option>
-                                <option value="Digital Account">Digital Account</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="text-[9px] font-bold text-slate-400 block mb-1">ACCOUNT NUMBER / ID</label>
-                            <input
-                              type="text"
-                              placeholder="Enter account or wallet number"
-                              value={accountDetails.accountNumber}
-                              onChange={(e) => setAccountDetails({...accountDetails, accountNumber: e.target.value})}
-                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[9px] font-bold text-slate-400 block mb-1">ACCOUNT HOLDER NAME</label>
-                            <input
-                              type="text"
-                              placeholder="Enter account holder's name"
-                              value={accountDetails.holderName}
-                              onChange={(e) => setAccountDetails({...accountDetails, holderName: e.target.value})}
-                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[9px] font-bold text-slate-400 block mb-1">SECURITY PIN / PASSWORD</label>
-                            <input
-                              type="password"
-                              placeholder="Enter PIN or password (simulated)"
-                              value={accountDetails.pin}
-                              onChange={(e) => setAccountDetails({...accountDetails, pin: e.target.value})}
-                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-
                     <button
                       onClick={handleOpenCheckoutModal}
                       className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-4 flex items-center justify-center gap-2 cursor-pointer"
@@ -700,7 +477,7 @@ export default function CartPage() {
 
       <Footer withSidebarOffset />
 
-      {/* Interactive Checkout & Payment Pop-up Window */}
+      {/* Interactive Checkout Order Preview Window */}
       {isCheckoutModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-6 max-h-[90vh] overflow-y-auto">
@@ -713,7 +490,7 @@ export default function CartPage() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 text-lg">Checkout Order Preview</h3>
-                  <p className="text-xs text-slate-500">Review your custom designs, delivery details & payment method</p>
+                  <p className="text-xs text-slate-500">Review your custom designs & delivery details before payment</p>
                 </div>
               </div>
               <button
@@ -832,195 +609,15 @@ export default function CartPage() {
               )}
             </div>
 
-            {/* Section 3: Dynamic Payment Method Details */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <CreditCard className="h-3.5 w-3.5 text-indigo-600" />
-                  Payment Method Details
-                </h4>
-                {hasSavedPaymentMethod && (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingPaymentMethod(!isEditingPaymentMethod)}
-                    className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-white border border-indigo-150 px-2.5 py-1 rounded-xl shadow-2xs hover:bg-indigo-50 transition cursor-pointer"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" />
-                    <span>{isEditingPaymentMethod ? "Use Saved Card" : "Edit / Change Payment Method"}</span>
-                  </button>
-                )}
+            {/* Section 3: Next Step Notice */}
+            <div className="p-4 bg-indigo-50/70 border border-indigo-150 rounded-2xl space-y-1.5 text-xs text-indigo-950">
+              <div className="flex items-center gap-2 font-extrabold text-indigo-900">
+                <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                <span>Next Step: Secure Payment Interface</span>
               </div>
-
-              {/* Case A: Saved Payment Method View */}
-              {hasSavedPaymentMethod && !isEditingPaymentMethod ? (
-                <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 shadow-md flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-white/10 border border-white/20 rounded-xl text-amber-400 font-black text-xs">
-                      {user.savedPaymentMethod.brand || "VISA"}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-bold tracking-wider">
-                          •••• •••• •••• {user.savedPaymentMethod.cardLast4 || "4242"}
-                        </span>
-                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md text-[9px] font-extrabold uppercase">
-                          Saved
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-300 font-medium mt-0.5">
-                        Cardholder: {user.savedPaymentMethod.cardholderName || user.name} | Expires: {user.savedPaymentMethod.expiryDate || "12/28"}
-                      </p>
-                    </div>
-                  </div>
-                  <ShieldCheck className="h-6 w-6 text-emerald-400 shrink-0" />
-                </div>
-              ) : (
-                /* Case B: First Time or Edit Payment Method */
-                <div className="space-y-4 bg-slate-50 border border-slate-150 rounded-2xl p-4">
-                  {/* Selector Tabs */}
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGateway("card")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
-                        selectedGateway === "card"
-                          ? "border-indigo-600 bg-white text-indigo-700 font-extrabold shadow-2xs"
-                          : "border-slate-200 text-slate-500 hover:bg-white"
-                      }`}
-                    >
-                      <CreditCard className="h-4 w-4 mb-0.5 text-indigo-600" />
-                      <span className="text-[11px] font-bold">Credit / Debit Card</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGateway("payhere")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
-                        selectedGateway === "payhere"
-                          ? "border-indigo-600 bg-white text-indigo-700 font-extrabold shadow-2xs"
-                          : "border-slate-200 text-slate-500 hover:bg-white"
-                      }`}
-                    >
-                      <Building className="h-4 w-4 mb-0.5 text-indigo-600" />
-                      <span className="text-[11px] font-bold">PayHere Portal</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGateway("cod")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
-                        selectedGateway === "cod"
-                          ? "border-indigo-600 bg-white text-indigo-700 font-extrabold shadow-2xs"
-                          : "border-slate-200 text-slate-500 hover:bg-white"
-                      }`}
-                    >
-                      <Truck className="h-4 w-4 mb-0.5 text-slate-600" />
-                      <span className="text-[11px] font-bold">Pay on Delivery</span>
-                    </button>
-                  </div>
-
-                  {/* Card Form Inputs */}
-                  {selectedGateway === "card" && (
-                    <div className="space-y-3 pt-2 text-xs font-semibold text-slate-700">
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                          Cardholder Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Sachinthaka Ravimal"
-                          value={cardForm.cardholderName}
-                          onChange={(e) => setCardForm({ ...cardForm, cardholderName: e.target.value })}
-                          className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-800"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                          Card Number *
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            required
-                            placeholder="4111 2222 3333 4444"
-                            maxLength={19}
-                            value={cardForm.cardNumber}
-                            onChange={handleCardNumberChange}
-                            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-800 font-mono"
-                          />
-                          <span className="absolute right-3 top-2 text-[10px] font-extrabold text-indigo-600">
-                            {getCardBrand()}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Expiry Date (MM/YY) *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="MM/YY"
-                            maxLength={5}
-                            value={cardForm.expiryDate}
-                            onChange={handleExpiryChange}
-                            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-800 font-mono"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            CVC / CVV *
-                          </label>
-                          <input
-                            type="password"
-                            required
-                            placeholder="123"
-                            maxLength={4}
-                            value={cardForm.cvv}
-                            onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "") })}
-                            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-slate-800 font-mono"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <input
-                          type="checkbox"
-                          id="saveCard"
-                          checked={cardForm.saveCard}
-                          onChange={(e) => setCardForm({ ...cardForm, saveCard: e.target.checked })}
-                          className="rounded text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <label htmlFor="saveCard" className="text-[11px] font-semibold text-slate-600">
-                          Save payment method for future orders
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedGateway === "payhere" && (
-                    <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs text-indigo-900">
-                      <p className="font-bold">PayHere Gateway Selected</p>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
-                        Supports Sampath Vishwa, Commercial Bank, HNB & eZ Cash online banking.
-                      </p>
-                    </div>
-                  )}
-
-                  {selectedGateway === "cod" && (
-                    <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-800">
-                      <p className="font-bold">Pay on Delivery Selected</p>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
-                        Pay cash directly to courier upon delivery at your shipping address.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+              <p className="text-[11px] text-slate-600 leading-snug">
+                When you click <strong>Proceed to Payment Interface</strong> below, your order will be created and you will land on our payment gateway page to enter your Payment Account or Card credentials and click Pay.
+              </p>
             </div>
 
             {/* Total Cost & Confirm Action */}
@@ -1053,12 +650,12 @@ export default function CartPage() {
                   {checkoutLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin text-white" />
-                      <span>Processing Payment...</span>
+                      <span>Creating Order...</span>
                     </>
                   ) : (
                     <>
                       <CreditCard className="h-4 w-4" />
-                      <span>Confirm & Pay Rs. {cartTotal.toFixed(2)}</span>
+                      <span>Proceed to Payment Interface</span>
                     </>
                   )}
                 </button>

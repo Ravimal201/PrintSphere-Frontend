@@ -3,16 +3,26 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2 } from "lucide-react";
+import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2, Wallet } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
+import { processAccountPayment, processCardPayment, createCheckoutSession } from "../services/paymentService";
 
 export default function PaymentPage() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState("card"); // 'card', 'payhere', 'cod'
+  const [selectedMethod, setSelectedMethod] = useState("paymentaccount"); // 'paymentaccount', 'card', 'payhere', 'cod'
+
+  // Payment Account Form State
+  const [accountDetails, setAccountDetails] = useState({
+    provider: "",
+    accountType: "Bank Account",
+    accountNumber: "",
+    holderName: "",
+    pin: ""
+  });
 
   // Card Form State
   const [cardForm, setCardForm] = useState({
@@ -113,9 +123,30 @@ export default function PaymentPage() {
     return "CARD";
   };
 
-  // Process Interactive Payment Submission
+  const loadPayHereScript = () => {
+    return new Promise((resolve, reject) => {
+      if (window.payhere) {
+        resolve(true);
+        return;
+      }
+      const existingScript = document.querySelector('script[src="https://www.payhere.lk/lib/payhere.js"]');
+      if (existingScript) {
+        existingScript.onload = () => resolve(true);
+        existingScript.onerror = () => reject(new Error("Failed to load PayHere SDK"));
+        return;
+      }
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src = "https://www.payhere.lk/lib/payhere.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => reject(new Error("Failed to load PayHere SDK"));
+      document.body.appendChild(script);
+    });
+  };
+
+  // Process Interactive Payment Submission via Gateway Verification
   const handleProcessPayment = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setErrorMessage("");
 
     if (!order) {
@@ -123,50 +154,112 @@ export default function PaymentPage() {
       return;
     }
 
-    if (selectedMethod === "card") {
-      const cleanNum = cardForm.cardNumber.replace(/\s/g, "");
-      if (cleanNum.length < 16) {
-        setErrorMessage("Please enter a valid 16-digit card number.");
-        return;
-      }
-      if (!cardForm.expiryDate || cardForm.expiryDate.length < 5) {
-        setErrorMessage("Please enter a valid expiry date (MM/YY).");
-        return;
-      }
-      if (!cardForm.cvv || cardForm.cvv.length < 3) {
-        setErrorMessage("Please enter a valid 3-digit CVV code.");
-        return;
-      }
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/login?redirect=/payment";
+      return;
     }
 
     setProcessingPayment(true);
 
     try {
-      const token = localStorage.getItem("token");
-      const headers = { Authorization: `Bearer ${token}` };
+      if (selectedMethod === "paymentaccount") {
+        if (!accountDetails.provider || !accountDetails.accountNumber || !accountDetails.holderName) {
+          setErrorMessage("Please fill in all account payment details (Provider Name, Account Number, and Account Holder Name).");
+          setProcessingPayment(false);
+          return;
+        }
 
-      // Simulate payment processing delay for realistic user experience
-      await new Promise(res => setTimeout(res, 1800));
+        const data = await processAccountPayment(order._id, accountDetails);
+        if (data && data.success) {
+          localStorage.removeItem("printsphere_pending_order_id");
+          localStorage.setItem("printsphere_cart", JSON.stringify([]));
+          window.location.href = `/payment/success?order_id=${order._id}&gateway=paymentaccount`;
+        } else {
+          throw new Error(data?.message || "Account payment verification failed.");
+        }
+      } else if (selectedMethod === "card") {
+        const cleanNum = cardForm.cardNumber.replace(/\s/g, "");
+        if (cleanNum.length < 15) {
+          setErrorMessage("Please enter a valid card number.");
+          setProcessingPayment(false);
+          return;
+        }
+        if (!cardForm.expiryDate || cardForm.expiryDate.length < 5) {
+          setErrorMessage("Please enter a valid expiry date (MM/YY).");
+          setProcessingPayment(false);
+          return;
+        }
+        if (!cardForm.cvv || cardForm.cvv.length < 3) {
+          setErrorMessage("Please enter a valid 3-digit CVV code.");
+          setProcessingPayment(false);
+          return;
+        }
 
-      // Call backend to verify and update order status to Paid
-      const res = await axios.get(
-        `${API_BASE_URL}/payment/success?session_id=direct_${selectedMethod}_${order._id}&order_id=${order._id}`,
-        { headers }
-      );
+        const data = await processCardPayment(order._id, {
+          cardNumber: cardForm.cardNumber,
+          cardholderName: cardForm.cardholderName,
+          expiryDate: cardForm.expiryDate,
+          cvv: cardForm.cvv,
+          brand: getCardBrand()
+        });
 
-      if (res.data && res.data.success) {
-        // Clear pending cart/order storage
-        localStorage.removeItem("printsphere_pending_order_id");
-        localStorage.setItem("printsphere_cart", JSON.stringify([]));
+        if (data && data.success) {
+          localStorage.removeItem("printsphere_pending_order_id");
+          localStorage.setItem("printsphere_cart", JSON.stringify([]));
+          window.location.href = `/payment/success?order_id=${order._id}&gateway=card`;
+        } else {
+          throw new Error(data?.message || "Card payment authorization failed.");
+        }
+      } else if (selectedMethod === "payhere") {
+        await loadPayHereScript();
+        const headers = { Authorization: `Bearer ${token}` };
+        const sessionRes = await axios.post(
+          `${API_BASE_URL}/payment/create-checkout-session`,
+          { orderId: order._id, gateway: "payhere" },
+          { headers }
+        );
 
-        // Redirect to success confirmation page
-        window.location.href = `/payment/success?order_id=${order._id}&gateway=${selectedMethod}`;
+        if (sessionRes.data && sessionRes.data.payhereParams) {
+          localStorage.removeItem("printsphere_pending_order_id");
+          localStorage.setItem("printsphere_cart", JSON.stringify([]));
+
+          window.payhere.onCompleted = function (completedOrderId) {
+            window.location.href = `/payment/success?order_id=${completedOrderId}&gateway=payhere`;
+          };
+
+          window.payhere.onDismissed = function () {
+            window.location.href = `/payment/cancel?order_id=${order._id}&gateway=payhere`;
+          };
+
+          window.payhere.onError = function (error) {
+            console.error("PayHere Checkout Error: ", error);
+            setErrorMessage("PayHere Checkout Error: " + error);
+            setProcessingPayment(false);
+          };
+
+          window.payhere.startPayment(sessionRes.data.payhereParams);
+        } else {
+          throw new Error("PayHere payment parameters were not returned by backend");
+        }
       } else {
-        throw new Error(res.data?.message || "Payment authorization failed");
+        // Cash on Delivery (COD)
+        const headers = { Authorization: `Bearer ${token}` };
+        const res = await axios.get(
+          `${API_BASE_URL}/payment/success?session_id=direct_cod_${order._id}&order_id=${order._id}`,
+          { headers }
+        );
+        if (res.data && res.data.success) {
+          localStorage.removeItem("printsphere_pending_order_id");
+          localStorage.setItem("printsphere_cart", JSON.stringify([]));
+          window.location.href = `/payment/success?order_id=${order._id}&gateway=cod`;
+        } else {
+          throw new Error("Order confirmation failed.");
+        }
       }
     } catch (err) {
       console.error("Payment submission error:", err);
-      setErrorMessage(err.response?.data?.message || err.message || "Payment processing error. Please verify card details.");
+      setErrorMessage(err.response?.data?.message || err.message || "Payment processing error. Please verify payment details.");
       setProcessingPayment(false);
     }
   };
@@ -232,11 +325,25 @@ export default function PaymentPage() {
                   <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
                     <h3 className="text-sm font-extrabold text-slate-900">Select Payment Method</h3>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMethod("paymentaccount")}
+                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
+                          selectedMethod === "paymentaccount"
+                            ? "border-indigo-650 bg-indigo-50/50 text-indigo-900 font-extrabold shadow-xs"
+                            : "border-slate-150 hover:border-slate-300 text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Wallet className="h-5 w-5 mb-1 text-indigo-600" />
+                        <span className="text-xs font-bold">Payment Account</span>
+                        <span className="text-[9px] text-slate-400 font-semibold">Bank / Wallet</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => setSelectedMethod("card")}
-                        className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
                           selectedMethod === "card"
                             ? "border-indigo-650 bg-indigo-50/50 text-indigo-900 font-extrabold shadow-xs"
                             : "border-slate-150 hover:border-slate-300 text-slate-500 hover:bg-slate-50"
@@ -244,13 +351,13 @@ export default function PaymentPage() {
                       >
                         <CreditCard className="h-5 w-5 mb-1 text-indigo-600" />
                         <span className="text-xs font-bold">Credit / Debit</span>
-                        <span className="text-[9px] text-slate-400 font-semibold">Instant</span>
+                        <span className="text-[9px] text-slate-400 font-semibold">Instant Card</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSelectedMethod("payhere")}
-                        className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
                           selectedMethod === "payhere"
                             ? "border-indigo-650 bg-indigo-50/50 text-indigo-900 font-extrabold shadow-xs"
                             : "border-slate-150 hover:border-slate-300 text-slate-500 hover:bg-slate-50"
@@ -264,7 +371,7 @@ export default function PaymentPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedMethod("cod")}
-                        className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
                           selectedMethod === "cod"
                             ? "border-indigo-650 bg-indigo-50/50 text-indigo-900 font-extrabold shadow-xs"
                             : "border-slate-150 hover:border-slate-300 text-slate-500 hover:bg-slate-50"
@@ -276,6 +383,117 @@ export default function PaymentPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Payment Account Form */}
+                  {selectedMethod === "paymentaccount" && (
+                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                      <div className="flex items-center gap-3 pb-3 border-b">
+                        <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-2xl text-indigo-600">
+                          <Wallet className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-extrabold text-slate-900 text-base">Payment Account Gateway</h4>
+                          <p className="text-xs text-slate-500">Enter bank, wallet, or payment account details to authorize payment</p>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleProcessPayment} className="space-y-4 text-xs font-semibold text-slate-700">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                              Provider Name *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Commercial Bank, PayPal, Sampath"
+                              value={accountDetails.provider}
+                              onChange={(e) => setAccountDetails({ ...accountDetails, provider: e.target.value })}
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 transition"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                              Account Type *
+                            </label>
+                            <select
+                              value={accountDetails.accountType}
+                              onChange={(e) => setAccountDetails({ ...accountDetails, accountType: e.target.value })}
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 bg-white transition cursor-pointer"
+                            >
+                              <option value="Bank Account">Bank Account</option>
+                              <option value="Mobile Wallet">Mobile Wallet</option>
+                              <option value="Card">Card Account</option>
+                              <option value="Digital Account">Digital Account</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                            Account Number / ID *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. 100234598120"
+                            value={accountDetails.accountNumber}
+                            onChange={(e) => setAccountDetails({ ...accountDetails, accountNumber: e.target.value })}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                            Account Holder Name *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Sachinthaka Ravimal"
+                            value={accountDetails.holderName}
+                            onChange={(e) => setAccountDetails({ ...accountDetails, holderName: e.target.value })}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 transition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                            Security PIN / Password
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="password"
+                              placeholder="Enter security PIN or password"
+                              value={accountDetails.pin}
+                              onChange={(e) => setAccountDetails({ ...accountDetails, pin: e.target.value })}
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
+                            />
+                            <Lock className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={processingPayment}
+                          className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-99 text-white rounded-xl text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
+                        >
+                          {processingPayment ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin text-white" />
+                              <span>Verifying Account & Processing Payment...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="h-5 w-5" />
+                              <span>Pay Rs. {order.totalCost?.toFixed(2)} Now</span>
+                            </>
+                          )}
+                        </button>
+                      </form>
+                    </div>
+                  )}
 
                   {/* Payment Card Form & Interactive Visual Graphic */}
                   {selectedMethod === "card" && (

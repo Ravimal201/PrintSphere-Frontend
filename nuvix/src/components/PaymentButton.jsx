@@ -63,23 +63,11 @@ export default function PaymentButton({
       return;
     }
 
-    if (gateway.toLowerCase() === "paymentaccount") {
-      setErrorMessage("");
-      setIsModalOpen(true);
-      return;
-    }
-
-    if (gateway.toLowerCase() === "stripe" || gateway.toLowerCase() === "card") {
-      setErrorMessage("");
-      setIsCardModalOpen(true);
-      return;
-    }
-
     setLoading(true);
     setErrorMessage("");
 
     try {
-      // Save pending order ID and redirect to Payment Portal page
+      // Save pending order ID and redirect to Payment Gateway page
       localStorage.setItem("printsphere_pending_order_id", orderId);
       window.location.href = `/payment?order_id=${orderId}`;
     } catch (err) {
