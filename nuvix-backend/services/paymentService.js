@@ -370,7 +370,7 @@ class PaymentService {
     if (resolvedPaymentMethod === "PayHere") {
       payment.stripeSessionId = sessionId || payment.stripeSessionId || "payhere_success";
       payment.stripePaymentIntentId = rawSessionData?.payment_id || sessionId || payment.stripePaymentIntentId || "payhere_success";
-    } else if (resolvedPaymentMethod === "PaymentAccount") {
+    } else if (resolvedPaymentMethod === "PaymentAccount" || resolvedPaymentMethod === "Card") {
       payment.stripeSessionId = sessionId || payment.stripeSessionId || `acct_session_${order._id}`;
       payment.stripePaymentIntentId = rawSessionData?.paymentIntentId || sessionId || payment.stripePaymentIntentId || `acct_intent_${order._id}`;
     } else {
@@ -507,6 +507,77 @@ class PaymentService {
     };
 
     return await this.verifyAndFulfillPayment(sessionId, order._id, rawSessionData, "PaymentAccount");
+  }
+
+  /**
+   * Process custom credit/debit card payment simulating gateway responses
+   */
+  async processCardPayment(orderId, cardDetails) {
+    const order = await Order.findById(orderId).populate("customerId");
+    if (!order) {
+      throw new Error("Order not found");
+    }
+
+    const cleanCardNo = (cardDetails.cardNumber || "").replace(/\s/g, "");
+
+    // Insufficient Funds Check
+    const insufficientFundsCards = ["4024007194349121", "5459051433777487", "370787711978928"];
+    if (insufficientFundsCards.includes(cleanCardNo)) {
+      throw new Error("Payment failed: Insufficient Funds");
+    }
+
+    // Limit Exceeded Check
+    const limitExceededCards = ["4929119799365646", "5491182243178283", "340701811823469"];
+    if (limitExceededCards.includes(cleanCardNo)) {
+      throw new Error("Payment failed: Limit Exceeded");
+    }
+
+    // Do Not Honor Check
+    const doNotHonorCards = ["4929768900837248", "5388172137367973", "374664175202812"];
+    if (doNotHonorCards.includes(cleanCardNo)) {
+      throw new Error("Payment failed: Do Not Honor");
+    }
+
+    // Network Error Check
+    const networkErrorCards = ["4024007120869333", "5237980565185003", "373433500205887"];
+    if (networkErrorCards.includes(cleanCardNo)) {
+      throw new Error("Payment failed: Network Error");
+    }
+
+    // Process payment as successful
+    const sessionId = `card_session_${order._id}_${Date.now()}`;
+    const paymentIntentId = `card_intent_${order._id}_${Date.now()}`;
+
+    let payment = await Payment.findOne({ orderId: order._id });
+    if (!payment) {
+      payment = new Payment({
+        orderId: order._id,
+        customerId: order.customerId?._id || null,
+        stripeSessionId: sessionId,
+        stripePaymentIntentId: paymentIntentId,
+        amount: order.totalCost,
+        currency: "lkr",
+        paymentMethod: "Card",
+        paymentStatus: "Pending",
+        gatewayResponse: { cardholderName: cardDetails.cardholderName, cardBrand: cardDetails.brand || "Card" }
+      });
+    } else {
+      payment.stripeSessionId = sessionId;
+      payment.stripePaymentIntentId = paymentIntentId;
+      payment.paymentMethod = "Card";
+      payment.paymentStatus = "Pending";
+      payment.gatewayResponse = { cardholderName: cardDetails.cardholderName, cardBrand: cardDetails.brand || "Card" };
+    }
+    await payment.save();
+
+    const rawSessionData = {
+      currency: "lkr",
+      paymentIntentId,
+      cardholderName: cardDetails.cardholderName,
+      processedAt: new Date()
+    };
+
+    return await this.verifyAndFulfillPayment(sessionId, order._id, rawSessionData, "Card");
   }
 
   /**

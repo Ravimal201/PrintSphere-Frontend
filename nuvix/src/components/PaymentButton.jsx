@@ -25,6 +25,14 @@ export default function PaymentButton({
     holderName: "",
     pin: ""
   });
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+  const [cardDetails, setCardDetails] = useState({
+    cardholderName: "",
+    cardNumber: "",
+    expiryDate: "",
+    cvv: "",
+    brand: "CARD"
+  });
 
   const loadPayHereScript = () => {
     return new Promise((resolve, reject) => {
@@ -55,17 +63,11 @@ export default function PaymentButton({
       return;
     }
 
-    if (gateway.toLowerCase() === "paymentaccount") {
-      setErrorMessage("");
-      setIsModalOpen(true);
-      return;
-    }
-
     setLoading(true);
     setErrorMessage("");
 
     try {
-      // Save pending order ID and redirect to Payment Portal page
+      // Save pending order ID and redirect to Payment Gateway page
       localStorage.setItem("printsphere_pending_order_id", orderId);
       window.location.href = `/payment?order_id=${orderId}`;
     } catch (err) {
@@ -102,6 +104,63 @@ export default function PaymentButton({
       window.location.href = `/payment/success?order_id=${orderId}&gateway=paymentaccount`;
     } catch (err) {
       const msg = err.message || err.error || "Failed to process payment account payment.";
+      setErrorMessage(msg);
+      setLoading(false);
+      if (onError) onError(msg);
+    }
+  };
+
+  const handleCardNumberChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+    const formatted = raw.replace(/(\d{4})/g, "$1 ").trim();
+    setCardDetails({ ...cardDetails, cardNumber: formatted, brand: getCardBrand(formatted) });
+  };
+
+  const handleExpiryChange = (e) => {
+    let raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+    if (raw.length >= 3) {
+      raw = `${raw.slice(0, 2)}/${raw.slice(2)}`;
+    }
+    setCardDetails({ ...cardDetails, expiryDate: raw });
+  };
+
+  const getCardBrand = (numString = "") => {
+    const num = (numString || cardDetails.cardNumber).replace(/\s/g, "");
+    if (num.startsWith("4")) return "VISA";
+    if (/^5[1-5]/.test(num)) return "MASTERCARD";
+    if (/^3[47]/.test(num)) return "AMEX";
+    return "CARD";
+  };
+
+  const handleCardPaymentSubmit = async (e) => {
+    e.preventDefault();
+    const cleanNum = cardDetails.cardNumber.replace(/\s/g, "");
+    if (cleanNum.length < 15) {
+      alert("Please enter a valid card number.");
+      return;
+    }
+    if (!cardDetails.expiryDate || cardDetails.expiryDate.length < 5) {
+      alert("Please enter a valid expiry date (MM/YY).");
+      return;
+    }
+    if (!cardDetails.cvv || cardDetails.cvv.length < 3) {
+      alert("Please enter a valid CVV code.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const data = await processCardPayment(orderId, {
+        ...cardDetails,
+        brand: getCardBrand()
+      });
+      setIsCardModalOpen(false);
+      if (onSuccess) onSuccess(data);
+      window.location.href = `/payment/success?order_id=${orderId}&gateway=card`;
+    } catch (err) {
+      const msg = err.message || err.error || "Failed to process card payment.";
       setErrorMessage(msg);
       setLoading(false);
       if (onError) onError(msg);
@@ -231,6 +290,107 @@ export default function PaymentButton({
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
+                  className="w-1/2 py-3 border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer text-center bg-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <span>Pay Rs. {Number(amount).toFixed(2)}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isCardModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white border border-slate-200 w-full max-w-md rounded-3xl shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 text-left">
+            <button
+              type="button"
+              onClick={() => setIsCardModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 transition cursor-pointer bg-transparent border-none p-0 outline-none animate-none"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-5 select-none">
+              <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-2xl text-indigo-600">
+                <CreditCard className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base leading-tight">Pay with Card</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Enter credit or debit card details</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCardPaymentSubmit} className="space-y-4">
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 block mb-1">CARDHOLDER NAME</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Alice Cooper"
+                  value={cardDetails.cardholderName}
+                  onChange={(e) => setCardDetails({...cardDetails, cardholderName: e.target.value})}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[9px] font-bold text-slate-400 block mb-1">CARD NUMBER</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="4111 2222 3333 4444"
+                    maxLength={19}
+                    value={cardDetails.cardNumber}
+                    onChange={handleCardNumberChange}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold font-mono"
+                    required
+                  />
+                  <span className="absolute right-3 top-2.5 text-[9px] font-black text-indigo-600 tracking-wider">
+                    {cardDetails.brand}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block mb-1">EXPIRY DATE (MM/YY)</label>
+                  <input
+                    type="text"
+                    placeholder="MM/YY"
+                    maxLength={5}
+                    value={cardDetails.expiryDate}
+                    onChange={handleExpiryChange}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold font-mono"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block mb-1">CVC / CVV</label>
+                  <input
+                    type="password"
+                    placeholder="123"
+                    maxLength={4}
+                    value={cardDetails.cvv}
+                    onChange={(e) => setCardDetails({...cardDetails, cvv: e.target.value.replace(/\D/g, "")})}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex gap-3 select-none">
+                <button
+                  type="button"
+                  onClick={() => setIsCardModalOpen(false)}
                   className="w-1/2 py-3 border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer text-center bg-white"
                 >
                   Cancel

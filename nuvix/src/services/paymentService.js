@@ -78,3 +78,25 @@ export const processAccountPayment = async (orderId, accountDetails) => {
     throw error.response?.data || error;
   }
 };
+
+/**
+ * Processes manual card payment simulating gateway responses
+ * @param {string} orderId 
+ * @param {Object} cardDetails 
+ */
+export const processCardPayment = async (orderId, cardDetails) => {
+  try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const response = await axios.post(
+      `${BASE_URL}/payment/process-card-payment`,
+      { orderId, cardDetails },
+      { headers }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error processing card payment:", error);
+    throw error.response?.data || error;
+  }
+};
