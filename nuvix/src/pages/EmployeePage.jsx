@@ -31,6 +31,17 @@ export default function EmployeePage() {
   const [passSuccess, setPassSuccess] = useState("");
   const [passLoading, setPassLoading] = useState(false);
 
+  // Search and filter states for tasks
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  // Employee profile details states
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeePhone, setEmployeePhone] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [profileError, setProfileError] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
+
   // Check authentication
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -45,6 +56,8 @@ export default function EmployeePage() {
       const user = JSON.parse(userStr);
       if (user.role === "Employee" || user.role === "Admin") {
         setIsEmployee(true);
+        setEmployeeName(user.name || "");
+        setEmployeePhone(user.phone || "");
         fetchEmployeeData();
       } else {
         window.location.href = "/login";
@@ -56,6 +69,41 @@ export default function EmployeePage() {
       setLoading(false);
     }
   }, []);
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setProfileError("");
+    setProfileSuccess("");
+    setProfileLoading(true);
+
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    try {
+      const res = await axios.put(
+        `${API_BASE_URL}/auth/update-profile`,
+        {
+          name: employeeName,
+          phone: employeePhone,
+          address: {
+            street: "",
+            city: "",
+            country: "Sri Lanka"
+          }
+        },
+        { headers }
+      );
+      
+      const updatedUser = res.data.user;
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setProfileSuccess("Profile details updated successfully!");
+    } catch (err) {
+      console.error("Employee profile update error:", err);
+      setProfileError(err.response?.data?.message || "Failed to update profile details.");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const fetchEmployeeData = async () => {
     setDataLoading(true);
@@ -272,171 +320,219 @@ export default function EmployeePage() {
         )}
 
         {/* ================= TAB 1: ASSIGNED TASKS ================= */}
-        {activeTab === "tasks" && (
-          <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-950 mb-6 flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-indigo-600" />
-              Assigned Print Queue & Tasks
-            </h3>
+        {activeTab === "tasks" && (() => {
+          const filteredOrders = assignedOrders.filter(order => {
+            if (statusFilter !== "All" && order.orderStatus !== statusFilter) {
+              return false;
+            }
+            if (searchTerm.trim() !== "") {
+              const s = searchTerm.toLowerCase();
+              const orderIdMatches = order._id.toLowerCase().includes(s);
+              const specMatches = order.items.some(item => 
+                item.itemType?.toLowerCase().includes(s) ||
+                item.size?.toLowerCase().includes(s) ||
+                item.color?.toLowerCase().includes(s) ||
+                item.material?.toLowerCase().includes(s)
+              );
+              return orderIdMatches || specMatches;
+            }
+            return true;
+          });
 
-            {assignedOrders.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-sm text-slate-500 font-semibold">No active print orders assigned to you.</p>
+          return (
+            <div className="bg-white border rounded-3xl p-6 shadow-sm">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-indigo-600" />
+                  Assigned Print Queue & Tasks
+                </h3>
+                
+                {/* Search and Filters */}
+                <div className="flex flex-wrap gap-2.5 w-full md:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Search by ID, size, color..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="text-xs border rounded-xl px-3 py-2 bg-slate-50/50 w-full sm:w-48"
+                  />
+                  <div className="flex gap-1.5">
+                    {["All", "Processing", "Printing", "Completed", "Cancelled"].map(st => (
+                      <button
+                        key={st}
+                        onClick={() => setStatusFilter(st)}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition cursor-pointer ${
+                          statusFilter === st
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-655 hover:bg-slate-200"
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div className="space-y-8">
-                {assignedOrders.map((order) => (
-                  <div key={order._id} className="border rounded-2xl p-5 hover:border-indigo-100 transition bg-slate-50/20">
 
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b border-dashed">
-                      <div>
-                        <span className="text-xs font-bold text-slate-500">Order ID: ...{order._id.slice(-8)}</span>
-                        <p className="text-[11px] text-slate-400 mt-0.5">Assigned: {new Date(order.createdAt).toLocaleDateString()}</p>
-                      </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.orderStatus === "Completed" ? "bg-indigo-50 text-indigo-600" : "bg-teal-50 text-teal-600"
-                        }`}>
-                        {order.orderStatus}
-                      </span>
-                    </div>
+              {filteredOrders.length === 0 ? (
+                <div className="text-center py-16">
+                  <p className="text-sm text-slate-500 font-semibold">No active print orders match the filters.</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {filteredOrders.map((order) => (
+                    <div key={order._id} className="border rounded-2xl p-5 hover:border-indigo-100 transition bg-slate-50/20">
 
-                    {/* Order items, details, and downloads */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-4">
-
-                      {/* Left: Shirt specs */}
-                      <div className="space-y-4">
+                      {/* Header */}
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b border-dashed">
                         <div>
-                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">Print Specifications</h4>
-                          <div className="space-y-3">
-                            {order.items.map((item, idx) => (
-                              <div key={idx} className="bg-white p-3 border rounded-xl shadow-xs">
-                                <p className="text-sm font-bold text-slate-900">
-                                  {item.itemType} T-Shirt (x{item.quantity})
-                                </p>
-                                <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-slate-500">
-                                  <p><span className="font-semibold text-slate-700">Size:</span> {item.size}</p>
-                                  <p><span className="font-semibold text-slate-700">Color:</span> {item.color}</p>
-                                  <p><span className="font-semibold text-slate-700">Material:</span> {item.material}</p>
+                          <span className="text-xs font-bold text-slate-500">Order ID: ...{order._id.slice(-8)}</span>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Assigned: {new Date(order.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.orderStatus === "Completed" ? "bg-indigo-50 text-indigo-600" : "bg-teal-50 text-teal-600"
+                          }`}>
+                          {order.orderStatus}
+                        </span>
+                      </div>
+
+                      {/* Order items, details, and downloads */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-4">
+
+                        {/* Left: Shirt specs */}
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">Print Specifications</h4>
+                            <div className="space-y-3">
+                              {order.items.map((item, idx) => (
+                                <div key={idx} className="bg-white p-3 border rounded-xl shadow-xs">
+                                  <p className="text-sm font-bold text-slate-900">
+                                    {item.itemType} T-Shirt (x{item.quantity})
+                                  </p>
+                                  <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-slate-500">
+                                    <p><span className="font-semibold text-slate-700">Size:</span> {item.size}</p>
+                                    <p><span className="font-semibold text-slate-700">Color:</span> {item.color}</p>
+                                    <p><span className="font-semibold text-slate-700">Material:</span> {item.material}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Right: Decals download assets */}
-                      <div>
-                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">Production Print Assets</h4>
-                        <div className="space-y-3">
-                          {order.items.map((item, idx) => {
-                            if (item.itemType === "Customized" && item.designId) {
-                              const imgLayers = (item.designId.layers || []).filter(l => l.type === "image" || l.type === "logo");
-                              return (
-                                <div key={idx} className="space-y-2">
-                                  {item.designId.thumbnailUrl && (
-                                    <div className="flex gap-3 items-center bg-slate-50 p-3 border rounded-xl">
-                                      <img
-                                        src={item.designId.thumbnailUrl}
-                                        alt="Design Preview"
-                                        className="h-14 w-14 object-contain bg-white rounded-lg border shadow-xs"
-                                        onError={(e) => e.target.src = "/images/dumyImage.png"}
-                                      />
-                                      <div>
-                                        <p className="text-xs font-bold text-slate-900">Custom layout composite</p>
-                                        <a
-                                          href={item.designId.thumbnailUrl}
-                                          download
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="inline-flex items-center gap-1 text-[10px] font-extrabold text-indigo-600 hover:underline mt-1"
-                                        >
-                                          <Download className="h-3 w-3" /> Download layout screenshot
-                                        </a>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {imgLayers.length === 0 ? (
-                                    <p className="text-[10px] text-slate-400 italic">No custom image layer uploads. Decal is text/shape base.</p>
-                                  ) : (
-                                    <div className="space-y-1">
-                                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Logo/Decal Assets:</p>
-                                      {imgLayers.map((layer, lIdx) => (
-                                        <div key={lIdx} className="flex justify-between items-center bg-white p-2 border rounded-xl">
-                                          <div className="flex items-center gap-2">
-                                            {layer.url && (
-                                              <img
-                                                src={layer.url}
-                                                alt="Asset Decal"
-                                                className="h-8 w-8 object-contain bg-slate-50 border rounded"
-                                                onError={(e) => e.target.src = "/images/dumyImage.png"}
-                                              />
-                                            )}
-                                            <span className="text-xs font-semibold text-slate-700">{layer.name || `Asset ${lIdx + 1}`}</span>
-                                          </div>
+                        {/* Right: Decals download assets */}
+                        <div>
+                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">Production Print Assets</h4>
+                          <div className="space-y-3">
+                            {order.items.map((item, idx) => {
+                              if (item.itemType === "Customized" && item.designId) {
+                                const imgLayers = (item.designId.layers || []).filter(l => l.type === "image" || l.type === "logo");
+                                return (
+                                  <div key={idx} className="space-y-2">
+                                    {item.designId.thumbnailUrl && (
+                                      <div className="flex gap-3 items-center bg-slate-50 p-3 border rounded-xl">
+                                        <img
+                                          src={item.designId.thumbnailUrl}
+                                          alt="Design Preview"
+                                          className="h-14 w-14 object-contain bg-white rounded-lg border shadow-xs"
+                                          onError={(e) => e.target.src = "/images/dumyImage.png"}
+                                        />
+                                        <div>
+                                          <p className="text-xs font-bold text-slate-900">Custom layout composite</p>
                                           <a
-                                            href={layer.url}
+                                            href={item.designId.thumbnailUrl}
                                             download
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="p-1 text-slate-500 hover:text-indigo-600 transition"
-                                            title="Download Asset Image"
+                                            className="inline-flex items-center gap-1 text-[10px] font-extrabold text-indigo-600 hover:underline mt-1"
                                           >
-                                            <Download className="h-4 w-4" />
+                                            <Download className="h-3 w-3" /> Download layout screenshot
                                           </a>
                                         </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div key={idx} className="bg-slate-50 p-3 border rounded-xl text-center">
-                                  <p className="text-xs text-slate-500">Ready-made catalog product printing. Check catalog details.</p>
-                                </div>
-                              );
-                            }
-                          })}
+                                      </div>
+                                    )}
+
+                                    {imgLayers.length === 0 ? (
+                                      <p className="text-[10px] text-slate-400 italic">No custom image layer uploads. Decal is text/shape base.</p>
+                                    ) : (
+                                      <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Logo/Decal Assets:</p>
+                                        {imgLayers.map((layer, lIdx) => (
+                                          <div key={lIdx} className="flex justify-between items-center bg-white p-2 border rounded-xl">
+                                            <div className="flex items-center gap-2">
+                                              {layer.url && (
+                                                <img
+                                                  src={layer.url}
+                                                  alt="Asset Decal"
+                                                  className="h-8 w-8 object-contain bg-slate-50 border rounded"
+                                                  onError={(e) => e.target.src = "/images/dumyImage.png"}
+                                                />
+                                              )}
+                                              <span className="text-xs font-semibold text-slate-700">{layer.name || `Asset ${lIdx + 1}`}</span>
+                                            </div>
+                                            <a
+                                              href={layer.url}
+                                              download
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="p-1 text-slate-500 hover:text-indigo-600 transition"
+                                              title="Download Asset Image"
+                                            >
+                                              <Download className="h-4 w-4" />
+                                            </a>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div key={idx} className="bg-slate-50 p-3 border rounded-xl text-center">
+                                    <p className="text-xs text-slate-500">Ready-made catalog product printing. Check catalog details.</p>
+                                  </div>
+                                );
+                              }
+                            })}
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* Timeline Updates */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-dashed">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder="Optional work log update note..."
+                            value={orderNotes[order._id] || ""}
+                            onChange={(e) => setOrderNotes(prev => ({ ...prev, [order._id]: e.target.value }))}
+                            className="w-full text-xs border rounded-xl px-3 py-2 bg-white"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {["Processing", "Printing", "Completed", "Cancelled"].map(st => (
+                            <button
+                              key={st}
+                              disabled={actionLoading[order._id]}
+                              onClick={() => handleUpdateStatus(order._id, st)}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition cursor-pointer ${order.orderStatus === st
+                                  ? "bg-teal-600 text-white shadow-xs"
+                                  : "bg-white border text-slate-700 hover:bg-slate-50"
+                                }`}
+                            >
+                              {st}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
                     </div>
-
-                    {/* Timeline Updates */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-dashed">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          placeholder="Optional work log update note..."
-                          value={orderNotes[order._id] || ""}
-                          onChange={(e) => setOrderNotes(prev => ({ ...prev, [order._id]: e.target.value }))}
-                          className="w-full text-xs border rounded-xl px-3 py-2 bg-white"
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {["Processing", "Printing", "Completed", "Cancelled"].map(st => (
-                          <button
-                            key={st}
-                            disabled={actionLoading[order._id]}
-                            onClick={() => handleUpdateStatus(order._id, st)}
-                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${order.orderStatus === st
-                                ? "bg-teal-600 text-white shadow-xs"
-                                : "bg-white border text-slate-700 hover:bg-slate-50"
-                              }`}
-                          >
-                            {st}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ================= TAB 2: MY SUBMISSIONS ================= */}
         {activeTab === "submissions" && (
@@ -525,16 +621,70 @@ export default function EmployeePage() {
 
         {/* ================= TAB 3: SETTINGS ================= */}
         {activeTab === "settings" && (
-          <div className="bg-white border rounded-3xl p-6 shadow-sm max-w-md">
-            <h3 className="text-lg font-bold text-slate-950 mb-6 flex items-center gap-2">
-              <Settings className="h-5 w-5 text-indigo-600" />
-              Settings & Account Security
-            </h3>
+          <div className="bg-white border rounded-3xl p-6 shadow-sm max-w-md space-y-8">
+            <div>
+              <h3 className="text-lg font-bold text-slate-950 mb-6 flex items-center gap-2">
+                <Settings className="h-5 w-5 text-indigo-600" />
+                Settings & Account Security
+              </h3>
 
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider border-b pb-1 mb-4">
-                Change Password
-              </h4>
+              <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider border-b pb-1 mb-4">
+                  Profile Information
+                </h4>
+
+                {profileError && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{profileError}</span>
+                  </div>
+                )}
+                {profileSuccess && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold">
+                    <CheckCircle className="h-4 w-4 shrink-0" />
+                    <span>{profileSuccess}</span>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={employeeName}
+                    onChange={(e) => setEmployeeName(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Phone Number</label>
+                  <input
+                    type="text"
+                    value={employeePhone}
+                    onChange={(e) => setEmployeePhone(e.target.value)}
+                    placeholder="e.g. +94 77 123 4567"
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={profileLoading}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                  >
+                    {profileLoading ? "Saving..." : "Save Profile Details"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="border-t pt-6">
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider border-b pb-1 mb-4">
+                  Change Password
+                </h4>
 
               {passError && (
                 <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
@@ -595,6 +745,7 @@ export default function EmployeePage() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         )}
 

@@ -644,8 +644,8 @@ exports.getUserProfile = async (req, res) => {
   }
 };
 
-// @desc    Update logged in user profile / delivery address
-// @route   PUT /api/auth/profile
+// @desc    Update customer profile details
+// @route   PUT /api/auth/profile OR /api/auth/update-profile
 exports.updateUserProfile = async (req, res) => {
   try {
     const decoded = verifyUserToken(req);
@@ -653,13 +653,19 @@ exports.updateUserProfile = async (req, res) => {
       return res.status(401).json({ message: "Authorization denied. Please log in." });
     }
 
-    const { phone, address, syncOrders } = req.body;
+    const { name, phone, address, syncOrders } = req.body;
 
     const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (name !== undefined) {
+      if (!name) {
+        return res.status(400).json({ message: "Name is required" });
+      }
+      user.name = name;
+    }
     if (phone !== undefined) user.phone = phone;
     if (address !== undefined) {
       user.address = {
@@ -689,18 +695,19 @@ exports.updateUserProfile = async (req, res) => {
     }
 
     res.json({
-      message: "Delivery details updated successfully",
+      message: "Profile updated successfully",
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         phone: user.phone,
-        address: user.address
+        address: user.address,
+        savedPaymentMethod: user.savedPaymentMethod
       }
     });
   } catch (error) {
-    console.error("Update user profile error:", error);
+    console.error("Update profile error:", error);
     res.status(500).json({ message: "Server error while updating profile" });
   }
 };
