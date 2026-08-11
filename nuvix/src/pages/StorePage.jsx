@@ -432,13 +432,6 @@ export default function StorePage() {
       );
       const orderId = orderRes.data.order._id;
 
-      // Initiate Stripe Sandbox checkout session
-      const sessionRes = await axios.post(
-        `${API_BASE_URL}/payment/create-checkout-session`,
-        { orderId, gateway: "stripe" },
-        { headers },
-      );
-
       // Track purchase activity
       cart.forEach((item) => {
         if (item.productId) {
@@ -450,20 +443,11 @@ export default function StorePage() {
         }
       });
 
-      setCheckoutSuccess(true);
-      saveCart([]); // Clear cart
-
-      if (sessionRes.data && sessionRes.data.url) {
-        setIsCartOpen(false);
-        // Redirect to Stripe checkout screen
-        window.location.href = sessionRes.data.url;
-      } else {
-        setTimeout(() => {
-          setCheckoutSuccess(false);
-          setIsCartOpen(false);
-          window.location.href = "/my-orders";
-        }, 2000);
-      }
+      // Save pending order ID, clear cart, and navigate to Payment Interface
+      localStorage.setItem("printsphere_pending_order_id", orderId);
+      saveCart([]);
+      setIsCartOpen(false);
+      window.location.href = `/payment?order_id=${orderId}`;
     } catch (err) {
       console.error("Checkout order error:", err);
       const errMsg =
