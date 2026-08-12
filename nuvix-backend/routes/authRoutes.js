@@ -12,6 +12,7 @@ const {
   getCustomerOrders,
   saveCustomerDesign,
   getCustomerDesigns,
+  deleteCustomerDesign,
   getTShirtStylesPublic,
   getUserProfile,
   updateUserProfile,
@@ -38,6 +39,7 @@ router.get("/orders", getCustomerOrders);
 router.put("/orders/:orderId/address", updateOrderAddress);
 router.post("/designs", saveCustomerDesign);
 router.get("/designs", getCustomerDesigns);
+router.delete("/designs/:id", deleteCustomerDesign);
 
 module.exports = router;
 

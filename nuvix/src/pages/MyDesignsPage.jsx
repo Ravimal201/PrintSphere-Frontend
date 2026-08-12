@@ -4,7 +4,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { Palette, Edit, AlertCircle } from "lucide-react";
+import { Palette, Edit, AlertCircle, Trash2 } from "lucide-react";
 import axios from "axios";
 
 import { API_BASE_URL } from "../config/api";
@@ -42,6 +42,23 @@ export default function MyDesignsPage() {
   const handleLoadDesign = (design) => {
     localStorage.setItem("load_custom_design", JSON.stringify(design));
     window.location.href = "/designer";
+  };
+
+  const handleDeleteDesign = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this design?")) {
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      await axios.delete(`${API_BASE_URL}/auth/designs/${id}`, { headers });
+      setDesigns(prev => prev.filter(d => d._id !== id));
+    } catch (err) {
+      console.error("Delete custom design error:", err);
+      alert(err.response?.data?.message || "Failed to delete design. Please try again.");
+    }
   };
 
   return (
@@ -100,8 +117,15 @@ export default function MyDesignsPage() {
                 {designs.map((design) => (
                   <div key={design._id} className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4">
                     {/* T-Shirt Preview Box */}
-                    <div className="bg-slate-50 rounded-2xl p-4 flex items-center justify-center border border-slate-100 min-h-[180px]">
+                    <div className="relative bg-slate-50 rounded-2xl p-4 flex items-center justify-center border border-slate-100 min-h-[180px] group">
                       <TShirt2D color={design.fabricColor} designUrl={design.thumbnailUrl} layers={design.layers} className="h-40 w-40" />
+                      <button
+                        onClick={() => handleDeleteDesign(design._id)}
+                        className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-rose-600 text-slate-500 hover:text-white rounded-xl shadow-sm border border-slate-100 transition-all duration-200 cursor-pointer active:scale-95 hover:shadow-md"
+                        title="Delete Design"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
 
                     {/* Details */}
