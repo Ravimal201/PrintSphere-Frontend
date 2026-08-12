@@ -611,6 +611,38 @@ exports.getCustomerDesigns = async (req, res) => {
   }
 };
 
+// @desc    Delete customer saved design
+// @route   DELETE /api/auth/designs/:id
+exports.deleteCustomerDesign = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const designId = req.params.id;
+
+    // Find the design first to make sure it exists and belongs to the user
+    const design = await CustomizedDesign.findOne({ _id: designId, userId: decoded.id });
+    if (!design) {
+      return res.status(404).json({ message: "Design not found or unauthorized" });
+    }
+
+    // Delete design
+    await CustomizedDesign.deleteOne({ _id: designId });
+
+    // Pull from user's savedDesigns array
+    await User.findByIdAndUpdate(decoded.id, {
+      $pull: { savedDesigns: designId }
+    });
+
+    res.json({ message: "Design deleted successfully" });
+  } catch (error) {
+    console.error("Delete customer design error:", error);
+    res.status(500).json({ message: "Server error while deleting design" });
+  }
+};
+
 // @desc    Get all active T-shirt styles (Public)
 // @route   GET /api/auth/tshirt-styles
 exports.getTShirtStylesPublic = async (req, res) => {
