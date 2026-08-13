@@ -390,16 +390,13 @@ class PaymentService {
     order.paymentStatus = "Paid";
     order.paymentTransactionId = payment.stripePaymentIntentId || payment.stripeSessionId;
 
-    // 4. Update Order.status / orderStatus = "Confirmed"
+    // 4. Update Order.status / orderStatus = "Processing"
     const isFirstTimeConfirmation = order.orderStatus === "Pending Payment";
     order.orderStatus = "Processing"; // Processing & Confirmed in production pipeline
 
-    // 5. Reduce Inventory
-    if (isFirstTimeConfirmation) {
-      await this.reduceInventory(order);
-    }
+    // Note: Inventory check and deduction is handled when the manager assigns the order to an employee.
 
-    // 6. Create Production Workflow
+    // 5. Create Production Workflow
     if (isFirstTimeConfirmation) {
       await this.createProductionWorkflow(order, resolvedPaymentMethod);
     } else {

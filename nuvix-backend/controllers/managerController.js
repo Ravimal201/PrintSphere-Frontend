@@ -375,6 +375,89 @@ exports.getOrders = async (req, res) => {
   }
 };
 
+const COLOR_HEX_MAP = {
+  "#111827": "black",
+  "#000000": "black",
+  "#ffffff": "white",
+  "#f8fafc": "white",
+  "#1e3a8a": "navy blue",
+  "#1e293b": "slate",
+  "#b91c1c": "red",
+  "#dc2626": "red",
+  "#da1010": "red",
+  "#047857": "emerald",
+  "#15803d": "green",
+  "#4338ca": "indigo",
+  "#6b7280": "gray"
+};
+
+const normalizeColorStr = (c) => {
+  if (!c) return "";
+  const raw = c.toString().toLowerCase().trim();
+  if (COLOR_HEX_MAP[raw]) return COLOR_HEX_MAP[raw].replace(/[^a-z0-9]/g, "");
+  return raw.replace(/[^a-z0-9]/g, "");
+};
+
+const normalizeStyleStr = (s) => {
+  if (!s) return "";
+  let str = s.toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+  str = str.replace(/tshirt$/, "").replace(/shirt$/, "");
+  return str;
+};
+
+const normalizeGsmStr = (g) => {
+  if (!g) return "";
+  return g.toString().toLowerCase().replace(/[^0-9]/g, "").trim();
+};
+
+const normalizeSizeStr = (sz) => {
+  if (!sz) return "";
+  return sz.toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+};
+
+const findMatchingInventory = (allInventory, spec) => {
+  const targetStyle = normalizeStyleStr(spec.tShirtStyle || spec.tShirtType || "Crew Neck");
+  const targetSize = normalizeSizeStr(spec.size || spec.selectedSize || "M");
+  const targetGsm = normalizeGsmStr(spec.gsm || spec.material || "180GSM");
+  const targetColor = normalizeColorStr(spec.color || spec.selectedColor || "White");
+
+  // Step 1: Filter inventory to plain garments / plain t-shirts
+  const plainTShirts = allInventory.filter(inv => {
+    const itType = (inv.itemType || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "");
+    return itType.includes("plain") || itType.includes("tshirt") || itType === "plaintshirt";
+  });
+
+  // Step 2: Look for match on size, gsm, style, color
+  return plainTShirts.find(inv => {
+    const invStyle = normalizeStyleStr(inv.tShirtType || inv.itemType || "");
+    const invSize = normalizeSizeStr(inv.size || "");
+    const invGsm = normalizeGsmStr(inv.gsm || inv.material || "");
+    const invColor = normalizeColorStr(inv.color || "");
+
+    // 1. Style match (e.g. "oversized" matches "oversized" or "oversized t-shirt")
+    if (invStyle && targetStyle && invStyle !== targetStyle && !invStyle.includes(targetStyle) && !targetStyle.includes(invStyle)) {
+      return false;
+    }
+
+    // 2. Size match (e.g. "xl", "m", "s", "xxl")
+    if (invSize && targetSize && invSize !== targetSize) {
+      return false;
+    }
+
+    // 3. GSM match (e.g. 180, 200, 220, 240)
+    if (invGsm && targetGsm && invGsm !== targetGsm) {
+      return false;
+    }
+
+    // 4. Color match (e.g. "black", "#111827", "white", "#ffffff", "red", "#da1010")
+    if (invColor && targetColor && invColor !== targetColor && !invColor.includes(targetColor) && !targetColor.includes(invColor)) {
+      return false;
+    }
+
+    return true;
+  });
+};
+
 // @desc    Approve/Reject or update order workflow status
 // @route   PUT /api/manager/orders/:id/status
 exports.updateOrderStatus = async (req, res) => {
@@ -392,13 +475,155 @@ exports.updateOrderStatus = async (req, res) => {
 
     const prevEmployee = order.assignedEmployee;
 
-    if (status) {
-      order.orderStatus = status;
-      order.timeline.push({ status, note: note || `Status updated to ${status}` });
+    // 1. If manager is assigning an employee to this order
+    if (assignedEmployeeId) {
+      // If inventory has not yet been deducted for this order, check and deduct stock
+      if (!order.inventoryDeducted) {
+        const allInventory = await Inventory.find();
+
+        const orderSpecs = (order.items && order.items.length > 0)
+          ? order.items.map(it => ({
+              tShirtStyle: it.tShirtStyle || it.tShirtType || order.tShirtStyle || "Crew Neck",
+              size: it.selectedSize || it.size || order.size || "M",
+              color: it.selectedColor || it.color || order.color || "White",
+              gsm: it.gsm || it.material || order.gsm || "180GSM",
+              quantity: Number(it.quantity) || 1
+            }))
+          : [{
+              tShirtStyle: order.tShirtStyle || "Crew Neck",
+              size: order.size || "M",
+              color: order.color || "White",
+              gsm: order.gsm || "180GSM",
+              quantity: Number(order.quantity) || 1
+            }];
+
+        const missingMaterials = [];
+        const deductions = [];
+
+        // Clone inventory quantities in memory for multi-item check
+        const inventoryPool = allInventory.map(inv => ({
+          _id: inv._id,
+          itemType: inv.itemType,
+          tShirtType: inv.tShirtType,
+          color: inv.color,
+          size: inv.size,
+          gsm: inv.gsm,
+          material: inv.material,
+          quantity: inv.quantity,
+          minThreshold: inv.minThreshold
+        }));
+
+        for (const spec of orderSpecs) {
+          const matchedInv = findMatchingInventory(inventoryPool, spec);
+          const availableQty = matchedInv ? matchedInv.quantity : 0;
+
+          if (!matchedInv || availableQty < spec.quantity) {
+            missingMaterials.push({
+              style: spec.tShirtStyle,
+              size: spec.size,
+              color: spec.color,
+              gsm: spec.gsm,
+              required: spec.quantity,
+              available: availableQty
+            });
+          } else {
+            deductions.push({
+              invId: matchedInv._id,
+              deductQty: spec.quantity,
+              spec
+            });
+            matchedInv.quantity -= spec.quantity;
+          }
+        }
+
+        // If any required material is not enough, halt and return 400
+        if (missingMaterials.length > 0) {
+          const formattedDetails = missingMaterials.map(m => 
+            `• ${m.required}x ${m.style} (${m.color}, Size ${m.size}, ${m.gsm}) - available in stock: ${m.available}`
+          ).join("\n");
+
+          return res.status(400).json({
+            message: "Not enough materials in inventory to assign this order!",
+            details: formattedDetails,
+            missingMaterials
+          });
+        }
+
+        // Materials are sufficient -> Deduct from DB
+        for (const item of deductions) {
+          const updatedInv = await Inventory.findByIdAndUpdate(
+            item.invId,
+            { 
+              $inc: { quantity: -item.deductQty },
+              lastRestocked: new Date()
+            },
+            { new: true }
+          );
+
+          if (updatedInv && updatedInv.quantity <= updatedInv.minThreshold) {
+            const itemDesc = `${updatedInv.tShirtType || "Plain"} T-Shirt (${updatedInv.color}, Size ${updatedInv.size}, ${updatedInv.gsm || ""})`;
+            const alertMsg = `${itemDesc} has fallen below minimum threshold! Current stock: ${updatedInv.quantity} (Threshold: ${updatedInv.minThreshold}).`;
+            
+            await createNotification({
+              recipientRole: "Manager",
+              title: "Low Stock Alert",
+              message: alertMsg,
+              type: "Low Stock"
+            });
+            await createNotification({
+              recipientRole: "Admin",
+              title: "Low Stock Alert",
+              message: alertMsg,
+              type: "Low Stock"
+            });
+          }
+        }
+
+        order.inventoryDeducted = true;
+      }
+
+      order.assignedEmployee = assignedEmployeeId;
     }
 
-    if (assignedEmployeeId) {
-      order.assignedEmployee = assignedEmployeeId;
+    // 2. Handle Status updates
+    if (status === "Cancelled") {
+      order.orderStatus = "Cancelled";
+      order.timeline.push({ status: "Cancelled", note: note || "Order cancelled by manager" });
+
+      // If inventory was previously deducted for this order, restore it
+      if (order.inventoryDeducted) {
+        const orderSpecs = (order.items && order.items.length > 0)
+          ? order.items.map(it => ({
+              tShirtStyle: it.tShirtStyle || it.tShirtType || order.tShirtStyle || "Crew Neck",
+              size: it.selectedSize || it.size || order.size || "M",
+              color: it.selectedColor || it.color || order.color || "White",
+              gsm: it.gsm || it.material || order.gsm || "180GSM",
+              quantity: Number(it.quantity) || 1
+            }))
+          : [{
+              tShirtStyle: order.tShirtStyle || "Crew Neck",
+              size: order.size || "M",
+              color: order.color || "White",
+              gsm: order.gsm || "180GSM",
+              quantity: Number(order.quantity) || 1
+            }];
+
+        const allInventory = await Inventory.find();
+        for (const spec of orderSpecs) {
+          const matchedInv = findMatchingInventory(allInventory, spec);
+          if (matchedInv) {
+            await Inventory.findByIdAndUpdate(matchedInv._id, {
+              $inc: { quantity: spec.quantity },
+              lastRestocked: new Date()
+            });
+          }
+        }
+
+        order.inventoryDeducted = false;
+      }
+    } else if (status) {
+      order.orderStatus = status;
+      order.timeline.push({ status, note: note || `Status updated to ${status}` });
     }
 
     await order.save();
