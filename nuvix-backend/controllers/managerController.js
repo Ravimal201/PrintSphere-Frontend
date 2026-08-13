@@ -266,6 +266,7 @@ exports.getOrders = async (req, res) => {
     }
 
     const orders = await Order.find()
+      .populate("customerId", "name email phone")
       .populate("assignedEmployee", "name")
       .populate("items.productId")
       .populate("items.designId")
@@ -340,7 +341,13 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    res.json({ message: "Order updated successfully", order });
+    const updatedOrder = await Order.findById(order._id)
+      .populate("customerId", "name email phone")
+      .populate("assignedEmployee", "name")
+      .populate("items.productId")
+      .populate("items.designId");
+
+    res.json({ message: "Order updated successfully", order: updatedOrder });
   } catch (error) {
     console.error("Update order status error:", error);
     res.status(500).json({ message: "Server error while updating order" });

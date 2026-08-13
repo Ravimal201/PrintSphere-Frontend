@@ -1145,11 +1145,19 @@ export default function ManagerPage() {
                             {order.orderStatus}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Customer:{" "}
-                          {order.guestEmail ||
-                            order.customerId?.email ||
-                            "Unknown"}
+                        <p className="text-xs text-slate-500 mt-1 flex items-center flex-wrap gap-1">
+                          <span className="font-medium text-slate-600">Customer:</span>{" "}
+                          <span className="font-bold text-slate-900">
+                            {order.customerId?.name ||
+                              (typeof order.customerId === "object" && order.customerId?.email) ||
+                              order.guestEmail ||
+                              "Unknown"}
+                          </span>
+                          {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
+                            <span className="text-slate-400 font-normal">
+                              ({order.customerId?.email || order.guestEmail})
+                            </span>
+                          ) : null}
                         </p>
                       </div>
                       <div className="text-right">

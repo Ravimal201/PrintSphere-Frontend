@@ -388,6 +388,20 @@ export default function EmployeePage() {
                         <div>
                           <span className="text-xs font-bold text-slate-500">Order ID: ...{order._id.slice(-8)}</span>
                           <p className="text-[11px] text-slate-400 mt-0.5">Assigned: {new Date(order.createdAt).toLocaleDateString()}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center flex-wrap gap-1">
+                            <span className="font-medium text-slate-500">Customer:</span>{" "}
+                            <span className="font-semibold text-slate-800">
+                              {order.customerId?.name ||
+                                (typeof order.customerId === "object" && order.customerId?.email) ||
+                                order.guestEmail ||
+                                "Unknown"}
+                            </span>
+                            {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
+                              <span className="text-slate-400 font-normal">
+                                ({order.customerId?.email || order.guestEmail})
+                              </span>
+                            ) : null}
+                          </p>
                         </div>
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.orderStatus === "Completed" ? "bg-indigo-50 text-indigo-600" : "bg-teal-50 text-teal-600"
                           }`}>
