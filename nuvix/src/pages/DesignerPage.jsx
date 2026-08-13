@@ -136,6 +136,8 @@ export default function DesignerPage() {
   const [submitSuccess, setSubmitSuccess] = useState("");
 
   const [availableStyles, setAvailableStyles] = useState(tShirtModels);
+  const [showCartRedirectModal, setShowCartRedirectModal] = useState(false);
+  const [addedItemDetails, setAddedItemDetails] = useState({ name: "", size: "" });
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -1837,8 +1839,11 @@ export default function DesignerPage() {
                   };
 
                   localStorage.setItem("printsphere_cart", JSON.stringify([...currentCart, cartItem]));
-                  alert(`Added ${selectedModel?.name || shirtType} (${selectedSize}) to cart! Redirecting to checkout...`);
-                  window.location.href = "/store";
+                  setAddedItemDetails({
+                    name: selectedModel?.name || shirtType,
+                    size: selectedSize
+                  });
+                  setShowCartRedirectModal(true);
                 }}
                 className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight"
               >
@@ -2024,6 +2029,45 @@ export default function DesignerPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Cart Redirect */}
+      {showCartRedirectModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 p-6 flex flex-col items-center text-center">
+            <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-4 border border-emerald-100">
+              <CheckCircle className="h-9 w-9" />
+            </div>
+            
+            <h3 className="text-lg font-bold text-slate-950 mb-1">Added to Cart!</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              <strong className="text-slate-800 font-semibold">{addedItemDetails.name} ({addedItemDetails.size})</strong> has been successfully added to your cart.
+            </p>
+            
+            <p className="text-xs text-slate-500 mb-6 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100 font-medium">
+              Would you like to redirect to checkout now?
+            </p>
+
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => {
+                  setShowCartRedirectModal(false);
+                }}
+                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  window.location.href = "/store";
+                }}
+                className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_12px_rgba(99,102,241,0.2)] focus:outline-none"
+              >
+                Go to Checkout
+              </button>
+            </div>
           </div>
         </div>
       )}

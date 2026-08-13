@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2, Wallet } from "lucide-react";
+import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2, Wallet, XCircle } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { processAccountPayment, processCardPayment, createCheckoutSession } from "../services/paymentService";
@@ -260,6 +260,70 @@ export default function PaymentPage() {
     } catch (err) {
       console.error("Payment submission error:", err);
       setErrorMessage(err.response?.data?.message || err.message || "Payment processing error. Please verify payment details.");
+    }
+  };
+
+  const handleCancelCheckout = async (e) => {
+    if (e) e.preventDefault();
+    if (!order) {
+      window.location.href = "/cart";
+      return;
+    }
+
+    const confirmCancel = window.confirm("Are you sure you want to cancel the checkout? This will restore your items back to the cart.");
+    if (!confirmCancel) return;
+
+    setProcessingPayment(true);
+    setErrorMessage("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      // 1. Call backend API to cancel the order
+      await axios.put(`${API_BASE_URL}/auth/orders/${order._id}/cancel`, {}, { headers });
+
+      // 2. Reconstruct cart from order items
+      if (order.items && order.items.length > 0) {
+        const restoredCart = order.items.map(item => {
+          const isCustom = !!item.designId;
+          const designInfo = isCustom ? item.designId : {};
+          const productInfo = !isCustom ? item.productId : {};
+          const itemId = isCustom ? designInfo._id : productInfo._id;
+          
+          const cartKey = `${itemId}-${item.selectedSize}-${item.selectedColor}`;
+          
+          return {
+            cartKey,
+            productId: !isCustom ? productInfo._id : undefined,
+            designId: isCustom ? designInfo._id : undefined,
+            title: isCustom ? (designInfo.tShirtType || "Custom T-Shirt") : productInfo.title,
+            basePrice: isCustom ? item.price : productInfo.basePrice,
+            discount: isCustom ? 0 : productInfo.discount || 0,
+            category: isCustom ? undefined : productInfo.category,
+            size: item.selectedSize,
+            color: item.selectedColor,
+            quantity: item.quantity,
+            image: isCustom ? (designInfo.thumbnailUrl || "/images/dumyImage.png") : (productInfo.images?.[0] || "/images/dumyImage.png"),
+            isCustom: isCustom,
+            layers: isCustom ? designInfo.layers : undefined,
+            material: isCustom ? designInfo.material : undefined,
+            tShirtType: isCustom ? designInfo.tShirtType : undefined,
+          };
+        });
+
+        // 3. Save restored cart to localStorage
+        localStorage.setItem("printsphere_cart", JSON.stringify(restoredCart));
+      }
+
+      // 4. Remove pending order ID
+      localStorage.removeItem("printsphere_pending_order_id");
+
+      // 5. Navigate to Cart
+      window.location.href = "/cart";
+    } catch (err) {
+      console.error("Cancel checkout error:", err);
+      setErrorMessage(err.response?.data?.message || err.message || "Failed to cancel checkout. Please try again.");
       setProcessingPayment(false);
     }
   };
@@ -277,9 +341,13 @@ export default function PaymentPage() {
             {/* Navigation & Header */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
               <div>
-                <a href="/cart" className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition mb-2">
+                <button
+                  onClick={handleCancelCheckout}
+                  disabled={processingPayment}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition mb-2 bg-transparent border-0 cursor-pointer p-0 disabled:opacity-50"
+                >
                   <ArrowLeft className="h-4 w-4" /> Back to Cart
-                </a>
+                </button>
                 <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
                   <CreditCard className="h-6 w-6 text-indigo-600" />
                   Secure Payment Gateway
@@ -706,6 +774,22 @@ export default function PaymentPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* Cancel Option */}
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3">
+                    <p className="text-xs text-slate-500 font-semibold">
+                      Did you enter checkout by mistake or want to modify your order items?
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCancelCheckout}
+                      disabled={processingPayment}
+                      className="px-6 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-2xl text-xs font-extrabold transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <XCircle className="h-4.5 w-4.5 text-rose-600" />
+                      <span>Cancel Checkout & Restore Cart</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Right Panel: Order Summary & Items List */}
