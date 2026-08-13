@@ -149,6 +149,15 @@ export default function ManagerPage() {
   const [editingEmployeeOrderId, setEditingEmployeeOrderId] = useState(null);
   const [selectedEmployeeForOrder, setSelectedEmployeeForOrder] = useState({});
 
+  // Insufficient Inventory popup modal state
+  const [inventoryAlertModal, setInventoryAlertModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    details: "",
+    missingItems: []
+  });
+
   // Password change states
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -298,10 +307,33 @@ export default function ManagerPage() {
         });
         setOrders(updatedOrders.data);
       }
+
+      // Also refresh inventory state so stock deduction is reflected live
+      try {
+        const invRes = await axios.get(`${API_BASE_URL}/manager/inventory`, { headers });
+        setInventory(invRes.data);
+      } catch (invErr) {
+        console.error("Refresh inventory error:", invErr);
+      }
+
       setEditingEmployeeOrderId(null);
     } catch (err) {
       console.error("Assign employee error:", err);
-      alert("Failed to assign employee");
+      const errMsg = err.response?.data?.message || "Failed to assign employee";
+      const details = err.response?.data?.details;
+      const missingMaterials = err.response?.data?.missingMaterials || [];
+
+      if (details || missingMaterials.length > 0) {
+        setInventoryAlertModal({
+          isOpen: true,
+          title: "Insufficient Inventory Materials!",
+          message: errMsg,
+          details: details || "",
+          missingItems: missingMaterials
+        });
+      } else {
+        alert(errMsg);
+      }
     } finally {
       setAssignLoading((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -341,17 +373,22 @@ export default function ManagerPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
+      const payloadToSave = {
+        ...productForm,
+        category: productForm.category || "T-Shirts"
+      };
+
       if (editingProduct) {
         // Edit Product
         await axios.put(
           `${API_BASE_URL}/manager/products/${editingProduct._id}`,
-          productForm,
+          payloadToSave,
           { headers },
         );
         setProductSuccess("Product updated successfully!");
       } else {
         // Create Product
-        await axios.post(`${API_BASE_URL}/manager/products`, productForm, {
+        await axios.post(`${API_BASE_URL}/manager/products`, payloadToSave, {
           headers,
         });
         setProductSuccess("Product created successfully!");
@@ -1926,45 +1963,7 @@ export default function ManagerPage() {
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
-                        <span>Category</span>
-                        <span className="text-[9px] text-indigo-600 font-normal">Select or type custom</span>
-                      </label>
-                      <div className="flex gap-2">
-                        {products && products.length > 0 && (
-                          <select
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                setProductForm((prev) => ({ ...prev, category: e.target.value }));
-                              }
-                            }}
-                            value={products.map((p) => p.category).includes(productForm.category) ? productForm.category : ""}
-                            className="px-3 py-2 border rounded-xl text-xs font-semibold bg-white max-w-[140px]"
-                          >
-                            <option value="">-- Existing --</option>
-                            {[...new Set(products.map((p) => p.category).filter(Boolean))].map((cat) => (
-                              <option key={cat} value={cat}>
-                                {cat}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <input
-                          type="text"
-                          required
-                          value={productForm.category}
-                          onChange={(e) =>
-                            setProductForm((prev) => ({
-                              ...prev,
-                              category: e.target.value,
-                            }))
-                          }
-                          placeholder="Category name..."
-                          className="w-full px-3 py-2 border rounded-xl text-sm"
-                        />
-                      </div>
-                    </div>
+
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -2195,51 +2194,7 @@ export default function ManagerPage() {
                           });
                         })()}
                       </div>
-                      {/* Add Custom GSM if desired */}
-                      <div className="flex items-center gap-2 pt-1">
-                        <input
-                          type="text"
-                          id="customGsmInput"
-                          placeholder="Add custom GSM (e.g. 190GSM)"
-                          className="px-2.5 py-1 text-xs border rounded-lg max-w-[200px]"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              const val = e.target.value.trim().toUpperCase();
-                              if (val) {
-                                const formatted = val.endsWith("GSM") ? val : `${val}GSM`;
-                                if (!(productForm.gsms || []).includes(formatted)) {
-                                  setProductForm((prev) => ({
-                                    ...prev,
-                                    gsms: [...(prev.gsms || []), formatted],
-                                  }));
-                                }
-                                e.target.value = "";
-                              }
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.getElementById("customGsmInput");
-                            if (input && input.value.trim()) {
-                              const val = input.value.trim().toUpperCase();
-                              const formatted = val.endsWith("GSM") ? val : `${val}GSM`;
-                              if (!(productForm.gsms || []).includes(formatted)) {
-                                setProductForm((prev) => ({
-                                  ...prev,
-                                  gsms: [...(prev.gsms || []), formatted],
-                                }));
-                              }
-                              input.value = "";
-                            }
-                          }}
-                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-lg border border-indigo-200 cursor-pointer"
-                        >
-                          + Add GSM
-                        </button>
-                      </div>
+
                     </div>
 
                     {/* Available Colors Selection (from selected T shirt Style) */}
@@ -4118,6 +4073,104 @@ export default function ManagerPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Insufficient Inventory Alert Modal */}
+      {inventoryAlertModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-rose-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-6 bg-rose-50/70 border-b border-rose-100 flex items-start gap-4">
+              <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0 shadow-xs">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-black text-rose-950">
+                    {inventoryAlertModal.title || "Insufficient Inventory Stock!"}
+                  </h3>
+                  <button
+                    onClick={() => setInventoryAlertModal((prev) => ({ ...prev, isOpen: false }))}
+                    className="p-1 text-slate-400 hover:text-slate-600 transition rounded-lg"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-rose-700 mt-1 font-semibold">
+                  {inventoryAlertModal.message || "Cannot assign employee to this order because required materials are out of stock."}
+                </p>
+              </div>
+            </div>
+
+            {/* Content & Details */}
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Required Materials Shortage:
+                </p>
+                {inventoryAlertModal.missingItems && inventoryAlertModal.missingItems.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {inventoryAlertModal.missingItems.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-2xl border border-rose-100 bg-rose-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-slate-900">
+                            {item.style || "Plain"} T-Shirt
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-500 font-semibold">
+                            <span className="px-2 py-0.5 bg-white border rounded-md">Size: {item.size}</span>
+                            <span className="px-2 py-0.5 bg-white border rounded-md">Color: {item.color}</span>
+                            <span className="px-2 py-0.5 bg-white border rounded-md">GSM: {item.gsm}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-xs font-bold text-slate-700">
+                            Required: <span className="font-black text-rose-600">{item.required}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            In Stock: <span className="font-bold text-amber-600">{item.available}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-2xl border border-rose-100 bg-rose-50/40 text-xs text-rose-800 whitespace-pre-line font-medium">
+                    {inventoryAlertModal.details}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-600 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
+                <span>Please restock the missing plain t-shirts in the inventory tab before assigning this order to an employee.</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-end gap-2.5">
+              <button
+                onClick={() => setInventoryAlertModal((prev) => ({ ...prev, isOpen: false }))}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 border rounded-xl hover:bg-white transition cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setInventoryAlertModal((prev) => ({ ...prev, isOpen: false }));
+                  setActiveTab("inventory");
+                }}
+                className="w-full sm:w-auto px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Package className="h-3.5 w-3.5" />
+                Go to Inventory & Restock
+              </button>
+            </div>
           </div>
         </div>
       )}
