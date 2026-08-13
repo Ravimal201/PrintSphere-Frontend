@@ -69,9 +69,17 @@ exports.updateAssignedOrderStatus = async (req, res) => {
 
     const { status, note } = req.body;
 
+    if (status === "Cancelled") {
+      return res.status(403).json({ message: "Employees cannot cancel orders. Only managers are authorized to cancel orders." });
+    }
+
     const order = await Order.findOne({ _id: req.params.id, assignedEmployee: decoded.id });
     if (!order) {
       return res.status(404).json({ message: "Assigned order not found" });
+    }
+
+    if (order.orderStatus === "Cancelled") {
+      return res.status(400).json({ message: "This order was cancelled by the manager and cannot be updated." });
     }
 
     if (status) {
