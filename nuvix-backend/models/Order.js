@@ -29,6 +29,13 @@ const OrderItemSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  tShirtStyle: {
+    type: String
+  },
+  gsm: {
+    type: String,
+    default: "180GSM"
+  },
   material: {
     type: String,
     default: "Standard cotton"

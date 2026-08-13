@@ -91,9 +91,9 @@ exports.getInventory = async (req, res) => {
     const count = await Inventory.countDocuments();
     if (count === 0) {
       await Inventory.insertMany([
-        { itemType: "Plain T-Shirt", tShirtType: "Crew Neck", color: "White", size: "M", material: "Cotton", quantity: 120, minThreshold: 15 },
-        { itemType: "Plain T-Shirt", tShirtType: "V-Neck", color: "Navy Blue", size: "L", material: "Cotton", quantity: 8, minThreshold: 15 },
-        { itemType: "Plain T-Shirt", tShirtType: "Polo", color: "Black", size: "XL", material: "Organic Cotton", quantity: 45, minThreshold: 10 },
+        { itemType: "Plain T-Shirt", tShirtType: "Crew Neck", color: "White", size: "M", gsm: "180GSM", material: "Cotton", quantity: 120, minThreshold: 15 },
+        { itemType: "Plain T-Shirt", tShirtType: "V-Neck", color: "Navy Blue", size: "L", gsm: "220GSM", material: "Cotton", quantity: 8, minThreshold: 15 },
+        { itemType: "Plain T-Shirt", tShirtType: "Polo", color: "Black", size: "XL", gsm: "240GSM", material: "Organic Cotton", quantity: 45, minThreshold: 10 },
         { itemType: "Printing Ink", color: "Cyan", quantity: 3, minThreshold: 5 },
         { itemType: "Transfer Paper", quantity: 150, minThreshold: 50 }
       ]);
@@ -147,7 +147,7 @@ exports.updateStock = async (req, res) => {
     // Check if item went below threshold and create alert notifications
     if (updated.quantity <= updated.minThreshold) {
       const itemDesc = updated.tShirtType 
-        ? `${updated.tShirtType} T-Shirt (${updated.color}, Size ${updated.size})` 
+        ? `${updated.tShirtType} T-Shirt (${updated.color}, Size ${updated.size}, ${updated.gsm || updated.material || ''})` 
         : updated.itemType;
       const alertMsg = `${itemDesc} has fallen below minimum threshold! Current stock: ${updated.quantity} (Threshold: ${updated.minThreshold}).`;
       
@@ -181,7 +181,7 @@ exports.addInventoryItem = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { itemType, tShirtType, color, size, material, quantity, minThreshold } = req.body;
+    const { itemType, tShirtType, color, size, gsm, material, quantity, minThreshold } = req.body;
 
     if (!itemType) {
       return res.status(400).json({ message: "Item type is required." });
@@ -191,7 +191,8 @@ exports.addInventoryItem = async (req, res) => {
     const targetTShirtType = targetItemType === "Plain T-Shirt" ? (tShirtType || "Crew Neck").trim() : "";
     const targetColor = (color || "White").trim();
     const targetSize = targetItemType === "Plain T-Shirt" ? (size || "M").trim() : "";
-    const targetMaterial = targetItemType === "Plain T-Shirt" ? (material || "180GSM").trim() : "";
+    const targetGsm = targetItemType === "Plain T-Shirt" ? (gsm || material || "180GSM").trim() : "";
+    const targetMaterial = targetItemType === "Plain T-Shirt" ? (material || targetGsm || "Cotton").trim() : "";
     const addQty = typeof quantity !== "undefined" && !isNaN(Number(quantity)) ? Number(quantity) : 0;
     const threshold = typeof minThreshold !== "undefined" && !isNaN(Number(minThreshold)) ? Number(minThreshold) : 10;
 
@@ -208,9 +209,9 @@ exports.addInventoryItem = async (req, res) => {
       const matchTShirt = norm(item.tShirtType) === norm(targetTShirtType);
       const matchColor = norm(item.color) === norm(targetColor);
       const matchSize = norm(item.size) === norm(targetSize);
-      const matchMaterial = norm(item.material) === norm(targetMaterial);
+      const matchGsm = norm(item.gsm) === norm(targetGsm) || norm(item.material) === norm(targetGsm);
 
-      return matchType && matchTShirt && matchColor && matchSize && matchMaterial;
+      return matchType && matchTShirt && matchColor && matchSize && matchGsm;
     });
 
     if (existingItem) {
@@ -218,6 +219,7 @@ exports.addInventoryItem = async (req, res) => {
       if (typeof minThreshold !== "undefined" && !isNaN(Number(minThreshold)) && Number(minThreshold) > 0) {
         existingItem.minThreshold = Number(minThreshold);
       }
+      if (targetGsm) existingItem.gsm = targetGsm;
       existingItem.lastRestocked = new Date();
       await existingItem.save();
 
@@ -234,6 +236,7 @@ exports.addInventoryItem = async (req, res) => {
       tShirtType: targetTShirtType || undefined,
       color: targetColor || "White",
       size: targetSize || undefined,
+      gsm: targetGsm || undefined,
       material: targetMaterial || undefined,
       quantity: addQty,
       minThreshold: threshold,
@@ -281,8 +284,8 @@ exports.getProducts = async (req, res) => {
     const count = await Product.countDocuments();
     if (count === 0) {
       await Product.insertMany([
-        { title: "Retro Mountain Adventure", description: "Vibrant retro mountains printed on soft crew neck cotton T-shirt.", category: "Nature Collection", basePrice: 21.05, sizes: ["S", "M", "L"], colors: ["White"], images: ["/images/dumyImage.png"], status: "Active", isApproved: true },
-        { title: "Minimalist Pine Silhouette", description: "Monochrome forest trees custom layout.", category: "Nature Collection", basePrice: 19.50, sizes: ["M", "L", "XL"], colors: ["Black"], images: ["/images/dumyImage.png"], status: "Draft", isApproved: false } // Employee Draft
+        { title: "Retro Mountain Adventure", description: "Vibrant retro mountains printed on soft crew neck cotton T-shirt.", category: "Nature Collection", basePrice: 21.05, sizes: ["S", "M", "L"], gsms: ["180GSM", "220GSM"], colors: ["White"], images: ["/images/dumyImage.png"], status: "Active", isApproved: true },
+        { title: "Minimalist Pine Silhouette", description: "Monochrome forest trees custom layout.", category: "Nature Collection", basePrice: 19.50, sizes: ["M", "L", "XL"], gsms: ["180GSM", "200GSM"], colors: ["Black"], images: ["/images/dumyImage.png"], status: "Draft", isApproved: false } // Employee Draft
       ]);
     }
 
@@ -471,7 +474,7 @@ exports.createProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { title, description, category, basePrice, sizes, colors, images, status, discount, modelPath, defaultColor, layers } = req.body;
+    const { title, description, category, basePrice, sizes, gsms, colors, images, status, discount, modelPath, defaultColor, layers } = req.body;
 
     if (!title || !description || !category || basePrice === undefined) {
       return res.status(400).json({ message: "Please provide all required product fields" });
@@ -480,13 +483,19 @@ exports.createProduct = async (req, res) => {
     const token = req.headers.authorization.split(" ")[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
+    const gsmsArray = Array.isArray(gsms) && gsms.length > 0 
+      ? gsms 
+      : (typeof gsms === "string" && gsms.trim() ? [gsms.trim()] : ["180GSM"]);
+
     const product = await Product.create({
       title,
       description,
       category,
       basePrice,
-      sizes: sizes || ["S", "M", "L"],
-      colors: colors || ["White"],
+      sizes: sizes && sizes.length > 0 ? sizes : ["S", "M", "L"],
+      gsm: gsmsArray[0] || "180GSM",
+      gsms: gsmsArray,
+      colors: colors && colors.length > 0 ? colors : ["#ffffff"],
       images: images && images.length > 0 ? images : ["/images/dumyImage.png"],
       status: status || "Active",
       isApproved: true,
@@ -520,25 +529,36 @@ exports.updateProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { title, description, category, basePrice, sizes, colors, images, status, isApproved, discount, modelPath, defaultColor, layers } = req.body;
+    const { title, description, category, basePrice, sizes, gsms, colors, images, status, isApproved, discount, modelPath, defaultColor, layers } = req.body;
+
+    const gsmsArray = Array.isArray(gsms) && gsms.length > 0 
+      ? gsms 
+      : (typeof gsms === "string" && gsms.trim() ? [gsms.trim()] : undefined);
+
+    const updatePayload = {
+      title,
+      description,
+      category,
+      basePrice,
+      sizes,
+      colors,
+      images,
+      status,
+      isApproved,
+      discount,
+      modelPath,
+      defaultColor,
+      layers
+    };
+
+    if (gsmsArray) {
+      updatePayload.gsms = gsmsArray;
+      updatePayload.gsm = gsmsArray[0];
+    }
 
     const updated = await Product.findByIdAndUpdate(
       req.params.id,
-      {
-        title,
-        description,
-        category,
-        basePrice,
-        sizes,
-        colors,
-        images,
-        status,
-        isApproved,
-        discount,
-        modelPath,
-        defaultColor,
-        layers
-      },
+      updatePayload,
       { new: true }
     );
 

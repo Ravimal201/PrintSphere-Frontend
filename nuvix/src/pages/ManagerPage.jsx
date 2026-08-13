@@ -81,6 +81,7 @@ export default function ManagerPage() {
     basePrice: 0,
     discount: 0,
     sizes: ["S", "M", "L", "XL", "XXL"],
+    gsms: ["180GSM", "200GSM", "220GSM", "240GSM"],
     colors: ["#ffffff"],
     images: [],
     modelPath: "/images/models/male normal t-shirt1.glb",
@@ -391,6 +392,21 @@ export default function ManagerPage() {
 
   const openEditProduct = (product) => {
     setEditingProduct(product);
+    let resolvedGsms = product.gsms || [];
+    if (resolvedGsms.length === 0) {
+      const matchedStyle = styles.find((s) => s.path === product.modelPath);
+      if (matchedStyle) {
+        if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+          resolvedGsms = matchedStyle.gsmPrices.map((gp) => gp.gsm);
+        } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+          resolvedGsms = matchedStyle.gsms;
+        }
+      }
+    }
+    if (resolvedGsms.length === 0) {
+      resolvedGsms = ["180GSM", "200GSM", "220GSM", "240GSM"];
+    }
+
     setProductForm({
       title: product.title,
       description: product.description,
@@ -398,6 +414,7 @@ export default function ManagerPage() {
       basePrice: product.basePrice,
       discount: product.discount || 0,
       sizes: product.sizes || ["S", "M", "L", "XL", "XXL"],
+      gsms: resolvedGsms,
       colors: product.colors || ["#ffffff"],
       images: product.images || [],
       modelPath: product.modelPath || "/images/models/male normal t-shirt1.glb",
@@ -408,17 +425,39 @@ export default function ManagerPage() {
   };
 
   const resetProductForm = () => {
+    const firstStyle = styles && styles.length > 0 ? styles[0] : null;
+    let initialGsms = [];
+    if (firstStyle) {
+      if (firstStyle.gsmPrices && firstStyle.gsmPrices.length > 0) {
+        initialGsms = firstStyle.gsmPrices.map((gp) => gp.gsm);
+      } else if (firstStyle.gsms && firstStyle.gsms.length > 0) {
+        initialGsms = firstStyle.gsms;
+      }
+    }
+    if (initialGsms.length === 0) {
+      initialGsms = ["180GSM", "200GSM", "220GSM", "240GSM"];
+    }
+
+    let initialColors = [];
+    if (firstStyle && firstStyle.colors && firstStyle.colors.length > 0) {
+      initialColors = firstStyle.colors.map((c) => (typeof c === "string" ? c : c.value));
+    }
+    if (initialColors.length === 0) {
+      initialColors = ["#ffffff"];
+    }
+
     setProductForm({
       title: "",
       description: "",
-      category: "",
-      basePrice: 0,
+      category: firstStyle ? (firstStyle.name || firstStyle.type || "") : "",
+      basePrice: firstStyle ? (firstStyle.price || 0) : 0,
       discount: 0,
       sizes: ["S", "M", "L", "XL", "XXL"],
-      colors: ["#ffffff"],
+      gsms: initialGsms,
+      colors: initialColors,
       images: [],
-      modelPath: "/images/models/male normal t-shirt1.glb",
-      defaultColor: "#ffffff",
+      modelPath: firstStyle ? firstStyle.path : "/images/models/male normal t-shirt1.glb",
+      defaultColor: initialColors[0] || "#ffffff",
       status: "Active",
     });
     setProductError("");
@@ -1294,10 +1333,10 @@ export default function ManagerPage() {
                                 className="bg-white p-3 border rounded-xl shadow-xs text-xs"
                               >
                                 <p className="font-bold text-slate-900">
-                                  {item.itemType} T-shirt (x{item.quantity})
+                                  {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
                                 </p>
                                 <p className="text-slate-500 text-[10px] mt-0.5">
-                                  {item.material} / {item.size} / {item.color}
+                                  Style: {item.tShirtStyle || "Crew Neck"} | Size: {item.selectedSize || item.size} | Color: {item.selectedColor || item.color} | GSM: {item.gsm || item.material || "180GSM"}
                                 </p>
 
                                 {item.itemType === "Customized" &&
@@ -1530,6 +1569,7 @@ export default function ManagerPage() {
                         <th className="pb-3">Price</th>
                         <th className="pb-3">Discount</th>
                         <th className="pb-3">Sizes</th>
+                        <th className="pb-3">GSMs</th>
                         <th className="pb-3">Status</th>
                         <th className="pb-3 text-right">Actions</th>
                       </tr>
@@ -1574,6 +1614,23 @@ export default function ManagerPage() {
                           </td>
                           <td className="py-4 text-xs text-slate-500">
                             {(p.sizes || []).join(", ")}
+                          </td>
+                          <td className="py-4 text-xs font-medium text-slate-700">
+                            {(() => {
+                              if (p.gsms && p.gsms.length > 0) {
+                                return p.gsms.join(", ");
+                              }
+                              const matchedStyle = styles.find((s) => s.path === p.modelPath);
+                              if (matchedStyle) {
+                                if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+                                  return matchedStyle.gsmPrices.map((gp) => gp.gsm).join(", ");
+                                }
+                                if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+                                  return matchedStyle.gsms.join(", ");
+                                }
+                              }
+                              return "180GSM";
+                            })()}
                           </td>
                           <td className="py-4 text-xs">
                             <span
@@ -1689,22 +1746,43 @@ export default function ManagerPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                        Category
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                        <span>Category</span>
+                        <span className="text-[9px] text-indigo-600 font-normal">Select or type custom</span>
                       </label>
-                      <input
-                        type="text"
-                        required
-                        value={productForm.category}
-                        onChange={(e) =>
-                          setProductForm((prev) => ({
-                            ...prev,
-                            category: e.target.value,
-                          }))
-                        }
-                        placeholder="e.g. Summer Collection"
-                        className="w-full px-3 py-2 border rounded-xl text-sm"
-                      />
+                      <div className="flex gap-2">
+                        {products && products.length > 0 && (
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setProductForm((prev) => ({ ...prev, category: e.target.value }));
+                              }
+                            }}
+                            value={products.map((p) => p.category).includes(productForm.category) ? productForm.category : ""}
+                            className="px-3 py-2 border rounded-xl text-xs font-semibold bg-white max-w-[140px]"
+                          >
+                            <option value="">-- Existing --</option>
+                            {[...new Set(products.map((p) => p.category).filter(Boolean))].map((cat) => (
+                              <option key={cat} value={cat}>
+                                {cat}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <input
+                          type="text"
+                          required
+                          value={productForm.category}
+                          onChange={(e) =>
+                            setProductForm((prev) => ({
+                              ...prev,
+                              category: e.target.value,
+                            }))
+                          }
+                          placeholder="Category name..."
+                          className="w-full px-3 py-2 border rounded-xl text-sm"
+                        />
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -1769,33 +1847,72 @@ export default function ManagerPage() {
 
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                          3D T-Shirt Cut Style
+                          T shirt Style
                         </label>
                         <select
                           value={productForm.modelPath}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const selectedPath = e.target.value;
+                            const matchedStyle = styles.find((s) => s.path === selectedPath);
+
+                            // Extract GSMs for matched style
+                            let styleGsms = [];
+                            if (matchedStyle) {
+                              if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+                                styleGsms = matchedStyle.gsmPrices.map((gp) => gp.gsm);
+                              } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+                                styleGsms = matchedStyle.gsms;
+                              }
+                            }
+                            if (styleGsms.length === 0) {
+                              styleGsms = ["180GSM", "200GSM", "220GSM", "240GSM"];
+                            }
+
+                            // Extract Colors for matched style
+                            let styleColors = [];
+                            if (matchedStyle && matchedStyle.colors && matchedStyle.colors.length > 0) {
+                              styleColors = matchedStyle.colors.map((c) => (typeof c === "string" ? c : c.value));
+                            }
+                            if (styleColors.length === 0) {
+                              styleColors = ["#ffffff"];
+                            }
+
                             setProductForm((prev) => ({
                               ...prev,
-                              modelPath: e.target.value,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border rounded-xl text-sm"
+                              modelPath: selectedPath,
+                              category: matchedStyle ? (matchedStyle.name || matchedStyle.type || prev.category) : prev.category,
+                              gsms: styleGsms,
+                              colors: styleColors,
+                              defaultColor: styleColors[0] || "#ffffff",
+                            }));
+                          }}
+                          className="w-full px-3 py-2 border rounded-xl text-sm font-semibold bg-white"
                         >
-                          <option value="/images/models/male normal t-shirt1.glb">
-                            Men's T-Shirt
-                          </option>
-                          <option value="/images/models/female normal t-shirt.glb">
-                            Women's T-Shirt
-                          </option>
-                          <option value="/images/models/long_sleeve_t-_shirt.glb">
-                            Long Sleeve Shirt
-                          </option>
-                          <option value="/images/models/oversized t-sdirt1.glb">
-                            Oversized T-Shirt
-                          </option>
-                          <option value="/images/models/t_shirt_hoodie.glb">
-                            Hoodie
-                          </option>
+                          {styles && styles.length > 0 ? (
+                            styles.map((st) => (
+                              <option key={st._id || st.path} value={st.path}>
+                                {st.name || st.type} ({st.type})
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="/images/models/male normal t-shirt1.glb">
+                                Men's T-Shirt (Crew Neck)
+                              </option>
+                              <option value="/images/models/female normal t-shirt.glb">
+                                Women's T-Shirt (V-Neck)
+                              </option>
+                              <option value="/images/models/long_sleeve_t-_shirt.glb">
+                                Long Sleeve Shirt (Crew Neck)
+                              </option>
+                              <option value="/images/models/oversized t-sdirt1.glb">
+                                Oversized T-Shirt (Crew Neck)
+                              </option>
+                              <option value="/images/models/t_shirt_hoodie.glb">
+                                Hoodie (Polo)
+                              </option>
+                            </>
+                          )}
                         </select>
                       </div>
                     </div>
@@ -1839,6 +1956,176 @@ export default function ManagerPage() {
                             </label>
                           );
                         })}
+                      </div>
+                    </div>
+
+                    {/* Available GSM Values Checkboxes (Filtered by selected T-shirt Style) */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                        <span>Available GSM Values (from T shirt Style)</span>
+                        <span className="text-[9px] text-indigo-600 font-normal">
+                          Selected: {(productForm.gsms || []).join(", ") || "None"}
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2 pt-0.5">
+                        {(() => {
+                          const matchedStyle = styles.find((s) => s.path === productForm.modelPath);
+                          let availableGsms = [];
+                          if (matchedStyle) {
+                            if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+                              availableGsms = matchedStyle.gsmPrices.map((gp) => gp.gsm);
+                            } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+                              availableGsms = matchedStyle.gsms;
+                            }
+                          }
+                          if (availableGsms.length === 0) {
+                            availableGsms = ["180GSM", "200GSM", "220GSM", "240GSM", "280GSM", "320GSM"];
+                          }
+
+                          return availableGsms.map((gsm) => {
+                            const isSelected = (productForm.gsms || []).includes(gsm);
+                            return (
+                              <label
+                                key={gsm}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
+                                  isSelected
+                                    ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
+                                    : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setProductForm((prev) => {
+                                      const currentGsms = prev.gsms || [];
+                                      const updatedGsms = checked
+                                        ? [...currentGsms, gsm]
+                                        : currentGsms.filter((g) => g !== gsm);
+                                      return { ...prev, gsms: updatedGsms };
+                                    });
+                                  }}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <span>{gsm}</span>
+                              </label>
+                            );
+                          });
+                        })()}
+                      </div>
+                      {/* Add Custom GSM if desired */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="text"
+                          id="customGsmInput"
+                          placeholder="Add custom GSM (e.g. 190GSM)"
+                          className="px-2.5 py-1 text-xs border rounded-lg max-w-[200px]"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const val = e.target.value.trim().toUpperCase();
+                              if (val) {
+                                const formatted = val.endsWith("GSM") ? val : `${val}GSM`;
+                                if (!(productForm.gsms || []).includes(formatted)) {
+                                  setProductForm((prev) => ({
+                                    ...prev,
+                                    gsms: [...(prev.gsms || []), formatted],
+                                  }));
+                                }
+                                e.target.value = "";
+                              }
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.getElementById("customGsmInput");
+                            if (input && input.value.trim()) {
+                              const val = input.value.trim().toUpperCase();
+                              const formatted = val.endsWith("GSM") ? val : `${val}GSM`;
+                              if (!(productForm.gsms || []).includes(formatted)) {
+                                setProductForm((prev) => ({
+                                  ...prev,
+                                  gsms: [...(prev.gsms || []), formatted],
+                                }));
+                              }
+                              input.value = "";
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-lg border border-indigo-200 cursor-pointer"
+                        >
+                          + Add GSM
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Available Colors Selection (from selected T shirt Style) */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                        <span>Select Product Colors (from T shirt Style)</span>
+                        <span className="text-[9px] text-indigo-600 font-normal">
+                          Selected: {(productForm.colors || []).length} colors
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2 pt-0.5">
+                        {(() => {
+                          const matchedStyle = styles.find((s) => s.path === productForm.modelPath);
+                          let availableStyleColors = matchedStyle && matchedStyle.colors && matchedStyle.colors.length > 0
+                            ? matchedStyle.colors
+                            : [
+                                { name: "White", value: "#ffffff" },
+                                { name: "Black", value: "#111827" },
+                                { name: "Navy Blue", value: "#1e3a8a" },
+                                { name: "Red", value: "#dc2626" },
+                              ];
+
+                          return availableStyleColors.map((cObj) => {
+                            const hexVal = typeof cObj === "string" ? cObj : cObj.value;
+                            const nameVal = typeof cObj === "string" ? cObj : cObj.name;
+                            const isSelected = (productForm.colors || []).some(
+                              (c) => c.toLowerCase() === hexVal.toLowerCase()
+                            );
+
+                            return (
+                              <button
+                                key={hexVal}
+                                type="button"
+                                onClick={() => {
+                                  setProductForm((prev) => {
+                                    const currentColors = prev.colors || [];
+                                    let updatedColors;
+                                    if (isSelected) {
+                                      updatedColors = currentColors.filter(
+                                        (c) => c.toLowerCase() !== hexVal.toLowerCase()
+                                      );
+                                      if (updatedColors.length === 0) updatedColors = [hexVal];
+                                    } else {
+                                      updatedColors = [...currentColors, hexVal];
+                                    }
+                                    return {
+                                      ...prev,
+                                      colors: updatedColors,
+                                      defaultColor: updatedColors[0] || "#ffffff",
+                                    };
+                                  });
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
+                                  isSelected
+                                    ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                }`}
+                              >
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                                  style={{ backgroundColor: hexVal }}
+                                />
+                                <span>{nameVal}</span>
+                              </button>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
 

@@ -73,6 +73,15 @@ const ProductSchema = new mongoose.Schema(
         enum: ["S", "M", "L", "XL", "XXL"]
       }
     ],
+    gsm: {
+      type: String,
+      default: "180GSM"
+    },
+    gsms: [
+      {
+        type: String
+      }
+    ],
     colors: [String],
     images: [String],
     status: {
