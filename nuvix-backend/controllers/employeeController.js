@@ -39,6 +39,7 @@ exports.getAssignedOrders = async (req, res) => {
     }
 
     const orders = await Order.find({ assignedEmployee: decoded.id })
+      .populate("customerId", "name email phone")
       .populate("assignedEmployee", "name")
       .populate("items.productId")
       .populate("items.designId")
