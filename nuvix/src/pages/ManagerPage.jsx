@@ -25,6 +25,10 @@ import {
   Tag,
   Package,
   Filter,
+  Ban,
+  Clock,
+  UserCheck,
+  User,
 } from "lucide-react";
 import axios from "axios";
 import Scene from "../three/Scene";
@@ -142,6 +146,8 @@ export default function ManagerPage() {
   // Assign employee & order status transitions
   const [assignLoading, setAssignLoading] = useState({});
   const [orderNotes, setOrderNotes] = useState({});
+  const [editingEmployeeOrderId, setEditingEmployeeOrderId] = useState(null);
+  const [selectedEmployeeForOrder, setSelectedEmployeeForOrder] = useState({});
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -242,26 +248,27 @@ export default function ManagerPage() {
 
   // ================= ORDERS OPERATIONS =================
 
-  const handleUpdateOrderStatus = async (orderId, status) => {
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order? This action will mark the order as Cancelled.")) {
+      return;
+    }
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
-    const note = orderNotes[orderId] || `Status updated to ${status}`;
 
     try {
       setAssignLoading((prev) => ({ ...prev, [orderId]: true }));
       const response = await axios.put(
         `${API_BASE_URL}/manager/orders/${orderId}/status`,
-        { status, note },
+        { status: "Cancelled", note: "Order cancelled by manager." },
         { headers },
       );
 
       setOrders((prev) =>
         prev.map((o) => (o._id === orderId ? response.data.order : o)),
       );
-      setOrderNotes((prev) => ({ ...prev, [orderId]: "" }));
     } catch (err) {
-      console.error("Update status error:", err);
-      alert(err.response?.data?.message || "Failed to update order status");
+      console.error("Cancel order error:", err);
+      alert(err.response?.data?.message || "Failed to cancel order");
     } finally {
       setAssignLoading((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -280,11 +287,18 @@ export default function ManagerPage() {
         { headers },
       );
 
-      // Refresh order list
-      const updatedOrders = await axios.get(`${API_BASE_URL}/manager/orders`, {
-        headers,
-      });
-      setOrders(updatedOrders.data);
+      // Update state
+      if (response.data?.order) {
+        setOrders((prev) =>
+          prev.map((o) => (o._id === orderId ? response.data.order : o)),
+        );
+      } else {
+        const updatedOrders = await axios.get(`${API_BASE_URL}/manager/orders`, {
+          headers,
+        });
+        setOrders(updatedOrders.data);
+      }
+      setEditingEmployeeOrderId(null);
     } catch (err) {
       console.error("Assign employee error:", err);
       alert("Failed to assign employee");
@@ -1249,10 +1263,20 @@ export default function ManagerPage() {
         {/* ================= TAB 2: ORDERS fulfillment ================= */}
         {activeTab === "orders" && (
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-950 mb-6 flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-indigo-600" />
-              Customer Orders & Production Pipeline
-            </h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-indigo-600" />
+                  Customer Orders & Production Pipeline
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Assign staff to orders, monitor production pipeline status, or manage order cancellations.
+                </p>
+              </div>
+              <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold">
+                {orders.length} Total Orders
+              </span>
+            </div>
 
             {orders.length === 0 ? (
               <div className="text-center py-16">
@@ -1262,267 +1286,424 @@ export default function ManagerPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {orders.map((order) => (
-                  <div
-                    key={order._id}
-                    className="border rounded-2xl p-5 hover:border-indigo-200 transition bg-slate-50/20"
-                  >
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-dashed">
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-slate-500">
-                            Order ID: ...{order._id.slice(-8)}
-                          </span>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              order.paymentStatus === "Paid"
-                                ? "bg-emerald-50 text-emerald-600"
-                                : "bg-amber-50 text-amber-600"
-                            }`}
-                          >
-                            {order.paymentStatus}
-                          </span>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              order.orderStatus === "Completed"
-                                ? "bg-indigo-50 text-indigo-600"
-                                : "bg-slate-100 text-slate-700"
-                            }`}
-                          >
-                            {order.orderStatus}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1 flex items-center flex-wrap gap-1">
-                          <span className="font-medium text-slate-600">Customer:</span>{" "}
-                          <span className="font-bold text-slate-900">
-                            {order.customerId?.name ||
-                              (typeof order.customerId === "object" && order.customerId?.email) ||
-                              order.guestEmail ||
-                              "Unknown"}
-                          </span>
-                          {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
-                            <span className="text-slate-400 font-normal">
-                              ({order.customerId?.email || order.guestEmail})
-                            </span>
-                          ) : null}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-black text-slate-900">
-                          Rs. {(order.totalCost || 0).toFixed(2)}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          {new Date(order.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
+                {orders.map((order) => {
+                  const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
+                  const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
+                  const isCancelled = order.orderStatus === "Cancelled";
+                  const isPendingPayment = order.orderStatus === "Pending Payment";
+                  const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
 
-                    {/* Content Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
-                      {/* Items */}
-                      <div className="space-y-4">
+                  return (
+                    <div
+                      key={order._id}
+                      className="border border-slate-200/80 rounded-2xl p-5 hover:border-indigo-200 transition bg-slate-50/20"
+                    >
+                      {/* Header */}
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-dashed">
                         <div>
-                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                            Order Items
-                          </h4>
-                          <div className="space-y-3">
-                            {order.items.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="bg-white p-3 border rounded-xl shadow-xs text-xs"
-                              >
-                                <p className="font-bold text-slate-900">
-                                  {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
-                                </p>
-                                <p className="text-slate-500 text-[10px] mt-0.5">
-                                  Style: {item.tShirtStyle || "Crew Neck"} | Size: {item.selectedSize || item.size} | Color: {item.selectedColor || item.color} | GSM: {item.gsm || item.material || "180GSM"}
-                                </p>
+                          <div className="flex items-center flex-wrap gap-2.5">
+                            <span className="text-xs font-bold text-slate-700">
+                              Order ID: <span className="font-mono text-indigo-600">#{order._id.slice(-8)}</span>
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                order.paymentStatus === "Paid"
+                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                  : "bg-amber-50 text-amber-600 border border-amber-200"
+                              }`}
+                            >
+                              Payment: {order.paymentStatus}
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                isCancelled
+                                  ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                  : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
+                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                  : order.orderStatus === "Printing"
+                                  ? "bg-purple-50 text-purple-600 border border-purple-200"
+                                  : order.orderStatus === "Processing"
+                                  ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                                  : "bg-slate-100 text-slate-700 border border-slate-200"
+                              }`}
+                            >
+                              Status: {order.orderStatus}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1.5 flex items-center flex-wrap gap-1">
+                            <span className="font-medium text-slate-600">Customer:</span>{" "}
+                            <span className="font-bold text-slate-900">
+                              {order.customerId?.name ||
+                                (typeof order.customerId === "object" && order.customerId?.email) ||
+                                order.guestEmail ||
+                                "Unknown"}
+                            </span>
+                            {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
+                              <span className="text-slate-400 font-normal">
+                                ({order.customerId?.email || order.guestEmail})
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
+                        <div className="text-left md:text-right">
+                          <p className="text-lg font-black text-slate-900">
+                            Rs. {(order.totalCost || 0).toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 md:justify-end">
+                            <Clock className="h-3 w-3" />
+                            Placed: {new Date(order.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
 
-                                {item.itemType === "Customized" &&
-                                  item.designId && (
-                                    <div className="mt-2 pt-2 border-t space-y-2">
-                                      {item.designId.thumbnailUrl && (
-                                        <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
-                                          <img
-                                            src={item.designId.thumbnailUrl}
-                                            alt="Preview"
-                                            className="h-10 w-10 object-contain bg-white rounded border"
-                                            onError={(e) =>
-                                              (e.target.src =
-                                                "/images/dumyImage.png")
-                                            }
-                                          />
-                                          <div>
-                                            <p className="text-[10px] font-bold text-slate-900">
-                                              Custom design thumbnail
-                                            </p>
-                                            <a
-                                              href={item.designId.thumbnailUrl}
-                                              download
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className="text-[9px] text-indigo-600 hover:underline flex items-center gap-0.5 mt-0.5"
-                                            >
-                                              <Download className="h-2.5 w-2.5" />{" "}
-                                              Download composite
-                                            </a>
-                                            <button
-                                              onClick={() => {
-                                                setSelected3DDesign(
-                                                  item.designId,
-                                                );
-                                                setIs3DModalOpen(true);
-                                              }}
-                                              className="text-[9px] text-indigo-650 hover:underline flex items-center gap-0.5 mt-1 cursor-pointer font-bold"
-                                            >
-                                              <Sparkles className="h-2.5 w-2.5 text-indigo-600 animate-pulse" />{" "}
-                                              View in 3D Format
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
+                      {/* Content Details */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+                        {/* Items */}
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                              Order Items
+                            </h4>
+                            <div className="space-y-3">
+                              {order.items.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="bg-white p-3 border rounded-xl shadow-xs text-xs"
+                                >
+                                  <p className="font-bold text-slate-900">
+                                    {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
+                                  </p>
+                                  <p className="text-slate-500 text-[10px] mt-0.5">
+                                    Style: {item.tShirtStyle || "Crew Neck"} | Size: {item.selectedSize || item.size} | Color: {item.selectedColor || item.color} | GSM: {item.gsm || item.material || "180GSM"}
+                                  </p>
 
-                                      {/* Logo layers */}
-                                      {(() => {
-                                        const imgLayers = (
-                                          item.designId.layers || []
-                                        ).filter(
-                                          (l) =>
-                                            l.type === "image" ||
-                                            l.type === "logo",
-                                        );
-                                        if (imgLayers.length > 0) {
-                                          return (
-                                            <div className="space-y-1 mt-2">
-                                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
-                                                Logo/Decal Assets:
+                                  {item.itemType === "Customized" &&
+                                    item.designId && (
+                                      <div className="mt-2 pt-2 border-t space-y-2">
+                                        {item.designId.thumbnailUrl && (
+                                          <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
+                                            <img
+                                              src={item.designId.thumbnailUrl}
+                                              alt="Preview"
+                                              className="h-10 w-10 object-contain bg-white rounded border"
+                                              onError={(e) =>
+                                                (e.target.src =
+                                                  "/images/dumyImage.png")
+                                              }
+                                            />
+                                            <div>
+                                              <p className="text-[10px] font-bold text-slate-900">
+                                                Custom design thumbnail
                                               </p>
-                                              {imgLayers.map((layer, lIdx) => (
-                                                <div
-                                                  key={lIdx}
-                                                  className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg text-[10px]"
-                                                >
-                                                  <span className="truncate max-w-[120px] font-semibold">
-                                                    {layer.name ||
-                                                      `Asset ${lIdx + 1}`}
-                                                  </span>
-                                                  <a
-                                                    href={layer.url}
-                                                    download
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-indigo-600 hover:underline"
-                                                  >
-                                                    Download
-                                                  </a>
-                                                </div>
-                                              ))}
+                                              <a
+                                                href={item.designId.thumbnailUrl}
+                                                download
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-[9px] text-indigo-600 hover:underline flex items-center gap-0.5 mt-0.5"
+                                              >
+                                                <Download className="h-2.5 w-2.5" />{" "}
+                                                Download composite
+                                              </a>
+                                              <button
+                                                onClick={() => {
+                                                  setSelected3DDesign(
+                                                    item.designId,
+                                                  );
+                                                  setIs3DModalOpen(true);
+                                                }}
+                                                className="text-[9px] text-indigo-650 hover:underline flex items-center gap-0.5 mt-1 cursor-pointer font-bold"
+                                              >
+                                                <Sparkles className="h-2.5 w-2.5 text-indigo-600 animate-pulse" />{" "}
+                                                View in 3D Format
+                                              </button>
                                             </div>
+                                          </div>
+                                        )}
+
+                                        {/* Logo layers */}
+                                        {(() => {
+                                          const imgLayers = (
+                                            item.designId.layers || []
+                                          ).filter(
+                                            (l) =>
+                                              l.type === "image" ||
+                                              l.type === "logo",
                                           );
-                                        }
-                                        return null;
-                                      })()}
-                                    </div>
-                                  )}
-                              </div>
-                            ))}
+                                          if (imgLayers.length > 0) {
+                                            return (
+                                              <div className="space-y-1 mt-2">
+                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
+                                                  Logo/Decal Assets:
+                                                </p>
+                                                {imgLayers.map((layer, lIdx) => (
+                                                  <div
+                                                    key={lIdx}
+                                                    className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg text-[10px]"
+                                                  >
+                                                    <span className="truncate max-w-[120px] font-semibold">
+                                                      {layer.name ||
+                                                        `Asset ${lIdx + 1}`}
+                                                    </span>
+                                                    <a
+                                                      href={layer.url}
+                                                      download
+                                                      target="_blank"
+                                                      rel="noreferrer"
+                                                      className="text-indigo-600 hover:underline"
+                                                    >
+                                                      Download
+                                                    </a>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
+                                      </div>
+                                    )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Ship Address */}
-                      <div>
-                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                          Shipping Destination
-                        </h4>
-                        {order.shippingAddress ? (
-                          <p className="text-xs text-slate-600 leading-relaxed">
-                            {order.shippingAddress.street},{" "}
-                            {order.shippingAddress.city},{" "}
-                            {order.shippingAddress.country}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-slate-400">
-                            Address not specified
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Assignments */}
-                      <div>
-                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                          Assign Printing Staff
-                        </h4>
-                        <div className="space-y-3">
-                          <select
-                            onChange={(e) =>
-                              handleAssignEmployee(order._id, e.target.value)
-                            }
-                            value={order.assignedEmployee?._id || ""}
-                            className="w-full text-xs border rounded-xl px-2 py-1.5 bg-white font-bold"
-                          >
-                            <option value="">
-                              -- Click to assign staff --
-                            </option>
-                            {employees.map((emp) => (
-                              <option key={emp._id} value={emp._id}>
-                                {emp.name}
-                              </option>
-                            ))}
-                          </select>
-                          {order.assignedEmployee && (
-                            <p className="text-[10px] text-indigo-600 font-extrabold bg-indigo-50 px-2 py-1 rounded-lg">
-                              Assigned task to: {order.assignedEmployee.name}
+                        {/* Ship Address */}
+                        <div>
+                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                            Shipping Destination
+                          </h4>
+                          {order.shippingAddress ? (
+                            <p className="text-xs text-slate-600 leading-relaxed bg-white p-3 border rounded-xl">
+                              {order.shippingAddress.street},{" "}
+                              {order.shippingAddress.city},{" "}
+                              {order.shippingAddress.country}
                             </p>
+                          ) : (
+                            <p className="text-xs text-slate-400 bg-white p-3 border rounded-xl">
+                              Address not specified
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Employee Assignment */}
+                        <div>
+                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                            Assigned Employee
+                          </h4>
+                          {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
+                            <div className="bg-white border rounded-xl p-3.5 space-y-2.5 shadow-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                    {order.assignedEmployee.name ? order.assignedEmployee.name.charAt(0).toUpperCase() : "E"}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-slate-900 truncate">
+                                      {order.assignedEmployee.name}
+                                    </p>
+                                    <p className="text-[10px] text-indigo-600 font-semibold">
+                                      Assigned Operator
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {!isCancelled && order.orderStatus !== "Shipped" && (
+                                  <button
+                                    onClick={() => {
+                                      setEditingEmployeeOrderId(order._id);
+                                      setSelectedEmployeeForOrder((prev) => ({
+                                        ...prev,
+                                        [order._id]: order.assignedEmployee?._id || "",
+                                      }));
+                                    }}
+                                    className="px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                                    title="Edit / Change assigned employee"
+                                  >
+                                    <Edit2 className="h-3 w-3 text-indigo-600" />
+                                    <span>Edit</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-white border rounded-xl p-3 space-y-2 shadow-xs">
+                              {editingEmployeeOrderId === order._id ? (
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] uppercase font-bold text-indigo-700">
+                                      Change Employee
+                                    </span>
+                                    <button
+                                      onClick={() => setEditingEmployeeOrderId(null)}
+                                      className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                                      title="Cancel"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <select
+                                      value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
+                                      onChange={(e) =>
+                                        setSelectedEmployeeForOrder((prev) => ({
+                                          ...prev,
+                                          [order._id]: e.target.value,
+                                        }))
+                                      }
+                                      className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                    >
+                                      <option value="">-- Select Employee --</option>
+                                      {employees.map((emp) => (
+                                        <option key={emp._id} value={emp._id}>
+                                          {emp.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
+                                      onClick={() => {
+                                        const empId = selectedEmployeeForOrder[order._id];
+                                        if (empId) {
+                                          handleAssignEmployee(order._id, empId);
+                                        }
+                                      }}
+                                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                                      title="Save change"
+                                    >
+                                      {assignLoading[order._id] ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="h-3.5 w-3.5" />
+                                      )}
+                                      <span>Save</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <select
+                                    disabled={assignLoading[order._id] || isCancelled}
+                                    onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
+                                    defaultValue=""
+                                    className="w-full text-xs border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50/50 font-bold text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                  >
+                                    <option value="" disabled>
+                                      -- Assign an employee --
+                                    </option>
+                                    {employees.map((emp) => (
+                                      <option key={emp._id} value={emp._id}>
+                                        {emp.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <p className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3 shrink-0" />
+                                    No employee assigned yet
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Production Pipeline Status Viewer & Order Actions */}
+                      <div className="pt-4 border-t border-dashed flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        {/* Status / Pipeline Display (Read-Only) */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                              Production Status:
+                            </span>
+                            {latestTimeline?.note && (
+                              <span className="text-[11px] text-slate-500 italic truncate max-w-md">
+                                ({latestTimeline.note})
+                              </span>
+                            )}
+                          </div>
+
+                          {isCancelled ? (
+                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
+                              <Ban className="h-4 w-4 text-rose-500 shrink-0" />
+                              <span>Order has been Cancelled</span>
+                            </div>
+                          ) : isPendingPayment ? (
+                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-bold">
+                              <Clock className="h-4 w-4 text-amber-500 shrink-0" />
+                              <span>Awaiting Customer Payment Before Processing</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
+                              {pipelineStages.map((stage, sIdx) => {
+                                const isPassed = currentStageIdx > sIdx;
+                                const isCurrent = currentStageIdx === sIdx;
+
+                                return (
+                                  <div key={stage} className="flex items-center shrink-0">
+                                    <div
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                        isCurrent
+                                          ? "bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200"
+                                          : isPassed
+                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                          : "bg-slate-100 text-slate-400 border border-slate-200"
+                                      }`}
+                                    >
+                                      {isPassed ? (
+                                        <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                      ) : isCurrent ? (
+                                        <div className="h-2 w-2 rounded-full bg-white animate-ping shrink-0" />
+                                      ) : (
+                                        <span className="h-2 w-2 rounded-full bg-slate-300 shrink-0" />
+                                      )}
+                                      <span>{stage}</span>
+                                    </div>
+                                    {sIdx < pipelineStages.length - 1 && (
+                                      <div
+                                        className={`w-3 sm:w-6 h-0.5 mx-1 transition ${
+                                          isPassed ? "bg-emerald-400" : "bg-slate-200"
+                                        }`}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Order Management Actions (Cancel Order) */}
+                        <div className="shrink-0 flex items-center gap-2">
+                          {!isCancelled && order.orderStatus !== "Shipped" ? (
+                            <button
+                              disabled={assignLoading[order._id]}
+                              onClick={() => handleCancelOrder(order._id)}
+                              className="px-3.5 py-2 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              title="Cancel this customer order"
+                            >
+                              {assignLoading[order._id] ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Ban className="h-3.5 w-3.5" />
+                              )}
+                              <span>Cancel Order</span>
+                            </button>
+                          ) : isCancelled ? (
+                            <span className="text-xs font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 flex items-center gap-1.5">
+                              <Ban className="h-3.5 w-3.5" /> Order Cancelled
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-1.5">
+                              <CheckCircle className="h-3.5 w-3.5" /> Order Fulfilled & Shipped
+                            </span>
                           )}
                         </div>
                       </div>
                     </div>
-
-                    {/* Transition Actions */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-dashed">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          placeholder="Optional timeline update note..."
-                          value={orderNotes[order._id] || ""}
-                          onChange={(e) =>
-                            setOrderNotes((prev) => ({
-                              ...prev,
-                              [order._id]: e.target.value,
-                            }))
-                          }
-                          className="w-full text-xs border rounded-xl px-3 py-2 bg-white"
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {[
-                          "Processing",
-                          "Printing",
-                          "Completed",
-                          "Shipped",
-                          "Cancelled",
-                        ].map((st) => (
-                          <button
-                            key={st}
-                            disabled={assignLoading[order._id]}
-                            onClick={() =>
-                              handleUpdateOrderStatus(order._id, st)
-                            }
-                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${
-                              order.orderStatus === st
-                                ? "bg-indigo-600 text-white"
-                                : "bg-white border text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            {st}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
