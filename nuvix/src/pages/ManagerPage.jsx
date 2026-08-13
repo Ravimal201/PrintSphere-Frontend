@@ -652,10 +652,19 @@ export default function ManagerPage() {
       const styleName = inventoryForm.tShirtType || (styles[0]?.name || styles[0]?.type || "Crew Neck");
       const chosenGsm = inventoryForm.material || selectedStyleObj?.gsmPrices?.[0]?.gsm || selectedStyleObj?.gsms?.[0] || "180GSM";
 
+      let finalItemType = inventoryForm.itemType || "Plain T-Shirt";
+      if (inventoryForm.itemType === "Materials") {
+        finalItemType = inventoryForm.materialCategory || "Transfer Paper";
+      }
+
+      let chosenColor = inventoryForm.colorName || inventoryForm.color || "Cyan (C)";
+
       const payload = {
-        itemType: inventoryForm.itemType || "Plain T-Shirt",
+        itemType: finalItemType,
         tShirtType: inventoryForm.itemType === "Plain T-Shirt" ? styleName : undefined,
-        color: inventoryForm.colorName || inventoryForm.color || "White",
+        color: (inventoryForm.itemType === "Plain T-Shirt" || inventoryForm.itemType === "Printing Ink")
+          ? chosenColor
+          : undefined,
         size: inventoryForm.itemType === "Plain T-Shirt" ? (inventoryForm.size || "M") : undefined,
         material: inventoryForm.itemType === "Plain T-Shirt" ? chosenGsm : undefined,
         quantity: Number(inventoryForm.quantity) >= 0 ? Number(inventoryForm.quantity) : 0,
@@ -674,8 +683,10 @@ export default function ManagerPage() {
       }
 
       setShowInventoryModal(false);
+      setShowCustomInkColor(false);
       setInventoryForm({
         itemType: "Plain T-Shirt",
+        materialCategory: "Transfer Paper",
         tShirtType: "",
         color: "#ffffff",
         colorName: "White",
@@ -2070,15 +2081,16 @@ export default function ManagerPage() {
               </button>
             </div>
 
-            {/* 3 Main Category Tabs */}
+            {/* 4 Main Category Filter Pills */}
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
               {[
+                { id: "ALL", label: "All Stock Items", icon: Layers },
                 { id: "TSHIRTS", label: "T-Shirts", icon: Tag },
                 { id: "INK", label: "Printing Ink", icon: Layers },
                 { id: "PAPERS_PACKAGING", label: "Transfer Papers & Packaging", icon: Package },
               ].map((cat) => {
                 const isActive = inventoryCategoryFilter === cat.id;
-                let count = 0;
+                let count = inventory.length;
                 if (cat.id === "TSHIRTS") {
                   count = inventory.filter(
                     (i) => i.itemType === "Plain T-Shirt" || i.itemType?.toLowerCase().includes("t-shirt")
@@ -2094,7 +2106,12 @@ export default function ManagerPage() {
                       typeLower.includes("transfer") ||
                       typeLower.includes("paper") ||
                       typeLower.includes("package") ||
-                      typeLower.includes("packaging")
+                      typeLower.includes("packaging") ||
+                      typeLower.includes("tape") ||
+                      typeLower.includes("stick") ||
+                      typeLower.includes("label") ||
+                      typeLower.includes("sticker") ||
+                      i.itemType === "Materials"
                     );
                   }).length;
                 }
@@ -2107,7 +2124,7 @@ export default function ManagerPage() {
                       setInventorySizeFilter("ALL");
                       setInventoryColorFilter("ALL");
                     }}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                       isActive
                         ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/10"
                         : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
@@ -2128,10 +2145,10 @@ export default function ManagerPage() {
               })}
             </div>
 
-            {/* Filter Control Bar (Size, Color, Search based on active tab) */}
+            {/* Filter Control Bar (Size, Color, Search based on active category) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/80 p-3.5 border rounded-2xl">
-              {/* Size Filter (Only for T-Shirts tab) */}
-              {inventoryCategoryFilter === "TSHIRTS" ? (
+              {/* Size Filter */}
+              {inventoryCategoryFilter === "ALL" || inventoryCategoryFilter === "TSHIRTS" ? (
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
                     Filter by Size
@@ -2153,8 +2170,8 @@ export default function ManagerPage() {
                 <div className="hidden sm:block" />
               )}
 
-              {/* Color Filter (For T-Shirts and Ink tabs) */}
-              {inventoryCategoryFilter === "TSHIRTS" || inventoryCategoryFilter === "INK" ? (
+              {/* Color Filter */}
+              {inventoryCategoryFilter === "ALL" || inventoryCategoryFilter === "TSHIRTS" || inventoryCategoryFilter === "INK" ? (
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
                     Filter by Color
@@ -2172,7 +2189,10 @@ export default function ManagerPage() {
                             if (inventoryCategoryFilter === "TSHIRTS") {
                               return i.itemType === "Plain T-Shirt" || i.itemType?.toLowerCase().includes("t-shirt");
                             }
-                            return i.itemType === "Printing Ink" || i.itemType?.toLowerCase().includes("ink");
+                            if (inventoryCategoryFilter === "INK") {
+                              return i.itemType === "Printing Ink" || i.itemType?.toLowerCase().includes("ink");
+                            }
+                            return true;
                           })
                           .map((i) => i.color)
                           .filter((c) => c && typeof c === "string" && c.trim() !== "")
@@ -2191,7 +2211,7 @@ export default function ManagerPage() {
               {/* Search Query */}
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
-                  Search Category
+                  Search Stock Items
                 </label>
                 <div className="relative">
                   <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
@@ -2232,24 +2252,26 @@ export default function ManagerPage() {
                     !typeLower.includes("transfer") &&
                     !typeLower.includes("paper") &&
                     !typeLower.includes("package") &&
-                    !typeLower.includes("packaging")
+                    !typeLower.includes("packaging") &&
+                    !typeLower.includes("tape") &&
+                    !typeLower.includes("stick") &&
+                    !typeLower.includes("label") &&
+                    !typeLower.includes("sticker") &&
+                    item.itemType !== "Materials"
                   ) {
                     return false;
                   }
                 }
 
-                // 2. Size Filter (T-Shirts tab)
-                if (inventoryCategoryFilter === "TSHIRTS" && inventorySizeFilter !== "ALL") {
+                // 2. Size Filter
+                if (inventorySizeFilter !== "ALL") {
                   if (item.size !== inventorySizeFilter) {
                     return false;
                   }
                 }
 
-                // 3. Color Filter (T-Shirts & Ink tabs)
-                if (
-                  (inventoryCategoryFilter === "TSHIRTS" || inventoryCategoryFilter === "INK") &&
-                  inventoryColorFilter !== "ALL"
-                ) {
+                // 3. Color Filter
+                if (inventoryColorFilter !== "ALL") {
                   if ((item.color || "").toLowerCase() !== inventoryColorFilter.toLowerCase()) {
                     return false;
                   }
@@ -2275,10 +2297,11 @@ export default function ManagerPage() {
                 return (
                   <div className="text-center py-16 border border-dashed border-slate-200 rounded-2xl">
                     <p className="text-sm text-slate-500 font-semibold">
-                      No stock items found in this category matching your filters.
+                      No stock items found matching your filters.
                     </p>
                     <button
                       onClick={() => {
+                        setInventoryCategoryFilter("ALL");
                         setInventorySizeFilter("ALL");
                         setInventoryColorFilter("ALL");
                         setInventorySearchQuery("");
@@ -2297,6 +2320,14 @@ export default function ManagerPage() {
                     <thead>
                       <tr className="border-b text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                         <th className="pb-3">Item Name</th>
+
+                        {/* All Items tab columns */}
+                        {inventoryCategoryFilter === "ALL" && (
+                          <>
+                            <th className="pb-3">Style / Details</th>
+                            <th className="pb-3">Size / Color</th>
+                          </>
+                        )}
 
                         {/* Category 1: T-Shirts columns */}
                         {inventoryCategoryFilter === "TSHIRTS" && (
@@ -2332,6 +2363,23 @@ export default function ManagerPage() {
                             <td className="py-4 font-bold text-slate-900">
                               {item.itemType}
                             </td>
+
+                            {/* All Items tab Data */}
+                            {inventoryCategoryFilter === "ALL" && (
+                              <>
+                                <td className="py-4 text-xs text-slate-600 font-medium">
+                                  <span className="font-bold text-slate-800">
+                                    {item.tShirtType || "Generic Consumable"}
+                                  </span>{" "}
+                                  {item.material ? `(${item.material})` : ""}
+                                </td>
+                                <td className="py-4 text-xs text-slate-500 font-medium">
+                                  {item.size || item.color
+                                    ? `${item.color || ""} ${item.size ? `— Size ${item.size}` : ""}`
+                                    : "—"}
+                                </td>
+                              </>
+                            )}
 
                             {/* Category 1: T-Shirts Data */}
                             {inventoryCategoryFilter === "TSHIRTS" && (
@@ -3238,20 +3286,43 @@ export default function ManagerPage() {
                     setInventoryForm((prev) => ({
                       ...prev,
                       itemType: newType,
+                      materialCategory: "Transfer Paper",
                       tShirtType: newType === "Plain T-Shirt" ? defaultStyleName : "",
-                      colorName: newType === "Printing Ink" ? "Cyan" : (defaultStyle?.colors?.[0]?.name || "White"),
-                      color: newType === "Printing Ink" ? "Cyan" : (defaultStyle?.colors?.[0]?.value || "#ffffff"),
+                      colorName: newType === "Printing Ink" ? "Cyan (C)" : (defaultStyle?.colors?.[0]?.name || "White"),
+                      color: newType === "Printing Ink" ? "Cyan (C)" : (defaultStyle?.colors?.[0]?.value || "#ffffff"),
                     }));
                   }}
                   className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
                 >
-                  <option value="Plain T-Shirt">Plain T-Shirt (Garment Stock)</option>
+                  <option value="Plain T-Shirt">T-Shirt (Garment Stock)</option>
                   <option value="Printing Ink">Printing Ink</option>
-                  <option value="Transfer Paper">Transfer Paper</option>
-                  <option value="Packaging Material">Packaging Material</option>
-                  <option value="Custom Consumable">Custom Consumable</option>
+                  <option value="Materials">Materials & Packaging Supplies</option>
                 </select>
               </div>
+
+              {/* Sub-Material Selection when itemType === "Materials" */}
+              {inventoryForm.itemType === "Materials" && (
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                    Select Material Category
+                  </label>
+                  <select
+                    value={inventoryForm.materialCategory || "Transfer Paper"}
+                    onChange={(e) =>
+                      setInventoryForm((prev) => ({
+                        ...prev,
+                        materialCategory: e.target.value,
+                      }))
+                    }
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                  >
+                    <option value="Transfer Paper">Transfer Paper</option>
+                    <option value="Packaging Material">Packaging Material</option>
+                    <option value="Stick Tapes">Stick Tapes</option>
+                    <option value="Label Stickers">Label Stickers</option>
+                  </select>
+                </div>
+              )}
 
               {/* Printing Ink Color Selection Box */}
               {inventoryForm.itemType === "Printing Ink" && (
@@ -3260,8 +3331,8 @@ export default function ManagerPage() {
                     Select Printing Ink Color Preset
                   </label>
 
-                  {/* Standard Ink Presets List */}
-                  <div className="space-y-2">
+                  {/* Essential Ink Presets List */}
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                     {[
                       {
                         name: "Cyan (C)",
@@ -3288,16 +3359,39 @@ export default function ManagerPage() {
                         value: "#FFFFFF",
                         desc: "White underbase ink for dark garment printing.",
                       },
+                      {
+                        name: "Spot Red",
+                        value: "#EF4444",
+                        desc: "Vivid spot red screen printing ink.",
+                      },
+                      {
+                        name: "Spot Blue",
+                        value: "#3B82F6",
+                        desc: "Royal spot blue screen printing ink.",
+                      },
+                      {
+                        name: "Spot Green",
+                        value: "#22C55E",
+                        desc: "Bright spot green printing ink.",
+                      },
+                      {
+                        name: "Metallic Gold",
+                        value: "#EAB308",
+                        desc: "Shimmering metallic gold specialty ink.",
+                      },
+                      {
+                        name: "Metallic Silver",
+                        value: "#94A3B8",
+                        desc: "Metallic silver shimmer specialty ink.",
+                      },
                     ].map((ink) => {
                       const isSelected =
-                        !showCustomInkColor &&
-                        (inventoryForm.colorName === ink.name || inventoryForm.color === ink.name);
+                        inventoryForm.colorName === ink.name || inventoryForm.color === ink.name;
                       return (
                         <button
                           key={ink.name}
                           type="button"
                           onClick={() => {
-                            setShowCustomInkColor(false);
                             setNewInkColor({ name: ink.name, value: ink.value });
                             setInventoryForm((prev) => ({
                               ...prev,
@@ -3331,79 +3425,12 @@ export default function ManagerPage() {
                         </button>
                       );
                     })}
-
-                    {/* "+ Other / Custom Color" Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCustomInkColor(true);
-                        setNewInkColor({ name: "", value: "#3b82f6" });
-                      }}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left font-bold text-xs transition cursor-pointer ${
-                        showCustomInkColor
-                          ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50 text-indigo-950"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      <span>+ Other / Custom Color</span>
-                      {showCustomInkColor && (
-                        <Check className="h-4 w-4 text-indigo-600 shrink-0" />
-                      )}
-                    </button>
                   </div>
-
-                  {/* Custom Ink Input Form (Visible when "Other" is clicked) */}
-                  {showCustomInkColor && (
-                    <div className="p-3 bg-white border border-indigo-200 rounded-xl space-y-2 mt-2">
-                      <label className="text-[10px] font-bold text-indigo-900 block">
-                        Specify Custom Ink Details
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Color name (e.g. Royal Blue, Neon Green)"
-                          value={newInkColor.name}
-                          onChange={(e) =>
-                            setNewInkColor((prev) => ({ ...prev, name: e.target.value }))
-                          }
-                          className="flex-1 px-3 py-2 border rounded-xl text-xs font-semibold bg-white focus:outline-indigo-500"
-                        />
-                        <input
-                          type="color"
-                          title="Color Palette"
-                          value={newInkColor.value}
-                          onChange={(e) =>
-                            setNewInkColor((prev) => ({
-                              ...prev,
-                              value: e.target.value,
-                            }))
-                          }
-                          className="h-8 w-12 p-0.5 border rounded-xl cursor-pointer bg-white shrink-0"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!newInkColor.name.trim()) {
-                              return alert("Please enter a color name.");
-                            }
-                            setInventoryForm((prev) => ({
-                              ...prev,
-                              colorName: newInkColor.name.trim(),
-                              color: newInkColor.name.trim(),
-                            }));
-                          }}
-                          className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
-                        >
-                          Set Color
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Selected Ink Color Preview Badge */}
                   {inventoryForm.colorName && (
                     <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
-                      <span className="text-[10px] font-bold text-slate-400">Selected Color:</span>
+                      <span className="text-[10px] font-bold text-slate-400">Selected Ink:</span>
                       <div className="flex items-center gap-1.5 bg-white border border-indigo-200 rounded-full px-3 py-1 text-xs shadow-2xs">
                         <span
                           className="h-3.5 w-3.5 rounded-full border border-slate-300 shrink-0"
