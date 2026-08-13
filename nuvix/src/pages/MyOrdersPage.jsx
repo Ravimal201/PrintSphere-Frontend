@@ -406,12 +406,16 @@ export default function MyOrdersPage() {
                                   </div>
                                   <div className="space-y-0.5">
                                     <h5 className="font-extrabold text-slate-900 text-sm capitalize">{name}</h5>
-                                    <div className="flex gap-1.5 text-[10px] text-slate-400 font-semibold uppercase">
-                                      <span>Size: {item.selectedSize}</span>
-                                      <span>•</span>
-                                      <span>Material: {material}</span>
-                                      <span>•</span>
-                                      <span>Qty: {item.quantity}</span>
+                                    <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400 font-semibold uppercase">
+                                       <span>Style: {item.tShirtStyle || item.designId?.tShirtType || "Crew Neck"}</span>
+                                       <span>•</span>
+                                       <span>Size: {item.selectedSize || item.size}</span>
+                                       <span>•</span>
+                                       <span>Color: {item.selectedColor || color}</span>
+                                       <span>•</span>
+                                       <span>GSM: {item.gsm || material || "180GSM"}</span>
+                                       <span>•</span>
+                                       <span>Qty: {item.quantity}</span>
                                     </div>
                                     {isCustom && item.designId && (
                                       <button

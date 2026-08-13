@@ -273,7 +273,9 @@ export default function CartPage() {
             quantity: item.quantity,
             price: item.basePrice,
             selectedSize: item.size,
-            selectedColor: item.color
+            selectedColor: item.color,
+            tShirtStyle: item.tShirtType || item.tShirtStyle || item.title || "Crew Neck",
+            gsm: item.gsm || item.material || "180GSM"
           });
         } else {
           resolvedItems.push({
@@ -281,7 +283,9 @@ export default function CartPage() {
             quantity: item.quantity,
             price: item.basePrice * (1 - (item.discount / 100)),
             selectedSize: item.size,
-            selectedColor: item.color
+            selectedColor: item.color,
+            tShirtStyle: item.tShirtStyle || item.title || "Crew Neck",
+            gsm: item.gsm || item.material || "180GSM"
           });
         }
       }
@@ -388,7 +392,7 @@ export default function CartPage() {
                               </button>
                             </div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">
-                              Size: {item.size} / Color: {item.color}
+                              Size: {item.size} / Color: {item.color} / GSM: {item.gsm || item.material || "180GSM"}
                             </p>
                             {item.isCustom && (
                               <button

@@ -18,6 +18,9 @@ const InventorySchema = new mongoose.Schema(
     material: {
       type: String
     },
+    gsm: {
+      type: String
+    },
     // Stock levels
     quantity: {
       type: Number,

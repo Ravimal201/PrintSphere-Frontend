@@ -94,6 +94,7 @@ export default function StorePage() {
   const [selected3DProduct, setSelected3DProduct] = useState(null);
   const [modalColor, setModalColor] = useState("");
   const [modalSize, setModalSize] = useState("");
+  const [modalGsm, setModalGsm] = useState("");
   const [modalQty, setModalQty] = useState(1);
   const [modalSide, setModalSide] = useState("front");
   const [modalZoom, setModalZoom] = useState(0.85);
@@ -104,6 +105,7 @@ export default function StorePage() {
     if (selected3DProduct) {
       setModalColor(selected3DProduct.colors?.[0] || "#ffffff");
       setModalSize(selected3DProduct.sizes?.[0] || "M");
+      setModalGsm(selected3DProduct.gsms?.[0] || "180GSM");
       setModalQty(1);
       setModalSide("front");
       setModalZoom(0.85);
@@ -305,25 +307,31 @@ export default function StorePage() {
     const defaultSize = selectedOptions.size || product.sizes?.[0] || "M";
     const defaultColor =
       selectedOptions.color || product.colors?.[0] || "White";
+    const defaultGsm =
+      selectedOptions.gsm || product.gsms?.[0] || "180GSM";
+    const qty = selectedOptions.quantity || 1;
+    const styleName = product.category || "Crew Neck";
 
-    const cartKey = `${product._id}-${defaultSize}-${defaultColor}`;
+    const cartKey = `${product._id}-${defaultSize}-${defaultColor}-${defaultGsm}`;
 
     const existingIndex = cart.findIndex((item) => item.cartKey === cartKey);
     if (existingIndex > -1) {
       const updatedCart = [...cart];
-      updatedCart[existingIndex].quantity += 1;
+      updatedCart[existingIndex].quantity += qty;
       saveCart(updatedCart);
     } else {
       const cartItem = {
         cartKey,
         productId: product._id,
         title: product.title,
+        tShirtStyle: styleName,
         basePrice: product.basePrice,
         discount: product.discount || 0,
         category: product.category,
         size: defaultSize,
         color: defaultColor,
-        quantity: 1,
+        gsm: defaultGsm,
+        quantity: qty,
         image: product.images?.[0] || "/images/dumyImage.png",
       };
       saveCart([...cart, cartItem]);
@@ -393,9 +401,9 @@ export default function StorePage() {
         if (item.isCustom || item.designId?.startsWith("custom-")) {
           // It's a local unsaved custom design. Let's save it to the DB first.
           const payload = {
-            tShirtType: item.tShirtType || item.title || "Custom T-Shirt",
+            tShirtType: item.tShirtStyle || item.tShirtType || item.title || "Custom T-Shirt",
             fabricColor: item.color,
-            material: item.material || "180GSM",
+            material: item.gsm || item.material || "180GSM",
             size: item.size || "M",
             layers: item.layers || [],
             estimatedCost: item.basePrice,
@@ -413,6 +421,8 @@ export default function StorePage() {
             price: item.basePrice,
             selectedSize: item.size,
             selectedColor: item.color,
+            tShirtStyle: item.tShirtStyle || item.tShirtType || item.title || "Crew Neck",
+            gsm: item.gsm || item.material || "180GSM",
           });
         } else {
           // Standard product
@@ -422,6 +432,8 @@ export default function StorePage() {
             price: item.basePrice * (1 - item.discount / 100),
             selectedSize: item.size,
             selectedColor: item.color,
+            tShirtStyle: item.tShirtStyle || item.category || item.title || "Crew Neck",
+            gsm: item.gsm || "180GSM",
           });
         }
       }
@@ -742,9 +754,10 @@ export default function StorePage() {
                                 </span>
                               )}
                             </div>
-                            <span className="text-[9px] font-bold text-slate-400">
-                              Sizes: {(p.sizes || []).join(", ")}
-                            </span>
+                            <div className="flex flex-col items-end text-[9px] font-bold text-slate-400">
+                              <span>Sizes: {(p.sizes || []).join(", ")}</span>
+                              <span className="text-indigo-600">GSM: {(p.gsms || []).join(", ") || p.gsm || "180GSM"}</span>
+                            </div>
                           </div>
 
                           <button
@@ -1324,6 +1337,31 @@ export default function StorePage() {
                   </div>
                 </div>
 
+                {/* GSM Selector */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Select GSM Value
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {(selected3DProduct.gsms && selected3DProduct.gsms.length > 0
+                      ? selected3DProduct.gsms
+                      : ["180GSM"]
+                    ).map((gsmVal) => (
+                      <button
+                        key={gsmVal}
+                        onClick={() => setModalGsm(gsmVal)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
+                          modalGsm === gsmVal
+                            ? "bg-slate-900 border-slate-900 text-white"
+                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {gsmVal}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Quantity */}
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -1355,15 +1393,15 @@ export default function StorePage() {
               <div className="mt-8 pt-4 border-t flex flex-col gap-2">
                 <button
                   onClick={() => {
-                    handleAddToCartFromModal(
-                      selected3DProduct,
-                      modalColor,
-                      modalSize,
-                      modalQty,
-                    );
+                    handleAddToCart(selected3DProduct, {
+                      color: modalColor,
+                      size: modalSize,
+                      gsm: modalGsm,
+                      quantity: modalQty,
+                    });
                     setSelected3DProduct(null);
                   }}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition cursor-pointer"
                 >
                   Add to Cart — Rs.{" "}
                   {(
