@@ -173,7 +173,7 @@ exports.updateStock = async (req, res) => {
   }
 };
 
-// @desc    Add new inventory item
+// @desc    Add new inventory item (or add quantity to existing matching item)
 // @route   POST /api/manager/inventory
 exports.addInventoryItem = async (req, res) => {
   try {
@@ -187,18 +187,60 @@ exports.addInventoryItem = async (req, res) => {
       return res.status(400).json({ message: "Item type is required." });
     }
 
+    const targetItemType = itemType.trim();
+    const targetTShirtType = targetItemType === "Plain T-Shirt" ? (tShirtType || "Crew Neck").trim() : "";
+    const targetColor = (color || "White").trim();
+    const targetSize = targetItemType === "Plain T-Shirt" ? (size || "M").trim() : "";
+    const targetMaterial = targetItemType === "Plain T-Shirt" ? (material || "180GSM").trim() : "";
+    const addQty = typeof quantity !== "undefined" && !isNaN(Number(quantity)) ? Number(quantity) : 0;
+    const threshold = typeof minThreshold !== "undefined" && !isNaN(Number(minThreshold)) ? Number(minThreshold) : 10;
+
+    // Helper for normalized string comparison
+    const norm = (str) => (str || "").trim().toLowerCase();
+
+    // Fetch existing candidates of the same itemType (case-insensitive)
+    const candidates = await Inventory.find({
+      itemType: { $regex: new RegExp(`^${targetItemType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") }
+    });
+
+    const existingItem = candidates.find((item) => {
+      const matchType = norm(item.itemType) === norm(targetItemType);
+      const matchTShirt = norm(item.tShirtType) === norm(targetTShirtType);
+      const matchColor = norm(item.color) === norm(targetColor);
+      const matchSize = norm(item.size) === norm(targetSize);
+      const matchMaterial = norm(item.material) === norm(targetMaterial);
+
+      return matchType && matchTShirt && matchColor && matchSize && matchMaterial;
+    });
+
+    if (existingItem) {
+      existingItem.quantity = (existingItem.quantity || 0) + addQty;
+      if (typeof minThreshold !== "undefined" && !isNaN(Number(minThreshold)) && Number(minThreshold) > 0) {
+        existingItem.minThreshold = Number(minThreshold);
+      }
+      existingItem.lastRestocked = new Date();
+      await existingItem.save();
+
+      return res.status(200).json({
+        message: `Added ${addQty} stock to existing item! Total stock is now ${existingItem.quantity}.`,
+        item: existingItem,
+        isExistingUpdated: true
+      });
+    }
+
+    // If no exact match exists, create new inventory record
     const newItem = await Inventory.create({
-      itemType: itemType || "Plain T-Shirt",
-      tShirtType: itemType === "Plain T-Shirt" ? (tShirtType || "Crew Neck") : undefined,
-      color: color || "White",
-      size: itemType === "Plain T-Shirt" ? (size || "M") : undefined,
-      material: itemType === "Plain T-Shirt" ? (material || "180GSM") : undefined,
-      quantity: typeof quantity !== "undefined" ? Number(quantity) : 0,
-      minThreshold: typeof minThreshold !== "undefined" ? Number(minThreshold) : 10,
+      itemType: targetItemType,
+      tShirtType: targetTShirtType || undefined,
+      color: targetColor || "White",
+      size: targetSize || undefined,
+      material: targetMaterial || undefined,
+      quantity: addQty,
+      minThreshold: threshold,
       lastRestocked: new Date()
     });
 
-    res.status(201).json({ message: "Inventory item added successfully", item: newItem });
+    res.status(201).json({ message: "Inventory item added successfully", item: newItem, isExistingUpdated: false });
   } catch (error) {
     console.error("Add inventory item error:", error);
     res.status(500).json({ message: error.message || "Server error while adding inventory item" });
