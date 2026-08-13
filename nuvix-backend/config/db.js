@@ -47,7 +47,7 @@ const connectDB = async () => {
             name: "Male Normal T-Shirt",
             path: "/images/models/male normal t-shirt1.glb",
             type: "Crew Neck",
-            gsms: ["180GSM", "220 GSM", "280GSM"],
+            gsms: ["GSM 180", "GSM 220", "GSM 280"],
             colors: [
               { name: "White", value: "#ffffff" },
               { name: "Black", value: "#111827" },
@@ -62,7 +62,7 @@ const connectDB = async () => {
             name: "Oversized T-Shirt",
             path: "/images/models/oversized t-sdirt1.glb",
             type: "Crew Neck",
-            gsms: ["220 GSM", "280GSM", "320GSM"],
+            gsms: ["GSM 220", "GSM 280", "GSM 320"],
             colors: [
               { name: "White", value: "#ffffff" },
               { name: "Black", value: "#111827" },
@@ -75,7 +75,7 @@ const connectDB = async () => {
             name: "Hoodie",
             path: "/images/models/t_shirt_hoodie.glb",
             type: "Polo",
-            gsms: ["280GSM", "320GSM"],
+            gsms: ["GSM 280", "GSM 320"],
             colors: [
               { name: "Black", value: "#111827" },
               { name: "Navy Blue", value: "#1e3a8a" },

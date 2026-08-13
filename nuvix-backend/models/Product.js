@@ -75,7 +75,7 @@ const ProductSchema = new mongoose.Schema(
     ],
     gsm: {
       type: String,
-      default: "180GSM"
+      default: "GSM 180"
     },
     gsms: [
       {

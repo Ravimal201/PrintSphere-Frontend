@@ -10,6 +10,7 @@ import { ShoppingBag, Calendar, MapPin, ShieldCheck, AlertCircle, Edit3, Plus, C
 import axios from "axios";
 
 import { API_BASE_URL } from "../config/api";
+import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 const statusColors = {
   Pending: "bg-amber-50 text-amber-700 border-amber-100",
@@ -411,9 +412,9 @@ export default function MyOrdersPage() {
                                        <span>•</span>
                                        <span>Size: {item.selectedSize || item.size}</span>
                                        <span>•</span>
-                                       <span>Color: {item.selectedColor || color}</span>
+                                       <span>Color: {resolveColorName(item.selectedColor || color)}</span>
                                        <span>•</span>
-                                       <span>GSM: {item.gsm || material || "180GSM"}</span>
+                                       <span>GSM: {formatGsm(item.gsm || material || "180GSM")}</span>
                                        <span>•</span>
                                        <span>Qty: {item.quantity}</span>
                                     </div>

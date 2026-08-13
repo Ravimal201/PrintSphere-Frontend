@@ -8,6 +8,7 @@ const CustomizedDesign = require("../models/CustomizedDesign");
 const TShirtStyle = require("../models/TShirtStyle");
 const UserActivity = require("../models/UserActivity");
 const { createNotification } = require("../utils/notificationHelper");
+const { resolveColorName, formatGsm } = require("../utils/colorHelper");
 
 // JWT Secret Key fallback
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -494,9 +495,51 @@ exports.createOrder = async (req, res) => {
 
     const { items, subtotal, printCost, complexityFee, totalCost, shippingAddress } = req.body;
 
+    const normalizedItems = (items || []).map((item) => {
+      const size = item.size || item.selectedSize || "M";
+      const color = resolveColorName(item.color || item.selectedColor || "White");
+      const gsm = formatGsm(item.gsm || item.material || "GSM 180");
+      const tShirtStyle = item.tShirtStyle || item.tShirtType || (item.designId?.tShirtType) || "Crew Neck";
+      const quantity = typeof item.quantity !== "undefined" && !isNaN(Number(item.quantity)) && Number(item.quantity) > 0 
+        ? Number(item.quantity) 
+        : 1;
+      const price = typeof item.price !== "undefined" && !isNaN(Number(item.price)) 
+        ? Number(item.price) 
+        : (item.basePrice || 0);
+      const itemType = item.itemType || (item.designId ? "Customized" : "Ready-made");
+
+      return {
+        ...item,
+        itemType,
+        quantity,
+        size,
+        selectedSize: size,
+        gsm,
+        color,
+        selectedColor: color,
+        tShirtStyle,
+        material: item.material || gsm,
+        price
+      };
+    });
+
+    const primaryItem = normalizedItems[0] || {};
+    const orderSize = req.body.size || primaryItem.size || "M";
+    const orderGsm = formatGsm(req.body.gsm || primaryItem.gsm || "GSM 180");
+    const orderColor = resolveColorName(req.body.color || primaryItem.color || "White");
+    const orderQuantity = typeof req.body.quantity !== "undefined" && !isNaN(Number(req.body.quantity))
+      ? Number(req.body.quantity)
+      : (normalizedItems.reduce((sum, it) => sum + (it.quantity || 1), 0) || 1);
+    const orderTShirtStyle = req.body.tShirtStyle || req.body.tShirtType || primaryItem.tShirtStyle || "Crew Neck";
+
     const order = await Order.create({
       customerId: decoded.id,
-      items,
+      size: orderSize,
+      gsm: orderGsm,
+      color: orderColor,
+      quantity: orderQuantity,
+      tShirtStyle: orderTShirtStyle,
+      items: normalizedItems,
       subtotal,
       printCost: printCost || 0,
       complexityFee: complexityFee || 0,
