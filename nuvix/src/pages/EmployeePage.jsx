@@ -8,6 +8,7 @@ import axios from "axios";
 import TShirt3DModal from "../components/TShirt3DModal";
 
 import { API_BASE_URL } from "../config/api";
+import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 export default function EmployeePage() {
   const [isEmployee, setIsEmployee] = useState(false);
@@ -26,6 +27,15 @@ export default function EmployeePage() {
   // 3D modal state for custom customer designs
   const [selected3DDesign, setSelected3DDesign] = useState(null);
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
+
+  // Insufficient packaging materials alert modal state
+  const [packagingAlertModal, setPackagingAlertModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    details: "",
+    missingItems: []
+  });
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -151,10 +161,24 @@ export default function EmployeePage() {
 
       setAssignedOrders(prev => prev.map(o => o._id === orderId ? response.data.order : o));
       setOrderNotes(prev => ({ ...prev, [orderId]: "" }));
-      alert("Order status updated successfully!");
+      alert(`Order status updated to "${status}" successfully!`);
     } catch (err) {
       console.error("Update status error:", err);
-      alert(err.response?.data?.message || "Failed to update status");
+      const errMsg = err.response?.data?.message || "Failed to update status";
+      const details = err.response?.data?.details;
+      const missingMaterials = err.response?.data?.missingMaterials || [];
+
+      if (details || missingMaterials.length > 0) {
+        setPackagingAlertModal({
+          isOpen: true,
+          title: "Insufficient Packaging Materials!",
+          message: errMsg,
+          details: details || "",
+          missingItems: missingMaterials
+        });
+      } else {
+        alert(errMsg);
+      }
     } finally {
       setActionLoading(prev => ({ ...prev, [orderId]: false }));
     }
@@ -482,9 +506,9 @@ export default function EmployeePage() {
                                     <p className="font-bold text-slate-900">
                                       {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
                                     </p>
-                                    <p className="text-slate-500 text-[10px] mt-0.5">
-                                      Style: {item.tShirtStyle || "Crew Neck"} | Size: {item.selectedSize || item.size} | Color: {item.selectedColor || item.color} | GSM: {item.gsm || item.material || "180GSM"}
-                                    </p>
+                                     <p className="text-slate-500 text-[10px] mt-0.5">
+                                       Style: {item.tShirtStyle || "Crew Neck"} | Size: {item.selectedSize || item.size} | Color: {resolveColorName(item.selectedColor || item.color)} | GSM: {formatGsm(item.gsm || item.material || "GSM 180")}
+                                     </p>
 
                                     {item.itemType === "Customized" && item.designId && (
                                       <div className="mt-2 pt-2 border-t space-y-2">
@@ -943,6 +967,48 @@ export default function EmployeePage() {
         }}
         design={selected3DDesign}
       />
+
+      {/* Insufficient Packaging Materials Alert Modal */}
+      {packagingAlertModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 flex flex-col gap-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="h-12 w-12 rounded-2xl bg-rose-50 flex items-center justify-center shrink-0">
+                <AlertCircle className="h-6 w-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">{packagingAlertModal.title}</h3>
+                <p className="text-xs text-rose-600 font-semibold">{packagingAlertModal.message}</p>
+              </div>
+            </div>
+
+            {packagingAlertModal.missingItems && packagingAlertModal.missingItems.length > 0 && (
+              <div className="bg-rose-50/70 border border-rose-100 rounded-2xl p-4 space-y-2.5">
+                <p className="text-xs font-bold text-rose-900 uppercase tracking-wide">Packaging Shortage Breakdown:</p>
+                <div className="space-y-1.5">
+                  {packagingAlertModal.missingItems.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs bg-white/80 px-3 py-2 rounded-xl border border-rose-100 shadow-2xs">
+                      <span className="font-bold text-slate-800">{item.name}</span>
+                      <span className="font-semibold text-rose-600">
+                        Required: <span className="font-extrabold">{item.required}</span> | Available: <span className="font-extrabold">{item.available}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setPackagingAlertModal({ isOpen: false, title: "", message: "", details: "", missingItems: [] })}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+              >
+                Close & Notify Manager
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

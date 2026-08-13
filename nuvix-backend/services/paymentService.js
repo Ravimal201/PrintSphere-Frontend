@@ -1,6 +1,7 @@
 const Payment = require("../models/Payment");
 const Order = require("../models/Order");
 const Inventory = require("../models/Inventory");
+const { formatGsm } = require("../utils/colorHelper");
 
 /**
  * Payment Gateway Strategy Abstract Interface
@@ -420,7 +421,7 @@ class PaymentService {
       for (const item of order.items) {
         const itemSize = item.selectedSize || "M";
         const itemColor = item.selectedColor || "White";
-        const itemGsm = item.gsm || item.material || "180GSM";
+        const itemGsm = formatGsm(item.gsm || item.material || "GSM 180");
         const itemStyle = item.tShirtStyle || "Crew Neck";
         const qty = item.quantity || 1;
 

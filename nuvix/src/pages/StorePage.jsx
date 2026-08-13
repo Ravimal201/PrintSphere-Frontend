@@ -31,6 +31,7 @@ import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
 import Store3DCardPreview from "../components/Store3DCardPreview";
 import { API_BASE_URL } from "../config/api";
+import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 const getOrCreateSessionId = () => {
   let sessionId = localStorage.getItem("printsphere_session_id");
@@ -105,7 +106,7 @@ export default function StorePage() {
     if (selected3DProduct) {
       setModalColor(selected3DProduct.colors?.[0] || "#ffffff");
       setModalSize(selected3DProduct.sizes?.[0] || "M");
-      setModalGsm(selected3DProduct.gsms?.[0] || "180GSM");
+      setModalGsm(formatGsm(selected3DProduct.gsms?.[0] || selected3DProduct.gsm || "GSM 180"));
       setModalQty(1);
       setModalSide("front");
       setModalZoom(0.85);
@@ -192,7 +193,8 @@ export default function StorePage() {
     selectedSize,
     quantity,
   ) => {
-    const cartKey = `${product._id}-${selectedSize}-${selectedColor}`;
+    const colorName = resolveColorName(selectedColor);
+    const cartKey = `${product._id}-${selectedSize}-${colorName}`;
 
     const existingIndex = cart.findIndex((item) => item.cartKey === cartKey);
     if (existingIndex > -1) {
@@ -208,7 +210,7 @@ export default function StorePage() {
         discount: product.discount || 0,
         category: product.category,
         size: selectedSize,
-        color: selectedColor,
+        color: colorName,
         quantity: quantity,
         image: product.images?.[0] || "/images/dumyImage.png",
       };
@@ -305,10 +307,12 @@ export default function StorePage() {
   // Add to cart
   const handleAddToCart = (product, selectedOptions = {}) => {
     const defaultSize = selectedOptions.size || product.sizes?.[0] || "M";
-    const defaultColor =
-      selectedOptions.color || product.colors?.[0] || "White";
-    const defaultGsm =
-      selectedOptions.gsm || product.gsms?.[0] || "180GSM";
+    const defaultColor = resolveColorName(
+      selectedOptions.color || product.colors?.[0] || "White"
+    );
+    const defaultGsm = formatGsm(
+      selectedOptions.gsm || product.gsms?.[0] || product.gsm || "GSM 180"
+    );
     const qty = selectedOptions.quantity || 1;
     const styleName = product.category || "Crew Neck";
 
@@ -400,10 +404,11 @@ export default function StorePage() {
       for (const item of cart) {
         if (item.isCustom || item.designId?.startsWith("custom-")) {
           // It's a local unsaved custom design. Let's save it to the DB first.
+          const formattedGsm = formatGsm(item.gsm || item.material || "GSM 180");
           const payload = {
             tShirtType: item.tShirtStyle || item.tShirtType || item.title || "Custom T-Shirt",
             fabricColor: item.color,
-            material: item.gsm || item.material || "180GSM",
+            material: formattedGsm,
             size: item.size || "M",
             layers: item.layers || [],
             estimatedCost: item.basePrice,
@@ -415,25 +420,32 @@ export default function StorePage() {
             { headers },
           );
           const dbDesignId = designRes.data.design._id;
+          const colorName = resolveColorName(item.color);
           resolvedItems.push({
             designId: dbDesignId,
             quantity: item.quantity,
             price: item.basePrice,
+            size: item.size,
             selectedSize: item.size,
-            selectedColor: item.color,
+            color: colorName,
+            selectedColor: colorName,
             tShirtStyle: item.tShirtStyle || item.tShirtType || item.title || "Crew Neck",
-            gsm: item.gsm || item.material || "180GSM",
+            gsm: formattedGsm,
           });
         } else {
           // Standard product
+          const colorName = resolveColorName(item.color);
+          const formattedGsm = formatGsm(item.gsm || "GSM 180");
           resolvedItems.push({
             productId: item.productId,
             quantity: item.quantity,
             price: item.basePrice * (1 - item.discount / 100),
+            size: item.size,
             selectedSize: item.size,
-            selectedColor: item.color,
+            color: colorName,
+            selectedColor: colorName,
             tShirtStyle: item.tShirtStyle || item.category || item.title || "Crew Neck",
-            gsm: item.gsm || "180GSM",
+            gsm: formattedGsm,
           });
         }
       }

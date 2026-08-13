@@ -36,6 +36,7 @@ import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
 
 import { API_BASE_URL } from "../config/api";
+import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 export default function ManagerPage() {
   const [isManager, setIsManager] = useState(false);
@@ -53,8 +54,8 @@ export default function ManagerPage() {
     path: "",
     type: "Crew Neck",
     gsmPrices: [
-      { gsm: "180GSM", price: 1200 },
-      { gsm: "220GSM", price: 1500 },
+      { gsm: "GSM 180", price: 1200 },
+      { gsm: "GSM 220", price: 1500 },
     ],
     colors: [
       { name: "White", value: "#ffffff" },
@@ -85,7 +86,7 @@ export default function ManagerPage() {
     basePrice: 0,
     discount: 0,
     sizes: ["S", "M", "L", "XL", "XXL"],
-    gsms: ["180GSM", "200GSM", "220GSM", "240GSM"],
+    gsms: ["GSM 180", "GSM 200", "GSM 220", "GSM 240"],
     colors: ["#ffffff"],
     images: [],
     modelPath: "/images/models/male normal t-shirt1.glb",
@@ -118,7 +119,7 @@ export default function ManagerPage() {
     color: "#ffffff",
     colorName: "White",
     size: "M",
-    material: "180GSM",
+    material: "GSM 180",
     quantity: 50,
     minThreshold: 15,
   });
@@ -448,14 +449,14 @@ export default function ManagerPage() {
       const matchedStyle = styles.find((s) => s.path === product.modelPath);
       if (matchedStyle) {
         if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
-          resolvedGsms = matchedStyle.gsmPrices.map((gp) => gp.gsm);
+          resolvedGsms = matchedStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
         } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
-          resolvedGsms = matchedStyle.gsms;
+          resolvedGsms = matchedStyle.gsms.map(formatGsm);
         }
       }
     }
     if (resolvedGsms.length === 0) {
-      resolvedGsms = ["180GSM", "200GSM", "220GSM", "240GSM"];
+      resolvedGsms = ["GSM 180", "GSM 200", "GSM 220", "GSM 240"];
     }
 
     setProductForm({
@@ -480,13 +481,13 @@ export default function ManagerPage() {
     let initialGsms = [];
     if (firstStyle) {
       if (firstStyle.gsmPrices && firstStyle.gsmPrices.length > 0) {
-        initialGsms = firstStyle.gsmPrices.map((gp) => gp.gsm);
+        initialGsms = firstStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
       } else if (firstStyle.gsms && firstStyle.gsms.length > 0) {
-        initialGsms = firstStyle.gsms;
+        initialGsms = firstStyle.gsms.map(formatGsm);
       }
     }
     if (initialGsms.length === 0) {
-      initialGsms = ["180GSM", "200GSM", "220GSM", "240GSM"];
+      initialGsms = ["GSM 180", "GSM 200", "GSM 220", "GSM 240"];
     }
 
     let initialColors = [];
@@ -740,7 +741,7 @@ export default function ManagerPage() {
         (s) => (s.name || s.type) === inventoryForm.tShirtType
       );
       const styleName = inventoryForm.tShirtType || (styles[0]?.name || styles[0]?.type || "Crew Neck");
-      const chosenGsm = inventoryForm.material || selectedStyleObj?.gsmPrices?.[0]?.gsm || selectedStyleObj?.gsms?.[0] || "180GSM";
+      const chosenGsm = formatGsm(inventoryForm.material || selectedStyleObj?.gsmPrices?.[0]?.gsm || selectedStyleObj?.gsms?.[0] || "GSM 180");
 
       let finalItemType = inventoryForm.itemType || "Plain T-Shirt";
       if (inventoryForm.itemType === "Materials") {
@@ -781,7 +782,7 @@ export default function ManagerPage() {
         color: "#ffffff",
         colorName: "White",
         size: "M",
-        material: "180GSM",
+        material: "GSM 180",
         quantity: 50,
         minThreshold: 15,
       });
@@ -1847,7 +1848,7 @@ export default function ManagerPage() {
                                   return matchedStyle.gsms.join(", ");
                                 }
                               }
-                              return "180GSM";
+                              return "GSM 180";
                             })()}
                           </td>
                           <td className="py-4 text-xs">
@@ -2039,13 +2040,13 @@ export default function ManagerPage() {
                             let styleGsms = [];
                             if (matchedStyle) {
                               if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
-                                styleGsms = matchedStyle.gsmPrices.map((gp) => gp.gsm);
+                                styleGsms = matchedStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
                               } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
-                                styleGsms = matchedStyle.gsms;
+                                styleGsms = matchedStyle.gsms.map(formatGsm);
                               }
                             }
                             if (styleGsms.length === 0) {
-                              styleGsms = ["180GSM", "200GSM", "220GSM", "240GSM"];
+                              styleGsms = ["GSM 180", "GSM 200", "GSM 220", "GSM 240"];
                             }
 
                             // Extract Colors for matched style
@@ -2153,13 +2154,13 @@ export default function ManagerPage() {
                           let availableGsms = [];
                           if (matchedStyle) {
                             if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
-                              availableGsms = matchedStyle.gsmPrices.map((gp) => gp.gsm);
+                              availableGsms = matchedStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
                             } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
-                              availableGsms = matchedStyle.gsms;
+                              availableGsms = matchedStyle.gsms.map(formatGsm);
                             }
                           }
                           if (availableGsms.length === 0) {
-                            availableGsms = ["180GSM", "200GSM", "220GSM", "240GSM", "280GSM", "320GSM"];
+                            availableGsms = ["GSM 180", "GSM 200", "GSM 220", "GSM 240", "GSM 280", "GSM 320"];
                           }
 
                           return availableGsms.map((gsm) => {
@@ -2479,7 +2480,7 @@ export default function ManagerPage() {
                 onClick={() => {
                   const defaultStyleName = styles[0]?.name || styles[0]?.type || "Crew Neck";
                   const defaultStyle = styles.find((s) => (s.name || s.type) === defaultStyleName);
-                  const firstGsm = defaultStyle?.gsmPrices?.[0]?.gsm || defaultStyle?.gsms?.[0] || "180GSM";
+                  const firstGsm = formatGsm(defaultStyle?.gsmPrices?.[0]?.gsm || defaultStyle?.gsms?.[0] || "GSM 180");
                   setInventoryForm({
                     itemType: inventoryCategoryFilter === "INK"
                       ? "Printing Ink"
@@ -2811,7 +2812,7 @@ export default function ManagerPage() {
                                   {item.tShirtType || "Crew Neck"}
                                 </td>
                                 <td className="py-4 text-xs text-slate-600 font-medium">
-                                  {item.material || "180GSM"}
+                                  {formatGsm(item.material || item.gsm || "GSM 180")}
                                 </td>
                                 <td className="py-4 text-xs text-slate-600 font-medium">
                                   {item.size || "M"}
@@ -2959,8 +2960,8 @@ export default function ManagerPage() {
                     path: "",
                     type: "Crew Neck",
                     gsmPrices: [
-                      { gsm: "180GSM", price: 1200 },
-                      { gsm: "220GSM", price: 1500 },
+                      { gsm: "GSM 180", price: 1200 },
+                      { gsm: "GSM 220", price: 1500 },
                     ],
                     colors: [
                       { name: "White", value: "#ffffff" },
@@ -3500,10 +3501,10 @@ export default function ManagerPage() {
                           ...prev.gsmPrices.filter(
                             (gp) =>
                               gp.gsm.toLowerCase() !==
-                              newGsmName.trim().toLowerCase(),
+                              formatGsm(newGsmName).toLowerCase(),
                           ),
                           {
-                            gsm: newGsmName.trim(),
+                            gsm: formatGsm(newGsmName),
                             price: Number(newGsmPrice),
                           },
                         ],
@@ -3881,7 +3882,7 @@ export default function ManagerPage() {
                         const matchStyle = styles.find(
                           (s) => (s.name || s.type) === styleVal
                         );
-                        const firstGsm = matchStyle?.gsmPrices?.[0]?.gsm || matchStyle?.gsms?.[0] || "180GSM";
+                        const firstGsm = formatGsm(matchStyle?.gsmPrices?.[0]?.gsm || matchStyle?.gsms?.[0] || "GSM 180");
                         setInventoryForm((prev) => ({
                           ...prev,
                           tShirtType: styleVal,
@@ -3986,8 +3987,8 @@ export default function ManagerPage() {
                           (s) => (s.name || s.type) === (inventoryForm.tShirtType || styles[0]?.name || styles[0]?.type)
                         );
                         const styleGsms = curStyle?.gsmPrices && curStyle.gsmPrices.length > 0
-                          ? curStyle.gsmPrices.map((gp) => gp.gsm)
-                          : (curStyle?.gsms && curStyle.gsms.length > 0 ? curStyle.gsms : ["180GSM", "200GSM", "220GSM", "240GSM"]);
+                          ? curStyle.gsmPrices.map((gp) => formatGsm(gp.gsm))
+                          : (curStyle?.gsms && curStyle.gsms.length > 0 ? curStyle.gsms.map(formatGsm) : ["GSM 180", "GSM 200", "GSM 220", "GSM 240"]);
 
                         return (
                           <select
@@ -4119,11 +4120,11 @@ export default function ManagerPage() {
                       >
                         <div className="space-y-0.5">
                           <p className="text-xs font-bold text-slate-900">
-                            {item.style || "Plain"} T-Shirt
+                            {item.style || item.tShirtStyle || "Plain T-Shirt"}
                           </p>
                           <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-500 font-semibold">
                             <span className="px-2 py-0.5 bg-white border rounded-md">Size: {item.size}</span>
-                            <span className="px-2 py-0.5 bg-white border rounded-md">Color: {item.color}</span>
+                            <span className="px-2 py-0.5 bg-white border rounded-md">Color: {resolveColorName(item.color)}</span>
                             <span className="px-2 py-0.5 bg-white border rounded-md">GSM: {item.gsm}</span>
                           </div>
                         </div>

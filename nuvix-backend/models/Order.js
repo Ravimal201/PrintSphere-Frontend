@@ -41,7 +41,7 @@ const OrderItemSchema = new mongoose.Schema({
   },
   gsm: {
     type: String,
-    default: "180GSM"
+    default: "GSM 180"
   },
   material: {
     type: String,
@@ -90,7 +90,7 @@ const OrderSchema = new mongoose.Schema(
     },
     gsm: {
       type: String,
-      default: "180GSM"
+      default: "GSM 180"
     },
     color: {
       type: String,
@@ -155,6 +155,10 @@ const OrderSchema = new mongoose.Schema(
       ref: "User" // Assigned printing operator
     },
     inventoryDeducted: {
+      type: Boolean,
+      default: false
+    },
+    packagingDeducted: {
       type: Boolean,
       default: false
     },

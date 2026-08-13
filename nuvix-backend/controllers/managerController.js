@@ -7,6 +7,7 @@ const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const TShirtStyle = require("../models/TShirtStyle");
 const { createNotification } = require("../utils/notificationHelper");
+const { resolveColorName, normalizeColorStr, formatGsm } = require("../utils/colorHelper");
 
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
 
@@ -91,9 +92,9 @@ exports.getInventory = async (req, res) => {
     const count = await Inventory.countDocuments();
     if (count === 0) {
       await Inventory.insertMany([
-        { itemType: "Plain T-Shirt", tShirtType: "Crew Neck", color: "White", size: "M", gsm: "180GSM", material: "Cotton", quantity: 120, minThreshold: 15 },
-        { itemType: "Plain T-Shirt", tShirtType: "V-Neck", color: "Navy Blue", size: "L", gsm: "220GSM", material: "Cotton", quantity: 8, minThreshold: 15 },
-        { itemType: "Plain T-Shirt", tShirtType: "Polo", color: "Black", size: "XL", gsm: "240GSM", material: "Organic Cotton", quantity: 45, minThreshold: 10 },
+        { itemType: "Plain T-Shirt", tShirtType: "Crew Neck", color: "White", size: "M", gsm: "GSM 180", material: "Cotton", quantity: 120, minThreshold: 15 },
+        { itemType: "Plain T-Shirt", tShirtType: "V-Neck", color: "Navy Blue", size: "L", gsm: "GSM 220", material: "Cotton", quantity: 8, minThreshold: 15 },
+        { itemType: "Plain T-Shirt", tShirtType: "Polo", color: "Black", size: "XL", gsm: "GSM 240", material: "Organic Cotton", quantity: 45, minThreshold: 10 },
         { itemType: "Printing Ink", color: "Cyan", quantity: 3, minThreshold: 5 },
         { itemType: "Transfer Paper", quantity: 150, minThreshold: 50 }
       ]);
@@ -191,7 +192,7 @@ exports.addInventoryItem = async (req, res) => {
     const targetTShirtType = targetItemType === "Plain T-Shirt" ? (tShirtType || "Crew Neck").trim() : "";
     const targetColor = (color || "White").trim();
     const targetSize = targetItemType === "Plain T-Shirt" ? (size || "M").trim() : "";
-    const targetGsm = targetItemType === "Plain T-Shirt" ? (gsm || material || "180GSM").trim() : "";
+    const targetGsm = targetItemType === "Plain T-Shirt" ? formatGsm(gsm || material || "GSM 180") : "";
     const targetMaterial = targetItemType === "Plain T-Shirt" ? (material || targetGsm || "Cotton").trim() : "";
     const addQty = typeof quantity !== "undefined" && !isNaN(Number(quantity)) ? Number(quantity) : 0;
     const threshold = typeof minThreshold !== "undefined" && !isNaN(Number(minThreshold)) ? Number(minThreshold) : 10;
@@ -375,55 +376,45 @@ exports.getOrders = async (req, res) => {
   }
 };
 
-const COLOR_HEX_MAP = {
-  "#111827": "black",
-  "#000000": "black",
-  "#ffffff": "white",
-  "#f8fafc": "white",
-  "#1e3a8a": "navy blue",
-  "#1e293b": "slate",
-  "#b91c1c": "red",
-  "#dc2626": "red",
-  "#da1010": "red",
-  "#047857": "emerald",
-  "#15803d": "green",
-  "#4338ca": "indigo",
-  "#6b7280": "gray"
-};
-
-const normalizeColorStr = (c) => {
-  if (!c) return "";
-  const raw = c.toString().toLowerCase().trim();
-  if (COLOR_HEX_MAP[raw]) return COLOR_HEX_MAP[raw].replace(/[^a-z0-9]/g, "");
-  return raw.replace(/[^a-z0-9]/g, "");
+const cleanAlphanumeric = (val) => {
+  if (!val) return "";
+  return val.toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim();
 };
 
 const normalizeStyleStr = (s) => {
   if (!s) return "";
-  let str = s.toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim();
-  str = str.replace(/tshirt$/, "").replace(/shirt$/, "");
+  let str = cleanAlphanumeric(s);
+  str = str.replace(/tshirt$/, "").replace(/shirt$/, "").replace(/^plain/, "");
   return str;
 };
 
 const normalizeGsmStr = (g) => {
   if (!g) return "";
-  return g.toString().toLowerCase().replace(/[^0-9]/g, "").trim();
+  // Extract all numeric digits (e.g., "GSM  400" -> "400", "gsm400" -> "400", "400 GSM" -> "400")
+  const digits = g.toString().replace(/[^0-9]/g, "").trim();
+  if (digits) return digits;
+  return cleanAlphanumeric(g);
 };
 
 const normalizeSizeStr = (sz) => {
   if (!sz) return "";
-  return sz.toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+  return cleanAlphanumeric(sz);
+};
+
+const normalizeColorVal = (c) => {
+  if (!c) return "";
+  return normalizeColorStr(c);
 };
 
 const findMatchingInventory = (allInventory, spec) => {
   const targetStyle = normalizeStyleStr(spec.tShirtStyle || spec.tShirtType || "Crew Neck");
   const targetSize = normalizeSizeStr(spec.size || spec.selectedSize || "M");
   const targetGsm = normalizeGsmStr(spec.gsm || spec.material || "180GSM");
-  const targetColor = normalizeColorStr(spec.color || spec.selectedColor || "White");
+  const targetColor = normalizeColorVal(spec.color || spec.selectedColor || "White");
 
   // Step 1: Filter inventory to plain garments / plain t-shirts
   const plainTShirts = allInventory.filter(inv => {
-    const itType = (inv.itemType || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const itType = cleanAlphanumeric(inv.itemType || "");
     return itType.includes("plain") || itType.includes("tshirt") || itType === "plaintshirt";
   });
 
@@ -432,9 +423,9 @@ const findMatchingInventory = (allInventory, spec) => {
     const invStyle = normalizeStyleStr(inv.tShirtType || inv.itemType || "");
     const invSize = normalizeSizeStr(inv.size || "");
     const invGsm = normalizeGsmStr(inv.gsm || inv.material || "");
-    const invColor = normalizeColorStr(inv.color || "");
+    const invColor = normalizeColorVal(inv.color || "");
 
-    // 1. Style match (e.g. "oversized" matches "oversized" or "oversized t-shirt")
+    // 1. Style match (e.g. "oversized" matches "oversized", "oversized t-shirt", "Oversized  Shirt")
     if (invStyle && targetStyle && invStyle !== targetStyle && !invStyle.includes(targetStyle) && !targetStyle.includes(invStyle)) {
       return false;
     }
@@ -444,12 +435,12 @@ const findMatchingInventory = (allInventory, spec) => {
       return false;
     }
 
-    // 3. GSM match (e.g. 180, 200, 220, 240)
+    // 3. GSM match (e.g. "GSM  400" matches "gsm400", "400", "400GSM", "400  gsm")
     if (invGsm && targetGsm && invGsm !== targetGsm) {
       return false;
     }
 
-    // 4. Color match (e.g. "black", "#111827", "white", "#ffffff", "red", "#da1010")
+    // 4. Color match (e.g. "Navy  Blue" matches "navyblue", "#1e3a8a", "Red " matches "red", "#db2424")
     if (invColor && targetColor && invColor !== targetColor && !invColor.includes(targetColor) && !targetColor.includes(invColor)) {
       return false;
     }
@@ -485,15 +476,15 @@ exports.updateOrderStatus = async (req, res) => {
           ? order.items.map(it => ({
               tShirtStyle: it.tShirtStyle || it.tShirtType || order.tShirtStyle || "Crew Neck",
               size: it.selectedSize || it.size || order.size || "M",
-              color: it.selectedColor || it.color || order.color || "White",
-              gsm: it.gsm || it.material || order.gsm || "180GSM",
+              color: resolveColorName(it.selectedColor || it.color || order.color || "White"),
+              gsm: formatGsm(it.gsm || it.material || order.gsm || "GSM 180"),
               quantity: Number(it.quantity) || 1
             }))
           : [{
               tShirtStyle: order.tShirtStyle || "Crew Neck",
               size: order.size || "M",
-              color: order.color || "White",
-              gsm: order.gsm || "180GSM",
+              color: resolveColorName(order.color || "White"),
+              gsm: formatGsm(order.gsm || "GSM 180"),
               quantity: Number(order.quantity) || 1
             }];
 
@@ -507,7 +498,7 @@ exports.updateOrderStatus = async (req, res) => {
           tShirtType: inv.tShirtType,
           color: inv.color,
           size: inv.size,
-          gsm: inv.gsm,
+          gsm: formatGsm(inv.gsm),
           material: inv.material,
           quantity: inv.quantity,
           minThreshold: inv.minThreshold
@@ -521,8 +512,8 @@ exports.updateOrderStatus = async (req, res) => {
             missingMaterials.push({
               style: spec.tShirtStyle,
               size: spec.size,
-              color: spec.color,
-              gsm: spec.gsm,
+              color: resolveColorName(spec.color),
+              gsm: formatGsm(spec.gsm),
               required: spec.quantity,
               available: availableQty
             });
@@ -708,9 +699,10 @@ exports.createProduct = async (req, res) => {
     const token = req.headers.authorization.split(" ")[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    const gsmsArray = Array.isArray(gsms) && gsms.length > 0 
+    const rawGsms = Array.isArray(gsms) && gsms.length > 0 
       ? gsms 
-      : (typeof gsms === "string" && gsms.trim() ? [gsms.trim()] : ["180GSM"]);
+      : (typeof gsms === "string" && gsms.trim() ? [gsms.trim()] : ["GSM 180"]);
+    const gsmsArray = rawGsms.map(formatGsm);
 
     const product = await Product.create({
       title,
@@ -718,7 +710,7 @@ exports.createProduct = async (req, res) => {
       category,
       basePrice,
       sizes: sizes && sizes.length > 0 ? sizes : ["S", "M", "L"],
-      gsm: gsmsArray[0] || "180GSM",
+      gsm: gsmsArray[0] || "GSM 180",
       gsms: gsmsArray,
       colors: colors && colors.length > 0 ? colors : ["#ffffff"],
       images: images && images.length > 0 ? images : ["/images/dumyImage.png"],
@@ -851,13 +843,14 @@ exports.createTShirtStyle = async (req, res) => {
       return res.status(400).json({ message: "Please provide T-Shirt type and model path" });
     }
 
+    const cleanGsmPrices = (gsmPrices || []).map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) }));
     const style = await TShirtStyle.create({
       name: styleName,
       path,
       type: styleType,
       price: Number(price) || 0,
-      gsms: gsmPrices ? gsmPrices.map(gp => gp.gsm) : (gsms || ["180GSM"]),
-      gsmPrices: gsmPrices || [],
+      gsms: cleanGsmPrices.length > 0 ? cleanGsmPrices.map(gp => gp.gsm) : (gsms || ["GSM 180"]).map(formatGsm),
+      gsmPrices: cleanGsmPrices,
       colors: colors || [{ name: "White", value: "#ffffff" }]
     });
 
@@ -879,6 +872,7 @@ exports.updateTShirtStyle = async (req, res) => {
     const { name, path, type, price, gsms, gsmPrices, colors } = req.body;
     const styleName = name || type;
     const styleType = type || name || "Crew Neck";
+    const cleanGsmPrices = (gsmPrices || []).map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) }));
     const updated = await TShirtStyle.findByIdAndUpdate(
       req.params.id,
       {
@@ -886,8 +880,8 @@ exports.updateTShirtStyle = async (req, res) => {
         path,
         type: styleType,
         price: Number(price) || 0,
-        gsms: gsmPrices ? gsmPrices.map(gp => gp.gsm) : (gsms || ["180GSM"]),
-        gsmPrices: gsmPrices || [],
+        gsms: cleanGsmPrices.length > 0 ? cleanGsmPrices.map(gp => gp.gsm) : (gsms || ["GSM 180"]).map(formatGsm),
+        gsmPrices: cleanGsmPrices,
         colors
       },
       { new: true }

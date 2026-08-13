@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Scene from "../three/Scene";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
+import { resolveColorName, formatGsm } from "../utils/colorHelper";
 import {
   Layers,
   Type,
@@ -72,10 +73,10 @@ const tShirtModels = [
     path: "/images/models/male normal t-shirt1.glb",
     type: "Crew Neck",
     gsmPrices: [
-      { gsm: "180GSM", price: 1200.00 },
-      { gsm: "220GSM", price: 1500.00 },
-      { gsm: "280GSM", price: 1800.00 },
-      { gsm: "320GSM", price: 2000.00 }
+      { gsm: "GSM 180", price: 1200.00 },
+      { gsm: "GSM 220", price: 1500.00 },
+      { gsm: "GSM 280", price: 1800.00 },
+      { gsm: "GSM 320", price: 2000.00 }
     ]
   },
   {
@@ -83,10 +84,10 @@ const tShirtModels = [
     path: "/images/models/female normal t-shirt.glb",
     type: "V-Neck",
     gsmPrices: [
-      { gsm: "180GSM", price: 1400.00 },
-      { gsm: "220GSM", price: 1700.00 },
-      { gsm: "280GSM", price: 1900.00 },
-      { gsm: "320GSM", price: 2200.00 }
+      { gsm: "GSM 180", price: 1400.00 },
+      { gsm: "GSM 220", price: 1700.00 },
+      { gsm: "GSM 280", price: 1900.00 },
+      { gsm: "GSM 320", price: 2200.00 }
     ]
   },
   {
@@ -94,8 +95,8 @@ const tShirtModels = [
     path: "/images/models/long_sleeve_t-_shirt.glb",
     type: "Crew Neck",
     gsmPrices: [
-      { gsm: "180GSM", price: 1800.00 },
-      { gsm: "220GSM", price: 2100.00 }
+      { gsm: "GSM 180", price: 1800.00 },
+      { gsm: "GSM 220", price: 2100.00 }
     ]
   },
   {
@@ -103,8 +104,8 @@ const tShirtModels = [
     path: "/images/models/oversized t-sdirt1.glb",
     type: "Crew Neck",
     gsmPrices: [
-      { gsm: "180GSM", price: 1500.00 },
-      { gsm: "220GSM", price: 1800.00 }
+      { gsm: "GSM 180", price: 1500.00 },
+      { gsm: "GSM 220", price: 1800.00 }
     ]
   },
   {
@@ -112,8 +113,8 @@ const tShirtModels = [
     path: "/images/models/t_shirt_hoodie.glb",
     type: "Polo",
     gsmPrices: [
-      { gsm: "180GSM", price: 2500.00 },
-      { gsm: "220GSM", price: 2800.00 }
+      { gsm: "GSM 180", price: 2500.00 },
+      { gsm: "GSM 220", price: 2800.00 }
     ]
   }
 ];
@@ -369,7 +370,7 @@ export default function DesignerPage() {
   const [selectedModel, setSelectedModel] = useState(tShirtModels[0]);
   const [selectedSize, setSelectedSize] = useState("M");
   const [shirtType, setShirtType] = useState("Crew Neck");
-  const [shirtMaterial, setShirtMaterial] = useState("180GSM");
+  const [shirtMaterial, setShirtMaterial] = useState("GSM 180");
   const [activeView, setActiveView] = useState("front");
   const [modelRotation, setModelRotation] = useState(0); // in radians
   const [zoomLevel, setZoomLevel] = useState(0.85);
@@ -845,11 +846,11 @@ export default function DesignerPage() {
 
   const getGSMDetails = (gsmName) => {
     if (!gsmName) return { premium: 0.00, label: "Base" };
-    const cleanGsm = gsmName.replace(/\s+/g, "").toUpperCase();
-    if (cleanGsm.includes("180GSM")) return { premium: 0.00, label: "Base" };
-    if (cleanGsm.includes("220GSM")) return { premium: 3.00, label: "+Rs. 3.00" };
-    if (cleanGsm.includes("280GSM")) return { premium: 6.00, label: "+Rs. 6.00" };
-    if (cleanGsm.includes("320GSM")) return { premium: 10.00, label: "+Rs. 10.00" };
+    const cleanGsm = formatGsm(gsmName);
+    if (cleanGsm.includes("180")) return { premium: 0.00, label: "Base" };
+    if (cleanGsm.includes("220")) return { premium: 3.00, label: "+Rs. 3.00" };
+    if (cleanGsm.includes("280")) return { premium: 6.00, label: "+Rs. 6.00" };
+    if (cleanGsm.includes("320")) return { premium: 10.00, label: "+Rs. 10.00" };
     return { premium: 0.00, label: "Base" };
   };
 
@@ -1820,6 +1821,13 @@ export default function DesignerPage() {
                     }
                   }
 
+                  const allModelColors = [
+                    ...(selectedModel?.colors || []),
+                    ...shirtColors
+                  ];
+                  const matchedColorObj = allModelColors.find(c => c.value && c.value.toLowerCase() === shirtColor.toLowerCase());
+                  const resolvedColorNameStr = matchedColorObj ? matchedColorObj.name : resolveColorName(shirtColor);
+
                   const cartItem = {
                     cartKey,
                     designId: designId,
@@ -1829,9 +1837,9 @@ export default function DesignerPage() {
                     discount: 0,
                     category: "Customized",
                     size: selectedSize,
-                    color: (selectedModel?.colors && selectedModel.colors.length > 0 ? selectedModel.colors : shirtColors).find(c => c.value.toLowerCase() === shirtColor.toLowerCase())?.name || "Custom Color",
-                    material: shirtMaterial,
-                    gsm: shirtMaterial,
+                    color: resolvedColorNameStr,
+                    material: formatGsm(shirtMaterial),
+                    gsm: formatGsm(shirtMaterial),
                     tShirtType: shirtType,
                     tShirtStyle: shirtType || selectedModel?.name || "Crew Neck",
                     quantity: quantity,
