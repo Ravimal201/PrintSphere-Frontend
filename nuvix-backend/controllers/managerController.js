@@ -173,6 +173,58 @@ exports.updateStock = async (req, res) => {
   }
 };
 
+// @desc    Add new inventory item
+// @route   POST /api/manager/inventory
+exports.addInventoryItem = async (req, res) => {
+  try {
+    if (!verifyManager(req)) {
+      return res.status(403).json({ message: "Access denied. Manager role required." });
+    }
+
+    const { itemType, tShirtType, color, size, material, quantity, minThreshold } = req.body;
+
+    if (!itemType) {
+      return res.status(400).json({ message: "Item type is required." });
+    }
+
+    const newItem = await Inventory.create({
+      itemType: itemType || "Plain T-Shirt",
+      tShirtType: itemType === "Plain T-Shirt" ? (tShirtType || "Crew Neck") : undefined,
+      color: color || "White",
+      size: itemType === "Plain T-Shirt" ? (size || "M") : undefined,
+      material: itemType === "Plain T-Shirt" ? (material || "180GSM") : undefined,
+      quantity: typeof quantity !== "undefined" ? Number(quantity) : 0,
+      minThreshold: typeof minThreshold !== "undefined" ? Number(minThreshold) : 10,
+      lastRestocked: new Date()
+    });
+
+    res.status(201).json({ message: "Inventory item added successfully", item: newItem });
+  } catch (error) {
+    console.error("Add inventory item error:", error);
+    res.status(500).json({ message: error.message || "Server error while adding inventory item" });
+  }
+};
+
+// @desc    Delete an inventory item
+// @route   DELETE /api/manager/inventory/:id
+exports.deleteInventoryItem = async (req, res) => {
+  try {
+    if (!verifyManager(req)) {
+      return res.status(403).json({ message: "Access denied. Manager role required." });
+    }
+
+    const deleted = await Inventory.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "Inventory item not found" });
+    }
+
+    res.json({ message: "Inventory item deleted successfully" });
+  } catch (error) {
+    console.error("Delete inventory item error:", error);
+    res.status(500).json({ message: "Server error while deleting inventory item" });
+  }
+};
+
 // ================= STORE PRODUCTS & APPROVALS =================
 
 // @desc    Get all store products (including drafts needing approval)

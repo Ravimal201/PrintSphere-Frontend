@@ -5,6 +5,8 @@ const {
   updatePricingRules,
   getInventory,
   updateStock,
+  addInventoryItem,
+  deleteInventoryItem,
   getProducts,
   createProduct,
   updateProduct,
@@ -23,7 +25,9 @@ router.get("/pricing-rules", getPricingRules);
 router.put("/pricing-rules", updatePricingRules);
 
 router.get("/inventory", getInventory);
+router.post("/inventory", addInventoryItem);
 router.put("/inventory/:id", updateStock);
+router.delete("/inventory/:id", deleteInventoryItem);
 
 router.get("/products", getProducts);
 router.post("/products", createProduct);
