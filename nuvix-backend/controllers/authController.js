@@ -824,3 +824,58 @@ exports.updateUserPaymentMethod = async (req, res) => {
     res.status(500).json({ message: "Server error while saving payment method" });
   }
 };
+
+// @desc    Cancel a pending order
+// @route   PUT /api/auth/orders/:orderId/cancel
+exports.cancelOrder = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { orderId } = req.params;
+
+    const order = await Order.findOne({ _id: orderId, customerId: decoded.id });
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (order.orderStatus !== "Pending Payment") {
+      return res.status(400).json({ message: "Only orders pending payment can be cancelled." });
+    }
+
+    order.orderStatus = "Cancelled";
+    order.timeline.push({
+      status: "Cancelled",
+      note: "Order cancelled by customer during checkout."
+    });
+
+    await order.save();
+
+    // Notify admins / managers
+    try {
+      await createNotification({
+        recipientRole: "Admin",
+        title: "Order Cancelled",
+        message: `Order #${order._id} has been cancelled by customer.`,
+        type: "Order Update"
+      });
+
+      await createNotification({
+        recipientRole: "Manager",
+        title: "Order Cancelled",
+        message: `Order #${order._id} has been cancelled by customer.`,
+        type: "Order Update"
+      });
+    } catch (notifErr) {
+      console.error("Failed to generate cancellation notifications:", notifErr);
+    }
+
+    res.json({ message: "Order cancelled successfully", order });
+  } catch (error) {
+    console.error("Cancel order error:", error);
+    res.status(500).json({ message: "Server error while cancelling order" });
+  }
+};
+

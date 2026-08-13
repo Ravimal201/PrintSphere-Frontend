@@ -17,7 +17,8 @@ const {
   getUserProfile,
   updateUserProfile,
   updateOrderAddress,
-  updateUserPaymentMethod
+  updateUserPaymentMethod,
+  cancelOrder
 } = require("../controllers/authController");
 
 router.post("/register", registerCustomer);
@@ -37,6 +38,7 @@ router.get("/tshirt-styles", getTShirtStylesPublic);
 router.post("/orders", createOrder);
 router.get("/orders", getCustomerOrders);
 router.put("/orders/:orderId/address", updateOrderAddress);
+router.put("/orders/:orderId/cancel", cancelOrder);
 router.post("/designs", saveCustomerDesign);
 router.get("/designs", getCustomerDesigns);
 router.delete("/designs/:id", deleteCustomerDesign);
