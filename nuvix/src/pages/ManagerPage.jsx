@@ -43,6 +43,7 @@ export default function ManagerPage() {
   const [styleForm, setStyleForm] = useState({
     name: "",
     path: "",
+    type: "Crew Neck",
     gsmPrices: [
       { gsm: "180GSM", price: 1200 },
       { gsm: "220GSM", price: 1500 },
@@ -545,6 +546,7 @@ export default function ManagerPage() {
     const payload = {
       name: styleForm.name,
       path: styleForm.path,
+      type: styleForm.type || "Crew Neck",
       gsmPrices: styleForm.gsmPrices,
       colors: styleForm.colors,
     };
@@ -566,6 +568,7 @@ export default function ManagerPage() {
       setStyleForm({
         name: "",
         path: "",
+        type: "Crew Neck",
         gsmPrices: [
           { gsm: "180GSM", price: 1200 },
           { gsm: "220GSM", price: 1500 },
@@ -2096,6 +2099,7 @@ export default function ManagerPage() {
                   setStyleForm({
                     name: "",
                     path: "",
+                    type: "Crew Neck",
                     gsmPrices: [
                       { gsm: "180GSM", price: 1200 },
                       { gsm: "220GSM", price: 1500 },
@@ -2130,12 +2134,9 @@ export default function ManagerPage() {
                     <div>
                       <div className="flex items-center justify-between border-b pb-3 mb-3">
                         <div>
-                          <h4 className="font-bold text-slate-900 text-base">
-                            {style.name}
+                          <h4 className="font-extrabold text-slate-900 text-base">
+                            {style.name || style.type || "Crew Neck"}
                           </h4>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">
-                            {style.type || "Crew Neck"}
-                          </span>
                         </div>
                       </div>
                       <p className="text-[10px] text-slate-400 font-mono break-all mb-3.5">
@@ -2196,6 +2197,7 @@ export default function ManagerPage() {
                           setStyleForm({
                             name: style.name,
                             path: style.path,
+                            type: style.type || "Crew Neck",
                             gsmPrices:
                               style.gsmPrices && style.gsmPrices.length > 0
                                 ? style.gsmPrices
@@ -2522,24 +2524,53 @@ export default function ManagerPage() {
 
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                  Style Name
+                  T-Shirt Type
                 </label>
                 <input
                   type="text"
                   required
                   value={styleForm.name}
                   onChange={(e) =>
-                    setStyleForm((prev) => ({ ...prev, name: e.target.value }))
+                    setStyleForm((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                      type: e.target.value,
+                    }))
                   }
-                  placeholder="e.g. V-Neck Fitted T-Shirt"
+                  placeholder="e.g. Crew Neck, V-Neck, Polo, Oversized, Hoodie"
                   className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold"
                 />
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="text-[9px] font-bold text-slate-400 self-center">Quick Select:</span>
+                  {["Crew Neck", "V-Neck", "Polo", "Oversized", "Hoodie", "Long Sleeve", "Tank Top"].map((tType) => (
+                    <button
+                      key={tType}
+                      type="button"
+                      onClick={() =>
+                        setStyleForm((prev) => ({
+                          ...prev,
+                          name: tType,
+                          type: tType,
+                        }))
+                      }
+                      className={`px-2.5 py-1 border rounded-lg text-[9px] font-bold transition cursor-pointer ${
+                        styleForm.name === tType
+                          ? "bg-indigo-600 border-indigo-600 text-white"
+                          : "bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {tType}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                  3D GLTF Model File Path
-                </label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                    3D GLTF Model File Path
+                  </label>
+                </div>
                 <input
                   type="text"
                   required
@@ -2547,9 +2578,34 @@ export default function ManagerPage() {
                   onChange={(e) =>
                     setStyleForm((prev) => ({ ...prev, path: e.target.value }))
                   }
-                  placeholder="e.g. /images/models/v_neck.glb"
+                  placeholder="e.g. /images/models/male normal t-shirt1.glb"
                   className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 font-mono"
                 />
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="text-[9px] font-bold text-slate-400 self-center">Presets:</span>
+                  {[
+                    { label: "Male Normal", path: "/images/models/male normal t-shirt1.glb", defaultType: "Crew Neck" },
+                    { label: "Female Normal", path: "/images/models/female normal t-shirt.glb", defaultType: "Crew Neck" },
+                    { label: "Long Sleeve", path: "/images/models/long_sleeve_t-_shirt.glb", defaultType: "Long Sleeve" },
+                    { label: "Oversized", path: "/images/models/oversized t-sdirt1.glb", defaultType: "Oversized" },
+                    { label: "Hoodie", path: "/images/models/t_shirt_hoodie.glb", defaultType: "Hoodie" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() =>
+                        setStyleForm((prev) => ({
+                          ...prev,
+                          path: preset.path,
+                          type: prev.type || preset.defaultType,
+                        }))
+                      }
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border rounded-lg text-[9px] font-bold transition cursor-pointer"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="border-t pt-4">

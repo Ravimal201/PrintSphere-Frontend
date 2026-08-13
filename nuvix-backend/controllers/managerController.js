@@ -506,14 +506,16 @@ exports.createTShirtStyle = async (req, res) => {
     }
 
     const { name, path, type, price, gsms, gsmPrices, colors } = req.body;
-    if (!name || !path) {
-      return res.status(400).json({ message: "Please provide style name and model path" });
+    const styleName = name || type;
+    const styleType = type || name || "Crew Neck";
+    if (!styleName || !path) {
+      return res.status(400).json({ message: "Please provide T-Shirt type and model path" });
     }
 
     const style = await TShirtStyle.create({
-      name,
+      name: styleName,
       path,
-      type: type || "Crew Neck",
+      type: styleType,
       price: Number(price) || 0,
       gsms: gsmPrices ? gsmPrices.map(gp => gp.gsm) : (gsms || ["180GSM"]),
       gsmPrices: gsmPrices || [],
@@ -536,12 +538,14 @@ exports.updateTShirtStyle = async (req, res) => {
     }
 
     const { name, path, type, price, gsms, gsmPrices, colors } = req.body;
+    const styleName = name || type;
+    const styleType = type || name || "Crew Neck";
     const updated = await TShirtStyle.findByIdAndUpdate(
       req.params.id,
       {
-        name,
+        name: styleName,
         path,
-        type: type || "Crew Neck",
+        type: styleType,
         price: Number(price) || 0,
         gsms: gsmPrices ? gsmPrices.map(gp => gp.gsm) : (gsms || ["180GSM"]),
         gsmPrices: gsmPrices || [],
