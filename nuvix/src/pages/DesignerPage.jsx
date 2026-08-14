@@ -63,8 +63,10 @@ const fontFamilies = [
 ];
 
 const presetLogos = [
-  { name: "Mountain Adventure", url: "/images/dumyImage.png" },
-  { name: "PrintSphere Brand", url: "/images/Logo.png" }
+  { name: "PrintSphere Brand", url: "/logos/Logo.png" },
+  { name: "Logo 1", url: "/logos/logo1.jpeg" },
+  { name: "Logo 2", url: "/logos/logo2.jpeg" },
+  { name: "Logo 3", url: "/logos/logo3.jpeg" }
 ];
 
 const tShirtModels = [
