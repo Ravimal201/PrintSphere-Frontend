@@ -34,6 +34,7 @@ import axios from "axios";
 import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
+import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
 
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
@@ -1404,104 +1405,41 @@ export default function ManagerPage() {
                             </h4>
                             <div className="space-y-3">
                               {order.items.map((item, idx) => (
-                                <div
-                                  key={idx}
-                                  className="bg-white p-3 border rounded-xl shadow-xs text-xs"
-                                >
-                                  <p className="font-bold text-slate-900">
-                                    {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
-                                  </p>
-                                  <p className="text-slate-500 text-[10px] mt-0.5">
-                                    Style: {item.tShirtStyle || "Crew Neck"} | Size: {item.selectedSize || item.size} | Color: {item.selectedColor || item.color} | GSM: {item.gsm || item.material || "180GSM"}
-                                  </p>
-
-                                  {item.itemType === "Customized" &&
-                                    item.designId && (
-                                      <div className="mt-2 pt-2 border-t space-y-2">
-                                        {item.designId.thumbnailUrl && (
-                                          <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
-                                            <img
-                                              src={item.designId.thumbnailUrl}
-                                              alt="Preview"
-                                              className="h-10 w-10 object-contain bg-white rounded border"
-                                              onError={(e) =>
-                                                (e.target.src =
-                                                  "/images/dumyImage.png")
-                                              }
-                                            />
-                                            <div>
-                                              <p className="text-[10px] font-bold text-slate-900">
-                                                Custom design thumbnail
-                                              </p>
-                                              <a
-                                                href={item.designId.thumbnailUrl}
-                                                download
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-[9px] text-indigo-600 hover:underline flex items-center gap-0.5 mt-0.5"
-                                              >
-                                                <Download className="h-2.5 w-2.5" />{" "}
-                                                Download composite
-                                              </a>
-                                              <button
-                                                onClick={() => {
-                                                  setSelected3DDesign(
-                                                    item.designId,
-                                                  );
-                                                  setIs3DModalOpen(true);
-                                                }}
-                                                className="text-[9px] text-indigo-650 hover:underline flex items-center gap-0.5 mt-1 cursor-pointer font-bold"
-                                              >
-                                                <Sparkles className="h-2.5 w-2.5 text-indigo-600 animate-pulse" />{" "}
-                                                View in 3D Format
-                                              </button>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {/* Logo layers */}
-                                        {(() => {
-                                          const imgLayers = (
-                                            item.designId.layers || []
-                                          ).filter(
-                                            (l) =>
-                                              l.type === "image" ||
-                                              l.type === "logo",
-                                          );
-                                          if (imgLayers.length > 0) {
-                                            return (
-                                              <div className="space-y-1 mt-2">
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
-                                                  Logo/Decal Assets:
-                                                </p>
-                                                {imgLayers.map((layer, lIdx) => (
-                                                  <div
-                                                    key={lIdx}
-                                                    className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg text-[10px]"
-                                                  >
-                                                    <span className="truncate max-w-[120px] font-semibold">
-                                                      {layer.name ||
-                                                        `Asset ${lIdx + 1}`}
-                                                    </span>
-                                                    <a
-                                                      href={layer.url}
-                                                      download
-                                                      target="_blank"
-                                                      rel="noreferrer"
-                                                      className="text-indigo-600 hover:underline"
-                                                    >
-                                                      Download
-                                                    </a>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            );
-                                          }
-                                          return null;
-                                        })()}
+                                  <div
+                                    key={idx}
+                                    className="bg-white p-3.5 border rounded-2xl shadow-xs text-xs space-y-3"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                                      <div>
+                                        <p className="font-extrabold text-slate-900 text-sm">
+                                          {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
+                                        </p>
+                                        <p className="text-slate-500 text-xs mt-0.5">
+                                          Style: <span className="font-semibold text-slate-700">{item.tShirtStyle || "Crew Neck"}</span> | 
+                                          Size: <span className="font-semibold text-slate-700">{item.selectedSize || item.size}</span> | 
+                                          Color: <span className="font-semibold text-slate-700">{resolveColorName(item.selectedColor || item.color)}</span> | 
+                                          GSM: <span className="font-semibold text-slate-700">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
+                                        </p>
                                       </div>
-                                    )}
-                                </div>
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                        item.itemType === "Customized" || item.designId
+                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                          : "bg-blue-50 text-blue-700 border border-blue-200"
+                                      }`}>
+                                        {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog Product"}
+                                      </span>
+                                    </div>
+
+                                    {/* Multi-Angle Screenshots (Front, Back, Both Sides) & Downloads */}
+                                    <DesignScreenshotViewer
+                                      item={item}
+                                      orderId={order._id}
+                                      onOpen3DModal={(designToOpen) => {
+                                        setSelected3DDesign(designToOpen);
+                                        setIs3DModalOpen(true);
+                                      }}
+                                    />
+                                  </div>
                               ))}
                             </div>
                           </div>
