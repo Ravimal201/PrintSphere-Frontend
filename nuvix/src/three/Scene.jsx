@@ -68,6 +68,10 @@ export default function Scene({
         position: [0, 0.1, 3.8],
         fov: 40
       }}
+      gl={{
+        preserveDrawingBuffer: true,
+        antialias: true
+      }}
       shadows
       className="w-full h-full"
     >

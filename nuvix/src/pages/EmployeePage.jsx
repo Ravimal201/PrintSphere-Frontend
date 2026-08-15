@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import TShirt3DModal from "../components/TShirt3DModal";
+import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
 
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
@@ -489,153 +490,101 @@ export default function EmployeePage() {
                           </div>
                         </div>
 
-                        {/* Details Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
-                          {/* Items & Print Specs */}
-                          <div className="space-y-4">
+                        {/* Details Grid: Left 2 cols for Multi-Angle Design Visualizer & Specs, Right col for Shipping & Task Info */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4">
+                          {/* Left 2 Cols: Items, Specifications & Multi-Angle Screenshots (Front, Back, Both Sides) */}
+                          <div className="lg:col-span-2 space-y-4">
                             <div>
                               <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                                Print Specifications & Items
+                                Print Specifications & Multi-Angle Screenshots
                               </h4>
-                              <div className="space-y-3">
+                              <div className="space-y-4">
                                 {order.items.map((item, idx) => (
                                   <div
                                     key={idx}
-                                    className="bg-white p-3 border rounded-xl shadow-xs text-xs"
+                                    className="bg-white p-4 border rounded-2xl shadow-xs space-y-3"
                                   >
-                                    <p className="font-bold text-slate-900">
-                                      {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
-                                    </p>
-                                     <p className="text-slate-500 text-[10px] mt-0.5">
-                                       Style: {item.tShirtStyle || "Crew Neck"} | Size: {item.selectedSize || item.size} | Color: {resolveColorName(item.selectedColor || item.color)} | GSM: {formatGsm(item.gsm || item.material || "GSM 180")}
-                                     </p>
-
-                                    {item.itemType === "Customized" && item.designId && (
-                                      <div className="mt-2 pt-2 border-t space-y-2">
-                                        {item.designId.thumbnailUrl && (
-                                          <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
-                                            <img
-                                              src={item.designId.thumbnailUrl}
-                                              alt="Preview"
-                                              className="h-10 w-10 object-contain bg-white rounded border"
-                                              onError={(e) =>
-                                                (e.target.src = "/images/dumyImage.png")
-                                              }
-                                            />
-                                            <div>
-                                              <p className="text-[10px] font-bold text-slate-900">
-                                                Custom design composite
-                                              </p>
-                                              <a
-                                                href={item.designId.thumbnailUrl}
-                                                download
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-[9px] text-indigo-600 hover:underline flex items-center gap-0.5 mt-0.5"
-                                              >
-                                                <Download className="h-2.5 w-2.5" /> Download screenshot
-                                              </a>
-                                              <button
-                                                onClick={() => {
-                                                  setSelected3DDesign(item.designId);
-                                                  setIs3DModalOpen(true);
-                                                }}
-                                                className="text-[9px] text-indigo-650 hover:underline flex items-center gap-0.5 mt-1 cursor-pointer font-bold"
-                                              >
-                                                <Sparkles className="h-2.5 w-2.5 text-indigo-600 animate-pulse" />{" "}
-                                                View in 3D Format
-                                              </button>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {/* Logo / Decal Assets */}
-                                        {(() => {
-                                          const imgLayers = (
-                                            item.designId.layers || []
-                                          ).filter(
-                                            (l) => l.type === "image" || l.type === "logo"
-                                          );
-                                          if (imgLayers.length > 0) {
-                                            return (
-                                              <div className="space-y-1 mt-2">
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
-                                                  Logo/Decal Assets ({imgLayers.length}):
-                                                </p>
-                                                {imgLayers.map((layer, lIdx) => (
-                                                  <div
-                                                    key={lIdx}
-                                                    className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg text-[10px]"
-                                                  >
-                                                    <span className="truncate max-w-[120px] font-semibold">
-                                                      {layer.name || `Asset ${lIdx + 1}`}
-                                                    </span>
-                                                    <a
-                                                      href={layer.url}
-                                                      download
-                                                      target="_blank"
-                                                      rel="noreferrer"
-                                                      className="text-indigo-600 hover:underline flex items-center gap-1 font-bold"
-                                                    >
-                                                      <Download className="h-3 w-3" /> Download
-                                                    </a>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            );
-                                          }
-                                          return null;
-                                        })()}
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                                      <div>
+                                        <p className="font-extrabold text-slate-900 text-sm">
+                                          {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
+                                        </p>
+                                        <p className="text-slate-500 text-xs mt-0.5">
+                                          Style: <span className="font-semibold text-slate-700">{item.tShirtStyle || "Crew Neck"}</span> | 
+                                          Size: <span className="font-semibold text-slate-700">{item.selectedSize || item.size}</span> | 
+                                          Color: <span className="font-semibold text-slate-700">{resolveColorName(item.selectedColor || item.color)}</span> | 
+                                          GSM: <span className="font-semibold text-slate-700">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
+                                        </p>
                                       </div>
-                                    )}
+                                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                                        item.itemType === "Customized" || item.designId
+                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                          : "bg-blue-50 text-blue-700 border border-blue-200"
+                                      }`}>
+                                        {item.itemType === "Customized" || item.designId ? "Custom 3D Print" : "Ready-Made Product"}
+                                      </span>
+                                    </div>
+
+                                    {/* Multi-Angle Design Screenshots Component (Front, Back, Left Side, Right Side, All Angles) */}
+                                    <DesignScreenshotViewer
+                                      item={item}
+                                      orderId={order._id}
+                                      onOpen3DModal={(designToOpen) => {
+                                        setSelected3DDesign(designToOpen);
+                                        setIs3DModalOpen(true);
+                                      }}
+                                    />
                                   </div>
                                 ))}
                               </div>
                             </div>
                           </div>
 
-                          {/* Shipping Destination */}
-                          <div>
-                            <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                              Shipping Destination
-                            </h4>
-                            {order.shippingAddress ? (
-                              <p className="text-xs text-slate-600 leading-relaxed bg-white p-3 border rounded-xl">
-                                {order.shippingAddress.street},{" "}
-                                {order.shippingAddress.city},{" "}
-                                {order.shippingAddress.country}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-slate-400 bg-white p-3 border rounded-xl">
-                                Address not specified
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Assigned Operator / Work Status */}
-                          <div>
-                            <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                              Task Assignment
-                            </h4>
-                            <div className="bg-white border rounded-xl p-3.5 space-y-2 shadow-xs">
-                              <div className="flex items-center gap-2.5">
-                                <div className="h-8 w-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-xs shrink-0">
-                                  <User className="h-4 w-4" />
-                                </div>
-                                <div>
-                                  <p className="text-xs font-bold text-slate-900">
-                                    Assigned to You
-                                  </p>
-                                  <p className="text-[10px] text-teal-600 font-semibold">
-                                    Active Print Task
-                                  </p>
-                                </div>
-                              </div>
-                              {latestTimeline?.note && (
-                                <p className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                  <span className="font-semibold text-slate-700">Latest Log:</span> {latestTimeline.note}
+                          {/* Right Col: Shipping Destination & Task Assignment */}
+                          <div className="space-y-4">
+                            {/* Shipping Destination */}
+                            <div>
+                              <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                                Shipping Destination
+                              </h4>
+                              {order.shippingAddress ? (
+                                <p className="text-xs text-slate-600 leading-relaxed bg-white p-3.5 border rounded-2xl shadow-2xs">
+                                  {order.shippingAddress.street},{" "}
+                                  {order.shippingAddress.city},{" "}
+                                  {order.shippingAddress.country}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-slate-400 bg-white p-3.5 border rounded-2xl shadow-2xs">
+                                  Address not specified
                                 </p>
                               )}
+                            </div>
+
+                            {/* Assigned Operator / Work Status */}
+                            <div>
+                              <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                                Task Assignment & Logging
+                              </h4>
+                              <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-8 w-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                    <User className="h-4 w-4" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-900">
+                                      Assigned to You
+                                    </p>
+                                    <p className="text-[10px] text-teal-600 font-semibold">
+                                      Active Print Task
+                                    </p>
+                                  </div>
+                                </div>
+                                {latestTimeline?.note && (
+                                  <p className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                    <span className="font-bold text-slate-800">Latest Log:</span> {latestTimeline.note}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
