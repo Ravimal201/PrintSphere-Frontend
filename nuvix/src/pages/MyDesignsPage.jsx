@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
-import TShirt2D from "../components/TShirt2D";
+import Store3DCardPreview from "../components/Store3DCardPreview";
 import TShirt3DModal from "../components/TShirt3DModal";
 import { Palette, Edit, AlertCircle, Trash2 } from "lucide-react";
 import axios from "axios";
@@ -116,12 +116,22 @@ export default function MyDesignsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {designs.map((design) => (
                   <div key={design._id} className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4">
-                    {/* T-Shirt Preview Box */}
-                    <div className="relative bg-slate-50 rounded-2xl p-4 flex items-center justify-center border border-slate-100 min-h-[180px] group">
-                      <TShirt2D color={design.fabricColor} designUrl={design.thumbnailUrl} layers={design.layers} className="h-40 w-40" />
+                    {/* 3D T-Shirt Card Preview with Front/Back/Side hover controls */}
+                    <div className="relative mb-4">
+                      <Store3DCardPreview
+                        product={design}
+                        activeColor={design.fabricColor}
+                        onClick={() => {
+                          setSelected3DDesign(design);
+                          setIs3DModalOpen(true);
+                        }}
+                      />
                       <button
-                        onClick={() => handleDeleteDesign(design._id)}
-                        className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-rose-600 text-slate-500 hover:text-white rounded-xl shadow-sm border border-slate-100 transition-all duration-200 cursor-pointer active:scale-95 hover:shadow-md"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDesign(design._id);
+                        }}
+                        className="absolute top-2.5 right-2.5 z-20 p-2 bg-white/90 hover:bg-rose-600 text-slate-500 hover:text-white rounded-xl shadow-sm border border-slate-100 transition-all duration-200 cursor-pointer active:scale-95 hover:shadow-md"
                         title="Delete Design"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -145,7 +155,7 @@ export default function MyDesignsPage() {
                     <div className="flex gap-2.5 pt-2 border-t border-slate-100">
                       <button
                         onClick={() => handleLoadDesign(design)}
-                        className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-655 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                        className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
                       >
                         <Edit className="h-3.5 w-3.5" />
                         Customize

@@ -54,7 +54,8 @@ export default function Store3DCardPreview({
   const getModelPath = () => {
     if (!product) return "/images/models/male normal t-shirt1.glb";
     if (product.modelPath) return product.modelPath;
-    const title = (product.title || product.tShirtType || "").toLowerCase();
+    if (product.modelUrl) return product.modelUrl;
+    const title = (product.title || product.tShirtType || product.name || "").toLowerCase();
     const category = (product.category || "").toLowerCase();
 
     if (
