@@ -131,7 +131,7 @@ export default function MyDesignsPage() {
                           e.stopPropagation();
                           handleDeleteDesign(design._id);
                         }}
-                        className="absolute top-2.5 right-2.5 z-20 p-2 bg-white/90 hover:bg-rose-600 text-slate-500 hover:text-white rounded-xl shadow-sm border border-slate-100 transition-all duration-200 cursor-pointer active:scale-95 hover:shadow-md"
+                        className="absolute top-2.5 right-2.5 z-40 p-2 bg-white/90 hover:bg-rose-600 text-slate-500 hover:text-white rounded-xl shadow-sm border border-slate-100 transition-all duration-200 cursor-pointer active:scale-95 hover:shadow-md"
                         title="Delete Design"
                       >
                         <Trash2 className="h-4 w-4" />
