@@ -54,7 +54,8 @@ export default function Store3DCardPreview({
   const getModelPath = () => {
     if (!product) return "/images/models/male normal t-shirt1.glb";
     if (product.modelPath) return product.modelPath;
-    const title = (product.title || product.tShirtType || "").toLowerCase();
+    if (product.modelUrl) return product.modelUrl;
+    const title = (product.title || product.tShirtType || product.name || "").toLowerCase();
     const category = (product.category || "").toLowerCase();
 
     if (
@@ -145,13 +146,13 @@ export default function Store3DCardPreview({
       {/* 3 View Buttons Overlay at top of card on hover */}
       {showControls && (
         <div
-          className={`absolute top-2.5 inset-x-0 z-30 flex justify-center items-center transition-all duration-300 ${
+          className={`absolute top-2.5 inset-x-0 z-30 flex justify-center items-center transition-all duration-300 pointer-events-none ${
             isHovered
-              ? "opacity-100 translate-y-0 pointer-events-auto"
-              : "opacity-0 -translate-y-2 pointer-events-none"
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 -translate-y-2"
           }`}
         >
-          <div className="bg-slate-900/85 backdrop-blur-md px-1.5 py-1 rounded-xl shadow-lg flex items-center gap-1 border border-white/15">
+          <div className="bg-slate-900/85 backdrop-blur-md px-1.5 py-1 rounded-xl shadow-lg flex items-center gap-1 border border-white/15 pointer-events-auto">
             {[
               { id: "front", label: "Front" },
               { id: "back", label: "Back" },
