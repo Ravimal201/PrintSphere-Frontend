@@ -734,10 +734,26 @@ export default function StorePage() {
                           </div>
 
                           {/* Info */}
-                          <div className="space-y-1 select-none">
-                            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">
-                              {p.category}
-                            </span>
+                          <div className="space-y-1.5 select-none">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">
+                                {p.category}
+                              </span>
+                              {/* Product Rating */}
+                              <div className="flex items-center gap-1 text-[11px]">
+                                <Star className={`h-3.5 w-3.5 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                                {p.ratingsCount > 0 ? (
+                                  <span className="font-extrabold text-slate-800">
+                                    {p.averageRating ? p.averageRating.toFixed(1) : "0.0"}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-medium text-[10px]">0 review</span>
+                                )}
+                                <span className="text-slate-400 font-bold text-[10px]">
+                                  ({p.ratingsCount || 0})
+                                </span>
+                              </div>
+                            </div>
                             <h4 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition leading-tight">
                               {p.title}
                             </h4>
@@ -823,15 +839,13 @@ export default function StorePage() {
                                 <span className="text-xs font-black text-slate-955">
                                   Rs. {finalPrice.toFixed(2)}
                                 </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelected3DProduct(p);
-                                  }}
-                                  className="text-[9px] font-black text-indigo-600 hover:underline"
-                                >
-                                  + Details
-                                </button>
+                                <div className="flex items-center gap-1 text-[10px]">
+                                  <Star className={`h-3 w-3 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                                  <span className={p.ratingsCount > 0 ? "font-bold text-slate-800" : "text-slate-400"}>
+                                    {p.ratingsCount > 0 ? (p.averageRating ? p.averageRating.toFixed(1) : "0.0") : "0 review"}
+                                  </span>
+                                  <span className="text-slate-400 font-semibold">({p.ratingsCount || 0})</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -876,15 +890,13 @@ export default function StorePage() {
                                   <span className="text-xs font-black text-slate-955">
                                     Rs. {finalPrice.toFixed(2)}
                                   </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelected3DProduct(p);
-                                    }}
-                                    className="text-[9px] font-black text-indigo-600 hover:underline"
-                                  >
-                                    + Details
-                                  </button>
+                                  <div className="flex items-center gap-1 text-[10px]">
+                                    <Star className={`h-3 w-3 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                                    <span className={p.ratingsCount > 0 ? "font-bold text-slate-800" : "text-slate-400"}>
+                                      {p.ratingsCount > 0 ? (p.averageRating ? p.averageRating.toFixed(1) : "0.0") : "0 review"}
+                                    </span>
+                                    <span className="text-slate-400 font-semibold">({p.ratingsCount || 0})</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1252,6 +1264,32 @@ export default function StorePage() {
                     <h3 className="text-xl font-black text-slate-900 leading-tight mt-0.5">
                       {selected3DProduct.title}
                     </h3>
+                    {/* Star Rating & Review Count */}
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <div className="flex items-center text-amber-400">
+                        {[1, 2, 3, 4, 5].map((s) => {
+                          const ratingVal = selected3DProduct.averageRating || 0;
+                          return (
+                            <Star
+                              key={s}
+                              className={`h-4 w-4 ${
+                                s <= Math.round(ratingVal) && ratingVal > 0
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-slate-200"
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="text-xs font-black text-slate-800">
+                        {selected3DProduct.ratingsCount > 0
+                          ? (selected3DProduct.averageRating ? selected3DProduct.averageRating.toFixed(1) : "0.0")
+                          : "0 review"}
+                      </span>
+                      <span className="text-slate-400 text-xs font-bold">
+                        ({selected3DProduct.ratingsCount || 0})
+                      </span>
+                    </div>
                   </div>
                   <button
                     onClick={() => setSelected3DProduct(null)}
@@ -1398,6 +1436,51 @@ export default function StorePage() {
                       <Plus className="h-3.5 w-3.5" />
                     </button>
                   </div>
+                </div>
+
+                {/* Customer Reviews List */}
+                <div className="space-y-2.5 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Customer Reviews ({selected3DProduct.ratingsCount || 0})
+                    </span>
+                    <div className="flex items-center gap-1 text-xs">
+                      <Star className={`h-3.5 w-3.5 ${selected3DProduct.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                      <span className="font-extrabold text-slate-800">
+                        {selected3DProduct.ratingsCount > 0
+                          ? (selected3DProduct.averageRating ? selected3DProduct.averageRating.toFixed(1) : "0.0")
+                          : "0 review"}
+                      </span>
+                      <span className="text-slate-400 font-bold text-[10px]">({selected3DProduct.ratingsCount || 0})</span>
+                    </div>
+                  </div>
+
+                  {selected3DProduct.reviews && selected3DProduct.reviews.length > 0 ? (
+                    <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                      {selected3DProduct.reviews.map((rev, rIdx) => (
+                        <div key={rIdx} className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-800">{rev.userName || "Verified Buyer"}</span>
+                            <div className="flex text-amber-400">
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star
+                                  key={s}
+                                  className={`h-3 w-3 ${s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          {rev.comment && (
+                            <p className="text-[11px] text-slate-600 italic leading-snug">"{rev.comment}"</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                      No customer reviews yet. Be the first to order and review!
+                    </p>
+                  )}
                 </div>
               </div>
 

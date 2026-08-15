@@ -52,7 +52,10 @@ function ProductCard({ product }) {
     ? `Rs. ${finalPrice.toFixed(2)}` 
     : product.price;
 
-  const rating = isDbProduct ? "4.8" : product.rating;
+  const ratingCount = isDbProduct ? (product.ratingsCount || 0) : (product.ratingsCount || 0);
+  const ratingVal = isDbProduct 
+    ? (product.ratingsCount > 0 ? (product.averageRating ? product.averageRating.toFixed(1) : "0.0") : "0 review")
+    : product.rating;
   const category = isDbProduct ? product.category : "Casual";
 
   const handleClick = () => {
@@ -157,9 +160,12 @@ function ProductCard({ product }) {
               )}
             </div>
 
-            <div className="flex items-center gap-1 text-amber-500">
-              <Star className="h-3.5 w-3.5 fill-current" />
-              <span className="text-xs font-medium text-slate-500">{rating}</span>
+            <div className="flex items-center gap-1 text-amber-500 text-xs">
+              <Star className={`h-3.5 w-3.5 ${ratingCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+              <span className={`text-xs ${ratingCount > 0 ? "font-bold text-slate-800" : "text-slate-400 font-medium text-[11px]"}`}>
+                {ratingVal}
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold">({ratingCount})</span>
             </div>
           </div>
         </div>
