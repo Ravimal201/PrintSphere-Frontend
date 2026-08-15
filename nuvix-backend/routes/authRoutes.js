@@ -18,7 +18,9 @@ const {
   updateUserProfile,
   updateOrderAddress,
   updateUserPaymentMethod,
-  cancelOrder
+  cancelOrder,
+  markOrderCollected,
+  submitOrderReview
 } = require("../controllers/authController");
 
 router.post("/register", registerCustomer);
@@ -39,6 +41,8 @@ router.post("/orders", createOrder);
 router.get("/orders", getCustomerOrders);
 router.put("/orders/:orderId/address", updateOrderAddress);
 router.put("/orders/:orderId/cancel", cancelOrder);
+router.put("/orders/:orderId/collect", markOrderCollected);
+router.post("/orders/:orderId/review", submitOrderReview);
 router.post("/designs", saveCustomerDesign);
 router.get("/designs", getCustomerDesigns);
 router.delete("/designs/:id", deleteCustomerDesign);

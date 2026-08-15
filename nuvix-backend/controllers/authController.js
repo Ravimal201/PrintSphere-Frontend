@@ -7,6 +7,7 @@ const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const TShirtStyle = require("../models/TShirtStyle");
 const UserActivity = require("../models/UserActivity");
+const Review = require("../models/Review");
 const { createNotification } = require("../utils/notificationHelper");
 const { resolveColorName, formatGsm } = require("../utils/colorHelper");
 
@@ -921,4 +922,197 @@ exports.cancelOrder = async (req, res) => {
     res.status(500).json({ message: "Server error while cancelling order" });
   }
 };
+
+// @desc    Mark an order as collected by customer
+// @route   PUT /api/auth/orders/:orderId/collect
+exports.markOrderCollected = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { orderId } = req.params;
+    const order = await Order.findOne({ _id: orderId, customerId: decoded.id })
+      .populate("assignedEmployee", "name")
+      .populate("items.productId")
+      .populate("items.designId");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Allow marking collected if Shipped or Completed
+    order.orderStatus = "Collected";
+    order.isCollected = true;
+    order.collectedAt = new Date();
+
+    order.timeline.push({
+      status: "Collected",
+      note: "Order confirmed collected and received by customer.",
+      timestamp: new Date()
+    });
+
+    await order.save();
+
+    // Create notifications for staff
+    try {
+      const notifMsg = `Customer has successfully collected Order #${order._id.toString().slice(-8).toUpperCase()}.`;
+
+      await createNotification({
+        recipientRole: "Admin",
+        title: "Order Collected",
+        message: notifMsg,
+        type: "Order Update"
+      });
+
+      await createNotification({
+        recipientRole: "Manager",
+        title: "Order Collected",
+        message: notifMsg,
+        type: "Order Update"
+      });
+
+      if (order.assignedEmployee) {
+        await createNotification({
+          recipientId: order.assignedEmployee._id || order.assignedEmployee,
+          title: "Order Collected",
+          message: notifMsg,
+          type: "Order Update"
+        });
+      }
+    } catch (notifErr) {
+      console.error("Failed to generate collection notifications:", notifErr);
+    }
+
+    res.json({ message: "Order marked as collected successfully", order });
+  } catch (error) {
+    console.error("Mark order collected error:", error);
+    res.status(500).json({ message: "Server error while updating order status" });
+  }
+};
+
+// @desc    Submit rating and review comment for product / order
+// @route   POST /api/auth/orders/:orderId/review
+exports.submitOrderReview = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { orderId } = req.params;
+    const { rating, comment } = req.body;
+
+    const numRating = Number(rating);
+    if (!numRating || numRating < 1 || numRating > 5) {
+      return res.status(400).json({ message: "Please provide a valid rating between 1 and 5 stars." });
+    }
+
+    const order = await Order.findOne({ _id: orderId, customerId: decoded.id })
+      .populate("items.productId")
+      .populate("items.designId");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const user = await User.findById(decoded.id);
+    const userName = user ? user.name : "Customer";
+
+    const reviewObj = {
+      rating: numRating,
+      comment: (comment || "").trim(),
+      createdAt: new Date()
+    };
+
+    // Update order review
+    order.review = reviewObj;
+
+    // Update item-level reviews
+    if (order.items && order.items.length > 0) {
+      order.items.forEach(item => {
+        item.review = reviewObj;
+      });
+    }
+
+    await order.save();
+
+    // Store review document(s) in Review collection and update product average rating
+    if (order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        const prodId = item.productId?._id || item.productId;
+        const desId = item.designId?._id || item.designId;
+
+        // Upsert review record
+        await Review.findOneAndUpdate(
+          { orderId: order._id, userId: decoded.id, ...(prodId ? { productId: prodId } : { designId: desId }) },
+          {
+            orderId: order._id,
+            productId: prodId || undefined,
+            designId: desId || undefined,
+            userId: decoded.id,
+            userName,
+            rating: numRating,
+            comment: (comment || "").trim()
+          },
+          { upsert: true, new: true }
+        );
+
+        // Recalculate average rating for store product if applicable
+        if (prodId) {
+          try {
+            const productReviews = await Review.find({ productId: prodId });
+            if (productReviews.length > 0) {
+              const avg = productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length;
+              await Product.findByIdAndUpdate(prodId, {
+                averageRating: parseFloat(avg.toFixed(1)),
+                ratingsCount: productReviews.length
+              });
+            }
+          } catch (pErr) {
+            console.error("Error updating product average rating:", pErr);
+          }
+        }
+      }
+    } else {
+      await Review.findOneAndUpdate(
+        { orderId: order._id, userId: decoded.id },
+        {
+          orderId: order._id,
+          userId: decoded.id,
+          userName,
+          rating: numRating,
+          comment: (comment || "").trim()
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    // Send notifications to Admin/Manager about new review
+    try {
+      await createNotification({
+        recipientRole: "Admin",
+        title: `New Product Review (${numRating}★)`,
+        message: `${userName} rated Order #${order._id.toString().slice(-8).toUpperCase()} with ${numRating} stars: "${(comment || "").slice(0, 80)}"`,
+        type: "Order Update"
+      });
+
+      await createNotification({
+        recipientRole: "Manager",
+        title: `New Product Review (${numRating}★)`,
+        message: `${userName} rated Order #${order._id.toString().slice(-8).toUpperCase()} with ${numRating} stars: "${(comment || "").slice(0, 80)}"`,
+        type: "Order Update"
+      });
+    } catch (notifErr) {
+      console.error("Failed to generate review notifications:", notifErr);
+    }
+
+    res.json({ message: "Thank you for your rating and feedback!", order });
+  } catch (error) {
+    console.error("Submit order review error:", error);
+    res.status(500).json({ message: "Server error while submitting review" });
+  }
+};
+
 

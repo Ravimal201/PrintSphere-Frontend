@@ -50,6 +50,11 @@ const OrderItemSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: true
+  },
+  review: {
+    rating: { type: Number, min: 1, max: 5 },
+    comment: String,
+    createdAt: { type: Date, default: Date.now }
   }
 });
 
@@ -62,6 +67,8 @@ const StatusTimelineSchema = new mongoose.Schema({
       "Printing",
       "Completed",
       "Shipped",
+      "Delivered",
+      "Collected",
       "Cancelled"
     ]
   },
@@ -139,6 +146,8 @@ const OrderSchema = new mongoose.Schema(
         "Printing",
         "Completed",
         "Shipped",
+        "Delivered",
+        "Collected",
         "Cancelled"
       ],
       default: "Pending Payment"
@@ -163,7 +172,17 @@ const OrderSchema = new mongoose.Schema(
       default: false
     },
     timeline: [StatusTimelineSchema], // History of order lifecycle
-    invoiceUrl: String
+    invoiceUrl: String,
+    isCollected: {
+      type: Boolean,
+      default: false
+    },
+    collectedAt: Date,
+    review: {
+      rating: { type: Number, min: 1, max: 5 },
+      comment: String,
+      createdAt: Date
+    }
   },
   {
     timestamps: true

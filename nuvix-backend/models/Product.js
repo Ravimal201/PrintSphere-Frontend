@@ -105,6 +105,14 @@ const ProductSchema = new mongoose.Schema(
       type: String,
       default: "#ffffff"
     },
+    averageRating: {
+      type: Number,
+      default: 0
+    },
+    ratingsCount: {
+      type: Number,
+      default: 0
+    },
     layers: [LayerSchema]
   },
   {
