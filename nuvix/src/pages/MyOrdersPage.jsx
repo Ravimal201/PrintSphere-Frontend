@@ -6,7 +6,10 @@ import TShirt2D from "../components/TShirt2D";
 import Store3DCardPreview from "../components/Store3DCardPreview";
 import TShirt3DModal from "../components/TShirt3DModal";
 import PaymentButton from "../components/PaymentButton";
-import { ShoppingBag, Calendar, MapPin, ShieldCheck, AlertCircle, Edit3, Plus, CheckCircle, X, Phone } from "lucide-react";
+import { 
+  ShoppingBag, Calendar, MapPin, ShieldCheck, AlertCircle, Edit3, Plus, 
+  CheckCircle, X, Phone, Star, PackageCheck, Sparkles, CheckCircle2, MessageSquare
+} from "lucide-react";
 import axios from "axios";
 
 import { API_BASE_URL } from "../config/api";
@@ -14,10 +17,13 @@ import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 const statusColors = {
   Pending: "bg-amber-50 text-amber-700 border-amber-100",
+  "Pending Payment": "bg-amber-50 text-amber-700 border-amber-100",
   Processing: "bg-blue-50 text-blue-700 border-blue-100",
   Printing: "bg-indigo-50 text-indigo-700 border-indigo-100",
-  Completed: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  Completed: "bg-teal-50 text-teal-700 border-teal-100",
   Shipped: "bg-purple-50 text-purple-700 border-purple-100",
+  Delivered: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  Collected: "bg-emerald-50 text-emerald-700 border-emerald-100",
   Cancelled: "bg-rose-50 text-rose-700 border-rose-100"
 };
 
@@ -42,6 +48,21 @@ export default function MyOrdersPage() {
     country: "Sri Lanka",
     phone: ""
   });
+
+  // Review & Rating Modal states
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewOrder, setReviewOrder] = useState(null);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [ratingHover, setRatingHover] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [collectingOrderId, setCollectingOrderId] = useState(null);
+  const [toastMessage, setToastMessage] = useState({ text: "", type: "success" });
+
+  const showToast = (text, type = "success") => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage({ text: "", type: "success" }), 4500);
+  };
 
   useEffect(() => {
     fetchUserProfile();
@@ -177,6 +198,80 @@ export default function MyOrdersPage() {
     }
   };
 
+  const handleMarkCollected = async (order) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    setCollectingOrderId(order._id);
+    try {
+      const res = await axios.put(
+        `${API_BASE_URL}/auth/orders/${order._id}/collect`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const updatedOrder = res.data.order || { 
+        ...order, 
+        orderStatus: "Collected", 
+        isCollected: true, 
+        collectedAt: new Date() 
+      };
+
+      setOrders(prev => prev.map(o => o._id === order._id ? updatedOrder : o));
+      showToast("Order marked as collected! Please share your feedback and rating.", "success");
+
+      // Open review dialog right after collecting
+      openReviewModal(updatedOrder);
+    } catch (err) {
+      console.error("Mark collected error:", err);
+      showToast(err.response?.data?.message || "Failed to mark order as collected.", "error");
+    } finally {
+      setCollectingOrderId(null);
+    }
+  };
+
+  const openReviewModal = (order) => {
+    setReviewOrder(order);
+    setRatingValue(order.review?.rating || 5);
+    setRatingHover(0);
+    setReviewComment(order.review?.comment || "");
+    setIsReviewModalOpen(true);
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!reviewOrder) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    setSubmittingReview(true);
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/auth/orders/${reviewOrder._id}/review`,
+        { rating: ratingValue, comment: reviewComment },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const updatedOrder = res.data.order || {
+        ...reviewOrder,
+        review: {
+          rating: ratingValue,
+          comment: reviewComment,
+          createdAt: new Date()
+        }
+      };
+
+      setOrders(prev => prev.map(o => o._id === reviewOrder._id ? updatedOrder : o));
+      setIsReviewModalOpen(false);
+      showToast("Thank you for your rating and feedback!", "success");
+    } catch (err) {
+      console.error("Submit review error:", err);
+      showToast(err.response?.data?.message || "Failed to submit review.", "error");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   const hasDefaultAddress = Boolean(user?.address && (user.address.street || user.address.city));
 
   return (
@@ -194,13 +289,26 @@ export default function MyOrdersPage() {
               <p className="text-xs text-slate-500 mt-1">Track your orders, manage delivery details, and view shipment status</p>
             </div>
 
-            {/* Success Toast / Notification */}
-            {addressSuccessMsg && (
+            {/* Success / Error Toast Notification */}
+            {toastMessage.text ? (
+              <div className={`flex items-center gap-2 p-4 rounded-2xl border text-sm font-semibold transition animate-fade-in shadow-sm ${
+                toastMessage.type === "error" 
+                  ? "border-rose-200 bg-rose-50 text-rose-700" 
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              }`}>
+                {toastMessage.type === "error" ? (
+                  <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
+                ) : (
+                  <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
+                )}
+                <span>{toastMessage.text}</span>
+              </div>
+            ) : addressSuccessMsg ? (
               <div className="flex items-center gap-2 p-4 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold transition animate-fade-in shadow-sm">
                 <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
                 <span>{addressSuccessMsg}</span>
               </div>
-            )}
+            ) : null}
 
             {/* Dynamic Default User Delivery Address Card */}
             <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -346,6 +454,45 @@ export default function MyOrdersPage() {
                             </div>
                           </div>
                         )}
+                        {/* Shipped -> Order Collected Button */}
+                        {order.orderStatus === "Shipped" && (
+                          <button
+                            onClick={() => handleMarkCollected(order)}
+                            disabled={collectingOrderId === order._id}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition shadow-sm cursor-pointer disabled:opacity-50"
+                            title="Click to confirm you have collected and received your order"
+                          >
+                            {collectingOrderId === order._id ? (
+                              <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <PackageCheck className="h-4 w-4" />
+                            )}
+                            <span>Order Collected</span>
+                          </button>
+                        )}
+
+                        {/* Collected / Delivered -> Rate Product Button */}
+                        {(order.orderStatus === "Collected" || order.orderStatus === "Delivered") && (
+                          !order.review?.rating ? (
+                            <button
+                              onClick={() => openReviewModal(order)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-xl text-xs font-black transition shadow-sm cursor-pointer"
+                            >
+                              <Star className="h-3.5 w-3.5 fill-white text-white" />
+                              <span>Rate Product</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => openReviewModal(order)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl text-[11px] font-extrabold transition cursor-pointer"
+                              title="Click to edit your rating and comment"
+                            >
+                              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                              <span>{order.review.rating}★ Rated</span>
+                            </button>
+                          )
+                        )}
+
                         <span className={`px-2.5 py-1 rounded-full border text-xs font-bold ${statusColors[order.orderStatus] || "bg-slate-100 text-slate-700 border-slate-200"}`}>
                           {order.orderStatus}
                         </span>
@@ -437,6 +584,71 @@ export default function MyOrdersPage() {
                             );
                           })}
                         </div>
+
+                        {/* Shipped Prompt Banner */}
+                        {order.orderStatus === "Shipped" && (
+                          <div className="mt-4 p-3.5 bg-indigo-50/70 border border-indigo-150 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2.5 text-indigo-900 font-semibold">
+                              <PackageCheck className="h-5 w-5 text-indigo-600 shrink-0" />
+                              <span>Your package is on its way! Once collected, click <strong>"Order Collected"</strong> to rate this product.</span>
+                            </div>
+                            <button
+                              onClick={() => handleMarkCollected(order)}
+                              disabled={collectingOrderId === order._id}
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shrink-0 cursor-pointer shadow-xs"
+                            >
+                              Order Collected
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Customer Rating & Review Box */}
+                        {order.review?.rating ? (
+                          <div className="mt-4 p-4 bg-gradient-to-r from-amber-50/80 to-orange-50/40 border border-amber-200/80 rounded-2xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="flex text-amber-400">
+                                  {[1, 2, 3, 4, 5].map((s) => (
+                                    <Star
+                                      key={s}
+                                      className={`h-4 w-4 ${s <= order.review.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-xs font-black text-amber-950">{order.review.rating}.0 / 5.0</span>
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  Verified Purchase Review
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => openReviewModal(order)}
+                                className="text-[11px] font-extrabold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                              >
+                                Edit Review
+                              </button>
+                            </div>
+                            {order.review.comment ? (
+                              <p className="text-xs text-slate-700 font-medium leading-relaxed italic bg-white/70 p-2.5 rounded-xl border border-amber-100">
+                                "{order.review.comment}"
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-slate-400 italic">No written comment provided.</p>
+                            )}
+                          </div>
+                        ) : (order.orderStatus === "Collected" || order.orderStatus === "Delivered") && (
+                          <div className="mt-4 p-3.5 bg-amber-50/60 border border-amber-200/70 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2 text-amber-900 font-semibold">
+                              <Star className="h-4 w-4 text-amber-500 fill-amber-500 shrink-0" />
+                              <span>Have a moment to rate this product? Your feedback is valuable!</span>
+                            </div>
+                            <button
+                              onClick={() => openReviewModal(order)}
+                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shrink-0 cursor-pointer shadow-xs"
+                            >
+                              Rate Product
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Delivery and Timeline Tracker */}
@@ -632,6 +844,139 @@ export default function MyOrdersPage() {
                     </>
                   ) : (
                     <span>Save Delivery Details</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Product Star Rating & Comment Modal */}
+      {isReviewModalOpen && reviewOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-6 animate-scale-up">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-50 border border-amber-100 rounded-2xl text-amber-600">
+                  <Star className="h-6 w-6 fill-amber-500 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">
+                    Rate Your Order & Products
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Order <span className="font-mono font-bold text-slate-700">#{reviewOrder._id.substring(reviewOrder._id.length - 8).toUpperCase()}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsReviewModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Ordered Items Preview */}
+            <div className="bg-slate-50 border border-slate-150/70 rounded-2xl p-3.5 space-y-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Items being reviewed</span>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                {reviewOrder.items?.map((it, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                    <span className="truncate max-w-[280px]">
+                      • {it.tShirtStyle || it.designId?.tShirtType || it.productId?.title || "Custom T-Shirt"} ({it.selectedSize || it.size}, {resolveColorName(it.selectedColor || it.color)})
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-bold shrink-0">x{it.quantity}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmitReview} className="space-y-5 text-xs font-semibold text-slate-700">
+              {/* Star Rating Selector */}
+              <div className="text-center space-y-2.5 py-2">
+                <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                  Overall Product Rating *
+                </label>
+                
+                <div className="flex items-center justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => {
+                    const activeRating = ratingHover || ratingValue;
+                    const isFilled = star <= activeRating;
+                    return (
+                      <button
+                        type="button"
+                        key={star}
+                        onClick={() => setRatingValue(star)}
+                        onMouseEnter={() => setRatingHover(star)}
+                        onMouseLeave={() => setRatingHover(0)}
+                        className="p-1.5 rounded-xl transition-all duration-150 transform hover:scale-125 active:scale-95 cursor-pointer focus:outline-none"
+                      >
+                        <Star
+                          className={`h-9 w-9 transition-colors duration-150 ${
+                            isFilled
+                              ? "fill-amber-400 text-amber-400 drop-shadow-[0_2px_8px_rgba(251,191,36,0.5)]"
+                              : "text-slate-200 hover:text-slate-300"
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="h-5 flex items-center justify-center">
+                  <span className="text-xs font-black text-amber-800 bg-amber-50 border border-amber-200 px-3 py-0.5 rounded-full animate-fade-in">
+                    {(ratingHover || ratingValue) === 1 && "😞 Poor Quality"}
+                    {(ratingHover || ratingValue) === 2 && "😐 Fair - Could be better"}
+                    {(ratingHover || ratingValue) === 3 && "🙂 Good - Met expectations"}
+                    {(ratingHover || ratingValue) === 4 && "😊 Very Good - Great quality"}
+                    {(ratingHover || ratingValue) === 5 && "🤩 Excellent - Loved it!"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Review Comment Box */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
+                  <span>Your Feedback / Comment (Optional)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">{reviewComment.length}/500</span>
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Share your thoughts about print accuracy, fabric softness, fit, or overall experience..."
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-800 transition resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsReviewModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-bold transition shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {submittingReview ? (
+                    <>
+                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Star className="h-4 w-4 fill-white" />
+                      <span>Submit Rating</span>
+                    </>
                   )}
                 </button>
               </div>

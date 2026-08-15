@@ -398,7 +398,7 @@ export default function EmployeePage() {
                     className="text-xs border rounded-xl px-3 py-2 bg-slate-50/50 w-full sm:w-56 focus:outline-none focus:border-indigo-500"
                   />
                   <div className="flex gap-1.5 overflow-x-auto py-1">
-                    {["All", "Processing", "Printing", "Completed", "Shipped"].map(st => (
+                    {["All", "Processing", "Printing", "Completed", "Shipped", "Collected"].map(st => (
                       <button
                         key={st}
                         onClick={() => setStatusFilter(st)}
@@ -425,6 +425,7 @@ export default function EmployeePage() {
                     const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
                     const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
                     const isCancelled = order.orderStatus === "Cancelled";
+                    const isCollected = order.orderStatus === "Collected" || order.orderStatus === "Delivered";
                     const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
 
                     return (
@@ -452,7 +453,7 @@ export default function EmployeePage() {
                                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
                                   isCancelled
                                     ? "bg-rose-50 text-rose-600 border border-rose-200"
-                                    : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
+                                    : order.orderStatus === "Completed" || order.orderStatus === "Shipped" || isCollected
                                     ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
                                     : order.orderStatus === "Printing"
                                     ? "bg-purple-50 text-purple-600 border border-purple-200"
@@ -463,6 +464,11 @@ export default function EmployeePage() {
                               >
                                 Status: {order.orderStatus}
                               </span>
+                              {order.review?.rating && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                                  ⭐ {order.review.rating}/5 Rated
+                                </span>
+                              )}
                             </div>
                             <p className="text-xs text-slate-500 mt-1.5 flex items-center flex-wrap gap-1">
                               <span className="font-medium text-slate-600">Customer:</span>{" "}
