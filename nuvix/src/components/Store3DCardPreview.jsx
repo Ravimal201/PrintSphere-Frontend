@@ -53,26 +53,33 @@ export default function Store3DCardPreview({
 
   const getModelPath = () => {
     if (!product) return "/images/models/male normal t-shirt1.glb";
-    if (product.modelPath) return product.modelPath;
-    if (product.modelUrl) return product.modelUrl;
-    const title = (product.title || product.tShirtType || product.name || "").toLowerCase();
-    const category = (product.category || "").toLowerCase();
+    if (product.modelPath && typeof product.modelPath === "string" && product.modelPath.endsWith(".glb")) {
+      return product.modelPath;
+    }
+    if (product.modelUrl && typeof product.modelUrl === "string" && product.modelUrl.endsWith(".glb")) {
+      return product.modelUrl;
+    }
+    const textStr = (
+      product.tShirtType ||
+      product.shirtType ||
+      product.type ||
+      product.model ||
+      product.title ||
+      product.name ||
+      product.category ||
+      ""
+    ).toLowerCase();
 
-    if (
-      title.includes("female") ||
-      title.includes("women") ||
-      category.includes("female") ||
-      category.includes("women")
-    ) {
+    if (textStr.includes("female") || textStr.includes("women") || textStr.includes("v-neck") || textStr.includes("woman")) {
       return "/images/models/female normal t-shirt.glb";
     }
-    if (title.includes("long sleeve") || category.includes("long sleeve")) {
+    if (textStr.includes("long sleeve") || textStr.includes("long-sleeve")) {
       return "/images/models/long_sleeve_t-_shirt.glb";
     }
-    if (title.includes("oversized") || category.includes("oversized")) {
+    if (textStr.includes("oversized")) {
       return "/images/models/oversized t-sdirt1.glb";
     }
-    if (title.includes("hoodie") || category.includes("hoodie")) {
+    if (textStr.includes("hoodie") || textStr.includes("polo")) {
       return "/images/models/t_shirt_hoodie.glb";
     }
     return "/images/models/male normal t-shirt1.glb";
@@ -80,18 +87,37 @@ export default function Store3DCardPreview({
 
   const getLayers = () => {
     if (!product) return [];
-    if (product.layers && product.layers.length > 0) {
-      return product.layers;
+    if (product.layers && Array.isArray(product.layers) && product.layers.length > 0) {
+      return product.layers.map((l, idx) => ({
+        id: l.id || `layer-${idx}`,
+        type: l.type || "image",
+        name: l.name || (l.type === "text" ? "Custom Text" : "Custom Logo"),
+        text: l.text || "",
+        fontFamily: l.fontFamily || "Outfit",
+        color: l.color || "#1e293b",
+        bold: Boolean(l.bold),
+        italic: Boolean(l.italic),
+        url: l.url || l.image || l.src || "",
+        visible: l.visible !== undefined ? Boolean(l.visible) : true,
+        locked: false,
+        flipX: Boolean(l.flipX),
+        flipY: Boolean(l.flipY),
+        position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
+        rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
+        scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
+        projectedForModel: l.projectedForModel || null,
+        targetMeshName: l.targetMeshName || null
+      }));
     }
     const designImg = product.images?.[0] || product.thumbnailUrl || product.designUrl;
-    if (designImg) {
+    if (designImg && designImg !== "/images/dumyImage.png") {
       return [
         {
           id: "logo-layer",
           type: "image",
           url: designImg,
           visible: true,
-          locked: true,
+          locked: false,
           position: [0, 0.1, 0.15],
           rotation: [0, 0, 0],
           scale: [0.35, 0.35, 0.35],

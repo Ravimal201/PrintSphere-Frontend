@@ -751,6 +751,11 @@ export default function ShirtModel({
   const rootGroupRef = useRef(null);
   const modelCenterRef = useRef(new THREE.Vector3(0, 0, 0));
   const modelSizeRef = useRef(new THREE.Vector3(1, 1, 1));
+  const [localLayers, setLocalLayers] = useState(() => layers || []);
+
+  useEffect(() => {
+    setLocalLayers(layers || []);
+  }, [layers]);
 
   // Center and normalize scale once when model loads
   useEffect(() => {
@@ -873,7 +878,7 @@ export default function ShirtModel({
 
   // Auto-project decals on the surface of the body mesh when scene or layers change
   useEffect(() => {
-    if (meshLoaded && activeScene === scene && bodyMeshRef.current && onUpdateLayers && layers.length > 0) {
+    if (meshLoaded && activeScene === scene && bodyMeshRef.current && localLayers && localLayers.length > 0) {
       // Safety guard: ensure bodyMeshRef.current belongs to the current scene
       let isCurrentMesh = false;
       scene.traverse((child) => {
@@ -890,16 +895,28 @@ export default function ShirtModel({
       const chestY = center.y + (size.y > 0 ? size.y * 0.05 : 0);
 
       let changed = false;
-      const nextLayers = layers.map((layer) => {
-        if (layer.locked) return layer;
-        // Skip heavy raycasting if layer is already projected for this model
-        if (layer.projectedForModel === modelPath) return layer;
+      const nextLayers = localLayers.map((layer) => {
+        const targetMeshCheck = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
+        let isTargetValid = false;
+        if (targetMeshCheck) {
+          scene.traverse((c) => { if (c === targetMeshCheck) isTargetValid = true; });
+        }
 
-        const mesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
+        // Only skip re-projection if locked AND already projected for THIS model AND target mesh is valid in current scene
+        if (layer.locked && layer.projectedForModel === modelPath && isTargetValid) {
+          return layer;
+        }
+
+        // Skip heavy raycasting if layer is already projected for this model and target mesh is valid
+        if (layer.projectedForModel === modelPath && isTargetValid) {
+          return layer;
+        }
+
+        const mesh = isTargetValid ? targetMeshCheck : bodyMeshRef.current;
         if (!mesh) return layer;
 
         // Project position from scene group-space onto the new mesh using a raycast from the outside towards the center
-        const groupPos = new THREE.Vector3().fromArray(layer.position);
+        const groupPos = new THREE.Vector3().fromArray(layer.position || [0, 0, 0]);
         
         // Target Y for raycasting: if layer position Y is near 0 or unprojected for current model, use chestY
         const targetY = (Math.abs(groupPos.y) < 0.01 || layer.projectedForModel !== modelPath) ? chestY : groupPos.y;
@@ -973,13 +990,13 @@ export default function ShirtModel({
           
           // Check if coordinates have changed significantly, or if model changed
           const posChanged = 
-            Math.abs(scenePoint.x - layer.position[0]) > 0.001 ||
-            Math.abs(scenePoint.y - layer.position[1]) > 0.001 ||
-            Math.abs(scenePoint.z - layer.position[2]) > 0.001;
+            Math.abs(scenePoint.x - (layer.position?.[0] || 0)) > 0.001 ||
+            Math.abs(scenePoint.y - (layer.position?.[1] || 0)) > 0.001 ||
+            Math.abs(scenePoint.z - (layer.position?.[2] || 0)) > 0.001;
 
           const rotChanged =
-            Math.abs(rotation.x - layer.rotation[0]) > 0.01 ||
-            Math.abs(rotation.y - layer.rotation[1]) > 0.01;
+            Math.abs(rotation.x - (layer.rotation?.[0] || 0)) > 0.01 ||
+            Math.abs(rotation.y - (layer.rotation?.[1] || 0)) > 0.01;
 
           const modelChanged = layer.projectedForModel !== modelPath;
 
@@ -988,7 +1005,7 @@ export default function ShirtModel({
             return {
               ...layer,
               position: [scenePoint.x, scenePoint.y, scenePoint.z],
-              rotation: [rotation.x, rotation.y, layer.rotation[2] || 0],
+              rotation: [rotation.x, rotation.y, layer.rotation?.[2] || 0],
               projectedForModel: modelPath,
               targetMeshName: targetMesh.name
             };
@@ -1009,12 +1026,15 @@ export default function ShirtModel({
       });
       
       if (changed) {
-        onUpdateLayers(nextLayers);
+        setLocalLayers(nextLayers);
+        if (onUpdateLayers) {
+          onUpdateLayers(nextLayers);
+        }
       }
     }
-  }, [meshLoaded, scene, layers, onUpdateLayers, modelPath]);
+  }, [meshLoaded, scene, localLayers, onUpdateLayers, modelPath]);
 
-  const activeLayer = layers.find((l) => l.id === selectedLayerId);
+  const activeLayer = localLayers.find((l) => l.id === selectedLayerId);
 
   return (
     <group ref={rootGroupRef}>
@@ -1024,16 +1044,18 @@ export default function ShirtModel({
 
       {/* Render decals inside target mesh portals so they inherit their local coordinates */}
       {meshLoaded && activeScene === scene && bodyMeshRef.current && (
-        layers.map((layer) => {
-          const targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
-          if (!targetMesh) return null;
-
-          // Double check that targetMesh belongs to the current scene
+        localLayers.map((layer) => {
+          let targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
           let isTargetInScene = false;
-          scene.traverse((c) => {
-            if (c === targetMesh) isTargetInScene = true;
-          });
-          if (!isTargetInScene) return null;
+          if (targetMesh) {
+            scene.traverse((c) => {
+              if (c === targetMesh) isTargetInScene = true;
+            });
+          }
+          if (!isTargetInScene) {
+            targetMesh = bodyMeshRef.current;
+          }
+          if (!targetMesh) return null;
 
           const meshRef = { current: targetMesh };
           return (
