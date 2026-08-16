@@ -32,22 +32,84 @@ const getColorValue = (colorStr) => {
   return colorMap[lower] || colorStr;
 };
 
-const getModelPath = (typeStr) => {
-  if (!typeStr) return "/images/models/male normal t-shirt1.glb";
-  const lower = typeStr.toLowerCase();
-  if (lower.includes("female") || lower.includes("women")) {
+const getModelPath = (design) => {
+  if (!design) return "/images/models/male normal t-shirt1.glb";
+  if (design.modelPath && typeof design.modelPath === "string" && design.modelPath.endsWith(".glb")) {
+    return design.modelPath;
+  }
+  if (design.modelUrl && typeof design.modelUrl === "string" && design.modelUrl.endsWith(".glb")) {
+    return design.modelUrl;
+  }
+
+  const textStr = (
+    design.tShirtType ||
+    design.shirtType ||
+    design.type ||
+    design.model ||
+    design.title ||
+    design.name ||
+    design.category ||
+    (typeof design === "string" ? design : "")
+  ).toLowerCase();
+
+  if (textStr.includes("female") || textStr.includes("women") || textStr.includes("v-neck") || textStr.includes("woman")) {
     return "/images/models/female normal t-shirt.glb";
   }
-  if (lower.includes("long sleeve") || lower.includes("long-sleeve")) {
+  if (textStr.includes("long sleeve") || textStr.includes("long-sleeve")) {
     return "/images/models/long_sleeve_t-_shirt.glb";
   }
-  if (lower.includes("oversized")) {
+  if (textStr.includes("oversized")) {
     return "/images/models/oversized t-sdirt1.glb";
   }
-  if (lower.includes("hoodie")) {
+  if (textStr.includes("hoodie") || textStr.includes("polo")) {
     return "/images/models/t_shirt_hoodie.glb";
   }
   return "/images/models/male normal t-shirt1.glb";
+};
+
+const getLayersFromDesign = (design) => {
+  if (!design) return [];
+  if (design.layers && Array.isArray(design.layers) && design.layers.length > 0) {
+    return design.layers.map((l, idx) => ({
+      id: l.id || `layer-${idx}`,
+      type: l.type || "image",
+      name: l.name || (l.type === "text" ? "Custom Text" : "Custom Logo"),
+      text: l.text || "",
+      fontFamily: l.fontFamily || "Outfit",
+      color: l.color || "#1e293b",
+      bold: Boolean(l.bold),
+      italic: Boolean(l.italic),
+      url: l.url || l.image || l.src || "",
+      visible: l.visible !== undefined ? Boolean(l.visible) : true,
+      locked: l.locked !== undefined ? Boolean(l.locked) : false,
+      flipX: Boolean(l.flipX),
+      flipY: Boolean(l.flipY),
+      position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
+      rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
+      scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
+      projectedForModel: l.projectedForModel || null,
+      targetMeshName: l.targetMeshName || null
+    }));
+  }
+  const designImg = design.thumbnailUrl || design.designUrl || (design.images && design.images[0]);
+  if (designImg && designImg !== "/images/dumyImage.png") {
+    return [
+      {
+        id: "logo-layer",
+        type: "image",
+        name: "Custom Logo",
+        url: designImg,
+        visible: true,
+        locked: false,
+        flipX: false,
+        flipY: false,
+        position: [0, 0.1, 0.15],
+        rotation: [0, 0, 0],
+        scale: [0.35, 0.35, 0.35],
+      },
+    ];
+  }
+  return [];
 };
 
 export default function TShirt3DModal({ isOpen, onClose, design }) {
@@ -65,8 +127,8 @@ export default function TShirt3DModal({ isOpen, onClose, design }) {
   if (!isOpen || !design) return null;
 
   const resolvedColor = getColorValue(design.fabricColor || design.color || design.selectedColor);
-  const resolvedModelPath = getModelPath(design.tShirtType || design.title);
-  const layers = design.layers || [];
+  const resolvedModelPath = getModelPath(design);
+  const layers = getLayersFromDesign(design);
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
