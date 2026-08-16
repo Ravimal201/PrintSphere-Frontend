@@ -21,13 +21,27 @@ const OrderItemSchema = new mongoose.Schema({
     required: true,
     min: 1
   },
-  selectedSize: {
+  size: {
     type: String,
-    required: true
+    default: "M"
+  },
+  selectedSize: {
+    type: String
+  },
+  color: {
+    type: String,
+    default: "White"
   },
   selectedColor: {
+    type: String
+  },
+  tShirtStyle: {
     type: String,
-    required: true
+    default: "Crew Neck"
+  },
+  gsm: {
+    type: String,
+    default: "GSM 180"
   },
   material: {
     type: String,
@@ -36,6 +50,11 @@ const OrderItemSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: true
+  },
+  review: {
+    rating: { type: Number, min: 1, max: 5 },
+    comment: String,
+    createdAt: { type: Date, default: Date.now }
   }
 });
 
@@ -48,6 +67,8 @@ const StatusTimelineSchema = new mongoose.Schema({
       "Printing",
       "Completed",
       "Shipped",
+      "Delivered",
+      "Collected",
       "Cancelled"
     ]
   },
@@ -69,6 +90,27 @@ const OrderSchema = new mongoose.Schema(
       ref: "User" // Null if guest user checked out
     },
     guestEmail: String, // if guest checkout
+    // Order specifications
+    size: {
+      type: String,
+      default: "M"
+    },
+    gsm: {
+      type: String,
+      default: "GSM 180"
+    },
+    color: {
+      type: String,
+      default: "White"
+    },
+    quantity: {
+      type: Number,
+      default: 1
+    },
+    tShirtStyle: {
+      type: String,
+      default: "Crew Neck"
+    },
     items: [OrderItemSchema],
     subtotal: {
       type: Number,
@@ -104,6 +146,8 @@ const OrderSchema = new mongoose.Schema(
         "Printing",
         "Completed",
         "Shipped",
+        "Delivered",
+        "Collected",
         "Cancelled"
       ],
       default: "Pending Payment"
@@ -119,8 +163,26 @@ const OrderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User" // Assigned printing operator
     },
+    inventoryDeducted: {
+      type: Boolean,
+      default: false
+    },
+    packagingDeducted: {
+      type: Boolean,
+      default: false
+    },
     timeline: [StatusTimelineSchema], // History of order lifecycle
-    invoiceUrl: String
+    invoiceUrl: String,
+    isCollected: {
+      type: Boolean,
+      default: false
+    },
+    collectedAt: Date,
+    review: {
+      rating: { type: Number, min: 1, max: 5 },
+      comment: String,
+      createdAt: Date
+    }
   },
   {
     timestamps: true

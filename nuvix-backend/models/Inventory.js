@@ -4,22 +4,22 @@ const InventorySchema = new mongoose.Schema(
   {
     itemType: {
       type: String,
-      enum: ["Plain T-Shirt", "Printing Ink", "Transfer Paper"],
-      required: true
+      required: true,
+      default: "Plain T-Shirt"
     },
     // Attributes specific to Plain T-shirts
     tShirtType: {
-      type: String,
-      enum: ["Crew Neck", "V-Neck", "Polo"]
+      type: String
     },
     color: String,
     size: {
-      type: String,
-      enum: ["S", "M", "L", "XL", "XXL"]
+      type: String
     },
     material: {
-      type: String,
-      enum: ["Cotton", "Polyester", "Organic Cotton"]
+      type: String
+    },
+    gsm: {
+      type: String
     },
     // Stock levels
     quantity: {

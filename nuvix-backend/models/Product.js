@@ -73,6 +73,15 @@ const ProductSchema = new mongoose.Schema(
         enum: ["S", "M", "L", "XL", "XXL"]
       }
     ],
+    gsm: {
+      type: String,
+      default: "GSM 180"
+    },
+    gsms: [
+      {
+        type: String
+      }
+    ],
     colors: [String],
     images: [String],
     status: {
@@ -95,6 +104,14 @@ const ProductSchema = new mongoose.Schema(
     defaultColor: {
       type: String,
       default: "#ffffff"
+    },
+    averageRating: {
+      type: Number,
+      default: 0
+    },
+    ratingsCount: {
+      type: Number,
+      default: 0
     },
     layers: [LayerSchema]
   },

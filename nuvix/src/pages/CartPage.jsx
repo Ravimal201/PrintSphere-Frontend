@@ -8,6 +8,7 @@ import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircl
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { processAccountPayment, processCardPayment } from "../services/paymentService";
+import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 export default function CartPage() {
   const [cart, setCart] = useState([]);
@@ -256,11 +257,13 @@ export default function CartPage() {
       // 2. Resolve custom designs and items
       const resolvedItems = [];
       for (const item of cart) {
+        const colorName = resolveColorName(item.color);
+        const formattedGsm = formatGsm(item.gsm || item.material || "GSM 180");
         if (item.isCustom || item.designId?.startsWith("custom-")) {
           const payload = {
             tShirtType: item.tShirtType || item.title || "Custom T-Shirt",
-            fabricColor: item.color,
-            material: item.material || "180GSM",
+            fabricColor: colorName,
+            material: formattedGsm,
             size: item.size || "M",
             layers: item.layers || [],
             estimatedCost: item.basePrice,
@@ -272,16 +275,24 @@ export default function CartPage() {
             designId: dbDesignId,
             quantity: item.quantity,
             price: item.basePrice,
+            size: item.size,
             selectedSize: item.size,
-            selectedColor: item.color
+            color: colorName,
+            selectedColor: colorName,
+            tShirtStyle: item.tShirtType || item.tShirtStyle || item.title || "Crew Neck",
+            gsm: formattedGsm
           });
         } else {
           resolvedItems.push({
             productId: item.productId,
             quantity: item.quantity,
             price: item.basePrice * (1 - (item.discount / 100)),
+            size: item.size,
             selectedSize: item.size,
-            selectedColor: item.color
+            color: colorName,
+            selectedColor: colorName,
+            tShirtStyle: item.tShirtStyle || item.title || "Crew Neck",
+            gsm: formattedGsm
           });
         }
       }
@@ -388,7 +399,7 @@ export default function CartPage() {
                               </button>
                             </div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">
-                              Size: {item.size} / Color: {item.color}
+                              Size: {item.size} / Color: {item.color} / GSM: {item.gsm || item.material || "180GSM"}
                             </p>
                             {item.isCustom && (
                               <button

@@ -4,6 +4,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const { createNotification } = require("../utils/notificationHelper");
+const { formatGsm } = require("../utils/colorHelper");
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -39,6 +40,7 @@ exports.getAssignedOrders = async (req, res) => {
     }
 
     const orders = await Order.find({ assignedEmployee: decoded.id })
+      .populate("customerId", "name email phone")
       .populate("assignedEmployee", "name")
       .populate("items.productId")
       .populate("items.designId")
@@ -50,6 +52,15 @@ exports.getAssignedOrders = async (req, res) => {
     res.status(500).json({ message: "Server error while fetching assigned orders" });
   }
 };
+
+const Inventory = require("../models/Inventory");
+
+const PACKAGING_REQUIREMENTS = [
+  { key: "sticker", label: "Sticker", keywords: ["sticker", "stickers", "packaging sticker", "label"] },
+  { key: "packaging", label: "Packaging", keywords: ["packaging", "package", "packaging bag", "packaging box", "poly mailer", "bag"] },
+  { key: "tape", label: "Tape", keywords: ["tape", "tapes", "packaging tape", "sealing tape"] },
+  { key: "transferPaper", label: "Transfer Paper", keywords: ["transfer paper", "transferpaper", "sublimation paper", "heat transfer paper"] }
+];
 
 // @desc    Update status of an assigned order
 // @route   PUT /api/employee/orders/:id/status
@@ -68,9 +79,108 @@ exports.updateAssignedOrderStatus = async (req, res) => {
 
     const { status, note } = req.body;
 
+    if (status === "Cancelled") {
+      return res.status(403).json({ message: "Employees cannot cancel orders. Only managers are authorized to cancel orders." });
+    }
+
     const order = await Order.findOne({ _id: req.params.id, assignedEmployee: decoded.id });
     if (!order) {
       return res.status(404).json({ message: "Assigned order not found" });
+    }
+
+    if (order.orderStatus === "Cancelled") {
+      return res.status(400).json({ message: "This order was cancelled by the manager and cannot be updated." });
+    }
+
+    // When status changes to "Completed", verify and deduct packaging consumables (1 unit each of sticker, packaging, tape, transfer paper per item quantity)
+    if (status === "Completed" && !order.packagingDeducted) {
+      const totalGarmentQty = (order.items && order.items.length > 0)
+        ? order.items.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0)
+        : (Number(order.quantity) || 1);
+
+      const allInventory = await Inventory.find();
+      const missingMaterials = [];
+      const itemsToDeduct = [];
+
+      for (const pkg of PACKAGING_REQUIREMENTS) {
+        let invDoc = allInventory.find(inv => {
+          const itType = (inv.itemType || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+          const tType = (inv.tShirtType || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+          return pkg.keywords.some(kw => {
+            const cleanKw = kw.toString().toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+            return itType === cleanKw || itType.includes(cleanKw) || tType.includes(cleanKw);
+          });
+        });
+
+        if (!invDoc) {
+          // Auto create initial stock if missing
+          invDoc = await Inventory.create({
+            itemType: pkg.label,
+            quantity: 100,
+            minThreshold: 20
+          });
+          allInventory.push(invDoc);
+        }
+
+        const availableQty = invDoc ? invDoc.quantity : 0;
+        if (availableQty < totalGarmentQty) {
+          missingMaterials.push({
+            name: pkg.label,
+            required: totalGarmentQty,
+            available: availableQty
+          });
+        } else {
+          itemsToDeduct.push({
+            invDoc,
+            deductQty: totalGarmentQty,
+            name: pkg.label
+          });
+        }
+      }
+
+      if (missingMaterials.length > 0) {
+        const shortageDetails = missingMaterials
+          .map(m => `• ${m.name}: requires ${m.required} units, only ${m.available} available in inventory`)
+          .join("\n");
+
+        return res.status(400).json({
+          message: "not enouugh materials for packge",
+          details: shortageDetails,
+          missingMaterials: missingMaterials
+        });
+      }
+
+      // Deduct packaging materials from inventory
+      for (const deduction of itemsToDeduct) {
+        const updatedInv = await Inventory.findByIdAndUpdate(
+          deduction.invDoc._id,
+          {
+            $inc: { quantity: -deduction.deductQty },
+            lastRestocked: new Date()
+          },
+          { new: true }
+        );
+
+        console.log(`Packaging material reduced for Completed order: ${deduction.name} reduced ${deduction.deductQty}, remaining ${updatedInv.quantity}`);
+
+        if (updatedInv && updatedInv.quantity <= updatedInv.minThreshold) {
+          const alertMsg = `Packaging consumable "${deduction.name}" is low in stock! Remaining: ${updatedInv.quantity} (Threshold: ${updatedInv.minThreshold}).`;
+          await createNotification({
+            recipientRole: "Manager",
+            title: "Low Packaging Stock Alert",
+            message: alertMsg,
+            type: "Low Stock"
+          });
+          await createNotification({
+            recipientRole: "Admin",
+            title: "Low Packaging Stock Alert",
+            message: alertMsg,
+            type: "Low Stock"
+          });
+        }
+      }
+
+      order.packagingDeducted = true;
     }
 
     if (status) {
@@ -137,7 +247,7 @@ exports.submitProductConcept = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Employee role required." });
     }
 
-    const { title, description, category, basePrice, sizes, colors, images, modelPath, defaultColor, layers } = req.body;
+    const { title, description, category, basePrice, sizes, gsms, colors, images, modelPath, defaultColor, layers } = req.body;
 
     if (!title || !description || !category || basePrice === undefined) {
       return res.status(400).json({ message: "Please provide all required product fields" });
@@ -149,6 +259,8 @@ exports.submitProductConcept = async (req, res) => {
       category,
       basePrice,
       sizes: sizes || ["S", "M", "L"],
+      gsms: (gsms || ["GSM 180", "GSM 200", "GSM 220", "GSM 240"]).map(formatGsm),
+      gsm: formatGsm(gsms?.[0] || "GSM 180"),
       colors: colors || ["White"],
       images: images && images.length > 0 ? images : ["/images/dumyImage.png"],
       status: "Draft",

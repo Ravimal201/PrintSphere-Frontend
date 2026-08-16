@@ -31,6 +31,7 @@ import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
 import Store3DCardPreview from "../components/Store3DCardPreview";
 import { API_BASE_URL } from "../config/api";
+import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 const getOrCreateSessionId = () => {
   let sessionId = localStorage.getItem("printsphere_session_id");
@@ -94,6 +95,7 @@ export default function StorePage() {
   const [selected3DProduct, setSelected3DProduct] = useState(null);
   const [modalColor, setModalColor] = useState("");
   const [modalSize, setModalSize] = useState("");
+  const [modalGsm, setModalGsm] = useState("");
   const [modalQty, setModalQty] = useState(1);
   const [modalSide, setModalSide] = useState("front");
   const [modalZoom, setModalZoom] = useState(0.85);
@@ -104,6 +106,7 @@ export default function StorePage() {
     if (selected3DProduct) {
       setModalColor(selected3DProduct.colors?.[0] || "#ffffff");
       setModalSize(selected3DProduct.sizes?.[0] || "M");
+      setModalGsm(formatGsm(selected3DProduct.gsms?.[0] || selected3DProduct.gsm || "GSM 180"));
       setModalQty(1);
       setModalSide("front");
       setModalZoom(0.85);
@@ -190,7 +193,8 @@ export default function StorePage() {
     selectedSize,
     quantity,
   ) => {
-    const cartKey = `${product._id}-${selectedSize}-${selectedColor}`;
+    const colorName = resolveColorName(selectedColor);
+    const cartKey = `${product._id}-${selectedSize}-${colorName}`;
 
     const existingIndex = cart.findIndex((item) => item.cartKey === cartKey);
     if (existingIndex > -1) {
@@ -206,7 +210,7 @@ export default function StorePage() {
         discount: product.discount || 0,
         category: product.category,
         size: selectedSize,
-        color: selectedColor,
+        color: colorName,
         quantity: quantity,
         image: product.images?.[0] || "/images/dumyImage.png",
       };
@@ -303,27 +307,35 @@ export default function StorePage() {
   // Add to cart
   const handleAddToCart = (product, selectedOptions = {}) => {
     const defaultSize = selectedOptions.size || product.sizes?.[0] || "M";
-    const defaultColor =
-      selectedOptions.color || product.colors?.[0] || "White";
+    const defaultColor = resolveColorName(
+      selectedOptions.color || product.colors?.[0] || "White"
+    );
+    const defaultGsm = formatGsm(
+      selectedOptions.gsm || product.gsms?.[0] || product.gsm || "GSM 180"
+    );
+    const qty = selectedOptions.quantity || 1;
+    const styleName = product.category || "Crew Neck";
 
-    const cartKey = `${product._id}-${defaultSize}-${defaultColor}`;
+    const cartKey = `${product._id}-${defaultSize}-${defaultColor}-${defaultGsm}`;
 
     const existingIndex = cart.findIndex((item) => item.cartKey === cartKey);
     if (existingIndex > -1) {
       const updatedCart = [...cart];
-      updatedCart[existingIndex].quantity += 1;
+      updatedCart[existingIndex].quantity += qty;
       saveCart(updatedCart);
     } else {
       const cartItem = {
         cartKey,
         productId: product._id,
         title: product.title,
+        tShirtStyle: styleName,
         basePrice: product.basePrice,
         discount: product.discount || 0,
         category: product.category,
         size: defaultSize,
         color: defaultColor,
-        quantity: 1,
+        gsm: defaultGsm,
+        quantity: qty,
         image: product.images?.[0] || "/images/dumyImage.png",
       };
       saveCart([...cart, cartItem]);
@@ -392,10 +404,11 @@ export default function StorePage() {
       for (const item of cart) {
         if (item.isCustom || item.designId?.startsWith("custom-")) {
           // It's a local unsaved custom design. Let's save it to the DB first.
+          const formattedGsm = formatGsm(item.gsm || item.material || "GSM 180");
           const payload = {
-            tShirtType: item.tShirtType || item.title || "Custom T-Shirt",
+            tShirtType: item.tShirtStyle || item.tShirtType || item.title || "Custom T-Shirt",
             fabricColor: item.color,
-            material: item.material || "180GSM",
+            material: formattedGsm,
             size: item.size || "M",
             layers: item.layers || [],
             estimatedCost: item.basePrice,
@@ -407,21 +420,32 @@ export default function StorePage() {
             { headers },
           );
           const dbDesignId = designRes.data.design._id;
+          const colorName = resolveColorName(item.color);
           resolvedItems.push({
             designId: dbDesignId,
             quantity: item.quantity,
             price: item.basePrice,
+            size: item.size,
             selectedSize: item.size,
-            selectedColor: item.color,
+            color: colorName,
+            selectedColor: colorName,
+            tShirtStyle: item.tShirtStyle || item.tShirtType || item.title || "Crew Neck",
+            gsm: formattedGsm,
           });
         } else {
           // Standard product
+          const colorName = resolveColorName(item.color);
+          const formattedGsm = formatGsm(item.gsm || "GSM 180");
           resolvedItems.push({
             productId: item.productId,
             quantity: item.quantity,
             price: item.basePrice * (1 - item.discount / 100),
+            size: item.size,
             selectedSize: item.size,
-            selectedColor: item.color,
+            color: colorName,
+            selectedColor: colorName,
+            tShirtStyle: item.tShirtStyle || item.category || item.title || "Crew Neck",
+            gsm: formattedGsm,
           });
         }
       }
@@ -710,10 +734,26 @@ export default function StorePage() {
                           </div>
 
                           {/* Info */}
-                          <div className="space-y-1 select-none">
-                            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">
-                              {p.category}
-                            </span>
+                          <div className="space-y-1.5 select-none">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">
+                                {p.category}
+                              </span>
+                              {/* Product Rating */}
+                              <div className="flex items-center gap-1 text-[11px]">
+                                <Star className={`h-3.5 w-3.5 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                                {p.ratingsCount > 0 ? (
+                                  <span className="font-extrabold text-slate-800">
+                                    {p.averageRating ? p.averageRating.toFixed(1) : "0.0"}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-medium text-[10px]">0 review</span>
+                                )}
+                                <span className="text-slate-400 font-bold text-[10px]">
+                                  ({p.ratingsCount || 0})
+                                </span>
+                              </div>
+                            </div>
                             <h4 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition leading-tight">
                               {p.title}
                             </h4>
@@ -742,9 +782,10 @@ export default function StorePage() {
                                 </span>
                               )}
                             </div>
-                            <span className="text-[9px] font-bold text-slate-400">
-                              Sizes: {(p.sizes || []).join(", ")}
-                            </span>
+                            <div className="flex flex-col items-end text-[9px] font-bold text-slate-400">
+                              <span>Sizes: {(p.sizes || []).join(", ")}</span>
+                              <span className="text-indigo-600">GSM: {(p.gsms || []).join(", ") || p.gsm || "180GSM"}</span>
+                            </div>
                           </div>
 
                           <button
@@ -798,15 +839,13 @@ export default function StorePage() {
                                 <span className="text-xs font-black text-slate-955">
                                   Rs. {finalPrice.toFixed(2)}
                                 </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelected3DProduct(p);
-                                  }}
-                                  className="text-[9px] font-black text-indigo-600 hover:underline"
-                                >
-                                  + Details
-                                </button>
+                                <div className="flex items-center gap-1 text-[10px]">
+                                  <Star className={`h-3 w-3 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                                  <span className={p.ratingsCount > 0 ? "font-bold text-slate-800" : "text-slate-400"}>
+                                    {p.ratingsCount > 0 ? (p.averageRating ? p.averageRating.toFixed(1) : "0.0") : "0 review"}
+                                  </span>
+                                  <span className="text-slate-400 font-semibold">({p.ratingsCount || 0})</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -851,15 +890,13 @@ export default function StorePage() {
                                   <span className="text-xs font-black text-slate-955">
                                     Rs. {finalPrice.toFixed(2)}
                                   </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelected3DProduct(p);
-                                    }}
-                                    className="text-[9px] font-black text-indigo-600 hover:underline"
-                                  >
-                                    + Details
-                                  </button>
+                                  <div className="flex items-center gap-1 text-[10px]">
+                                    <Star className={`h-3 w-3 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                                    <span className={p.ratingsCount > 0 ? "font-bold text-slate-800" : "text-slate-400"}>
+                                      {p.ratingsCount > 0 ? (p.averageRating ? p.averageRating.toFixed(1) : "0.0") : "0 review"}
+                                    </span>
+                                    <span className="text-slate-400 font-semibold">({p.ratingsCount || 0})</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1227,6 +1264,32 @@ export default function StorePage() {
                     <h3 className="text-xl font-black text-slate-900 leading-tight mt-0.5">
                       {selected3DProduct.title}
                     </h3>
+                    {/* Star Rating & Review Count */}
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <div className="flex items-center text-amber-400">
+                        {[1, 2, 3, 4, 5].map((s) => {
+                          const ratingVal = selected3DProduct.averageRating || 0;
+                          return (
+                            <Star
+                              key={s}
+                              className={`h-4 w-4 ${
+                                s <= Math.round(ratingVal) && ratingVal > 0
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-slate-200"
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="text-xs font-black text-slate-800">
+                        {selected3DProduct.ratingsCount > 0
+                          ? (selected3DProduct.averageRating ? selected3DProduct.averageRating.toFixed(1) : "0.0")
+                          : "0 review"}
+                      </span>
+                      <span className="text-slate-400 text-xs font-bold">
+                        ({selected3DProduct.ratingsCount || 0})
+                      </span>
+                    </div>
                   </div>
                   <button
                     onClick={() => setSelected3DProduct(null)}
@@ -1324,6 +1387,31 @@ export default function StorePage() {
                   </div>
                 </div>
 
+                {/* GSM Selector */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Select GSM Value
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {(selected3DProduct.gsms && selected3DProduct.gsms.length > 0
+                      ? selected3DProduct.gsms
+                      : ["180GSM"]
+                    ).map((gsmVal) => (
+                      <button
+                        key={gsmVal}
+                        onClick={() => setModalGsm(gsmVal)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
+                          modalGsm === gsmVal
+                            ? "bg-slate-900 border-slate-900 text-white"
+                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {gsmVal}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Quantity */}
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -1349,21 +1437,66 @@ export default function StorePage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Customer Reviews List */}
+                <div className="space-y-2.5 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Customer Reviews ({selected3DProduct.ratingsCount || 0})
+                    </span>
+                    <div className="flex items-center gap-1 text-xs">
+                      <Star className={`h-3.5 w-3.5 ${selected3DProduct.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                      <span className="font-extrabold text-slate-800">
+                        {selected3DProduct.ratingsCount > 0
+                          ? (selected3DProduct.averageRating ? selected3DProduct.averageRating.toFixed(1) : "0.0")
+                          : "0 review"}
+                      </span>
+                      <span className="text-slate-400 font-bold text-[10px]">({selected3DProduct.ratingsCount || 0})</span>
+                    </div>
+                  </div>
+
+                  {selected3DProduct.reviews && selected3DProduct.reviews.length > 0 ? (
+                    <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                      {selected3DProduct.reviews.map((rev, rIdx) => (
+                        <div key={rIdx} className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-800">{rev.userName || "Verified Buyer"}</span>
+                            <div className="flex text-amber-400">
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star
+                                  key={s}
+                                  className={`h-3 w-3 ${s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          {rev.comment && (
+                            <p className="text-[11px] text-slate-600 italic leading-snug">"{rev.comment}"</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                      No customer reviews yet. Be the first to order and review!
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Actions Footer */}
               <div className="mt-8 pt-4 border-t flex flex-col gap-2">
                 <button
                   onClick={() => {
-                    handleAddToCartFromModal(
-                      selected3DProduct,
-                      modalColor,
-                      modalSize,
-                      modalQty,
-                    );
+                    handleAddToCart(selected3DProduct, {
+                      color: modalColor,
+                      size: modalSize,
+                      gsm: modalGsm,
+                      quantity: modalQty,
+                    });
                     setSelected3DProduct(null);
                   }}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition cursor-pointer"
                 >
                   Add to Cart — Rs.{" "}
                   {(

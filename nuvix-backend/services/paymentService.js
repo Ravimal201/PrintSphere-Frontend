@@ -1,6 +1,7 @@
 const Payment = require("../models/Payment");
 const Order = require("../models/Order");
 const Inventory = require("../models/Inventory");
+const { formatGsm } = require("../utils/colorHelper");
 
 /**
  * Payment Gateway Strategy Abstract Interface
@@ -390,16 +391,13 @@ class PaymentService {
     order.paymentStatus = "Paid";
     order.paymentTransactionId = payment.stripePaymentIntentId || payment.stripeSessionId;
 
-    // 4. Update Order.status / orderStatus = "Confirmed"
+    // 4. Update Order.status / orderStatus = "Processing"
     const isFirstTimeConfirmation = order.orderStatus === "Pending Payment";
     order.orderStatus = "Processing"; // Processing & Confirmed in production pipeline
 
-    // 5. Reduce Inventory
-    if (isFirstTimeConfirmation) {
-      await this.reduceInventory(order);
-    }
+    // Note: Inventory check and deduction is handled when the manager assigns the order to an employee.
 
-    // 6. Create Production Workflow
+    // 5. Create Production Workflow
     if (isFirstTimeConfirmation) {
       await this.createProductionWorkflow(order, resolvedPaymentMethod);
     } else {
@@ -414,31 +412,63 @@ class PaymentService {
   }
 
   /**
-   * Helper: Step 5 - Reduce Inventory
+   * Helper: Step 5 - Reduce Inventory according to specifications (t-shirt style, gsm, size, color, quantity)
    */
   async reduceInventory(order) {
     try {
       if (!order.items || order.items.length === 0) return;
 
       for (const item of order.items) {
-        if (item.selectedSize && item.selectedColor) {
-          // Attempt to find matching plain t-shirt stock
-          const invItem = await Inventory.findOne({
-            size: item.selectedSize,
-            color: new RegExp(`^${item.selectedColor.replace("#", "")}`, "i")
-          });
+        const itemSize = item.selectedSize || "M";
+        const itemColor = item.selectedColor || "White";
+        const itemGsm = formatGsm(item.gsm || item.material || "GSM 180");
+        const itemStyle = item.tShirtStyle || "Crew Neck";
+        const qty = item.quantity || 1;
 
-          if (invItem && invItem.quantity >= item.quantity) {
-            invItem.quantity -= item.quantity;
-            await invItem.save();
-          } else {
-            // General size fallback inventory reduction
-            const generalInv = await Inventory.findOne({ size: item.selectedSize });
-            if (generalInv && generalInv.quantity >= item.quantity) {
-              generalInv.quantity -= item.quantity;
-              await generalInv.save();
-            }
-          }
+        const escapeRegex = (s) => (s || "").replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // 1. Try 4-way match: tShirtType, gsm/material, size, color
+        let invItem = await Inventory.findOne({
+          tShirtType: new RegExp(`^${escapeRegex(itemStyle)}$`, "i"),
+          $or: [
+            { gsm: new RegExp(`^${escapeRegex(itemGsm)}$`, "i") },
+            { material: new RegExp(`^${escapeRegex(itemGsm)}$`, "i") }
+          ],
+          size: new RegExp(`^${escapeRegex(itemSize)}$`, "i"),
+          color: new RegExp(`^${escapeRegex(itemColor)}$`, "i")
+        });
+
+        // 2. Try 3-way match: gsm/material, size, color
+        if (!invItem) {
+          invItem = await Inventory.findOne({
+            $or: [
+              { gsm: new RegExp(`^${escapeRegex(itemGsm)}$`, "i") },
+              { material: new RegExp(`^${escapeRegex(itemGsm)}$`, "i") }
+            ],
+            size: new RegExp(`^${escapeRegex(itemSize)}$`, "i"),
+            color: new RegExp(`^${escapeRegex(itemColor)}$`, "i")
+          });
+        }
+
+        // 3. Try 2-way match: size, color
+        if (!invItem) {
+          invItem = await Inventory.findOne({
+            size: new RegExp(`^${escapeRegex(itemSize)}$`, "i"),
+            color: new RegExp(`^${escapeRegex(itemColor)}$`, "i")
+          });
+        }
+
+        // 4. Fallback match by size
+        if (!invItem) {
+          invItem = await Inventory.findOne({
+            size: new RegExp(`^${escapeRegex(itemSize)}$`, "i")
+          });
+        }
+
+        if (invItem) {
+          invItem.quantity = Math.max(0, (invItem.quantity || 0) - qty);
+          await invItem.save();
+          console.log(`Inventory reduced for ${itemStyle} (${itemGsm}, ${itemSize}, ${itemColor}): reduced ${qty}, remaining ${invItem.quantity}`);
         }
       }
     } catch (err) {

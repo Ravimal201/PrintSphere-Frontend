@@ -21,13 +21,23 @@ import {
   FileText,
   ChevronRight,
   Download,
+  Search,
+  Tag,
+  Package,
+  Filter,
+  Ban,
+  Clock,
+  UserCheck,
+  User,
 } from "lucide-react";
 import axios from "axios";
 import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
+import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
 
 import { API_BASE_URL } from "../config/api";
+import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 export default function ManagerPage() {
   const [isManager, setIsManager] = useState(false);
@@ -43,9 +53,10 @@ export default function ManagerPage() {
   const [styleForm, setStyleForm] = useState({
     name: "",
     path: "",
+    type: "Crew Neck",
     gsmPrices: [
-      { gsm: "180GSM", price: 1200 },
-      { gsm: "220GSM", price: 1500 },
+      { gsm: "GSM 180", price: 1200 },
+      { gsm: "GSM 220", price: 1500 },
     ],
     colors: [
       { name: "White", value: "#ffffff" },
@@ -76,6 +87,7 @@ export default function ManagerPage() {
     basePrice: 0,
     discount: 0,
     sizes: ["S", "M", "L", "XL", "XXL"],
+    gsms: ["GSM 180", "GSM 200", "GSM 220", "GSM 240"],
     colors: ["#ffffff"],
     images: [],
     modelPath: "/images/models/male normal t-shirt1.glb",
@@ -97,10 +109,31 @@ export default function ManagerPage() {
   const [pricingSuccess, setPricingSuccess] = useState(false);
   const [pricingError, setPricingError] = useState("");
 
-  // Restock states
+  // Restock & Inventory states
   const [restockQuantities, setRestockQuantities] = useState({});
   const [editingThresholdId, setEditingThresholdId] = useState(null);
   const [thresholdInputs, setThresholdInputs] = useState({});
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [inventoryForm, setInventoryForm] = useState({
+    itemType: "Plain T-Shirt",
+    tShirtType: "",
+    color: "#ffffff",
+    colorName: "White",
+    size: "M",
+    material: "GSM 180",
+    quantity: 50,
+    minThreshold: 15,
+  });
+  const [inventoryActionLoading, setInventoryActionLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState("");
+  const [newInkColor, setNewInkColor] = useState({ name: "Cyan (C)", value: "#00ffff" });
+  const [showCustomInkColor, setShowCustomInkColor] = useState(false);
+
+  // Inventory Filtering states
+  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState("TSHIRTS"); // TSHIRTS, INK, PAPERS_PACKAGING
+  const [inventorySizeFilter, setInventorySizeFilter] = useState("ALL");
+  const [inventoryColorFilter, setInventoryColorFilter] = useState("ALL");
+  const [inventorySearchQuery, setInventorySearchQuery] = useState("");
 
   // Manager 3D preview modal state for pending submissions
   const [selectedSubmissionProduct, setSelectedSubmissionProduct] =
@@ -115,6 +148,17 @@ export default function ManagerPage() {
   // Assign employee & order status transitions
   const [assignLoading, setAssignLoading] = useState({});
   const [orderNotes, setOrderNotes] = useState({});
+  const [editingEmployeeOrderId, setEditingEmployeeOrderId] = useState(null);
+  const [selectedEmployeeForOrder, setSelectedEmployeeForOrder] = useState({});
+
+  // Insufficient Inventory popup modal state
+  const [inventoryAlertModal, setInventoryAlertModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    details: "",
+    missingItems: []
+  });
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -215,26 +259,27 @@ export default function ManagerPage() {
 
   // ================= ORDERS OPERATIONS =================
 
-  const handleUpdateOrderStatus = async (orderId, status) => {
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order? This action will mark the order as Cancelled.")) {
+      return;
+    }
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
-    const note = orderNotes[orderId] || `Status updated to ${status}`;
 
     try {
       setAssignLoading((prev) => ({ ...prev, [orderId]: true }));
       const response = await axios.put(
         `${API_BASE_URL}/manager/orders/${orderId}/status`,
-        { status, note },
+        { status: "Cancelled", note: "Order cancelled by manager." },
         { headers },
       );
 
       setOrders((prev) =>
         prev.map((o) => (o._id === orderId ? response.data.order : o)),
       );
-      setOrderNotes((prev) => ({ ...prev, [orderId]: "" }));
     } catch (err) {
-      console.error("Update status error:", err);
-      alert(err.response?.data?.message || "Failed to update order status");
+      console.error("Cancel order error:", err);
+      alert(err.response?.data?.message || "Failed to cancel order");
     } finally {
       setAssignLoading((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -253,14 +298,44 @@ export default function ManagerPage() {
         { headers },
       );
 
-      // Refresh order list
-      const updatedOrders = await axios.get(`${API_BASE_URL}/manager/orders`, {
-        headers,
-      });
-      setOrders(updatedOrders.data);
+      // Update state
+      if (response.data?.order) {
+        setOrders((prev) =>
+          prev.map((o) => (o._id === orderId ? response.data.order : o)),
+        );
+      } else {
+        const updatedOrders = await axios.get(`${API_BASE_URL}/manager/orders`, {
+          headers,
+        });
+        setOrders(updatedOrders.data);
+      }
+
+      // Also refresh inventory state so stock deduction is reflected live
+      try {
+        const invRes = await axios.get(`${API_BASE_URL}/manager/inventory`, { headers });
+        setInventory(invRes.data);
+      } catch (invErr) {
+        console.error("Refresh inventory error:", invErr);
+      }
+
+      setEditingEmployeeOrderId(null);
     } catch (err) {
       console.error("Assign employee error:", err);
-      alert("Failed to assign employee");
+      const errMsg = err.response?.data?.message || "Failed to assign employee";
+      const details = err.response?.data?.details;
+      const missingMaterials = err.response?.data?.missingMaterials || [];
+
+      if (details || missingMaterials.length > 0) {
+        setInventoryAlertModal({
+          isOpen: true,
+          title: "Insufficient Inventory Materials!",
+          message: errMsg,
+          details: details || "",
+          missingItems: missingMaterials
+        });
+      } else {
+        alert(errMsg);
+      }
     } finally {
       setAssignLoading((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -300,17 +375,22 @@ export default function ManagerPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
+      const payloadToSave = {
+        ...productForm,
+        category: productForm.category || "T-Shirts"
+      };
+
       if (editingProduct) {
         // Edit Product
         await axios.put(
           `${API_BASE_URL}/manager/products/${editingProduct._id}`,
-          productForm,
+          payloadToSave,
           { headers },
         );
         setProductSuccess("Product updated successfully!");
       } else {
         // Create Product
-        await axios.post(`${API_BASE_URL}/manager/products`, productForm, {
+        await axios.post(`${API_BASE_URL}/manager/products`, payloadToSave, {
           headers,
         });
         setProductSuccess("Product created successfully!");
@@ -365,6 +445,21 @@ export default function ManagerPage() {
 
   const openEditProduct = (product) => {
     setEditingProduct(product);
+    let resolvedGsms = product.gsms || [];
+    if (resolvedGsms.length === 0) {
+      const matchedStyle = styles.find((s) => s.path === product.modelPath);
+      if (matchedStyle) {
+        if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+          resolvedGsms = matchedStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
+        } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+          resolvedGsms = matchedStyle.gsms.map(formatGsm);
+        }
+      }
+    }
+    if (resolvedGsms.length === 0) {
+      resolvedGsms = ["GSM 180", "GSM 200", "GSM 220", "GSM 240"];
+    }
+
     setProductForm({
       title: product.title,
       description: product.description,
@@ -372,6 +467,7 @@ export default function ManagerPage() {
       basePrice: product.basePrice,
       discount: product.discount || 0,
       sizes: product.sizes || ["S", "M", "L", "XL", "XXL"],
+      gsms: resolvedGsms,
       colors: product.colors || ["#ffffff"],
       images: product.images || [],
       modelPath: product.modelPath || "/images/models/male normal t-shirt1.glb",
@@ -382,17 +478,39 @@ export default function ManagerPage() {
   };
 
   const resetProductForm = () => {
+    const firstStyle = styles && styles.length > 0 ? styles[0] : null;
+    let initialGsms = [];
+    if (firstStyle) {
+      if (firstStyle.gsmPrices && firstStyle.gsmPrices.length > 0) {
+        initialGsms = firstStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
+      } else if (firstStyle.gsms && firstStyle.gsms.length > 0) {
+        initialGsms = firstStyle.gsms.map(formatGsm);
+      }
+    }
+    if (initialGsms.length === 0) {
+      initialGsms = ["GSM 180", "GSM 200", "GSM 220", "GSM 240"];
+    }
+
+    let initialColors = [];
+    if (firstStyle && firstStyle.colors && firstStyle.colors.length > 0) {
+      initialColors = firstStyle.colors.map((c) => (typeof c === "string" ? c : c.value));
+    }
+    if (initialColors.length === 0) {
+      initialColors = ["#ffffff"];
+    }
+
     setProductForm({
       title: "",
       description: "",
-      category: "",
-      basePrice: 0,
+      category: firstStyle ? (firstStyle.name || firstStyle.type || "") : "",
+      basePrice: firstStyle ? (firstStyle.price || 0) : 0,
       discount: 0,
       sizes: ["S", "M", "L", "XL", "XXL"],
-      colors: ["#ffffff"],
+      gsms: initialGsms,
+      colors: initialColors,
       images: [],
-      modelPath: "/images/models/male normal t-shirt1.glb",
-      defaultColor: "#ffffff",
+      modelPath: firstStyle ? firstStyle.path : "/images/models/male normal t-shirt1.glb",
+      defaultColor: initialColors[0] || "#ffffff",
       status: "Active",
     });
     setProductError("");
@@ -545,6 +663,7 @@ export default function ManagerPage() {
     const payload = {
       name: styleForm.name,
       path: styleForm.path,
+      type: styleForm.type || "Crew Neck",
       gsmPrices: styleForm.gsmPrices,
       colors: styleForm.colors,
     };
@@ -566,6 +685,7 @@ export default function ManagerPage() {
       setStyleForm({
         name: "",
         path: "",
+        type: "Crew Neck",
         gsmPrices: [
           { gsm: "180GSM", price: 1200 },
           { gsm: "220GSM", price: 1500 },
@@ -605,6 +725,87 @@ export default function ManagerPage() {
     } catch (err) {
       console.error("Delete style error:", err);
       alert("Failed to delete style.");
+    }
+  };
+
+  // ================= INVENTORY CRUD =================
+
+  const handleSaveInventory = async (e) => {
+    e.preventDefault();
+    setInventoryError("");
+    setInventoryActionLoading(true);
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    try {
+      const selectedStyleObj = styles.find(
+        (s) => (s.name || s.type) === inventoryForm.tShirtType
+      );
+      const styleName = inventoryForm.tShirtType || (styles[0]?.name || styles[0]?.type || "Crew Neck");
+      const chosenGsm = formatGsm(inventoryForm.material || selectedStyleObj?.gsmPrices?.[0]?.gsm || selectedStyleObj?.gsms?.[0] || "GSM 180");
+
+      let finalItemType = inventoryForm.itemType || "Plain T-Shirt";
+      if (inventoryForm.itemType === "Materials") {
+        finalItemType = inventoryForm.materialCategory || "Transfer Paper";
+      }
+
+      let chosenColor = inventoryForm.colorName || inventoryForm.color || "Cyan (C)";
+
+      const payload = {
+        itemType: finalItemType,
+        tShirtType: inventoryForm.itemType === "Plain T-Shirt" ? styleName : undefined,
+        color: (inventoryForm.itemType === "Plain T-Shirt" || inventoryForm.itemType === "Printing Ink")
+          ? chosenColor
+          : undefined,
+        size: inventoryForm.itemType === "Plain T-Shirt" ? (inventoryForm.size || "M") : undefined,
+        material: inventoryForm.itemType === "Plain T-Shirt" ? chosenGsm : undefined,
+        quantity: Number(inventoryForm.quantity) >= 0 ? Number(inventoryForm.quantity) : 0,
+        minThreshold: Number(inventoryForm.minThreshold) > 0 ? Number(inventoryForm.minThreshold) : 15,
+      };
+
+      const res = await axios.post(`${API_BASE_URL}/manager/inventory`, payload, { headers });
+
+      if (res.data && res.data.item) {
+        setInventory((prev) => [res.data.item, ...prev.filter((i) => i._id !== res.data.item._id)]);
+      }
+
+      const invRes = await axios.get(`${API_BASE_URL}/manager/inventory`, { headers });
+      if (invRes.data && Array.isArray(invRes.data)) {
+        setInventory(invRes.data);
+      }
+
+      setShowInventoryModal(false);
+      setShowCustomInkColor(false);
+      setInventoryForm({
+        itemType: "Plain T-Shirt",
+        materialCategory: "Transfer Paper",
+        tShirtType: "",
+        color: "#ffffff",
+        colorName: "White",
+        size: "M",
+        material: "GSM 180",
+        quantity: 50,
+        minThreshold: 15,
+      });
+    } catch (err) {
+      console.error("Save inventory item error:", err);
+      setInventoryError(err.response?.data?.message || "Failed to add inventory item.");
+    } finally {
+      setInventoryActionLoading(false);
+    }
+  };
+
+  const handleDeleteInventory = async (id) => {
+    if (!confirm("Are you sure you want to delete this inventory item?")) return;
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      await axios.delete(`${API_BASE_URL}/manager/inventory/${id}`, { headers });
+      const invRes = await axios.get(`${API_BASE_URL}/manager/inventory`, { headers });
+      setInventory(invRes.data);
+    } catch (err) {
+      console.error("Delete inventory item error:", err);
+      alert(err.response?.data?.message || "Failed to delete inventory item.");
     }
   };
 
@@ -1101,10 +1302,20 @@ export default function ManagerPage() {
         {/* ================= TAB 2: ORDERS fulfillment ================= */}
         {activeTab === "orders" && (
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-950 mb-6 flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-indigo-600" />
-              Customer Orders & Production Pipeline
-            </h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-indigo-600" />
+                  Customer Orders & Production Pipeline
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Assign staff to orders, monitor production pipeline status, or manage order cancellations.
+                </p>
+              </div>
+              <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold">
+                {orders.length} Total Orders
+              </span>
+            </div>
 
             {orders.length === 0 ? (
               <div className="text-center py-16">
@@ -1114,259 +1325,361 @@ export default function ManagerPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {orders.map((order) => (
-                  <div
-                    key={order._id}
-                    className="border rounded-2xl p-5 hover:border-indigo-200 transition bg-slate-50/20"
-                  >
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-dashed">
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-slate-500">
-                            Order ID: ...{order._id.slice(-8)}
-                          </span>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              order.paymentStatus === "Paid"
-                                ? "bg-emerald-50 text-emerald-600"
-                                : "bg-amber-50 text-amber-600"
-                            }`}
-                          >
-                            {order.paymentStatus}
-                          </span>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              order.orderStatus === "Completed"
-                                ? "bg-indigo-50 text-indigo-600"
-                                : "bg-slate-100 text-slate-700"
-                            }`}
-                          >
-                            {order.orderStatus}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Customer:{" "}
-                          {order.guestEmail ||
-                            order.customerId?.email ||
-                            "Unknown"}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-black text-slate-900">
-                          Rs. {(order.totalCost || 0).toFixed(2)}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          {new Date(order.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
+                {orders.map((order) => {
+                  const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
+                  const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
+                  const isCancelled = order.orderStatus === "Cancelled";
+                  const isPendingPayment = order.orderStatus === "Pending Payment";
+                  const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
 
-                    {/* Content Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
-                      {/* Items */}
-                      <div className="space-y-4">
+                  return (
+                    <div
+                      key={order._id}
+                      className="border border-slate-200/80 rounded-2xl p-5 hover:border-indigo-200 transition bg-slate-50/20"
+                    >
+                      {/* Header */}
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-dashed">
                         <div>
-                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                            Order Items
-                          </h4>
-                          <div className="space-y-3">
-                            {order.items.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="bg-white p-3 border rounded-xl shadow-xs text-xs"
-                              >
-                                <p className="font-bold text-slate-900">
-                                  {item.itemType} T-shirt (x{item.quantity})
-                                </p>
-                                <p className="text-slate-500 text-[10px] mt-0.5">
-                                  {item.material} / {item.size} / {item.color}
-                                </p>
+                          <div className="flex items-center flex-wrap gap-2.5">
+                            <span className="text-xs font-bold text-slate-700">
+                              Order ID: <span className="font-mono text-indigo-600">#{order._id.slice(-8)}</span>
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                order.paymentStatus === "Paid"
+                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                  : "bg-amber-50 text-amber-600 border border-amber-200"
+                              }`}
+                            >
+                              Payment: {order.paymentStatus}
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                isCancelled
+                                  ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                  : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
+                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                  : order.orderStatus === "Printing"
+                                  ? "bg-purple-50 text-purple-600 border border-purple-200"
+                                  : order.orderStatus === "Processing"
+                                  ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                                  : "bg-slate-100 text-slate-700 border border-slate-200"
+                              }`}
+                            >
+                              Status: {order.orderStatus}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1.5 flex items-center flex-wrap gap-1">
+                            <span className="font-medium text-slate-600">Customer:</span>{" "}
+                            <span className="font-bold text-slate-900">
+                              {order.customerId?.name ||
+                                (typeof order.customerId === "object" && order.customerId?.email) ||
+                                order.guestEmail ||
+                                "Unknown"}
+                            </span>
+                            {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
+                              <span className="text-slate-400 font-normal">
+                                ({order.customerId?.email || order.guestEmail})
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
+                        <div className="text-left md:text-right">
+                          <p className="text-lg font-black text-slate-900">
+                            Rs. {(order.totalCost || 0).toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 md:justify-end">
+                            <Clock className="h-3 w-3" />
+                            Placed: {new Date(order.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
 
-                                {item.itemType === "Customized" &&
-                                  item.designId && (
-                                    <div className="mt-2 pt-2 border-t space-y-2">
-                                      {item.designId.thumbnailUrl && (
-                                        <div className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg">
-                                          <img
-                                            src={item.designId.thumbnailUrl}
-                                            alt="Preview"
-                                            className="h-10 w-10 object-contain bg-white rounded border"
-                                            onError={(e) =>
-                                              (e.target.src =
-                                                "/images/dumyImage.png")
-                                            }
-                                          />
-                                          <div>
-                                            <p className="text-[10px] font-bold text-slate-900">
-                                              Custom design thumbnail
-                                            </p>
-                                            <a
-                                              href={item.designId.thumbnailUrl}
-                                              download
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className="text-[9px] text-indigo-600 hover:underline flex items-center gap-0.5 mt-0.5"
-                                            >
-                                              <Download className="h-2.5 w-2.5" />{" "}
-                                              Download composite
-                                            </a>
-                                            <button
-                                              onClick={() => {
-                                                setSelected3DDesign(
-                                                  item.designId,
-                                                );
-                                                setIs3DModalOpen(true);
-                                              }}
-                                              className="text-[9px] text-indigo-650 hover:underline flex items-center gap-0.5 mt-1 cursor-pointer font-bold"
-                                            >
-                                              <Sparkles className="h-2.5 w-2.5 text-indigo-600 animate-pulse" />{" "}
-                                              View in 3D Format
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      {/* Logo layers */}
-                                      {(() => {
-                                        const imgLayers = (
-                                          item.designId.layers || []
-                                        ).filter(
-                                          (l) =>
-                                            l.type === "image" ||
-                                            l.type === "logo",
-                                        );
-                                        if (imgLayers.length > 0) {
-                                          return (
-                                            <div className="space-y-1 mt-2">
-                                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
-                                                Logo/Decal Assets:
-                                              </p>
-                                              {imgLayers.map((layer, lIdx) => (
-                                                <div
-                                                  key={lIdx}
-                                                  className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg text-[10px]"
-                                                >
-                                                  <span className="truncate max-w-[120px] font-semibold">
-                                                    {layer.name ||
-                                                      `Asset ${lIdx + 1}`}
-                                                  </span>
-                                                  <a
-                                                    href={layer.url}
-                                                    download
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-indigo-600 hover:underline"
-                                                  >
-                                                    Download
-                                                  </a>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
+                      {/* Content Details */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+                        {/* Items */}
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                              Order Items
+                            </h4>
+                            <div className="space-y-3">
+                              {order.items.map((item, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="bg-white p-3.5 border rounded-2xl shadow-xs text-xs space-y-3"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                                      <div>
+                                        <p className="font-extrabold text-slate-900 text-sm">
+                                          {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
+                                        </p>
+                                        <p className="text-slate-500 text-xs mt-0.5">
+                                          Style: <span className="font-semibold text-slate-700">{item.tShirtStyle || "Crew Neck"}</span> | 
+                                          Size: <span className="font-semibold text-slate-700">{item.selectedSize || item.size}</span> | 
+                                          Color: <span className="font-semibold text-slate-700">{resolveColorName(item.selectedColor || item.color)}</span> | 
+                                          GSM: <span className="font-semibold text-slate-700">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
+                                        </p>
+                                      </div>
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                        item.itemType === "Customized" || item.designId
+                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                          : "bg-blue-50 text-blue-700 border border-blue-200"
+                                      }`}>
+                                        {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog Product"}
+                                      </span>
                                     </div>
-                                  )}
-                              </div>
-                            ))}
+
+                                    {/* Multi-Angle Screenshots (Front, Back, Both Sides) & Downloads */}
+                                    <DesignScreenshotViewer
+                                      item={item}
+                                      orderId={order._id}
+                                      onOpen3DModal={(designToOpen) => {
+                                        setSelected3DDesign(designToOpen);
+                                        setIs3DModalOpen(true);
+                                      }}
+                                    />
+                                  </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Ship Address */}
-                      <div>
-                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                          Shipping Destination
-                        </h4>
-                        {order.shippingAddress ? (
-                          <p className="text-xs text-slate-600 leading-relaxed">
-                            {order.shippingAddress.street},{" "}
-                            {order.shippingAddress.city},{" "}
-                            {order.shippingAddress.country}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-slate-400">
-                            Address not specified
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Assignments */}
-                      <div>
-                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                          Assign Printing Staff
-                        </h4>
-                        <div className="space-y-3">
-                          <select
-                            onChange={(e) =>
-                              handleAssignEmployee(order._id, e.target.value)
-                            }
-                            value={order.assignedEmployee?._id || ""}
-                            className="w-full text-xs border rounded-xl px-2 py-1.5 bg-white font-bold"
-                          >
-                            <option value="">
-                              -- Click to assign staff --
-                            </option>
-                            {employees.map((emp) => (
-                              <option key={emp._id} value={emp._id}>
-                                {emp.name}
-                              </option>
-                            ))}
-                          </select>
-                          {order.assignedEmployee && (
-                            <p className="text-[10px] text-indigo-600 font-extrabold bg-indigo-50 px-2 py-1 rounded-lg">
-                              Assigned task to: {order.assignedEmployee.name}
+                        {/* Ship Address */}
+                        <div>
+                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                            Shipping Destination
+                          </h4>
+                          {order.shippingAddress ? (
+                            <p className="text-xs text-slate-600 leading-relaxed bg-white p-3 border rounded-xl">
+                              {order.shippingAddress.street},{" "}
+                              {order.shippingAddress.city},{" "}
+                              {order.shippingAddress.country}
                             </p>
+                          ) : (
+                            <p className="text-xs text-slate-400 bg-white p-3 border rounded-xl">
+                              Address not specified
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Employee Assignment */}
+                        <div>
+                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
+                            Assigned Employee
+                          </h4>
+                          {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
+                            <div className="bg-white border rounded-xl p-3.5 space-y-2.5 shadow-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                    {order.assignedEmployee.name ? order.assignedEmployee.name.charAt(0).toUpperCase() : "E"}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-slate-900 truncate">
+                                      {order.assignedEmployee.name}
+                                    </p>
+                                    <p className="text-[10px] text-indigo-600 font-semibold">
+                                      Assigned Operator
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {!isCancelled && order.orderStatus !== "Shipped" && (
+                                  <button
+                                    onClick={() => {
+                                      setEditingEmployeeOrderId(order._id);
+                                      setSelectedEmployeeForOrder((prev) => ({
+                                        ...prev,
+                                        [order._id]: order.assignedEmployee?._id || "",
+                                      }));
+                                    }}
+                                    className="px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                                    title="Edit / Change assigned employee"
+                                  >
+                                    <Edit2 className="h-3 w-3 text-indigo-600" />
+                                    <span>Edit</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-white border rounded-xl p-3 space-y-2 shadow-xs">
+                              {editingEmployeeOrderId === order._id ? (
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] uppercase font-bold text-indigo-700">
+                                      Change Employee
+                                    </span>
+                                    <button
+                                      onClick={() => setEditingEmployeeOrderId(null)}
+                                      className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                                      title="Cancel"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <select
+                                      value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
+                                      onChange={(e) =>
+                                        setSelectedEmployeeForOrder((prev) => ({
+                                          ...prev,
+                                          [order._id]: e.target.value,
+                                        }))
+                                      }
+                                      className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                    >
+                                      <option value="">-- Select Employee --</option>
+                                      {employees.map((emp) => (
+                                        <option key={emp._id} value={emp._id}>
+                                          {emp.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
+                                      onClick={() => {
+                                        const empId = selectedEmployeeForOrder[order._id];
+                                        if (empId) {
+                                          handleAssignEmployee(order._id, empId);
+                                        }
+                                      }}
+                                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                                      title="Save change"
+                                    >
+                                      {assignLoading[order._id] ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="h-3.5 w-3.5" />
+                                      )}
+                                      <span>Save</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <select
+                                    disabled={assignLoading[order._id] || isCancelled}
+                                    onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
+                                    defaultValue=""
+                                    className="w-full text-xs border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50/50 font-bold text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                  >
+                                    <option value="" disabled>
+                                      -- Assign an employee --
+                                    </option>
+                                    {employees.map((emp) => (
+                                      <option key={emp._id} value={emp._id}>
+                                        {emp.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <p className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3 shrink-0" />
+                                    No employee assigned yet
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Production Pipeline Status Viewer & Order Actions */}
+                      <div className="pt-4 border-t border-dashed flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        {/* Status / Pipeline Display (Read-Only) */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                              Production Status:
+                            </span>
+                            {latestTimeline?.note && (
+                              <span className="text-[11px] text-slate-500 italic truncate max-w-md">
+                                ({latestTimeline.note})
+                              </span>
+                            )}
+                          </div>
+
+                          {isCancelled ? (
+                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
+                              <Ban className="h-4 w-4 text-rose-500 shrink-0" />
+                              <span>Order has been Cancelled</span>
+                            </div>
+                          ) : isPendingPayment ? (
+                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-bold">
+                              <Clock className="h-4 w-4 text-amber-500 shrink-0" />
+                              <span>Awaiting Customer Payment Before Processing</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
+                              {pipelineStages.map((stage, sIdx) => {
+                                const isPassed = currentStageIdx > sIdx;
+                                const isCurrent = currentStageIdx === sIdx;
+
+                                return (
+                                  <div key={stage} className="flex items-center shrink-0">
+                                    <div
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                        isCurrent
+                                          ? "bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200"
+                                          : isPassed
+                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                          : "bg-slate-100 text-slate-400 border border-slate-200"
+                                      }`}
+                                    >
+                                      {isPassed ? (
+                                        <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                      ) : isCurrent ? (
+                                        <div className="h-2 w-2 rounded-full bg-white animate-ping shrink-0" />
+                                      ) : (
+                                        <span className="h-2 w-2 rounded-full bg-slate-300 shrink-0" />
+                                      )}
+                                      <span>{stage}</span>
+                                    </div>
+                                    {sIdx < pipelineStages.length - 1 && (
+                                      <div
+                                        className={`w-3 sm:w-6 h-0.5 mx-1 transition ${
+                                          isPassed ? "bg-emerald-400" : "bg-slate-200"
+                                        }`}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Order Management Actions (Cancel Order) */}
+                        <div className="shrink-0 flex items-center gap-2">
+                          {!isCancelled && order.orderStatus !== "Shipped" ? (
+                            <button
+                              disabled={assignLoading[order._id]}
+                              onClick={() => handleCancelOrder(order._id)}
+                              className="px-3.5 py-2 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              title="Cancel this customer order"
+                            >
+                              {assignLoading[order._id] ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Ban className="h-3.5 w-3.5" />
+                              )}
+                              <span>Cancel Order</span>
+                            </button>
+                          ) : isCancelled ? (
+                            <span className="text-xs font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 flex items-center gap-1.5">
+                              <Ban className="h-3.5 w-3.5" /> Order Cancelled
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-1.5">
+                              <CheckCircle className="h-3.5 w-3.5" /> Order Fulfilled & Shipped
+                            </span>
                           )}
                         </div>
                       </div>
                     </div>
-
-                    {/* Transition Actions */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-dashed">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          placeholder="Optional timeline update note..."
-                          value={orderNotes[order._id] || ""}
-                          onChange={(e) =>
-                            setOrderNotes((prev) => ({
-                              ...prev,
-                              [order._id]: e.target.value,
-                            }))
-                          }
-                          className="w-full text-xs border rounded-xl px-3 py-2 bg-white"
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {[
-                          "Processing",
-                          "Printing",
-                          "Completed",
-                          "Shipped",
-                          "Cancelled",
-                        ].map((st) => (
-                          <button
-                            key={st}
-                            disabled={assignLoading[order._id]}
-                            onClick={() =>
-                              handleUpdateOrderStatus(order._id, st)
-                            }
-                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition ${
-                              order.orderStatus === st
-                                ? "bg-indigo-600 text-white"
-                                : "bg-white border text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            {st}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1413,6 +1726,7 @@ export default function ManagerPage() {
                         <th className="pb-3">Price</th>
                         <th className="pb-3">Discount</th>
                         <th className="pb-3">Sizes</th>
+                        <th className="pb-3">GSMs</th>
                         <th className="pb-3">Status</th>
                         <th className="pb-3 text-right">Actions</th>
                       </tr>
@@ -1457,6 +1771,23 @@ export default function ManagerPage() {
                           </td>
                           <td className="py-4 text-xs text-slate-500">
                             {(p.sizes || []).join(", ")}
+                          </td>
+                          <td className="py-4 text-xs font-medium text-slate-700">
+                            {(() => {
+                              if (p.gsms && p.gsms.length > 0) {
+                                return p.gsms.join(", ");
+                              }
+                              const matchedStyle = styles.find((s) => s.path === p.modelPath);
+                              if (matchedStyle) {
+                                if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+                                  return matchedStyle.gsmPrices.map((gp) => gp.gsm).join(", ");
+                                }
+                                if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+                                  return matchedStyle.gsms.join(", ");
+                                }
+                              }
+                              return "GSM 180";
+                            })()}
                           </td>
                           <td className="py-4 text-xs">
                             <span
@@ -1571,24 +1902,7 @@ export default function ManagerPage() {
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                        Category
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={productForm.category}
-                        onChange={(e) =>
-                          setProductForm((prev) => ({
-                            ...prev,
-                            category: e.target.value,
-                          }))
-                        }
-                        placeholder="e.g. Summer Collection"
-                        className="w-full px-3 py-2 border rounded-xl text-sm"
-                      />
-                    </div>
+
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -1652,33 +1966,72 @@ export default function ManagerPage() {
 
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                          3D T-Shirt Cut Style
+                          T shirt Style
                         </label>
                         <select
                           value={productForm.modelPath}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const selectedPath = e.target.value;
+                            const matchedStyle = styles.find((s) => s.path === selectedPath);
+
+                            // Extract GSMs for matched style
+                            let styleGsms = [];
+                            if (matchedStyle) {
+                              if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+                                styleGsms = matchedStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
+                              } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+                                styleGsms = matchedStyle.gsms.map(formatGsm);
+                              }
+                            }
+                            if (styleGsms.length === 0) {
+                              styleGsms = ["GSM 180", "GSM 200", "GSM 220", "GSM 240"];
+                            }
+
+                            // Extract Colors for matched style
+                            let styleColors = [];
+                            if (matchedStyle && matchedStyle.colors && matchedStyle.colors.length > 0) {
+                              styleColors = matchedStyle.colors.map((c) => (typeof c === "string" ? c : c.value));
+                            }
+                            if (styleColors.length === 0) {
+                              styleColors = ["#ffffff"];
+                            }
+
                             setProductForm((prev) => ({
                               ...prev,
-                              modelPath: e.target.value,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border rounded-xl text-sm"
+                              modelPath: selectedPath,
+                              category: matchedStyle ? (matchedStyle.name || matchedStyle.type || prev.category) : prev.category,
+                              gsms: styleGsms,
+                              colors: styleColors,
+                              defaultColor: styleColors[0] || "#ffffff",
+                            }));
+                          }}
+                          className="w-full px-3 py-2 border rounded-xl text-sm font-semibold bg-white"
                         >
-                          <option value="/images/models/male normal t-shirt1.glb">
-                            Men's T-Shirt
-                          </option>
-                          <option value="/images/models/female normal t-shirt.glb">
-                            Women's T-Shirt
-                          </option>
-                          <option value="/images/models/long_sleeve_t-_shirt.glb">
-                            Long Sleeve Shirt
-                          </option>
-                          <option value="/images/models/oversized t-sdirt1.glb">
-                            Oversized T-Shirt
-                          </option>
-                          <option value="/images/models/t_shirt_hoodie.glb">
-                            Hoodie
-                          </option>
+                          {styles && styles.length > 0 ? (
+                            styles.map((st) => (
+                              <option key={st._id || st.path} value={st.path}>
+                                {st.name || st.type} ({st.type})
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="/images/models/male normal t-shirt1.glb">
+                                Men's T-Shirt (Crew Neck)
+                              </option>
+                              <option value="/images/models/female normal t-shirt.glb">
+                                Women's T-Shirt (V-Neck)
+                              </option>
+                              <option value="/images/models/long_sleeve_t-_shirt.glb">
+                                Long Sleeve Shirt (Crew Neck)
+                              </option>
+                              <option value="/images/models/oversized t-sdirt1.glb">
+                                Oversized T-Shirt (Crew Neck)
+                              </option>
+                              <option value="/images/models/t_shirt_hoodie.glb">
+                                Hoodie (Polo)
+                              </option>
+                            </>
+                          )}
                         </select>
                       </div>
                     </div>
@@ -1722,6 +2075,132 @@ export default function ManagerPage() {
                             </label>
                           );
                         })}
+                      </div>
+                    </div>
+
+                    {/* Available GSM Values Checkboxes (Filtered by selected T-shirt Style) */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                        <span>Available GSM Values (from T shirt Style)</span>
+                        <span className="text-[9px] text-indigo-600 font-normal">
+                          Selected: {(productForm.gsms || []).join(", ") || "None"}
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2 pt-0.5">
+                        {(() => {
+                          const matchedStyle = styles.find((s) => s.path === productForm.modelPath);
+                          let availableGsms = [];
+                          if (matchedStyle) {
+                            if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+                              availableGsms = matchedStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
+                            } else if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+                              availableGsms = matchedStyle.gsms.map(formatGsm);
+                            }
+                          }
+                          if (availableGsms.length === 0) {
+                            availableGsms = ["GSM 180", "GSM 200", "GSM 220", "GSM 240", "GSM 280", "GSM 320"];
+                          }
+
+                          return availableGsms.map((gsm) => {
+                            const isSelected = (productForm.gsms || []).includes(gsm);
+                            return (
+                              <label
+                                key={gsm}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
+                                  isSelected
+                                    ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
+                                    : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setProductForm((prev) => {
+                                      const currentGsms = prev.gsms || [];
+                                      const updatedGsms = checked
+                                        ? [...currentGsms, gsm]
+                                        : currentGsms.filter((g) => g !== gsm);
+                                      return { ...prev, gsms: updatedGsms };
+                                    });
+                                  }}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <span>{gsm}</span>
+                              </label>
+                            );
+                          });
+                        })()}
+                      </div>
+
+                    </div>
+
+                    {/* Available Colors Selection (from selected T shirt Style) */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                        <span>Select Product Colors (from T shirt Style)</span>
+                        <span className="text-[9px] text-indigo-600 font-normal">
+                          Selected: {(productForm.colors || []).length} colors
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2 pt-0.5">
+                        {(() => {
+                          const matchedStyle = styles.find((s) => s.path === productForm.modelPath);
+                          let availableStyleColors = matchedStyle && matchedStyle.colors && matchedStyle.colors.length > 0
+                            ? matchedStyle.colors
+                            : [
+                                { name: "White", value: "#ffffff" },
+                                { name: "Black", value: "#111827" },
+                                { name: "Navy Blue", value: "#1e3a8a" },
+                                { name: "Red", value: "#dc2626" },
+                              ];
+
+                          return availableStyleColors.map((cObj) => {
+                            const hexVal = typeof cObj === "string" ? cObj : cObj.value;
+                            const nameVal = typeof cObj === "string" ? cObj : cObj.name;
+                            const isSelected = (productForm.colors || []).some(
+                              (c) => c.toLowerCase() === hexVal.toLowerCase()
+                            );
+
+                            return (
+                              <button
+                                key={hexVal}
+                                type="button"
+                                onClick={() => {
+                                  setProductForm((prev) => {
+                                    const currentColors = prev.colors || [];
+                                    let updatedColors;
+                                    if (isSelected) {
+                                      updatedColors = currentColors.filter(
+                                        (c) => c.toLowerCase() !== hexVal.toLowerCase()
+                                      );
+                                      if (updatedColors.length === 0) updatedColors = [hexVal];
+                                    } else {
+                                      updatedColors = [...currentColors, hexVal];
+                                    }
+                                    return {
+                                      ...prev,
+                                      colors: updatedColors,
+                                      defaultColor: updatedColors[0] || "#ffffff",
+                                    };
+                                  });
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
+                                  isSelected
+                                    ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                }`}
+                              >
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                                  style={{ backgroundColor: hexVal }}
+                                />
+                                <span>{nameVal}</span>
+                              </button>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
 
@@ -1923,67 +2402,446 @@ export default function ManagerPage() {
 
         {/* ================= TAB 5: INVENTORY ================= */}
         {activeTab === "inventory" && (
-          <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-950 mb-6 flex items-center gap-2">
-              <Inbox className="h-5 w-5 text-indigo-600" />
-              Manage Inventory Stock & Restocking
-            </h3>
-
-            {inventory.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-sm text-slate-500 font-semibold">
-                  No inventory records configured.
+          <div className="bg-white border rounded-3xl p-6 shadow-sm space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                  <Inbox className="h-5 w-5 text-indigo-600" />
+                  Manage Inventory Stock & Restocking
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Categorized stock control for garment blanks, printing inks, and packaging supplies.
                 </p>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                      <th className="pb-3">Item Name</th>
-                      <th className="pb-3">Type Details</th>
-                      <th className="pb-3">Size/Color</th>
-                      <th className="pb-3">Current Stock</th>
-                      <th className="pb-3">Min Threshold</th>
-                      <th className="pb-3">Status</th>
-                      <th className="pb-3 text-right">Restock Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inventory.map((item) => {
-                      const isLow = item.quantity <= item.minThreshold;
-                      return (
-                        <tr
-                          key={item._id}
-                          className="border-b last:border-b-0 hover:bg-slate-50/50 transition"
-                        >
-                          <td className="py-4 font-bold text-slate-900">
-                            {item.itemType}
-                          </td>
-                          <td className="py-4 text-xs text-slate-600">
-                            {item.tShirtType || "Generic consumable"}{" "}
-                            {item.material ? `(${item.material})` : ""}
-                          </td>
-                          <td className="py-4 text-xs text-slate-500">
-                            {item.size || item.color
-                              ? `${item.color || ""} ${item.size || ""}`
-                              : "—"}
-                          </td>
-                          <td className="py-4 text-xs font-bold text-slate-900">
-                            {item.quantity} units
-                          </td>
-                          <td className="py-4 text-xs text-slate-400">
-                            {editingThresholdId === item._id ? (
-                              <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const defaultStyleName = styles[0]?.name || styles[0]?.type || "Crew Neck";
+                  const defaultStyle = styles.find((s) => (s.name || s.type) === defaultStyleName);
+                  const firstGsm = formatGsm(defaultStyle?.gsmPrices?.[0]?.gsm || defaultStyle?.gsms?.[0] || "GSM 180");
+                  setInventoryForm({
+                    itemType: inventoryCategoryFilter === "INK"
+                      ? "Printing Ink"
+                      : inventoryCategoryFilter === "PAPERS_PACKAGING"
+                      ? "Transfer Paper"
+                      : "Plain T-Shirt",
+                    tShirtType: defaultStyleName,
+                    color: defaultStyle?.colors?.[0]?.value || "#ffffff",
+                    colorName: defaultStyle?.colors?.[0]?.name || "White",
+                    size: "M",
+                    material: firstGsm,
+                    quantity: 50,
+                    minThreshold: 15,
+                  });
+                  setInventoryError("");
+                  setShowInventoryModal(true);
+                }}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+                Add New Inventory
+              </button>
+            </div>
+
+            {/* 4 Main Category Filter Pills */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
+              {[
+                { id: "ALL", label: "All Stock Items", icon: Layers },
+                { id: "TSHIRTS", label: "T-Shirts", icon: Tag },
+                { id: "INK", label: "Printing Ink", icon: Layers },
+                { id: "PAPERS_PACKAGING", label: "Transfer Papers & Packaging", icon: Package },
+              ].map((cat) => {
+                const isActive = inventoryCategoryFilter === cat.id;
+                let count = inventory.length;
+                if (cat.id === "TSHIRTS") {
+                  count = inventory.filter(
+                    (i) => i.itemType === "Plain T-Shirt" || i.itemType?.toLowerCase().includes("t-shirt")
+                  ).length;
+                } else if (cat.id === "INK") {
+                  count = inventory.filter(
+                    (i) => i.itemType === "Printing Ink" || i.itemType?.toLowerCase().includes("ink")
+                  ).length;
+                } else if (cat.id === "PAPERS_PACKAGING") {
+                  count = inventory.filter((i) => {
+                    const typeLower = (i.itemType || "").toLowerCase();
+                    return (
+                      typeLower.includes("transfer") ||
+                      typeLower.includes("paper") ||
+                      typeLower.includes("package") ||
+                      typeLower.includes("packaging") ||
+                      typeLower.includes("tape") ||
+                      typeLower.includes("stick") ||
+                      typeLower.includes("label") ||
+                      typeLower.includes("sticker") ||
+                      i.itemType === "Materials"
+                    );
+                  }).length;
+                }
+
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setInventoryCategoryFilter(cat.id);
+                      setInventorySizeFilter("ALL");
+                      setInventoryColorFilter("ALL");
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      isActive
+                        ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/10"
+                        : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
+                    }`}
+                  >
+                    <span>{cat.label}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        isActive
+                          ? "bg-indigo-500 text-white"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Filter Control Bar (Size, Color, Search based on active category) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/80 p-3.5 border rounded-2xl">
+              {/* Size Filter */}
+              {inventoryCategoryFilter === "ALL" || inventoryCategoryFilter === "TSHIRTS" ? (
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                    Filter by Size
+                  </label>
+                  <select
+                    value={inventorySizeFilter}
+                    onChange={(e) => setInventorySizeFilter(e.target.value)}
+                    className="w-full px-3 py-1.5 border rounded-xl text-xs font-semibold bg-white focus:outline-indigo-500"
+                  >
+                    <option value="ALL">All Sizes</option>
+                    {["S", "M", "L", "XL", "XXL", "3XL"].map((sz) => (
+                      <option key={sz} value={sz}>
+                        Size {sz}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="hidden sm:block" />
+              )}
+
+              {/* Color Filter */}
+              {inventoryCategoryFilter === "ALL" || inventoryCategoryFilter === "TSHIRTS" || inventoryCategoryFilter === "INK" ? (
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                    Filter by Color
+                  </label>
+                  <select
+                    value={inventoryColorFilter}
+                    onChange={(e) => setInventoryColorFilter(e.target.value)}
+                    className="w-full px-3 py-1.5 border rounded-xl text-xs font-semibold bg-white focus:outline-indigo-500"
+                  >
+                    <option value="ALL">All Colors</option>
+                    {Array.from(
+                      new Set(
+                        inventory
+                          .filter((i) => {
+                            if (inventoryCategoryFilter === "TSHIRTS") {
+                              return i.itemType === "Plain T-Shirt" || i.itemType?.toLowerCase().includes("t-shirt");
+                            }
+                            if (inventoryCategoryFilter === "INK") {
+                              return i.itemType === "Printing Ink" || i.itemType?.toLowerCase().includes("ink");
+                            }
+                            return true;
+                          })
+                          .map((i) => i.color)
+                          .filter((c) => c && typeof c === "string" && c.trim() !== "")
+                      )
+                    ).map((colorVal) => (
+                      <option key={colorVal} value={colorVal}>
+                        {colorVal}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="hidden sm:block" />
+              )}
+
+              {/* Search Query */}
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                  Search Stock Items
+                </label>
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Search stock..."
+                    value={inventorySearchQuery}
+                    onChange={(e) => setInventorySearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-7 py-1.5 border rounded-xl text-xs font-semibold bg-white focus:outline-indigo-500"
+                  />
+                  {inventorySearchQuery && (
+                    <button
+                      onClick={() => setInventorySearchQuery("")}
+                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Inventory Items Table per Category */}
+            {(() => {
+              const filteredInventory = inventory.filter((item) => {
+                // 1. Category Filter
+                if (inventoryCategoryFilter === "TSHIRTS") {
+                  if (item.itemType !== "Plain T-Shirt" && !item.itemType?.toLowerCase().includes("t-shirt")) {
+                    return false;
+                  }
+                } else if (inventoryCategoryFilter === "INK") {
+                  if (item.itemType !== "Printing Ink" && !item.itemType?.toLowerCase().includes("ink")) {
+                    return false;
+                  }
+                } else if (inventoryCategoryFilter === "PAPERS_PACKAGING") {
+                  const typeLower = (item.itemType || "").toLowerCase();
+                  if (
+                    !typeLower.includes("transfer") &&
+                    !typeLower.includes("paper") &&
+                    !typeLower.includes("package") &&
+                    !typeLower.includes("packaging") &&
+                    !typeLower.includes("tape") &&
+                    !typeLower.includes("stick") &&
+                    !typeLower.includes("label") &&
+                    !typeLower.includes("sticker") &&
+                    item.itemType !== "Materials"
+                  ) {
+                    return false;
+                  }
+                }
+
+                // 2. Size Filter
+                if (inventorySizeFilter !== "ALL") {
+                  if (item.size !== inventorySizeFilter) {
+                    return false;
+                  }
+                }
+
+                // 3. Color Filter
+                if (inventoryColorFilter !== "ALL") {
+                  if ((item.color || "").toLowerCase() !== inventoryColorFilter.toLowerCase()) {
+                    return false;
+                  }
+                }
+
+                // 4. Search Filter
+                if (inventorySearchQuery.trim()) {
+                  const q = inventorySearchQuery.toLowerCase();
+                  const matchName = (item.itemType || "").toLowerCase().includes(q);
+                  const matchType = (item.tShirtType || "").toLowerCase().includes(q);
+                  const matchColor = (item.color || "").toLowerCase().includes(q);
+                  const matchSize = (item.size || "").toLowerCase().includes(q);
+                  const matchMat = (item.material || "").toLowerCase().includes(q);
+                  if (!matchName && !matchType && !matchColor && !matchSize && !matchMat) {
+                    return false;
+                  }
+                }
+
+                return true;
+              });
+
+              if (filteredInventory.length === 0) {
+                return (
+                  <div className="text-center py-16 border border-dashed border-slate-200 rounded-2xl">
+                    <p className="text-sm text-slate-500 font-semibold">
+                      No stock items found matching your filters.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setInventoryCategoryFilter("ALL");
+                        setInventorySizeFilter("ALL");
+                        setInventoryColorFilter("ALL");
+                        setInventorySearchQuery("");
+                      }}
+                      className="mt-3 text-xs font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                    >
+                      Reset filters
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                        <th className="pb-3">Item Name</th>
+
+                        {/* All Items tab columns */}
+                        {inventoryCategoryFilter === "ALL" && (
+                          <>
+                            <th className="pb-3">Style / Details</th>
+                            <th className="pb-3">Size / Color</th>
+                          </>
+                        )}
+
+                        {/* Category 1: T-Shirts columns */}
+                        {inventoryCategoryFilter === "TSHIRTS" && (
+                          <>
+                            <th className="pb-3">Style</th>
+                            <th className="pb-3">GSM Weight</th>
+                            <th className="pb-3">Size</th>
+                            <th className="pb-3">Color</th>
+                          </>
+                        )}
+
+                        {/* Category 2: Printing Ink columns */}
+                        {inventoryCategoryFilter === "INK" && (
+                          <th className="pb-3">Color</th>
+                        )}
+
+                        {/* Category 3: Transfer Papers & Packaging has no extra columns */}
+
+                        <th className="pb-3">Current Stock</th>
+                        <th className="pb-3">Min Threshold</th>
+                        <th className="pb-3">Status</th>
+                        <th className="pb-3 text-right">Actions & Restock</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredInventory.map((item) => {
+                        const isLow = item.quantity <= item.minThreshold;
+                        return (
+                          <tr
+                            key={item._id}
+                            className="border-b last:border-b-0 hover:bg-slate-50/50 transition"
+                          >
+                            <td className="py-4 font-bold text-slate-900">
+                              {item.itemType}
+                            </td>
+
+                            {/* All Items tab Data */}
+                            {inventoryCategoryFilter === "ALL" && (
+                              <>
+                                <td className="py-4 text-xs text-slate-600 font-medium">
+                                  <span className="font-bold text-slate-800">
+                                    {item.tShirtType || "Generic Consumable"}
+                                  </span>{" "}
+                                  {item.material ? `(${item.material})` : ""}
+                                </td>
+                                <td className="py-4 text-xs text-slate-500 font-medium">
+                                  {item.size || item.color
+                                    ? `${item.color || ""} ${item.size ? `— Size ${item.size}` : ""}`
+                                    : "—"}
+                                </td>
+                              </>
+                            )}
+
+                            {/* Category 1: T-Shirts Data */}
+                            {inventoryCategoryFilter === "TSHIRTS" && (
+                              <>
+                                <td className="py-4 text-xs font-semibold text-slate-800">
+                                  {item.tShirtType || "Crew Neck"}
+                                </td>
+                                <td className="py-4 text-xs text-slate-600 font-medium">
+                                  {formatGsm(item.material || item.gsm || "GSM 180")}
+                                </td>
+                                <td className="py-4 text-xs text-slate-600 font-medium">
+                                  {item.size || "M"}
+                                </td>
+                                <td className="py-4 text-xs font-semibold text-slate-800">
+                                  {item.color || "White"}
+                                </td>
+                              </>
+                            )}
+
+                            {/* Category 2: Printing Ink Data */}
+                            {inventoryCategoryFilter === "INK" && (
+                              <td className="py-4 text-xs font-semibold text-slate-800">
+                                {item.color || "Cyan/Magenta/Yellow/Black"}
+                              </td>
+                            )}
+
+                            {/* Common Stock & Restock Controls */}
+                            <td className="py-4 text-xs font-bold text-slate-900">
+                              {item.quantity} units
+                            </td>
+                            <td className="py-4 text-xs text-slate-400">
+                              {editingThresholdId === item._id ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={
+                                      thresholdInputs[item._id] ??
+                                      item.minThreshold
+                                    }
+                                    onChange={(e) =>
+                                      setThresholdInputs((prev) => ({
+                                        ...prev,
+                                        [item._id]: e.target.value,
+                                      }))
+                                    }
+                                    className="w-16 px-2 py-1 text-xs border rounded-xl text-center"
+                                  />
+                                  <button
+                                    onClick={() =>
+                                      handleUpdateMinThreshold(item._id)
+                                    }
+                                    className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingThresholdId(null)}
+                                    className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span>{item.minThreshold} units</span>
+                                  <button
+                                    onClick={() => {
+                                      setEditingThresholdId(item._id);
+                                      setThresholdInputs((prev) => ({
+                                        ...prev,
+                                        [item._id]: item.minThreshold,
+                                      }));
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-[10px] font-bold"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-4 text-xs">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                  isLow
+                                    ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
+                                    : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                                }`}
+                              >
+                                {isLow ? "Low stock" : "In Stock"}
+                              </span>
+                            </td>
+                            <td className="py-4 text-right">
+                              <div className="inline-flex items-center gap-2 justify-end">
                                 <input
                                   type="number"
-                                  min="0"
-                                  value={
-                                    thresholdInputs[item._id] ??
-                                    item.minThreshold
-                                  }
+                                  placeholder="+ Qty"
+                                  value={restockQuantities[item._id] || ""}
                                   onChange={(e) =>
-                                    setThresholdInputs((prev) => ({
+                                    setRestockQuantities((prev) => ({
                                       ...prev,
                                       [item._id]: e.target.value,
                                     }))
@@ -1991,86 +2849,36 @@ export default function ManagerPage() {
                                   className="w-16 px-2 py-1 text-xs border rounded-xl text-center"
                                 />
                                 <button
-                                  onClick={() =>
-                                    handleUpdateMinThreshold(item._id)
-                                  }
-                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                  onClick={() => handleRestockQuantity(item._id)}
+                                  className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-bold transition"
                                 >
-                                  <Check className="h-3.5 w-3.5" />
+                                  {(() => {
+                                    const value = Number(
+                                      restockQuantities[item._id] ?? "",
+                                    );
+                                    if (!Number.isNaN(value) && value < 0) {
+                                      return "Remove";
+                                    }
+                                    return "Add";
+                                  })()}
                                 </button>
                                 <button
-                                  onClick={() => setEditingThresholdId(null)}
-                                  className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                  onClick={() => handleDeleteInventory(item._id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
+                                  title="Delete item"
                                 >
-                                  <X className="h-3.5 w-3.5" />
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span>{item.minThreshold} units</span>
-                                <button
-                                  onClick={() => {
-                                    setEditingThresholdId(item._id);
-                                    setThresholdInputs((prev) => ({
-                                      ...prev,
-                                      [item._id]: item.minThreshold,
-                                    }));
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-[10px] font-bold"
-                                >
-                                  Edit
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-4 text-xs">
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                                isLow
-                                  ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
-                                  : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                              }`}
-                            >
-                              {isLow ? "Low stock" : "In Stock"}
-                            </span>
-                          </td>
-                          <td className="py-4 text-right">
-                            <div className="inline-flex items-center gap-1.5 justify-end">
-                              <input
-                                type="number"
-                                placeholder="+ Qty"
-                                value={restockQuantities[item._id] || ""}
-                                onChange={(e) =>
-                                  setRestockQuantities((prev) => ({
-                                    ...prev,
-                                    [item._id]: e.target.value,
-                                  }))
-                                }
-                                className="w-16 px-2 py-1 text-xs border rounded-xl text-center"
-                              />
-                              <button
-                                onClick={() => handleRestockQuantity(item._id)}
-                                className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-bold transition"
-                              >
-                                {(() => {
-                                  const value = Number(
-                                    restockQuantities[item._id] ?? "",
-                                  );
-                                  if (!Number.isNaN(value) && value < 0) {
-                                    return "Remove";
-                                  }
-                                  return "Add";
-                                })()}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -2088,9 +2896,10 @@ export default function ManagerPage() {
                   setStyleForm({
                     name: "",
                     path: "",
+                    type: "Crew Neck",
                     gsmPrices: [
-                      { gsm: "180GSM", price: 1200 },
-                      { gsm: "220GSM", price: 1500 },
+                      { gsm: "GSM 180", price: 1200 },
+                      { gsm: "GSM 220", price: 1500 },
                     ],
                     colors: [
                       { name: "White", value: "#ffffff" },
@@ -2122,12 +2931,9 @@ export default function ManagerPage() {
                     <div>
                       <div className="flex items-center justify-between border-b pb-3 mb-3">
                         <div>
-                          <h4 className="font-bold text-slate-900 text-base">
-                            {style.name}
+                          <h4 className="font-extrabold text-slate-900 text-base">
+                            {style.name || style.type || "Crew Neck"}
                           </h4>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">
-                            {style.type || "Crew Neck"}
-                          </span>
                         </div>
                       </div>
                       <p className="text-[10px] text-slate-400 font-mono break-all mb-3.5">
@@ -2188,6 +2994,7 @@ export default function ManagerPage() {
                           setStyleForm({
                             name: style.name,
                             path: style.path,
+                            type: style.type || "Crew Neck",
                             gsmPrices:
                               style.gsmPrices && style.gsmPrices.length > 0
                                 ? style.gsmPrices
@@ -2514,24 +3321,53 @@ export default function ManagerPage() {
 
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                  Style Name
+                  T-Shirt Type
                 </label>
                 <input
                   type="text"
                   required
                   value={styleForm.name}
                   onChange={(e) =>
-                    setStyleForm((prev) => ({ ...prev, name: e.target.value }))
+                    setStyleForm((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                      type: e.target.value,
+                    }))
                   }
-                  placeholder="e.g. V-Neck Fitted T-Shirt"
+                  placeholder="e.g. Crew Neck, V-Neck, Polo, Oversized, Hoodie"
                   className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold"
                 />
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="text-[9px] font-bold text-slate-400 self-center">Quick Select:</span>
+                  {["Crew Neck", "V-Neck", "Polo", "Oversized", "Hoodie", "Long Sleeve", "Tank Top"].map((tType) => (
+                    <button
+                      key={tType}
+                      type="button"
+                      onClick={() =>
+                        setStyleForm((prev) => ({
+                          ...prev,
+                          name: tType,
+                          type: tType,
+                        }))
+                      }
+                      className={`px-2.5 py-1 border rounded-lg text-[9px] font-bold transition cursor-pointer ${
+                        styleForm.name === tType
+                          ? "bg-indigo-600 border-indigo-600 text-white"
+                          : "bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {tType}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                  3D GLTF Model File Path
-                </label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                    3D GLTF Model File Path
+                  </label>
+                </div>
                 <input
                   type="text"
                   required
@@ -2539,9 +3375,34 @@ export default function ManagerPage() {
                   onChange={(e) =>
                     setStyleForm((prev) => ({ ...prev, path: e.target.value }))
                   }
-                  placeholder="e.g. /images/models/v_neck.glb"
+                  placeholder="e.g. /images/models/male normal t-shirt1.glb"
                   className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 font-mono"
                 />
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="text-[9px] font-bold text-slate-400 self-center">Presets:</span>
+                  {[
+                    { label: "Male Normal", path: "/images/models/male normal t-shirt1.glb", defaultType: "Crew Neck" },
+                    { label: "Female Normal", path: "/images/models/female normal t-shirt.glb", defaultType: "Crew Neck" },
+                    { label: "Long Sleeve", path: "/images/models/long_sleeve_t-_shirt.glb", defaultType: "Long Sleeve" },
+                    { label: "Oversized", path: "/images/models/oversized t-sdirt1.glb", defaultType: "Oversized" },
+                    { label: "Hoodie", path: "/images/models/t_shirt_hoodie.glb", defaultType: "Hoodie" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() =>
+                        setStyleForm((prev) => ({
+                          ...prev,
+                          path: preset.path,
+                          type: prev.type || preset.defaultType,
+                        }))
+                      }
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border rounded-lg text-[9px] font-bold transition cursor-pointer"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="border-t pt-4">
@@ -2578,10 +3439,10 @@ export default function ManagerPage() {
                           ...prev.gsmPrices.filter(
                             (gp) =>
                               gp.gsm.toLowerCase() !==
-                              newGsmName.trim().toLowerCase(),
+                              formatGsm(newGsmName).toLowerCase(),
                           ),
                           {
-                            gsm: newGsmName.trim(),
+                            gsm: formatGsm(newGsmName),
                             price: Number(newGsmPrice),
                           },
                         ],
@@ -2739,6 +3600,516 @@ export default function ManagerPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Inventory Modal */}
+      {showInventoryModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="font-bold text-sm uppercase tracking-wider">
+                  Add New Inventory Stock
+                </h3>
+                <p className="text-[10px] text-indigo-300 mt-0.5">
+                  Stock Control & T-Shirt Style Inventory
+                </p>
+              </div>
+              <button
+                onClick={() => setShowInventoryModal(false)}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveInventory}
+              className="p-6 space-y-4 overflow-y-auto flex-1 text-slate-800"
+            >
+              {inventoryError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl text-xs font-semibold">
+                  {inventoryError}
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                  Inventory Item Type
+                </label>
+                <select
+                  value={inventoryForm.itemType}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    const defaultStyleName = styles[0]?.name || styles[0]?.type || "Crew Neck";
+                    const defaultStyle = styles.find((s) => (s.name || s.type) === defaultStyleName);
+                    setInventoryForm((prev) => ({
+                      ...prev,
+                      itemType: newType,
+                      materialCategory: "Transfer Paper",
+                      tShirtType: newType === "Plain T-Shirt" ? defaultStyleName : "",
+                      colorName: newType === "Printing Ink" ? "Cyan (C)" : (defaultStyle?.colors?.[0]?.name || "White"),
+                      color: newType === "Printing Ink" ? "Cyan (C)" : (defaultStyle?.colors?.[0]?.value || "#ffffff"),
+                    }));
+                  }}
+                  className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                >
+                  <option value="Plain T-Shirt">T-Shirt (Garment Stock)</option>
+                  <option value="Printing Ink">Printing Ink</option>
+                  <option value="Materials">Materials & Packaging Supplies</option>
+                </select>
+              </div>
+
+              {/* Sub-Material Selection when itemType === "Materials" */}
+              {inventoryForm.itemType === "Materials" && (
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                    Select Material Category
+                  </label>
+                  <select
+                    value={inventoryForm.materialCategory || "Transfer Paper"}
+                    onChange={(e) =>
+                      setInventoryForm((prev) => ({
+                        ...prev,
+                        materialCategory: e.target.value,
+                      }))
+                    }
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                  >
+                    <option value="Transfer Paper">Transfer Paper</option>
+                    <option value="Packaging Material">Packaging Material</option>
+                    <option value="Stick Tapes">Stick Tapes</option>
+                    <option value="Label Stickers">Label Stickers</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Printing Ink Color Selection Box */}
+              {inventoryForm.itemType === "Printing Ink" && (
+                <div className="space-y-3 bg-slate-50 p-4 border rounded-2xl">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                    Select Printing Ink Color Preset
+                  </label>
+
+                  {/* Essential Ink Presets List */}
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {[
+                      {
+                        name: "Cyan (C)",
+                        value: "#00FFFF",
+                        desc: "A bright, greenish-blue ink that filters out red light.",
+                      },
+                      {
+                        name: "Magenta (M)",
+                        value: "#FF00FF",
+                        desc: "A vivid purplish-pink ink that filters out green light.",
+                      },
+                      {
+                        name: "Yellow (Y)",
+                        value: "#FFFF00",
+                        desc: "A bright yellow ink that filters out blue light.",
+                      },
+                      {
+                        name: "Key / Black (K)",
+                        value: "#111827",
+                        desc: "Key / Black process ink for deep shadows and line work.",
+                      },
+                      {
+                        name: "White",
+                        value: "#FFFFFF",
+                        desc: "White underbase ink for dark garment printing.",
+                      },
+                      {
+                        name: "Spot Red",
+                        value: "#EF4444",
+                        desc: "Vivid spot red screen printing ink.",
+                      },
+                      {
+                        name: "Spot Blue",
+                        value: "#3B82F6",
+                        desc: "Royal spot blue screen printing ink.",
+                      },
+                      {
+                        name: "Spot Green",
+                        value: "#22C55E",
+                        desc: "Bright spot green printing ink.",
+                      },
+                      {
+                        name: "Metallic Gold",
+                        value: "#EAB308",
+                        desc: "Shimmering metallic gold specialty ink.",
+                      },
+                      {
+                        name: "Metallic Silver",
+                        value: "#94A3B8",
+                        desc: "Metallic silver shimmer specialty ink.",
+                      },
+                    ].map((ink) => {
+                      const isSelected =
+                        inventoryForm.colorName === ink.name || inventoryForm.color === ink.name;
+                      return (
+                        <button
+                          key={ink.name}
+                          type="button"
+                          onClick={() => {
+                            setNewInkColor({ name: ink.name, value: ink.value });
+                            setInventoryForm((prev) => ({
+                              ...prev,
+                              colorName: ink.name,
+                              color: ink.name,
+                            }));
+                          }}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                            isSelected
+                              ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50/80 shadow-xs"
+                              : "border-slate-200 bg-white hover:bg-slate-100/70"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className="h-4 w-4 rounded-full border border-slate-300 shrink-0"
+                              style={{ backgroundColor: ink.value }}
+                            />
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">
+                                {ink.name}
+                              </p>
+                              <p className="text-[10px] text-slate-500 font-medium">
+                                {ink.desc}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-indigo-600 shrink-0 ml-2" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Selected Ink Color Preview Badge */}
+                  {inventoryForm.colorName && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
+                      <span className="text-[10px] font-bold text-slate-400">Selected Ink:</span>
+                      <div className="flex items-center gap-1.5 bg-white border border-indigo-200 rounded-full px-3 py-1 text-xs shadow-2xs">
+                        <span
+                          className="h-3.5 w-3.5 rounded-full border border-slate-300 shrink-0"
+                          style={{ backgroundColor: newInkColor.value }}
+                        />
+                        <span className="font-bold text-indigo-950">
+                          {inventoryForm.colorName}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {inventoryForm.itemType === "Plain T-Shirt" && (
+                <>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                      Select T-Shirt Style / Type
+                    </label>
+                    <select
+                      value={inventoryForm.tShirtType || (styles[0]?.name || styles[0]?.type || "Crew Neck")}
+                      onChange={(e) => {
+                        const styleVal = e.target.value;
+                        const matchStyle = styles.find(
+                          (s) => (s.name || s.type) === styleVal
+                        );
+                        const firstGsm = formatGsm(matchStyle?.gsmPrices?.[0]?.gsm || matchStyle?.gsms?.[0] || "GSM 180");
+                        setInventoryForm((prev) => ({
+                          ...prev,
+                          tShirtType: styleVal,
+                          colorName: matchStyle?.colors?.[0]?.name || "White",
+                          color: matchStyle?.colors?.[0]?.value || "#ffffff",
+                          material: firstGsm,
+                        }));
+                      }}
+                      className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                    >
+                      {styles.length > 0 ? (
+                        styles.map((s) => (
+                          <option key={s._id} value={s.name || s.type}>
+                            {s.name || s.type}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Crew Neck">Crew Neck</option>
+                          <option value="V-Neck">V-Neck</option>
+                          <option value="Polo">Polo</option>
+                          <option value="Oversized">Oversized</option>
+                          <option value="Hoodie">Hoodie</option>
+                          <option value="Long Sleeve">Long Sleeve</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-1.5">
+                      Allowed Style Color
+                    </label>
+                    {(() => {
+                      const curStyle = styles.find(
+                        (s) => (s.name || s.type) === (inventoryForm.tShirtType || styles[0]?.name || styles[0]?.type)
+                      );
+                      const availableColors = curStyle?.colors || [
+                        { name: "White", value: "#ffffff" },
+                        { name: "Black", value: "#111827" },
+                      ];
+                      return (
+                        <div className="flex flex-wrap gap-2">
+                          {availableColors.map((c, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() =>
+                                setInventoryForm((prev) => ({
+                                  ...prev,
+                                  colorName: c.name,
+                                  color: c.value,
+                                }))
+                              }
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer ${
+                                inventoryForm.colorName === c.name
+                                  ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50 text-indigo-950 font-bold"
+                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              <span
+                                className="h-3.5 w-3.5 rounded-full border border-slate-300 shrink-0"
+                                style={{ backgroundColor: c.value }}
+                              />
+                              <span>{c.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                        Size
+                      </label>
+                      <select
+                        value={inventoryForm.size}
+                        onChange={(e) =>
+                          setInventoryForm((prev) => ({
+                            ...prev,
+                            size: e.target.value,
+                          }))
+                        }
+                        className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                      >
+                        {["S", "M", "L", "XL", "XXL", "3XL"].map((sz) => (
+                          <option key={sz} value={sz}>
+                            Size {sz}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                        GSM Weight
+                      </label>
+                      {(() => {
+                        const curStyle = styles.find(
+                          (s) => (s.name || s.type) === (inventoryForm.tShirtType || styles[0]?.name || styles[0]?.type)
+                        );
+                        const styleGsms = curStyle?.gsmPrices && curStyle.gsmPrices.length > 0
+                          ? curStyle.gsmPrices.map((gp) => formatGsm(gp.gsm))
+                          : (curStyle?.gsms && curStyle.gsms.length > 0 ? curStyle.gsms.map(formatGsm) : ["GSM 180", "GSM 200", "GSM 220", "GSM 240"]);
+
+                        return (
+                          <select
+                            value={inventoryForm.material}
+                            onChange={(e) =>
+                              setInventoryForm((prev) => ({
+                                ...prev,
+                                material: e.target.value,
+                              }))
+                            }
+                            className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                          >
+                            {styleGsms.map((gsmVal) => (
+                              <option key={gsmVal} value={gsmVal}>
+                                {gsmVal}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                    Initial Stock Qty
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={inventoryForm.quantity}
+                    onChange={(e) =>
+                      setInventoryForm((prev) => ({
+                        ...prev,
+                        quantity: e.target.value,
+                      }))
+                    }
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                    Min Stock Threshold
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={inventoryForm.minThreshold}
+                    onChange={(e) =>
+                      setInventoryForm((prev) => ({
+                        ...prev,
+                        minThreshold: e.target.value,
+                      }))
+                    }
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowInventoryModal(false)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={inventoryActionLoading}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {inventoryActionLoading && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  )}
+                  Save Inventory Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Insufficient Inventory Alert Modal */}
+      {inventoryAlertModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-rose-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-6 bg-rose-50/70 border-b border-rose-100 flex items-start gap-4">
+              <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0 shadow-xs">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-black text-rose-950">
+                    {inventoryAlertModal.title || "Insufficient Inventory Stock!"}
+                  </h3>
+                  <button
+                    onClick={() => setInventoryAlertModal((prev) => ({ ...prev, isOpen: false }))}
+                    className="p-1 text-slate-400 hover:text-slate-600 transition rounded-lg"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-rose-700 mt-1 font-semibold">
+                  {inventoryAlertModal.message || "Cannot assign employee to this order because required materials are out of stock."}
+                </p>
+              </div>
+            </div>
+
+            {/* Content & Details */}
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Required Materials Shortage:
+                </p>
+                {inventoryAlertModal.missingItems && inventoryAlertModal.missingItems.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {inventoryAlertModal.missingItems.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-2xl border border-rose-100 bg-rose-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-slate-900">
+                            {item.style || item.tShirtStyle || "Plain T-Shirt"}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-500 font-semibold">
+                            <span className="px-2 py-0.5 bg-white border rounded-md">Size: {item.size}</span>
+                            <span className="px-2 py-0.5 bg-white border rounded-md">Color: {resolveColorName(item.color)}</span>
+                            <span className="px-2 py-0.5 bg-white border rounded-md">GSM: {item.gsm}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-xs font-bold text-slate-700">
+                            Required: <span className="font-black text-rose-600">{item.required}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            In Stock: <span className="font-bold text-amber-600">{item.available}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-2xl border border-rose-100 bg-rose-50/40 text-xs text-rose-800 whitespace-pre-line font-medium">
+                    {inventoryAlertModal.details}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-600 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
+                <span>Please restock the missing plain t-shirts in the inventory tab before assigning this order to an employee.</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-end gap-2.5">
+              <button
+                onClick={() => setInventoryAlertModal((prev) => ({ ...prev, isOpen: false }))}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 border rounded-xl hover:bg-white transition cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setInventoryAlertModal((prev) => ({ ...prev, isOpen: false }));
+                  setActiveTab("inventory");
+                }}
+                className="w-full sm:w-auto px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Package className="h-3.5 w-3.5" />
+                Go to Inventory & Restock
+              </button>
+            </div>
           </div>
         </div>
       )}

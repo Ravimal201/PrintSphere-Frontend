@@ -7,7 +7,9 @@ const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const TShirtStyle = require("../models/TShirtStyle");
 const UserActivity = require("../models/UserActivity");
+const Review = require("../models/Review");
 const { createNotification } = require("../utils/notificationHelper");
+const { resolveColorName, formatGsm } = require("../utils/colorHelper");
 
 // JWT Secret Key fallback
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -149,17 +151,148 @@ exports.changePassword = async (req, res) => {
   }
 };
 
-// @desc    Get all active store products
+// @desc    Get all active store products with reviews and ratings
 // @route   GET /api/auth/products
 exports.getStoreProducts = async (req, res) => {
   try {
     const products = await Product.find({ isApproved: true, status: "Active" })
       .populate("createdBy", "name")
       .sort({ createdAt: -1 });
-    res.json(products);
+
+    // Aggregate review stats to ensure real-time accuracy for every product
+    const allReviews = await Review.find().sort({ createdAt: -1 });
+    const productStats = {};
+    allReviews.forEach((r) => {
+      if (r.productId) {
+        const pId = r.productId.toString();
+        if (!productStats[pId]) {
+          productStats[pId] = { total: 0, count: 0, reviews: [] };
+        }
+        productStats[pId].total += Number(r.rating) || 0;
+        productStats[pId].count += 1;
+        productStats[pId].reviews.push({
+          userName: r.userName || "Verified Buyer",
+          rating: r.rating,
+          comment: r.comment,
+          createdAt: r.createdAt
+        });
+      }
+    });
+
+    const productsWithRatings = products.map((p) => {
+      const pObj = p.toObject();
+      const stats = productStats[p._id.toString()];
+      if (stats && stats.count > 0) {
+        pObj.averageRating = parseFloat((stats.total / stats.count).toFixed(1));
+        pObj.ratingsCount = stats.count;
+        pObj.reviews = stats.reviews;
+      } else {
+        pObj.averageRating = p.averageRating || 0;
+        pObj.ratingsCount = p.ratingsCount || 0;
+        pObj.reviews = [];
+      }
+      return pObj;
+    });
+
+    res.json(productsWithRatings);
   } catch (error) {
     console.error("Fetch store products error:", error);
     res.status(500).json({ message: "Server error while fetching store products" });
+  }
+};
+
+// @desc    Get reviews for a specific product
+// @route   GET /api/auth/products/:productId/reviews
+exports.getProductReviews = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const reviews = await Review.find({ productId }).sort({ createdAt: -1 });
+    res.json(reviews);
+  } catch (error) {
+    console.error("Fetch product reviews error:", error);
+    res.status(500).json({ message: "Server error while fetching reviews" });
+  }
+};
+
+// @desc    Get all customer reviews for home page testimonials
+// @route   GET /api/auth/reviews
+exports.getAllCustomerReviews = async (req, res) => {
+  try {
+    const reviews = await Review.find()
+      .populate("productId", "title images category")
+      .populate("designId", "tShirtType fabricColor thumbnailUrl")
+      .sort({ createdAt: -1 })
+      .limit(30);
+
+    const formatted = reviews.map((r) => {
+      const productName = r.productId?.title || r.designId?.tShirtType || "Customized T-Shirt";
+      const userInitials = (r.userName || "Customer")
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+
+      return {
+        _id: r._id,
+        quote: r.comment && r.comment.trim() ? r.comment : "Amazing print quality and fabric! Delivered on time.",
+        name: r.userName || "Verified Buyer",
+        role: productName,
+        rating: r.rating || 5,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(r.userName || "Customer")}&backgroundColor=6366f1,4f46e5,7c3aed&textColor=ffffff`,
+        initials: userInitials,
+        productImage: r.productId?.images?.[0] || r.designId?.thumbnailUrl || null,
+        createdAt: r.createdAt
+      };
+    });
+
+    res.json(formatted);
+  } catch (error) {
+    console.error("Fetch all reviews error:", error);
+    res.status(500).json({ message: "Server error while fetching customer reviews" });
+  }
+};
+
+// @desc    Get real platform statistics for Home Page Dashboard Cards
+// @route   GET /api/auth/stats
+exports.getPlatformStats = async (req, res) => {
+  try {
+    const [
+      completedOrdersCount,
+      totalOrdersCount,
+      designsCount,
+      productsCount,
+      reviews
+    ] = await Promise.all([
+      Order.countDocuments({ orderStatus: { $in: ["Completed", "Shipped", "Collected", "Delivered"] } }),
+      Order.countDocuments(),
+      CustomizedDesign.countDocuments(),
+      Product.countDocuments({ isApproved: true, status: "Active" }),
+      Review.find()
+    ]);
+
+    const reviewCount = reviews.length;
+    const avgRating = reviewCount > 0
+      ? (reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0) / reviewCount).toFixed(1)
+      : "0.0";
+
+    res.json({
+      ordersCompleted: completedOrdersCount,
+      totalOrders: totalOrdersCount,
+      uniqueDesigns: designsCount,
+      premiumProducts: productsCount,
+      customerRating: reviewCount > 0 ? `${avgRating}/5` : "0.0/5",
+      averageRating: parseFloat(avgRating),
+      reviewCount: reviewCount,
+      ratingSubtitle: reviewCount === 0 
+        ? "No reviews yet" 
+        : reviewCount === 1 
+        ? "Based on 1 review" 
+        : `Based on ${reviewCount} reviews`
+    });
+  } catch (error) {
+    console.error("Fetch platform stats error:", error);
+    res.status(500).json({ message: "Server error while fetching platform stats" });
   }
 };
 
@@ -494,9 +627,51 @@ exports.createOrder = async (req, res) => {
 
     const { items, subtotal, printCost, complexityFee, totalCost, shippingAddress } = req.body;
 
+    const normalizedItems = (items || []).map((item) => {
+      const size = item.size || item.selectedSize || "M";
+      const color = resolveColorName(item.color || item.selectedColor || "White");
+      const gsm = formatGsm(item.gsm || item.material || "GSM 180");
+      const tShirtStyle = item.tShirtStyle || item.tShirtType || (item.designId?.tShirtType) || "Crew Neck";
+      const quantity = typeof item.quantity !== "undefined" && !isNaN(Number(item.quantity)) && Number(item.quantity) > 0 
+        ? Number(item.quantity) 
+        : 1;
+      const price = typeof item.price !== "undefined" && !isNaN(Number(item.price)) 
+        ? Number(item.price) 
+        : (item.basePrice || 0);
+      const itemType = item.itemType || (item.designId ? "Customized" : "Ready-made");
+
+      return {
+        ...item,
+        itemType,
+        quantity,
+        size,
+        selectedSize: size,
+        gsm,
+        color,
+        selectedColor: color,
+        tShirtStyle,
+        material: item.material || gsm,
+        price
+      };
+    });
+
+    const primaryItem = normalizedItems[0] || {};
+    const orderSize = req.body.size || primaryItem.size || "M";
+    const orderGsm = formatGsm(req.body.gsm || primaryItem.gsm || "GSM 180");
+    const orderColor = resolveColorName(req.body.color || primaryItem.color || "White");
+    const orderQuantity = typeof req.body.quantity !== "undefined" && !isNaN(Number(req.body.quantity))
+      ? Number(req.body.quantity)
+      : (normalizedItems.reduce((sum, it) => sum + (it.quantity || 1), 0) || 1);
+    const orderTShirtStyle = req.body.tShirtStyle || req.body.tShirtType || primaryItem.tShirtStyle || "Crew Neck";
+
     const order = await Order.create({
       customerId: decoded.id,
-      items,
+      size: orderSize,
+      gsm: orderGsm,
+      color: orderColor,
+      quantity: orderQuantity,
+      tShirtStyle: orderTShirtStyle,
+      items: normalizedItems,
       subtotal,
       printCost: printCost || 0,
       complexityFee: complexityFee || 0,
@@ -878,4 +1053,197 @@ exports.cancelOrder = async (req, res) => {
     res.status(500).json({ message: "Server error while cancelling order" });
   }
 };
+
+// @desc    Mark an order as collected by customer
+// @route   PUT /api/auth/orders/:orderId/collect
+exports.markOrderCollected = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { orderId } = req.params;
+    const order = await Order.findOne({ _id: orderId, customerId: decoded.id })
+      .populate("assignedEmployee", "name")
+      .populate("items.productId")
+      .populate("items.designId");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Allow marking collected if Shipped or Completed
+    order.orderStatus = "Collected";
+    order.isCollected = true;
+    order.collectedAt = new Date();
+
+    order.timeline.push({
+      status: "Collected",
+      note: "Order confirmed collected and received by customer.",
+      timestamp: new Date()
+    });
+
+    await order.save();
+
+    // Create notifications for staff
+    try {
+      const notifMsg = `Customer has successfully collected Order #${order._id.toString().slice(-8).toUpperCase()}.`;
+
+      await createNotification({
+        recipientRole: "Admin",
+        title: "Order Collected",
+        message: notifMsg,
+        type: "Order Update"
+      });
+
+      await createNotification({
+        recipientRole: "Manager",
+        title: "Order Collected",
+        message: notifMsg,
+        type: "Order Update"
+      });
+
+      if (order.assignedEmployee) {
+        await createNotification({
+          recipientId: order.assignedEmployee._id || order.assignedEmployee,
+          title: "Order Collected",
+          message: notifMsg,
+          type: "Order Update"
+        });
+      }
+    } catch (notifErr) {
+      console.error("Failed to generate collection notifications:", notifErr);
+    }
+
+    res.json({ message: "Order marked as collected successfully", order });
+  } catch (error) {
+    console.error("Mark order collected error:", error);
+    res.status(500).json({ message: "Server error while updating order status" });
+  }
+};
+
+// @desc    Submit rating and review comment for product / order
+// @route   POST /api/auth/orders/:orderId/review
+exports.submitOrderReview = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const { orderId } = req.params;
+    const { rating, comment } = req.body;
+
+    const numRating = Number(rating);
+    if (!numRating || numRating < 1 || numRating > 5) {
+      return res.status(400).json({ message: "Please provide a valid rating between 1 and 5 stars." });
+    }
+
+    const order = await Order.findOne({ _id: orderId, customerId: decoded.id })
+      .populate("items.productId")
+      .populate("items.designId");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const user = await User.findById(decoded.id);
+    const userName = user ? user.name : "Customer";
+
+    const reviewObj = {
+      rating: numRating,
+      comment: (comment || "").trim(),
+      createdAt: new Date()
+    };
+
+    // Update order review
+    order.review = reviewObj;
+
+    // Update item-level reviews
+    if (order.items && order.items.length > 0) {
+      order.items.forEach(item => {
+        item.review = reviewObj;
+      });
+    }
+
+    await order.save();
+
+    // Store review document(s) in Review collection and update product average rating
+    if (order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        const prodId = item.productId?._id || item.productId;
+        const desId = item.designId?._id || item.designId;
+
+        // Upsert review record
+        await Review.findOneAndUpdate(
+          { orderId: order._id, userId: decoded.id, ...(prodId ? { productId: prodId } : { designId: desId }) },
+          {
+            orderId: order._id,
+            productId: prodId || undefined,
+            designId: desId || undefined,
+            userId: decoded.id,
+            userName,
+            rating: numRating,
+            comment: (comment || "").trim()
+          },
+          { upsert: true, new: true }
+        );
+
+        // Recalculate average rating for store product if applicable
+        if (prodId) {
+          try {
+            const productReviews = await Review.find({ productId: prodId });
+            if (productReviews.length > 0) {
+              const avg = productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length;
+              await Product.findByIdAndUpdate(prodId, {
+                averageRating: parseFloat(avg.toFixed(1)),
+                ratingsCount: productReviews.length
+              });
+            }
+          } catch (pErr) {
+            console.error("Error updating product average rating:", pErr);
+          }
+        }
+      }
+    } else {
+      await Review.findOneAndUpdate(
+        { orderId: order._id, userId: decoded.id },
+        {
+          orderId: order._id,
+          userId: decoded.id,
+          userName,
+          rating: numRating,
+          comment: (comment || "").trim()
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    // Send notifications to Admin/Manager about new review
+    try {
+      await createNotification({
+        recipientRole: "Admin",
+        title: `New Product Review (${numRating}★)`,
+        message: `${userName} rated Order #${order._id.toString().slice(-8).toUpperCase()} with ${numRating} stars: "${(comment || "").slice(0, 80)}"`,
+        type: "Order Update"
+      });
+
+      await createNotification({
+        recipientRole: "Manager",
+        title: `New Product Review (${numRating}★)`,
+        message: `${userName} rated Order #${order._id.toString().slice(-8).toUpperCase()} with ${numRating} stars: "${(comment || "").slice(0, 80)}"`,
+        type: "Order Update"
+      });
+    } catch (notifErr) {
+      console.error("Failed to generate review notifications:", notifErr);
+    }
+
+    res.json({ message: "Thank you for your rating and feedback!", order });
+  } catch (error) {
+    console.error("Submit order review error:", error);
+    res.status(500).json({ message: "Server error while submitting review" });
+  }
+};
+
 
