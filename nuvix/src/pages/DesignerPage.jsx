@@ -118,6 +118,24 @@ const tShirtModels = [
       { gsm: "GSM 180", price: 2500.00 },
       { gsm: "GSM 220", price: 2800.00 }
     ]
+  },
+  {
+    name: "Test FBX Model",
+    path: "/images/models/test1.fbx",
+    type: "FBX Model",
+    gsmPrices: [
+      { gsm: "GSM 180", price: 1600.00 },
+      { gsm: "GSM 220", price: 1900.00 }
+    ]
+  },
+  {
+    name: "Test Walk FBX",
+    path: "/images/models/TestWalk.fbx",
+    type: "FBX Model",
+    gsmPrices: [
+      { gsm: "GSM 180", price: 1700.00 },
+      { gsm: "GSM 220", price: 2000.00 }
+    ]
   }
 ];
 
@@ -370,6 +388,7 @@ export default function DesignerPage() {
   const [rightTab, setRightTab] = useState("layers");
   const [shirtColor, setShirtColor] = useState("#ffffff");
   const [selectedModel, setSelectedModel] = useState(tShirtModels[0]);
+  const [customModelInput, setCustomModelInput] = useState("");
   const [selectedSize, setSelectedSize] = useState("M");
   const [shirtType, setShirtType] = useState("Crew Neck");
   const [shirtMaterial, setShirtMaterial] = useState("GSM 180");
@@ -1214,6 +1233,48 @@ export default function DesignerPage() {
                         </button>
                       );
                     })}
+                  </div>
+                  <div className="pt-3 border-t space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Custom 3D Model Path (.fbx / .glb)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. /images/models/test1.fbx"
+                        value={customModelInput}
+                        onChange={(e) => setCustomModelInput(e.target.value)}
+                        className="flex-1 px-3 py-2 border rounded-xl text-xs font-mono focus:outline-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!customModelInput.trim()) return;
+                          const trimmed = customModelInput.trim();
+                          const fileName = trimmed.split("/").pop() || "Custom Model";
+                          const isFbx = trimmed.toLowerCase().endsWith(".fbx");
+                          const newModel = {
+                            name: fileName,
+                            path: trimmed,
+                            type: isFbx ? "FBX Model" : "3D Model",
+                            gsmPrices: [
+                              { gsm: "GSM 180", price: 1500.00 },
+                              { gsm: "GSM 220", price: 1800.00 }
+                            ]
+                          };
+                          setAvailableStyles((prev) => {
+                            const exists = prev.find(m => m.path === newModel.path);
+                            if (exists) return prev;
+                            return [...prev, newModel];
+                          });
+                          setSelectedModel(newModel);
+                          setShirtType(newModel.type);
+                        }}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                      >
+                        Load
+                      </button>
+                    </div>
                   </div>
                 </div>
 

@@ -53,10 +53,15 @@ export default function Store3DCardPreview({
 
   const getModelPath = () => {
     if (!product) return "/images/models/male normal t-shirt1.glb";
-    if (product.modelPath && typeof product.modelPath === "string" && product.modelPath.endsWith(".glb")) {
+    const isModelFile = (url) => typeof url === "string" && (
+      url.toLowerCase().endsWith(".glb") ||
+      url.toLowerCase().endsWith(".fbx") ||
+      url.toLowerCase().endsWith(".gltf")
+    );
+    if (product.modelPath && isModelFile(product.modelPath)) {
       return product.modelPath;
     }
-    if (product.modelUrl && typeof product.modelUrl === "string" && product.modelUrl.endsWith(".glb")) {
+    if (product.modelUrl && isModelFile(product.modelUrl)) {
       return product.modelUrl;
     }
     const textStr = (
