@@ -743,8 +743,11 @@ export default function ShirtModel({
   onInteractionStart,
   onInteractionEnd
 }) {
+  const resolvedModelPath = (typeof modelPath === "string" && (modelPath.toLowerCase().endsWith(".glb") || modelPath.toLowerCase().endsWith(".gltf")))
+    ? modelPath
+    : "/images/models/male normal t-shirt1.glb";
   const { scene: rootScene } = useThree();
-  const { scene } = useGLTF(modelPath);
+  const { scene } = useGLTF(resolvedModelPath);
   const bodyMeshRef = useRef(null);
   const [meshLoaded, setMeshLoaded] = useState(false);
   const [activeScene, setActiveScene] = useState(null);

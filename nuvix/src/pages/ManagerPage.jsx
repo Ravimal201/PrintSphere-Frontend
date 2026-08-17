@@ -851,7 +851,7 @@ export default function ManagerPage() {
   const getSubmissionModelPath = () => {
     if (!selectedSubmissionProduct)
       return "/images/models/male normal t-shirt1.glb";
-    if (selectedSubmissionProduct.modelPath) {
+    if (selectedSubmissionProduct.modelPath && typeof selectedSubmissionProduct.modelPath === "string" && (selectedSubmissionProduct.modelPath.toLowerCase().endsWith(".glb") || selectedSubmissionProduct.modelPath.toLowerCase().endsWith(".gltf"))) {
       return selectedSubmissionProduct.modelPath;
     }
     const title = (selectedSubmissionProduct.title || "").toLowerCase();

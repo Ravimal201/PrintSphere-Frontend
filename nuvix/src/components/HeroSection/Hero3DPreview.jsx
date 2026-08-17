@@ -2,6 +2,8 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Center, Float, OrbitControls, useGLTF } from "@react-three/drei";
 import { Suspense, useRef, useEffect, forwardRef, useImperativeHandle, useState } from "react";
 import { DoubleSide, TextureLoader, SRGBColorSpace } from "three";
+import * as THREE from "three";
+import ThreeErrorBoundary from "../ThreeErrorBoundary";
 
 function ShirtModel({ modelRef, scale, color, designImageUrl, designScale, designPlacement, onDesignPlacementChange }) {
   const { scene } = useGLTF("/images/models/amazigh_traditional_t-shirt.glb");
@@ -222,23 +224,25 @@ const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, 
   return (
     <div onWheel={handleWheel} className="relative h-72 w-full max-w-80 cursor-pointer sm:h-90 sm:max-w-90 lg:h-105 lg:max-w-115">
       <div className="absolute inset-0 rounded-4xl bg-linear-to-br from-white via-indigo-50 to-violet-100 shadow-[0_24px_60px_rgba(99,102,241,0.14)]" />
-      <Canvas camera={{ position: [0, 0.18, 2.6], fov: 38 }} shadows className="relative z-10 h-full w-full">
+      <Canvas camera={{ position: [0, 0.18, 2.6], fov: 38 }} shadows={{ type: THREE.PCFShadowMap }} className="relative z-10 h-full w-full">
         <ambientLight intensity={1.4} />
         <directionalLight position={[3, 4, 5]} intensity={2.1} castShadow />
         <directionalLight position={[-3, 1, 2]} intensity={0.9} />
-        <Suspense fallback={null}>
-          <Float speed={1.5} rotationIntensity={0.6} floatIntensity={0.8}>
-            <ShirtModel
-              modelRef={modelRef}
-              scale={scale}
-              color={color}
-              designImageUrl={designImageUrl}
-              designScale={designScale}
-              designPlacement={designPlacement}
-              onDesignPlacementChange={onDesignPlacementChange}
-            />
-          </Float>
-        </Suspense>
+        <ThreeErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <Float speed={1.5} rotationIntensity={0.6} floatIntensity={0.8}>
+              <ShirtModel
+                modelRef={modelRef}
+                scale={scale}
+                color={color}
+                designImageUrl={designImageUrl}
+                designScale={designScale}
+                designPlacement={designPlacement}
+                onDesignPlacementChange={onDesignPlacementChange}
+              />
+            </Float>
+          </Suspense>
+        </ThreeErrorBoundary>
         <OrbitControls enablePan={false} enableZoom={false} minPolarAngle={Math.PI / 2.8} maxPolarAngle={Math.PI / 2.2} />
       </Canvas>
     </div>

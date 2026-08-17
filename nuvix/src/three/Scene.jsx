@@ -1,8 +1,10 @@
 import { useRef, useState, useEffect, Suspense } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Environment } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import ShirtModel from "./ShirtModel";
+import StudioEnvironment from "./StudioEnvironment";
+import ThreeErrorBoundary from "../components/ThreeErrorBoundary";
 
 // Helper component to manage smooth turntable transitions and zoom changes
 function ViewManager({ modelRotation, activeSide, zoomLevel, groupRef, controlsRef }) {
@@ -72,7 +74,7 @@ export default function Scene({
         preserveDrawingBuffer: true,
         antialias: true
       }}
-      shadows
+      shadows={{ type: THREE.PCFShadowMap }}
       className="w-full h-full"
     >
       {/* Studio Lighting */}
@@ -93,24 +95,26 @@ export default function Scene({
       />
 
       {/* Environment preset to add subtle realistic reflections */}
-      <Suspense fallback={null}>
-         <Environment preset="city" />
+      <ThreeErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <StudioEnvironment />
 
-        {/* Rotatable Group containing the T-shirt */}
-        <group ref={groupRef}>
-          <ShirtModel
-            modelPath={modelPath}
-            shirtColor={shirtColor}
-            layers={layers}
-            selectedLayerId={selectedLayerId}
-            onSelectLayer={onSelectLayer}
-            onUpdateLayers={onUpdateLayers}
-            onDeleteLayer={onDeleteLayer}
-            onInteractionStart={() => setIsInteracting(true)}
-            onInteractionEnd={() => setIsInteracting(false)}
-          />
-        </group>
-      </Suspense>
+          {/* Rotatable Group containing the T-shirt */}
+          <group ref={groupRef}>
+            <ShirtModel
+              modelPath={modelPath}
+              shirtColor={shirtColor}
+              layers={layers}
+              selectedLayerId={selectedLayerId}
+              onSelectLayer={onSelectLayer}
+              onUpdateLayers={onUpdateLayers}
+              onDeleteLayer={onDeleteLayer}
+              onInteractionStart={() => setIsInteracting(true)}
+              onInteractionEnd={() => setIsInteracting(false)}
+            />
+          </group>
+        </Suspense>
+      </ThreeErrorBoundary>
 
       {/* Smoothly controls camera zoom and turntable rotation */}
       <ViewManager
