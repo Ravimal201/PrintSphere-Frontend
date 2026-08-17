@@ -6,7 +6,6 @@ import PopularProducts from "../components/PopularProducts/PopularProducts";
 import Testimonials from "../components/Testimonials/Testimonials";
 import HowItWorks from "../components/HowItWorks/HowItWorks";
 import HeroSection from "../components/HeroSection/HeroSection";
-import BannerSection from "../components/BannerSection/BannerSection";
 
 export default function HomePage() {
   return (
@@ -31,8 +30,6 @@ export default function HomePage() {
           <PopularProducts />
 
           <Testimonials />
-
-          <BannerSection />
 
         </main>
 
