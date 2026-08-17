@@ -118,6 +118,15 @@ const tShirtModels = [
       { gsm: "GSM 180", price: 2500.00 },
       { gsm: "GSM 220", price: 2800.00 }
     ]
+  },
+  {
+    name: "Classic FBX T-Shirt",
+    path: "/images/models/T SHIRT.fbx",
+    type: "Crew Neck",
+    gsmPrices: [
+      { gsm: "GSM 180", price: 1300.00 },
+      { gsm: "GSM 220", price: 1600.00 }
+    ]
   }
 ];
 

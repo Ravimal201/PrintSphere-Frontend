@@ -224,7 +224,14 @@ const Hero3DPreview = forwardRef(function Hero3DPreview({ scale, onScaleChange, 
   return (
     <div onWheel={handleWheel} className="relative h-72 w-full max-w-80 cursor-pointer sm:h-90 sm:max-w-90 lg:h-105 lg:max-w-115">
       <div className="absolute inset-0 rounded-4xl bg-linear-to-br from-white via-indigo-50 to-violet-100 shadow-[0_24px_60px_rgba(99,102,241,0.14)]" />
-      <Canvas camera={{ position: [0, 0.18, 2.6], fov: 38 }} shadows={{ type: THREE.PCFShadowMap }} className="relative z-10 h-full w-full">
+      <Canvas
+        camera={{ position: [0, 0.18, 2.6], fov: 38 }}
+        shadows
+        onCreated={({ gl }) => {
+          if (gl?.shadowMap) gl.shadowMap.type = THREE.PCFShadowMap;
+        }}
+        className="relative z-10 h-full w-full"
+      >
         <ambientLight intensity={1.4} />
         <directionalLight position={[3, 4, 5]} intensity={2.1} castShadow />
         <directionalLight position={[-3, 1, 2]} intensity={0.9} />

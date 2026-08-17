@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import * as THREE from "three";
-import { useGLTF, Html } from "@react-three/drei";
+import { useGLTF, useFBX, Html } from "@react-three/drei";
 import { createPortal, useThree } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
@@ -70,14 +70,30 @@ function SafeDecal({
 
     const posVec = new THREE.Vector3().fromArray(vecToArray(position));
     const scaleVec = new THREE.Vector3().fromArray(vecToArray(scale));
-    
+
+    if (isNaN(posVec.x) || !isFinite(posVec.x)) posVec.x = 0;
+    if (isNaN(posVec.y) || !isFinite(posVec.y)) posVec.y = 0;
+    if (isNaN(posVec.z) || !isFinite(posVec.z)) posVec.z = 0;
+
+    if (isNaN(scaleVec.x) || !isFinite(scaleVec.x) || scaleVec.x <= 0) scaleVec.x = 0.3;
+    if (isNaN(scaleVec.y) || !isFinite(scaleVec.y) || scaleVec.y <= 0) scaleVec.y = 0.3;
+    if (isNaN(scaleVec.z) || !isFinite(scaleVec.z) || scaleVec.z <= 0) scaleVec.z = 0.25;
+
+    if (!parent.geometry || !parent.geometry.attributes || !parent.geometry.attributes.position) {
+      return;
+    }
+
     let rotEuler;
     if (!rotation || typeof rotation === 'number') {
       const o = new THREE.Object3D();
       o.position.copy(posVec);
 
       if (parent.geometry.attributes.normal === undefined) {
-        parent.geometry.computeVertexNormals();
+        try {
+          parent.geometry.computeVertexNormals();
+        } catch (e) {
+          console.warn("Could not compute vertex normals:", e);
+        }
       }
       
       const vertices = parent.geometry.attributes.position.array;
@@ -732,6 +748,33 @@ const fallbackLayer = {
   scale: [0.4, 0.12, 0.25]
 };
 
+// Subcomponents to dynamically load and clone GLTF (.glb, .gltf) or FBX (.fbx) models
+function ModelSceneLoader({ modelPath, onSceneReady }) {
+  const isFbx = typeof modelPath === "string" && modelPath.toLowerCase().endsWith(".fbx");
+  if (isFbx) {
+    return <FBXModelLoaderSub modelPath={modelPath} onSceneReady={onSceneReady} />;
+  }
+  return <GLTFModelLoaderSub modelPath={modelPath} onSceneReady={onSceneReady} />;
+}
+
+function FBXModelLoaderSub({ modelPath, onSceneReady }) {
+  const fbx = useFBX(modelPath);
+  const scene = useMemo(() => (fbx ? fbx.clone(true) : null), [fbx]);
+  useEffect(() => {
+    if (scene) onSceneReady(scene);
+  }, [scene, onSceneReady]);
+  return null;
+}
+
+function GLTFModelLoaderSub({ modelPath, onSceneReady }) {
+  const { scene: rawScene } = useGLTF(modelPath);
+  const scene = useMemo(() => (rawScene ? rawScene.clone(true) : null), [rawScene]);
+  useEffect(() => {
+    if (scene) onSceneReady(scene);
+  }, [scene, onSceneReady]);
+  return null;
+}
+
 export default function ShirtModel({
   modelPath = "/images/models/male normal t-shirt1.glb",
   shirtColor,
@@ -743,11 +786,20 @@ export default function ShirtModel({
   onInteractionStart,
   onInteractionEnd
 }) {
-  const resolvedModelPath = (typeof modelPath === "string" && (modelPath.toLowerCase().endsWith(".glb") || modelPath.toLowerCase().endsWith(".gltf")))
+  const resolvedModelPath = (typeof modelPath === "string" && (
+    modelPath.toLowerCase().endsWith(".glb") ||
+    modelPath.toLowerCase().endsWith(".gltf") ||
+    modelPath.toLowerCase().endsWith(".fbx")
+  ))
     ? modelPath
     : "/images/models/male normal t-shirt1.glb";
+
   const { scene: rootScene } = useThree();
-  const { scene } = useGLTF(resolvedModelPath);
+  const [scene, setScene] = useState(null);
+
+  const handleSceneReady = useCallback((loadedScene) => {
+    setScene(loadedScene);
+  }, []);
   const bodyMeshRef = useRef(null);
   const [meshLoaded, setMeshLoaded] = useState(false);
   const [activeScene, setActiveScene] = useState(null);
@@ -1041,9 +1093,12 @@ export default function ShirtModel({
 
   return (
     <group ref={rootGroupRef}>
-      <primitive
-        object={scene}
-      />
+      <ModelSceneLoader modelPath={resolvedModelPath} onSceneReady={handleSceneReady} />
+      {scene && (
+        <primitive
+          object={scene}
+        />
+      )}
 
       {/* Render decals inside target mesh portals so they inherit their local coordinates */}
       {meshLoaded && activeScene === scene && bodyMeshRef.current && (
