@@ -74,7 +74,10 @@ export default function Scene({
         preserveDrawingBuffer: true,
         antialias: true
       }}
-      shadows={{ type: THREE.PCFShadowMap }}
+      shadows
+      onCreated={({ gl }) => {
+        if (gl?.shadowMap) gl.shadowMap.type = THREE.PCFShadowMap;
+      }}
       className="w-full h-full"
     >
       {/* Studio Lighting */}

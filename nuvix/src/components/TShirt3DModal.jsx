@@ -36,10 +36,10 @@ const getColorValue = (colorStr) => {
 
 const getModelPath = (design) => {
   if (!design) return "/images/models/male normal t-shirt1.glb";
-  if (design.modelPath && typeof design.modelPath === "string" && design.modelPath.endsWith(".glb")) {
+  if (design.modelPath && typeof design.modelPath === "string" && (design.modelPath.toLowerCase().endsWith(".glb") || design.modelPath.toLowerCase().endsWith(".gltf") || design.modelPath.toLowerCase().endsWith(".fbx"))) {
     return design.modelPath;
   }
-  if (design.modelUrl && typeof design.modelUrl === "string" && design.modelUrl.endsWith(".glb")) {
+  if (design.modelUrl && typeof design.modelUrl === "string" && (design.modelUrl.toLowerCase().endsWith(".glb") || design.modelUrl.toLowerCase().endsWith(".gltf") || design.modelUrl.toLowerCase().endsWith(".fbx"))) {
     return design.modelUrl;
   }
 

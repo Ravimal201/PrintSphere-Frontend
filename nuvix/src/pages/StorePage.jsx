@@ -161,10 +161,10 @@ export default function StorePage() {
 
   const getModalModelPath = () => {
     if (!selected3DProduct) return "/images/models/male normal t-shirt1.glb";
-    if (selected3DProduct.modelPath && typeof selected3DProduct.modelPath === "string" && (selected3DProduct.modelPath.toLowerCase().endsWith(".glb") || selected3DProduct.modelPath.toLowerCase().endsWith(".gltf"))) {
+    if (selected3DProduct.modelPath && typeof selected3DProduct.modelPath === "string" && (selected3DProduct.modelPath.toLowerCase().endsWith(".glb") || selected3DProduct.modelPath.toLowerCase().endsWith(".gltf") || selected3DProduct.modelPath.toLowerCase().endsWith(".fbx"))) {
       return selected3DProduct.modelPath;
     }
-    if (selected3DProduct.modelUrl && typeof selected3DProduct.modelUrl === "string" && (selected3DProduct.modelUrl.toLowerCase().endsWith(".glb") || selected3DProduct.modelUrl.toLowerCase().endsWith(".gltf"))) {
+    if (selected3DProduct.modelUrl && typeof selected3DProduct.modelUrl === "string" && (selected3DProduct.modelUrl.toLowerCase().endsWith(".glb") || selected3DProduct.modelUrl.toLowerCase().endsWith(".gltf") || selected3DProduct.modelUrl.toLowerCase().endsWith(".fbx"))) {
       return selected3DProduct.modelUrl;
     }
     const title = (selected3DProduct.title || "").toLowerCase();

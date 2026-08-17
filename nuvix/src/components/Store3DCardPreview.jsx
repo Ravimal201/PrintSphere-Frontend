@@ -55,10 +55,10 @@ export default function Store3DCardPreview({
 
   const getModelPath = () => {
     if (!product) return "/images/models/male normal t-shirt1.glb";
-    if (product.modelPath && typeof product.modelPath === "string" && product.modelPath.endsWith(".glb")) {
+    if (product.modelPath && typeof product.modelPath === "string" && (product.modelPath.toLowerCase().endsWith(".glb") || product.modelPath.toLowerCase().endsWith(".gltf") || product.modelPath.toLowerCase().endsWith(".fbx"))) {
       return product.modelPath;
     }
-    if (product.modelUrl && typeof product.modelUrl === "string" && product.modelUrl.endsWith(".glb")) {
+    if (product.modelUrl && typeof product.modelUrl === "string" && (product.modelUrl.toLowerCase().endsWith(".glb") || product.modelUrl.toLowerCase().endsWith(".gltf") || product.modelUrl.toLowerCase().endsWith(".fbx"))) {
       return product.modelUrl;
     }
     const textStr = (
@@ -238,7 +238,10 @@ export default function Store3DCardPreview({
               frameloop="demand"
               gl={{ preserveDrawingBuffer: true, antialias: true }}
               camera={{ position: [0, 0.1, 4.0], fov: 38 }}
-              shadows={{ type: THREE.PCFShadowMap }}
+              shadows
+              onCreated={({ gl }) => {
+                if (gl?.shadowMap) gl.shadowMap.type = THREE.PCFShadowMap;
+              }}
               className="w-full h-full pointer-events-none"
             >
               <ambientLight intensity={1.6} />
