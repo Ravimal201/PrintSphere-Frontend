@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
-import { useGLTF, useFBX, Html } from "@react-three/drei";
+import { useGLTF, Html } from "@react-three/drei";
 import { createPortal, useThree } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
@@ -732,8 +732,7 @@ const fallbackLayer = {
   scale: [0.4, 0.12, 0.25]
 };
 
-function ShirtModelContent({
-  scene,
+export default function ShirtModel({
   modelPath = "/images/models/male normal t-shirt1.glb",
   shirtColor,
   layers,
@@ -744,7 +743,11 @@ function ShirtModelContent({
   onInteractionStart,
   onInteractionEnd
 }) {
+  const resolvedModelPath = (typeof modelPath === "string" && (modelPath.toLowerCase().endsWith(".glb") || modelPath.toLowerCase().endsWith(".gltf")))
+    ? modelPath
+    : "/images/models/male normal t-shirt1.glb";
   const { scene: rootScene } = useThree();
+  const { scene } = useGLTF(resolvedModelPath);
   const bodyMeshRef = useRef(null);
   const [meshLoaded, setMeshLoaded] = useState(false);
   const [activeScene, setActiveScene] = useState(null);
@@ -834,10 +837,8 @@ function ShirtModelContent({
           if (child.material) {
             const mats = Array.isArray(child.material) ? child.material : [child.material];
             mats.forEach((mat) => {
-              if (mat.color) {
-                mat.color.set(shirtColor);
-                mat.needsUpdate = true;
-              }
+              mat.color.set(shirtColor);
+              mat.needsUpdate = true;
             });
           }
 
@@ -1036,9 +1037,13 @@ function ShirtModelContent({
     }
   }, [meshLoaded, scene, localLayers, onUpdateLayers, modelPath]);
 
+  const activeLayer = localLayers.find((l) => l.id === selectedLayerId);
+
   return (
     <group ref={rootGroupRef}>
-      <primitive object={scene} />
+      <primitive
+        object={scene}
+      />
 
       {/* Render decals inside target mesh portals so they inherit their local coordinates */}
       {meshLoaded && activeScene === scene && bodyMeshRef.current && (
@@ -1079,29 +1084,6 @@ function ShirtModelContent({
       )}
     </group>
   );
-}
-
-function GLTFShirtModelWrapper(props) {
-  const { scene } = useGLTF(props.modelPath);
-  const clonedScene = useMemo(() => scene.clone(true), [scene]);
-  return <ShirtModelContent {...props} scene={clonedScene} />;
-}
-
-function FBXShirtModelWrapper(props) {
-  const fbx = useFBX(props.modelPath);
-  const clonedScene = useMemo(() => fbx.clone(true), [fbx]);
-  return <ShirtModelContent {...props} scene={clonedScene} />;
-}
-
-export default function ShirtModel(props) {
-  const modelPath = props.modelPath || "/images/models/male normal t-shirt1.glb";
-  const cleanPath = typeof modelPath === "string" ? modelPath.split("?")[0].split("#")[0].toLowerCase() : "";
-  const isFbx = cleanPath.endsWith(".fbx");
-
-  if (isFbx) {
-    return <FBXShirtModelWrapper {...props} modelPath={modelPath} />;
-  }
-  return <GLTFShirtModelWrapper {...props} modelPath={modelPath} />;
 }
 
 // Preload all dynamic GLB models to eliminate switching latency

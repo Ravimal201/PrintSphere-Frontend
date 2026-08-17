@@ -851,7 +851,7 @@ export default function ManagerPage() {
   const getSubmissionModelPath = () => {
     if (!selectedSubmissionProduct)
       return "/images/models/male normal t-shirt1.glb";
-    if (selectedSubmissionProduct.modelPath) {
+    if (selectedSubmissionProduct.modelPath && typeof selectedSubmissionProduct.modelPath === "string" && (selectedSubmissionProduct.modelPath.toLowerCase().endsWith(".glb") || selectedSubmissionProduct.modelPath.toLowerCase().endsWith(".gltf"))) {
       return selectedSubmissionProduct.modelPath;
     }
     const title = (selectedSubmissionProduct.title || "").toLowerCase();
@@ -3365,7 +3365,7 @@ export default function ManagerPage() {
               <div>
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                    3D Model File Path (.glb, .fbx, .gltf)
+                    3D GLTF Model File Path
                   </label>
                 </div>
                 <input
@@ -3375,7 +3375,7 @@ export default function ManagerPage() {
                   onChange={(e) =>
                     setStyleForm((prev) => ({ ...prev, path: e.target.value }))
                   }
-                  placeholder="e.g. /images/models/test1.fbx or male normal t-shirt1.glb"
+                  placeholder="e.g. /images/models/male normal t-shirt1.glb"
                   className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 font-mono"
                 />
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -3386,8 +3386,6 @@ export default function ManagerPage() {
                     { label: "Long Sleeve", path: "/images/models/long_sleeve_t-_shirt.glb", defaultType: "Long Sleeve" },
                     { label: "Oversized", path: "/images/models/oversized t-sdirt1.glb", defaultType: "Oversized" },
                     { label: "Hoodie", path: "/images/models/t_shirt_hoodie.glb", defaultType: "Hoodie" },
-                    { label: "Test FBX Model", path: "/images/models/test1.fbx", defaultType: "FBX Model" },
-                    { label: "Test Walk FBX", path: "/images/models/TestWalk.fbx", defaultType: "FBX Model" },
                   ].map((preset) => (
                     <button
                       key={preset.label}

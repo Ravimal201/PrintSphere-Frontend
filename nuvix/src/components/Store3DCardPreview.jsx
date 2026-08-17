@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
+import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
-import { Environment } from "@react-three/drei";
 import ShirtModel from "../three/ShirtModel";
+import StudioEnvironment from "../three/StudioEnvironment";
 import TShirt2D from "./TShirt2D";
+import ThreeErrorBoundary from "./ThreeErrorBoundary";
 import { Sparkles, Image as ImageIcon } from "lucide-react";
 
 // Global cache for frozen 3D model snapshot images
@@ -53,15 +55,10 @@ export default function Store3DCardPreview({
 
   const getModelPath = () => {
     if (!product) return "/images/models/male normal t-shirt1.glb";
-    const isModelFile = (url) => typeof url === "string" && (
-      url.toLowerCase().endsWith(".glb") ||
-      url.toLowerCase().endsWith(".fbx") ||
-      url.toLowerCase().endsWith(".gltf")
-    );
-    if (product.modelPath && isModelFile(product.modelPath)) {
+    if (product.modelPath && typeof product.modelPath === "string" && product.modelPath.endsWith(".glb")) {
       return product.modelPath;
     }
-    if (product.modelUrl && isModelFile(product.modelUrl)) {
+    if (product.modelUrl && typeof product.modelUrl === "string" && product.modelUrl.endsWith(".glb")) {
       return product.modelUrl;
     }
     const textStr = (
@@ -241,27 +238,29 @@ export default function Store3DCardPreview({
               frameloop="demand"
               gl={{ preserveDrawingBuffer: true, antialias: true }}
               camera={{ position: [0, 0.1, 4.0], fov: 38 }}
-              shadows
+              shadows={{ type: THREE.PCFShadowMap }}
               className="w-full h-full pointer-events-none"
             >
               <ambientLight intensity={1.6} />
               <directionalLight position={[4, 5, 5]} intensity={2.2} />
               <directionalLight position={[-4, 3, -5]} intensity={1.2} />
 
-              <Suspense fallback={null}>
-                <Environment preset="city" />
-                <group rotation={[0, rotationY, 0]}>
-                  <ShirtModel
-                    modelPath={getModelPath()}
-                    shirtColor={shirtColor}
-                    layers={getLayers()}
-                    selectedLayerId={null}
-                    onSelectLayer={() => {}}
-                    onUpdateLayers={() => {}}
-                  />
-                </group>
-                <SnapshotCapturer onCapture={handleCapture} />
-              </Suspense>
+              <ThreeErrorBoundary fallback={null}>
+                <Suspense fallback={null}>
+                  <StudioEnvironment />
+                  <group rotation={[0, rotationY, 0]}>
+                    <ShirtModel
+                      modelPath={getModelPath()}
+                      shirtColor={shirtColor}
+                      layers={getLayers()}
+                      selectedLayerId={null}
+                      onSelectLayer={() => {}}
+                      onUpdateLayers={() => {}}
+                    />
+                  </group>
+                  <SnapshotCapturer onCapture={handleCapture} />
+                </Suspense>
+              </ThreeErrorBoundary>
             </Canvas>
           </div>
         </div>
