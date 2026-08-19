@@ -51,7 +51,7 @@ export default function ContactUsPage() {
                       </div>
                       <div>
                         <p className="font-bold text-slate-900">Our Office</p>
-                        <p className="text-slate-500 mt-0.5">100 Galle Road, Colombo 03, Sri Lanka</p>
+                        <p className="text-slate-500 mt-0.5">Nuvix Apparel, Dampalgama, Unella, Palatuwa, Matara</p>
                       </div>
                     </div>
 
@@ -61,7 +61,7 @@ export default function ContactUsPage() {
                       </div>
                       <div>
                         <p className="font-bold text-slate-900">Email Address</p>
-                        <p className="text-slate-500 mt-0.5">support@printsphere.com</p>
+                        <p className="text-slate-500 mt-0.5">nuvixapparelbiz@gmail.com</p>
                       </div>
                     </div>
 
@@ -71,7 +71,7 @@ export default function ContactUsPage() {
                       </div>
                       <div>
                         <p className="font-bold text-slate-900">Phone Hotline</p>
-                        <p className="text-slate-550 mt-0.5">+94 11 234 5678</p>
+                        <p className="text-slate-550 mt-0.5">+94 771497641</p>
                       </div>
                     </div>
 
