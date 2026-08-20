@@ -77,6 +77,9 @@ const CustomizedDesignSchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    modelPath: {
+      type: String
+    },
     fabricColor: {
       type: String,
       required: true

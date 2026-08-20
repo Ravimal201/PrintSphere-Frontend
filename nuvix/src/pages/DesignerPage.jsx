@@ -130,7 +130,55 @@ const tShirtModels = [
   }
 ];
 
+// Helper to read cached custom design synchronously on component mount
+const getInitialCustomDesign = () => {
+  try {
+    const raw = localStorage.getItem("load_custom_design");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("Error reading initial custom design from storage:", e);
+    return null;
+  }
+};
+
+const findMatchingModel = (design, styles = tShirtModels) => {
+  if (!design) return styles[0] || tShirtModels[0];
+  if (design.modelPath) {
+    const match = styles.find(m => m.path === design.modelPath) || tShirtModels.find(m => m.path === design.modelPath);
+    if (match) return match;
+  }
+  const typeStr = (design.tShirtType || design.shirtType || design.name || "").toLowerCase();
+  if (typeStr) {
+    const match = styles.find(m => m.name.toLowerCase() === typeStr) ||
+                  tShirtModels.find(m => m.name.toLowerCase() === typeStr) ||
+                  styles.find(m => m.name.toLowerCase().includes(typeStr) || typeStr.includes(m.name.toLowerCase())) ||
+                  tShirtModels.find(m => m.name.toLowerCase().includes(typeStr) || typeStr.includes(m.name.toLowerCase()));
+    if (match) return match;
+
+    if (typeStr.includes("female") || typeStr.includes("women") || typeStr.includes("woman") || typeStr.includes("v-neck")) {
+      return styles.find(m => m.path.includes("female")) || tShirtModels[1];
+    }
+    if (typeStr.includes("long sleeve") || typeStr.includes("long-sleeve")) {
+      return styles.find(m => m.path.includes("long_sleeve")) || tShirtModels[2];
+    }
+    if (typeStr.includes("oversized")) {
+      return styles.find(m => m.path.includes("oversized")) || tShirtModels[3];
+    }
+    if (typeStr.includes("hoodie") || typeStr.includes("polo")) {
+      return styles.find(m => m.path.includes("hoodie")) || tShirtModels[4];
+    }
+    if (typeStr.includes("fbx") || typeStr.includes("classic")) {
+      return styles.find(m => m.path.includes("fbx") || m.path.includes("T SHIRT")) || tShirtModels[5];
+    }
+  }
+  return styles[0] || tShirtModels[0];
+};
+
 export default function DesignerPage() {
+  const initialDraft = useRef(getInitialCustomDesign()).current;
+  const initialModel = findMatchingModel(initialDraft, tShirtModels);
+
   const [activeMenu, setActiveMenu] = useState("3d-designer");
 
   const [isEmployee, setIsEmployee] = useState(false);
@@ -174,7 +222,7 @@ export default function DesignerPage() {
           axios.get(`${API_BASE_URL}/auth/tshirt-styles`),
           axios.get(`${API_BASE_URL}/auth/pricing-rules`)
         ]);
-        if (stylesRes.data) {
+        if (stylesRes.data && Array.isArray(stylesRes.data) && stylesRes.data.length > 0) {
           setAvailableStyles(stylesRes.data);
           stylesList = stylesRes.data;
         }
@@ -201,8 +249,9 @@ export default function DesignerPage() {
         try {
           const design = JSON.parse(designToLoad);
           if (design.layers && Array.isArray(design.layers)) {
-            const normalizedLayers = design.layers.map((l) => ({
+            const normalizedLayers = design.layers.map((l, idx) => ({
               ...l,
+              id: l.id || `layer-${idx}`,
               visible: l.visible !== undefined ? Boolean(l.visible) : true,
               locked: l.locked !== undefined ? Boolean(l.locked) : false,
               flipX: Boolean(l.flipX),
@@ -214,37 +263,17 @@ export default function DesignerPage() {
             setLayers(normalizedLayers);
           }
           if (design.fabricColor) setShirtColor(design.fabricColor);
-          if (design.tShirtType) {
-            const model = stylesList.find(m => m.name === design.tShirtType) ||
-              stylesList.find(m => m.name.toLowerCase().includes(design.tShirtType.toLowerCase()));
-            if (model) {
-              setSelectedModel(model);
-              setShirtType(model.type);
-            }
+          
+          const model = findMatchingModel(design, stylesList);
+          if (model) {
+            setSelectedModel(model);
+            setShirtType(model.type);
           }
+          if (design.material) setShirtMaterial(design.material);
           if (design.size) setSelectedSize(design.size);
           localStorage.removeItem("load_custom_design");
         } catch (err) {
           console.error("Error loading design:", err);
-        }
-      } else {
-        const defaultModel = stylesList && stylesList.length > 0 ? stylesList[0] : null;
-        if (defaultModel) {
-          setSelectedModel(defaultModel);
-          setShirtType(defaultModel.type);
-          if (defaultModel.colors && defaultModel.colors.length > 0) {
-            setShirtColor(defaultModel.colors[0].value);
-          }
-          const defaultGSMs = defaultModel.gsmPrices && defaultModel.gsmPrices.length > 0
-            ? defaultModel.gsmPrices.map(gp => gp.gsm)
-            : (defaultModel.gsms || []);
-          if (defaultGSMs.length > 0) {
-            setShirtMaterial(defaultGSMs[0]);
-          }
-        } else {
-          setSelectedModel(null);
-          setShirtType("Crew Neck");
-          setShirtColor("#ffffff");
         }
       }
     };
@@ -358,6 +387,7 @@ export default function DesignerPage() {
 
     const payload = {
       tShirtType: selectedModel?.name || "Crew Neck T-Shirt",
+      modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
       fabricColor: shirtColor,
       material: shirtMaterial,
       size: selectedSize,
@@ -377,11 +407,11 @@ export default function DesignerPage() {
 
   const [leftTab, setLeftTab] = useState("edit");
   const [rightTab, setRightTab] = useState("layers");
-  const [shirtColor, setShirtColor] = useState("#ffffff");
-  const [selectedModel, setSelectedModel] = useState(tShirtModels[0]);
-  const [selectedSize, setSelectedSize] = useState("M");
-  const [shirtType, setShirtType] = useState("Crew Neck");
-  const [shirtMaterial, setShirtMaterial] = useState("GSM 180");
+  const [shirtColor, setShirtColor] = useState(() => initialDraft?.fabricColor || initialDraft?.color || "#ffffff");
+  const [selectedModel, setSelectedModel] = useState(() => initialModel);
+  const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
+  const [shirtType, setShirtType] = useState(() => initialModel?.type || "Crew Neck");
+  const [shirtMaterial, setShirtMaterial] = useState(() => initialDraft?.material || "GSM 180");
   const [activeView, setActiveView] = useState("front");
   const [modelRotation, setModelRotation] = useState(0); // in radians
   const [zoomLevel, setZoomLevel] = useState(0.85);
@@ -398,7 +428,32 @@ export default function DesignerPage() {
     volumeDiscountPercentage: 10
   });
 
-  const [layers, setLayers] = useState([]);
+  const [layers, setLayers] = useState(() => {
+    if (initialDraft?.layers && Array.isArray(initialDraft.layers)) {
+      return initialDraft.layers.map((l, idx) => ({
+        id: l.id || `layer-${idx}`,
+        type: l.type || "image",
+        name: l.name || (l.type === "text" ? "Custom Text" : "Custom Logo"),
+        text: l.text || "",
+        fontFamily: l.fontFamily || "Outfit",
+        color: l.color || "#1e293b",
+        bold: Boolean(l.bold),
+        italic: Boolean(l.italic),
+        url: l.url || l.image || l.src || "",
+        visible: l.visible !== undefined ? Boolean(l.visible) : true,
+        locked: l.locked !== undefined ? Boolean(l.locked) : false,
+        flipX: Boolean(l.flipX),
+        flipY: Boolean(l.flipY),
+        position: Array.isArray(l.position) ? l.position : [0, 0, 0],
+        rotation: Array.isArray(l.rotation) ? l.rotation : [0, 0, 0],
+        scale: Array.isArray(l.scale) ? l.scale : [0.3, 0.3, 0.25],
+        projectedForModel: l.projectedForModel || initialModel?.path || null,
+        targetMeshName: l.targetMeshName || null,
+        aspectRatio: l.aspectRatio || 1
+      }));
+    }
+    return [];
+  });
   const [userImages, setUserImages] = useState([]);
 
   const saveUserImagesToStorage = (imagesList, user = currentUser) => {

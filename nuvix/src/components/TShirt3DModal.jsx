@@ -66,6 +66,9 @@ const getModelPath = (design) => {
   if (textStr.includes("hoodie") || textStr.includes("polo")) {
     return "/images/models/t_shirt_hoodie.glb";
   }
+  if (textStr.includes("fbx") || textStr.includes("classic")) {
+    return "/images/models/T SHIRT.fbx";
+  }
   return "/images/models/male normal t-shirt1.glb";
 };
 

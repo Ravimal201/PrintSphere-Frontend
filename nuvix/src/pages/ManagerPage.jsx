@@ -4114,6 +4114,323 @@ export default function ManagerPage() {
         </div>
       )}
 
+      {/* Add / Edit T-Shirt Style Modal */}
+      {showStyleModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-600/30 rounded-xl text-indigo-400">
+                  <Layers className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm uppercase tracking-wider">
+                    {editingStyle ? "Edit T-Shirt Style" : "Add New T-Shirt Style"}
+                  </h3>
+                  <p className="text-[10px] text-indigo-300 mt-0.5">
+                    3D Model Configuration, Pricing & Color Swatches
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowStyleModal(false);
+                  setEditingStyle(null);
+                }}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveStyle}
+              className="p-6 space-y-5 overflow-y-auto flex-1 text-slate-800"
+            >
+              {stylesError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{stylesError}</span>
+                </div>
+              )}
+
+              {/* Style Name */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                  Style Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Women's V-Neck, Long Sleeve Shirt, Oversized Tee"
+                  value={styleForm.name}
+                  onChange={(e) =>
+                    setStyleForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2.5 border rounded-xl text-xs font-bold focus:outline-indigo-500"
+                />
+              </div>
+
+              {/* 3D Model Path Preset / Custom */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                  3D Model File (.glb, .gltf, .fbx) *
+                </label>
+                <select
+                  value={styleForm.path}
+                  onChange={(e) =>
+                    setStyleForm((prev) => ({ ...prev, path: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 bg-white"
+                >
+                  <option value="">-- Select from Available 3D Model Files --</option>
+                  <option value="/images/models/male normal t-shirt1.glb">
+                    Men's Normal T-Shirt (male normal t-shirt1.glb)
+                  </option>
+                  <option value="/images/models/female normal t-shirt.glb">
+                    Women's T-Shirt (female normal t-shirt.glb)
+                  </option>
+                  <option value="/images/models/long_sleeve_t-_shirt.glb">
+                    Long Sleeve T-Shirt (long_sleeve_t-_shirt.glb)
+                  </option>
+                  <option value="/images/models/oversized t-sdirt1.glb">
+                    Oversized T-Shirt (oversized t-sdirt1.glb)
+                  </option>
+                  <option value="/images/models/t_shirt_hoodie.glb">
+                    T-Shirt Hoodie / Polo (t_shirt_hoodie.glb)
+                  </option>
+                  <option value="/images/models/T SHIRT.fbx">
+                    Classic T-Shirt (T SHIRT.fbx)
+                  </option>
+                  <option value="/images/models/amazigh_traditional_t-shirt.glb">
+                    Amazigh Traditional T-Shirt (amazigh_traditional_t-shirt.glb)
+                  </option>
+                  <option value="/images/models/orange_shirt_with_collar.glb">
+                    Collar Shirt (orange_shirt_with_collar.glb)
+                  </option>
+                </select>
+                <input
+                  type="text"
+                  required
+                  placeholder="Or enter custom path e.g. /images/models/custom.glb"
+                  value={styleForm.path}
+                  onChange={(e) =>
+                    setStyleForm((prev) => ({ ...prev, path: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2 border rounded-xl text-xs font-mono text-slate-700 focus:outline-indigo-500 mt-1"
+                />
+              </div>
+
+              {/* Collar / Garment Type */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                  Collar / Garment Category
+                </label>
+                <select
+                  value={styleForm.type}
+                  onChange={(e) =>
+                    setStyleForm((prev) => ({ ...prev, type: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 bg-white"
+                >
+                  <option value="Crew Neck">Crew Neck</option>
+                  <option value="V-Neck">V-Neck</option>
+                  <option value="Polo">Polo</option>
+                  <option value="Hoodie">Hoodie</option>
+                  <option value="Oversized">Oversized</option>
+                  <option value="Long Sleeve">Long Sleeve</option>
+                </select>
+              </div>
+
+              {/* GSM Weights & Prices Section */}
+              <div className="space-y-2.5 border rounded-2xl p-4 bg-slate-50/70">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                    Fabric Weights & Pricing (GSM)
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    {styleForm.gsmPrices?.length || 0} Weights Added
+                  </span>
+                </div>
+
+                {/* List of current GSMs */}
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {(styleForm.gsmPrices || []).map((gp, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200 text-xs shadow-2xs"
+                    >
+                      <span className="font-bold text-slate-800">{gp.gsm}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-extrabold text-indigo-600">
+                          Rs. {Number(gp.price || 0).toFixed(2)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStyleForm((prev) => ({
+                              ...prev,
+                              gsmPrices: prev.gsmPrices.filter((_, i) => i !== idx),
+                            }));
+                          }}
+                          className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-md transition"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add new GSM inputs */}
+                <div className="flex gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="e.g. GSM 200"
+                    value={newGsmName}
+                    onChange={(e) => setNewGsmName(e.target.value)}
+                    className="flex-1 px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-indigo-500"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Price (Rs.)"
+                    value={newGsmPrice}
+                    onChange={(e) => setNewGsmPrice(e.target.value)}
+                    className="w-28 px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newGsmName.trim() || !newGsmPrice) return;
+                      const formatted = newGsmName.toUpperCase().includes("GSM")
+                        ? newGsmName.toUpperCase().trim()
+                        : `GSM ${newGsmName.trim()}`;
+                      setStyleForm((prev) => ({
+                        ...prev,
+                        gsmPrices: [
+                          ...(prev.gsmPrices || []),
+                          { gsm: formatted, price: Number(newGsmPrice) },
+                        ],
+                      }));
+                      setNewGsmName("");
+                      setNewGsmPrice("");
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Colors Swatches Section */}
+              <div className="space-y-2.5 border rounded-2xl p-4 bg-slate-50/70">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                    Available Fabric Colors
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    {styleForm.colors?.length || 0} Colors
+                  </span>
+                </div>
+
+                {/* Swatches display */}
+                <div className="flex flex-wrap gap-2">
+                  {(styleForm.colors || []).map((color, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 bg-white border border-slate-200 rounded-full text-xs shadow-2xs group"
+                    >
+                      <span
+                        className="h-4 w-4 rounded-full border border-slate-300 shrink-0"
+                        style={{ backgroundColor: color.value }}
+                      />
+                      <span className="text-[11px] font-semibold text-slate-700">
+                        {color.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStyleForm((prev) => ({
+                            ...prev,
+                            colors: prev.colors.filter((_, i) => i !== idx),
+                          }));
+                        }}
+                        className="text-slate-400 hover:text-rose-600 transition"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add new color inputs */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="color"
+                    value={newColor.value}
+                    onChange={(e) =>
+                      setNewColor((prev) => ({ ...prev, value: e.target.value }))
+                    }
+                    className="w-9 h-8 border rounded-xl cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Color Name (e.g. Navy Blue)"
+                    value={newColor.name}
+                    onChange={(e) =>
+                      setNewColor((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    className="flex-1 px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newColor.name.trim()) return;
+                      setStyleForm((prev) => ({
+                        ...prev,
+                        colors: [
+                          ...(prev.colors || []),
+                          { name: newColor.name.trim(), value: newColor.value },
+                        ],
+                      }));
+                      setNewColor({ name: "", value: "#ffffff" });
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStyleModal(false);
+                    setEditingStyle(null);
+                  }}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={stylesLoading}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {stylesLoading && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  )}
+                  {editingStyle ? "Update Style" : "Save T-Shirt Style"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <TShirt3DModal
         isOpen={is3DModalOpen}
         onClose={() => {
