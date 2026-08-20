@@ -743,11 +743,12 @@ exports.saveCustomerDesign = async (req, res) => {
       return res.status(401).json({ message: "Authorization denied. Please log in." });
     }
 
-    const { tShirtType, fabricColor, material, size, layers, estimatedCost, thumbnailUrl } = req.body;
+    const { tShirtType, modelPath, fabricColor, material, size, layers, estimatedCost, thumbnailUrl } = req.body;
 
     const design = await CustomizedDesign.create({
       userId: decoded.id,
       tShirtType,
+      modelPath,
       fabricColor,
       material,
       size,

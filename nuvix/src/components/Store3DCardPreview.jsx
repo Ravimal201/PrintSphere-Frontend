@@ -84,6 +84,9 @@ export default function Store3DCardPreview({
     if (textStr.includes("hoodie") || textStr.includes("polo")) {
       return "/images/models/t_shirt_hoodie.glb";
     }
+    if (textStr.includes("fbx") || textStr.includes("classic")) {
+      return "/images/models/T SHIRT.fbx";
+    }
     return "/images/models/male normal t-shirt1.glb";
   };
 
@@ -129,10 +132,14 @@ export default function Store3DCardPreview({
     return [];
   };
 
+  const modelPathStr = getModelPath();
   const shirtColor = activeColor || product?.fabricColor || product?.colors?.[0] || "#ffffff";
   const designImg = product?.images?.[0] || product?.thumbnailUrl;
   const productId = product?._id || product?.id || product?.title || "prod";
-  const cacheKey = `${productId}_${shirtColor}_${viewAngle}_${designImg || ""}`;
+  const layersKey = (product?.layers && Array.isArray(product.layers))
+    ? product.layers.map(l => `${l.id || l.type}_${l.position?.join(',') || ''}_${l.scale?.join(',') || ''}`).join(';')
+    : (designImg || "");
+  const cacheKey = `${productId}_${modelPathStr}_${shirtColor}_${viewAngle}_${layersKey}`;
 
   const [snapshotUrl, setSnapshotUrl] = useState(() => snapshotCache.get(cacheKey) || null);
   const [isCapturing, setIsCapturing] = useState(!snapshotCache.has(cacheKey));
