@@ -7,12 +7,11 @@ const LayerSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["text", "image", "logo", "shape"],
-    required: true
+    default: "image"
   },
   name: {
     type: String,
-    required: true
+    default: "Layer"
   },
   // Text specific parameters
   text: String,
@@ -50,21 +49,21 @@ const LayerSchema = new mongoose.Schema({
   // 3D transform metrics (X, Y, Z coordinates and factors)
   position: {
     type: [Number],
-    required: true
+    default: [0, 0, 0]
   },
   rotation: {
     type: [Number],
-    required: true
+    default: [0, 0, 0]
   },
   scale: {
     type: [Number],
-    required: true
+    default: [0.3, 0.3, 0.25]
   },
   aspectRatio: {
     type: Number,
     default: 1
   }
-});
+}, { _id: false });
 
 const CustomizedDesignSchema = new mongoose.Schema(
   {
@@ -90,13 +89,12 @@ const CustomizedDesignSchema = new mongoose.Schema(
     },
     size: {
       type: String,
-      enum: ["S", "M", "L", "XL", "XXL"],
-      required: true
+      default: "M"
     },
     layers: [LayerSchema], // List of 3D decals projected
     estimatedCost: {
       type: Number,
-      required: true
+      default: 0
     },
     thumbnailUrl: {
       type: String

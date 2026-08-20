@@ -33,7 +33,10 @@ import {
   FlipHorizontal,
   FlipVertical,
   Undo2,
-  Redo2
+  Redo2,
+  Plus,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 
 const shirtColors = [
@@ -180,6 +183,15 @@ export default function DesignerPage() {
   const initialModel = findMatchingModel(initialDraft, tShirtModels);
 
   const [activeMenu, setActiveMenu] = useState("3d-designer");
+  const [loadedDesignId, setLoadedDesignId] = useState(() => initialDraft?._id || initialDraft?.id || sessionStorage.getItem("active_editing_design_id") || null);
+  const [showSaveChoiceModal, setShowSaveChoiceModal] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  useEffect(() => {
+    if (loadedDesignId) {
+      sessionStorage.setItem("active_editing_design_id", loadedDesignId);
+    }
+  }, [loadedDesignId]);
 
   const [isEmployee, setIsEmployee] = useState(false);
   const [isManager, setIsManager] = useState(false);
@@ -248,6 +260,9 @@ export default function DesignerPage() {
       if (designToLoad) {
         try {
           const design = JSON.parse(designToLoad);
+          if (design._id || design.id) {
+            setLoadedDesignId(design._id || design.id);
+          }
           if (design.layers && Array.isArray(design.layers)) {
             const normalizedLayers = design.layers.map((l, idx) => ({
               ...l,
@@ -376,16 +391,9 @@ export default function DesignerPage() {
     }
   };
 
-  const handleSaveCustomerDesign = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      alert("Please log in to save your design to your account.");
-      return;
-    }
-    const headers = { Authorization: `Bearer ${token}` };
+  const getDesignPayload = () => {
     const thumbnailUrl = generateDesignThumbnail(layers);
-
-    const payload = {
+    return {
       tShirtType: selectedModel?.name || "Crew Neck T-Shirt",
       modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
       fabricColor: shirtColor,
@@ -395,13 +403,85 @@ export default function DesignerPage() {
       estimatedCost: unitPrice,
       thumbnailUrl: thumbnailUrl
     };
+  };
+
+  const handleSaveBtnClick = () => {
+    if (isEmployee || isManager) {
+      setSubmitError("");
+      setSubmitSuccess("");
+      setSubmitForm({
+        title: "",
+        description: "",
+        category: selectedModel?.name || "",
+        basePrice: Math.round(unitPrice)
+      });
+      setShowSubmitModal(true);
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to save your design to your account.");
+      return;
+    }
+
+    // If currently editing a previously saved design, ask whether to overwrite or save as new
+    if (loadedDesignId) {
+      setShowSaveChoiceModal(true);
+    } else {
+      handleSaveNewDesign();
+    }
+  };
+
+  // 1. Save as a New Design Copy (POST)
+  const handleSaveNewDesign = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to save your design to your account.");
+      return;
+    }
+    setSaveLoading(true);
+    const headers = { Authorization: `Bearer ${token}` };
+    const payload = getDesignPayload();
 
     try {
-      await axios.post(`${API_BASE_URL}/auth/designs`, payload, { headers });
-      alert("Design saved successfully to your account!");
+      const res = await axios.post(`${API_BASE_URL}/auth/designs`, payload, { headers });
+      if (res.data?.design?._id) {
+        setLoadedDesignId(res.data.design._id);
+        sessionStorage.setItem("active_editing_design_id", res.data.design._id);
+      }
+      setShowSaveChoiceModal(false);
+      alert("Design saved as a new copy successfully!");
     } catch (err) {
-      console.error("Save customer design error:", err);
-      alert(err.response?.data?.message || "Failed to save design. Please try again.");
+      console.error("Save new design error:", err);
+      alert(err.response?.data?.message || err.message || "Failed to save design. Please try again.");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  // 2. Overwrite / Save On Existing Design (PUT)
+  const handleOverwriteExistingDesign = async () => {
+    const currentId = loadedDesignId || sessionStorage.getItem("active_editing_design_id");
+    if (!currentId) return handleSaveNewDesign();
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to save your design to your account.");
+      return;
+    }
+    setSaveLoading(true);
+    const headers = { Authorization: `Bearer ${token}` };
+    const payload = getDesignPayload();
+
+    try {
+      const res = await axios.put(`${API_BASE_URL}/auth/designs/${currentId}`, payload, { headers });
+      setShowSaveChoiceModal(false);
+      alert(res.data?.message || "Design updated successfully!");
+    } catch (err) {
+      console.error("Overwrite design error:", err);
+      alert(err.response?.data?.message || err.message || "Failed to update design. Please try again.");
+    } finally {
+      setSaveLoading(false);
     }
   };
 
@@ -1082,7 +1162,7 @@ export default function DesignerPage() {
                   });
                   setShowSubmitModal(true);
                 } else {
-                  handleSaveCustomerDesign();
+                  handleSaveBtnClick();
                 }
               }}
               className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition"
@@ -2142,6 +2222,89 @@ export default function DesignerPage() {
                 className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_12px_rgba(99,102,241,0.2)] focus:outline-none"
               >
                 Go to Checkout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Custom Design Choice Modal (Save on it vs Save as new one) */}
+      {showSaveChoiceModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden select-none">
+            {/* Modal Header */}
+            <div className="p-6 text-center border-b bg-slate-50/60 flex flex-col items-center">
+              <div className="h-14 w-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-3 border border-indigo-100 shadow-xs">
+                <FolderHeart className="h-7 w-7" />
+              </div>
+              <h3 className="text-lg font-black text-slate-900">Save Custom Design</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                You are modifying a previously saved design. How would you like to save your changes?
+              </p>
+            </div>
+
+            {/* Options Body */}
+            <div className="p-6 space-y-3">
+              {/* Option 1: Overwrite / Save On It */}
+              <button
+                type="button"
+                disabled={saveLoading}
+                onClick={handleOverwriteExistingDesign}
+                className="w-full text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 transition group cursor-pointer active:scale-[0.99] flex items-start gap-3.5"
+              >
+                <div className="p-2.5 rounded-xl bg-slate-100 group-hover:bg-indigo-600 text-slate-600 group-hover:text-white transition shrink-0 mt-0.5">
+                  <RefreshCw className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-sm text-slate-900 group-hover:text-indigo-950">
+                      Overwrite Existing Design
+                    </span>
+                    <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 bg-slate-200 group-hover:bg-indigo-100 group-hover:text-indigo-700 text-slate-600 rounded-md">
+                      Save on it
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 leading-snug">
+                    Update and replace the existing saved design with your latest modifications.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 2: Save as New One */}
+              <button
+                type="button"
+                disabled={saveLoading}
+                onClick={handleSaveNewDesign}
+                className="w-full text-left p-4 rounded-2xl border-2 border-indigo-500 bg-indigo-50/30 hover:bg-indigo-50/80 transition group cursor-pointer active:scale-[0.99] flex items-start gap-3.5"
+              >
+                <div className="p-2.5 rounded-xl bg-indigo-600 text-white transition shrink-0 mt-0.5 shadow-xs">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-sm text-indigo-950">
+                      Save as New Design
+                    </span>
+                    <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 bg-indigo-600 text-white rounded-md">
+                      New copy
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 leading-snug">
+                    Keep your original design intact and save these changes as a brand new copy.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t flex justify-end">
+              <button
+                type="button"
+                disabled={saveLoading}
+                onClick={() => setShowSaveChoiceModal(false)}
+                className="w-full py-2.5 px-4 text-xs font-bold text-slate-600 hover:text-slate-900 border rounded-xl hover:bg-white transition cursor-pointer"
+              >
+                Cancel
               </button>
             </div>
           </div>

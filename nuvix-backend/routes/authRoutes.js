@@ -11,6 +11,7 @@ const {
   createOrder,
   getCustomerOrders,
   saveCustomerDesign,
+  updateCustomerDesign,
   getCustomerDesigns,
   deleteCustomerDesign,
   getTShirtStylesPublic,
@@ -50,6 +51,7 @@ router.put("/orders/:orderId/cancel", cancelOrder);
 router.put("/orders/:orderId/collect", markOrderCollected);
 router.post("/orders/:orderId/review", submitOrderReview);
 router.post("/designs", saveCustomerDesign);
+router.put("/designs/:id", updateCustomerDesign);
 router.get("/designs", getCustomerDesigns);
 router.delete("/designs/:id", deleteCustomerDesign);
 

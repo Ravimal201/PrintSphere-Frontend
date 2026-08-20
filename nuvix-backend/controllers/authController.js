@@ -734,6 +734,31 @@ exports.getCustomerOrders = async (req, res) => {
   }
 };
 
+// Helper to sanitize layer data
+const sanitizeLayers = (layers) => {
+  return (layers || []).map((l, idx) => ({
+    id: String(l.id || `layer-${idx}`),
+    type: l.type || (l.text ? "text" : "image"),
+    name: String(l.name || (l.type === "text" ? "Custom Text" : "Custom Logo")),
+    text: l.text || "",
+    fontFamily: l.fontFamily || "Outfit",
+    color: l.color || "#1e293b",
+    bold: Boolean(l.bold),
+    italic: Boolean(l.italic),
+    url: l.url || l.image || l.src || "",
+    visible: l.visible !== undefined ? Boolean(l.visible) : true,
+    locked: l.locked !== undefined ? Boolean(l.locked) : false,
+    flipX: Boolean(l.flipX),
+    flipY: Boolean(l.flipY),
+    targetMeshName: l.targetMeshName || "",
+    projectedForModel: l.projectedForModel || "",
+    position: Array.isArray(l.position) ? l.position : [0, 0, 0],
+    rotation: Array.isArray(l.rotation) ? l.rotation : [0, 0, 0],
+    scale: Array.isArray(l.scale) ? l.scale : [0.3, 0.3, 0.25],
+    aspectRatio: typeof l.aspectRatio === "number" ? l.aspectRatio : 1
+  }));
+};
+
 // @desc    Save customer custom design draft
 // @route   POST /api/auth/designs
 exports.saveCustomerDesign = async (req, res) => {
@@ -747,14 +772,14 @@ exports.saveCustomerDesign = async (req, res) => {
 
     const design = await CustomizedDesign.create({
       userId: decoded.id,
-      tShirtType,
-      modelPath,
-      fabricColor,
-      material,
-      size,
-      layers: layers || [],
-      estimatedCost,
-      thumbnailUrl
+      tShirtType: tShirtType || "Crew Neck",
+      modelPath: modelPath || "/images/models/male normal t-shirt1.glb",
+      fabricColor: fabricColor || "#ffffff",
+      material: material || "GSM 180",
+      size: size || "M",
+      layers: sanitizeLayers(layers),
+      estimatedCost: Number(estimatedCost) || 0,
+      thumbnailUrl: thumbnailUrl || ""
     });
 
     await User.findByIdAndUpdate(decoded.id, {
@@ -764,7 +789,45 @@ exports.saveCustomerDesign = async (req, res) => {
     res.status(201).json({ message: "Design saved successfully", design });
   } catch (error) {
     console.error("Save customer design error:", error);
-    res.status(500).json({ message: "Server error while saving design" });
+    res.status(500).json({ message: error.message || "Server error while saving design" });
+  }
+};
+
+// @desc    Update existing customer custom design
+// @route   PUT /api/auth/designs/:id
+exports.updateCustomerDesign = async (req, res) => {
+  try {
+    const decoded = verifyUserToken(req);
+    if (!decoded) {
+      return res.status(401).json({ message: "Authorization denied. Please log in." });
+    }
+
+    const designId = req.params.id;
+    const { tShirtType, modelPath, fabricColor, material, size, layers, estimatedCost, thumbnailUrl } = req.body;
+
+    let design = await CustomizedDesign.findOne({ _id: designId, userId: decoded.id });
+    if (!design) {
+      design = await CustomizedDesign.findById(designId);
+      if (!design) {
+        return res.status(404).json({ message: "Design not found" });
+      }
+    }
+
+    if (tShirtType) design.tShirtType = tShirtType;
+    if (modelPath) design.modelPath = modelPath;
+    if (fabricColor) design.fabricColor = fabricColor;
+    if (material) design.material = material;
+    if (size) design.size = size;
+    if (layers) design.layers = sanitizeLayers(layers);
+    if (typeof estimatedCost !== "undefined") design.estimatedCost = Number(estimatedCost) || 0;
+    if (thumbnailUrl) design.thumbnailUrl = thumbnailUrl;
+
+    await design.save();
+
+    res.json({ message: "Design updated successfully", design });
+  } catch (error) {
+    console.error("Update customer design error:", error);
+    res.status(500).json({ message: error.message || "Server error while updating design" });
   }
 };
 
