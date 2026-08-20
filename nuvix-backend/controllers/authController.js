@@ -759,7 +759,7 @@ const sanitizeLayers = (layers) => {
   }));
 };
 
-// @desc    Save customer custom design draft
+// @desc    Save or Update customer custom design draft
 // @route   POST /api/auth/designs
 exports.saveCustomerDesign = async (req, res) => {
   try {
@@ -768,7 +768,28 @@ exports.saveCustomerDesign = async (req, res) => {
       return res.status(401).json({ message: "Authorization denied. Please log in." });
     }
 
-    const { tShirtType, modelPath, fabricColor, material, size, layers, estimatedCost, thumbnailUrl } = req.body;
+    const { designId, _id, tShirtType, modelPath, fabricColor, material, size, layers, estimatedCost, thumbnailUrl } = req.body;
+    const targetId = designId || _id;
+
+    if (targetId) {
+      let existing = await CustomizedDesign.findOne({ _id: targetId, userId: decoded.id });
+      if (!existing) {
+        existing = await CustomizedDesign.findById(targetId);
+      }
+      if (existing) {
+        if (tShirtType) existing.tShirtType = tShirtType;
+        if (modelPath) existing.modelPath = modelPath;
+        if (fabricColor) existing.fabricColor = fabricColor;
+        if (material) existing.material = material;
+        if (size) existing.size = size;
+        if (layers) existing.layers = sanitizeLayers(layers);
+        if (typeof estimatedCost !== "undefined") existing.estimatedCost = Number(estimatedCost) || 0;
+        if (thumbnailUrl) existing.thumbnailUrl = thumbnailUrl;
+
+        await existing.save();
+        return res.json({ message: "Design updated successfully", design: existing });
+      }
+    }
 
     const design = await CustomizedDesign.create({
       userId: decoded.id,

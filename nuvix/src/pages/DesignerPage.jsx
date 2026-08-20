@@ -460,7 +460,7 @@ export default function DesignerPage() {
     }
   };
 
-  // 2. Overwrite / Save On Existing Design (PUT)
+  // 2. Overwrite / Save On Existing Design
   const handleOverwriteExistingDesign = async () => {
     const currentId = loadedDesignId || sessionStorage.getItem("active_editing_design_id");
     if (!currentId) return handleSaveNewDesign();
@@ -471,10 +471,23 @@ export default function DesignerPage() {
     }
     setSaveLoading(true);
     const headers = { Authorization: `Bearer ${token}` };
-    const payload = getDesignPayload();
+    const payload = {
+      ...getDesignPayload(),
+      designId: currentId,
+      _id: currentId
+    };
 
     try {
-      const res = await axios.put(`${API_BASE_URL}/auth/designs/${currentId}`, payload, { headers });
+      let res;
+      try {
+        res = await axios.put(`${API_BASE_URL}/auth/designs/${currentId}`, payload, { headers });
+      } catch (putErr) {
+        if (putErr.response && putErr.response.status === 404) {
+          res = await axios.post(`${API_BASE_URL}/auth/designs`, payload, { headers });
+        } else {
+          throw putErr;
+        }
+      }
       setShowSaveChoiceModal(false);
       alert(res.data?.message || "Design updated successfully!");
     } catch (err) {
