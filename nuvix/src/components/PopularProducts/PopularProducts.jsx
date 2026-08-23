@@ -21,12 +21,47 @@ import {
   SlidersHorizontal,
   ArrowRight,
   Filter,
+  Trash2,
+  Plus,
+  Minus,
+  AlertCircle,
 } from "lucide-react";
 import axios from "axios";
 import Store3DCardPreview from "../Store3DCardPreview";
 import Scene from "../../three/Scene";
 import { API_BASE_URL } from "../../config/api";
 import { resolveColorName, formatGsm } from "../../utils/colorHelper";
+
+const getOrCreateSessionId = () => {
+  let sessionId = localStorage.getItem("printsphere_session_id");
+  if (!sessionId) {
+    sessionId =
+      "sess_" +
+      Math.random().toString(36).substring(2, 11) +
+      "_" +
+      Date.now();
+    localStorage.setItem("printsphere_session_id", sessionId);
+  }
+  return sessionId;
+};
+
+const logUserActivity = async (actionData) => {
+  try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const sessionId = getOrCreateSessionId();
+    await axios.post(
+      `${API_BASE_URL}/auth/activity`,
+      {
+        ...actionData,
+        sessionId,
+      },
+      { headers }
+    );
+  } catch (err) {
+    console.error("Activity logging error:", err);
+  }
+};
 
 const fallbackProducts = [
   {
@@ -160,6 +195,14 @@ export default function PopularProducts() {
   const scrollRef = useRef(null);
   const filterDropdownsRef = useRef(null);
 
+  // Pricing rules for volume discounts
+  const [pricingRules, setPricingRules] = useState(null);
+
+  // Cart state
+  const [cart, setCart] = useState([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+
   // Filters state
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSize, setSelectedSize] = useState("All");
@@ -210,24 +253,64 @@ export default function PopularProducts() {
     localStorage.setItem("printsphere_favorites", JSON.stringify(nextFavs));
   };
 
+  // Load initial products, pricing rules and cart
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchInitialData = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/auth/products`);
-        if (Array.isArray(response.data) && response.data.length > 0) {
-          setProducts(response.data);
+        const [productsRes, pricingRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/auth/products`).catch(() => ({ data: [] })),
+          axios.get(`${API_BASE_URL}/auth/pricing-rules`).catch(() => ({ data: null })),
+        ]);
+
+        if (Array.isArray(productsRes.data) && productsRes.data.length > 0) {
+          setProducts(productsRes.data);
         } else {
           setProducts(fallbackProducts);
         }
+
+        if (pricingRes.data) {
+          setPricingRules(pricingRes.data);
+        }
       } catch (err) {
-        console.error("Error loading popular products, using fallbacks:", err);
+        console.error("Error loading popular products data:", err);
         setProducts(fallbackProducts);
       } finally {
         setLoading(false);
       }
     };
-    fetchProducts();
+
+    // Load cart
+    try {
+      const savedCart = localStorage.getItem("printsphere_cart");
+      if (savedCart) setCart(JSON.parse(savedCart));
+    } catch (e) {
+      console.error("Failed to parse cart:", e);
+    }
+
+    fetchInitialData();
   }, []);
+
+  const saveCart = (newCart) => {
+    setCart(newCart);
+    localStorage.setItem("printsphere_cart", JSON.stringify(newCart));
+    window.dispatchEvent(new Event("cartUpdated"));
+  };
+
+  const handleUpdateQuantity = (cartKey, delta) => {
+    const updatedCart = cart.map((item) => {
+      if (item.cartKey === cartKey) {
+        const newQty = item.quantity + delta;
+        return { ...item, quantity: Math.max(1, newQty) };
+      }
+      return item;
+    });
+    saveCart(updatedCart);
+  };
+
+  const handleRemoveItem = (cartKey) => {
+    const updatedCart = cart.filter((item) => item.cartKey !== cartKey);
+    saveCart(updatedCart);
+  };
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -243,7 +326,7 @@ export default function PopularProducts() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Initialize modal fields when product is selected
+  // Initialize modal fields & log view activity when product is selected
   useEffect(() => {
     if (selected3DProduct) {
       setModalColor(selected3DProduct.colors?.[0] || "#ffffff");
@@ -260,6 +343,14 @@ export default function PopularProducts() {
       setModalZoom(0.85);
       setModalRotation(0);
       setModalAutoRotate(false);
+
+      if (selected3DProduct._id && !selected3DProduct._id.startsWith("fb-")) {
+        logUserActivity({
+          action: "VIEW_PRODUCT",
+          productId: selected3DProduct._id,
+          category: selected3DProduct.category,
+        });
+      }
     }
   }, [selected3DProduct]);
 
@@ -356,6 +447,24 @@ export default function PopularProducts() {
     }
   };
 
+  // Cart calculations
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartSubtotal = cart.reduce((sum, item) => {
+    const itemPrice = item.basePrice * (1 - (item.discount || 0) / 100);
+    return sum + itemPrice * item.quantity;
+  }, 0);
+
+  const isVolumeDiscountEligible =
+    pricingRules &&
+    pricingRules.volumeDiscount &&
+    cartItemCount >= pricingRules.volumeDiscount.thresholdQty;
+
+  const volumeDiscountAmount = isVolumeDiscountEligible
+    ? cartSubtotal * (pricingRules.volumeDiscount.discountPercentage / 100)
+    : 0;
+
+  const cartTotal = cartSubtotal - volumeDiscountAmount;
+
   // Add to cart from 3D Detail Modal
   const handleAddToCart = () => {
     if (!selected3DProduct) return;
@@ -364,25 +473,13 @@ export default function PopularProducts() {
     const formattedGsmVal = formatGsm(modalGsm);
     const cartKey = `${selected3DProduct._id || selected3DProduct.title}-${modalSize}-${colorName}-${formattedGsmVal}`;
 
-    let currentCart = [];
-    try {
-      const saved = localStorage.getItem("printsphere_cart");
-      if (saved) currentCart = JSON.parse(saved);
-    } catch (e) {
-      console.error("Cart read error:", e);
-    }
+    const existingIndex = cart.findIndex((item) => item.cartKey === cartKey);
+    let updatedCart = [...cart];
 
-    const existingIndex = currentCart.findIndex(
-      (item) => item.cartKey === cartKey
-    );
     if (existingIndex > -1) {
-      currentCart[existingIndex].quantity += modalQty;
+      updatedCart[existingIndex].quantity += modalQty;
     } else {
-      const finalUnitPrice = selected3DProduct.discount > 0
-        ? selected3DProduct.basePrice * (1 - selected3DProduct.discount / 100)
-        : selected3DProduct.basePrice;
-
-      currentCart.push({
+      updatedCart.push({
         cartKey,
         productId: selected3DProduct._id,
         title: selected3DProduct.title || selected3DProduct.name,
@@ -398,11 +495,145 @@ export default function PopularProducts() {
       });
     }
 
-    localStorage.setItem("printsphere_cart", JSON.stringify(currentCart));
+    saveCart(updatedCart);
+
+    if (selected3DProduct._id && !selected3DProduct._id.startsWith("fb-")) {
+      logUserActivity({
+        action: "ADD_TO_CART",
+        productId: selected3DProduct._id,
+        category: selected3DProduct.category,
+      });
+    }
+
     showToast(
       `Added ${modalQty}x "${selected3DProduct.title || selected3DProduct.name}" to cart!`
     );
+
+    // Close 3D product modal and open Shopping Cart Drawer
     setSelected3DProduct(null);
+    setIsCartOpen(true);
+  };
+
+  // Checkout handling for Guest vs Logged-In User
+  const handleCheckout = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.log("Guest user attempted checkout from popular products. Redirecting to login...");
+      alert("Please log in to complete your checkout.");
+      window.location.href = "/login?redirect=/store";
+      return;
+    }
+
+    const headers = { Authorization: `Bearer ${token}` };
+
+    let userAddress = { street: "", city: "", country: "Sri Lanka" };
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const parsedUser = JSON.parse(userStr);
+        if (parsedUser.address) {
+          userAddress = {
+            street: parsedUser.address.street || "",
+            city: parsedUser.address.city || "",
+            country: parsedUser.address.country || "Sri Lanka",
+          };
+        }
+      } catch (e) {
+        console.error("Failed to parse user for address:", e);
+      }
+    }
+
+    try {
+      const resolvedItems = [];
+      for (const item of cart) {
+        if (item.isCustom || item.designId?.startsWith("custom-")) {
+          // Local custom design
+          const formattedGsm = formatGsm(item.gsm || item.material || "GSM 180");
+          const payload = {
+            tShirtType: item.tShirtStyle || item.tShirtType || item.title || "Custom T-Shirt",
+            fabricColor: item.color,
+            material: formattedGsm,
+            size: item.size || "M",
+            layers: item.layers || [],
+            estimatedCost: item.basePrice,
+            thumbnailUrl: item.image || "/images/dumyImage.png",
+          };
+          const designRes = await axios.post(
+            `${API_BASE_URL}/auth/designs`,
+            payload,
+            { headers }
+          );
+          const dbDesignId = designRes.data.design._id;
+          const colorName = resolveColorName(item.color);
+          resolvedItems.push({
+            designId: dbDesignId,
+            quantity: item.quantity,
+            price: item.basePrice,
+            size: item.size,
+            selectedSize: item.size,
+            color: colorName,
+            selectedColor: colorName,
+            tShirtStyle: item.tShirtStyle || item.tShirtType || item.title || "Crew Neck",
+            gsm: formattedGsm,
+          });
+        } else {
+          // Standard catalog product
+          const colorName = resolveColorName(item.color);
+          const formattedGsm = formatGsm(item.gsm || "GSM 180");
+          resolvedItems.push({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.basePrice * (1 - (item.discount || 0) / 100),
+            size: item.size,
+            selectedSize: item.size,
+            color: colorName,
+            selectedColor: colorName,
+            tShirtStyle: item.tShirtStyle || item.category || item.title || "Crew Neck",
+            gsm: formattedGsm,
+          });
+        }
+      }
+
+      const orderPayload = {
+        items: resolvedItems,
+        subtotal: cartSubtotal,
+        printCost: 0,
+        complexityFee: 0,
+        totalCost: cartTotal,
+        shippingAddress: userAddress,
+      };
+
+      const orderRes = await axios.post(
+        `${API_BASE_URL}/auth/orders`,
+        orderPayload,
+        { headers }
+      );
+      const orderId = orderRes.data.order._id;
+
+      // Track purchase activity
+      cart.forEach((item) => {
+        if (item.productId && !item.productId.startsWith("fb-")) {
+          logUserActivity({
+            action: "PURCHASE",
+            productId: item.productId,
+            category: item.category,
+          });
+        }
+      });
+
+      // Save pending order ID, clear cart, and navigate to Payment Interface
+      localStorage.setItem("printsphere_pending_order_id", orderId);
+      saveCart([]);
+      setIsCartOpen(false);
+      window.location.href = `/payment?order_id=${orderId}`;
+    } catch (err) {
+      console.error("Checkout order error:", err);
+      const errMsg =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to process checkout. Please try again.";
+      alert(errMsg);
+    }
   };
 
   const handleCustomizeDesign = () => {
@@ -642,14 +873,30 @@ export default function PopularProducts() {
           </div>
         </div>
 
-        {/* View All Store link */}
-        <a
-          href="/store"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-indigo-600 transition hover:text-indigo-700 hover:translate-x-0.5 group"
-        >
-          <span>Explore Entire Store</span>
-          <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
-        </a>
+        {/* View All Store link and My Cart trigger */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsCartOpen(true)}
+            className="relative flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-3.5 py-2 font-bold text-xs shadow-xs transition cursor-pointer"
+          >
+            <ShoppingCart className="h-3.5 w-3.5 text-indigo-400" />
+            <span>My Cart</span>
+            {cartItemCount > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] font-black h-4 w-4 rounded-full flex items-center justify-center">
+                {cartItemCount}
+              </span>
+            )}
+          </button>
+
+          <a
+            href="/store"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-indigo-600 transition hover:text-indigo-700 hover:translate-x-0.5 group"
+          >
+            <span>Explore Store</span>
+            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+          </a>
+        </div>
       </div>
 
       {/* Active Filter Chips */}
@@ -1359,6 +1606,182 @@ export default function PopularProducts() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shopping Cart Drawer */}
+      {isCartOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-end">
+          <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between select-none animate-in slide-in-from-right duration-300">
+            {/* Cart Header */}
+            <div className="bg-slate-950 text-white px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-indigo-300" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                  Your Shopping Cart
+                </h3>
+                <span className="text-xs font-bold text-indigo-300">
+                  ({cartItemCount} Items)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(false)}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Cart Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {checkoutSuccess && (
+                <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-bold">
+                  <CheckCircle className="h-5 w-5 shrink-0" />
+                  <span>Order placed successfully!</span>
+                </div>
+              )}
+
+              {cart.length === 0 ? (
+                <div className="text-center py-20 text-slate-400">
+                  <ShoppingBag className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm font-bold">Your cart is currently empty.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cart.map((item) => {
+                    const priceAfterDiscount =
+                      item.basePrice * (1 - (item.discount || 0) / 100);
+                    return (
+                      <div
+                        key={item.cartKey}
+                        className="border border-slate-200 rounded-2xl p-3 flex gap-3 hover:bg-slate-50 transition bg-slate-50/25"
+                      >
+                        <div
+                          className="h-16 w-16 rounded-xl border border-slate-200 flex items-center justify-center p-1 shrink-0 overflow-hidden"
+                          style={{
+                            backgroundColor: item.color
+                              ? item.color.startsWith("#")
+                                ? item.color
+                                : "#ffffff"
+                              : "#ffffff",
+                          }}
+                        >
+                          {item.image && item.image !== "/images/dumyImage.png" ? (
+                            <img
+                              src={item.image}
+                              alt={item.title}
+                              className="h-full w-full object-contain"
+                            />
+                          ) : (
+                            <ShoppingBag className="h-6 w-6 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-start">
+                              <h4 className="text-xs font-bold text-slate-900 truncate leading-tight pr-2">
+                                {item.title}
+                              </h4>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(item.cartKey)}
+                                className="text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-0.5">
+                              Size: {item.size} / Color: {item.color}
+                            </p>
+                          </div>
+
+                          <div className="flex justify-between items-center mt-2">
+                            <span className="text-xs font-black text-slate-950">
+                              Rs. {priceAfterDiscount.toFixed(2)}
+                            </span>
+
+                            <div className="flex items-center gap-1 bg-white border rounded-xl px-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateQuantity(item.cartKey, -1)
+                                }
+                                className="p-1 hover:text-indigo-600 transition cursor-pointer"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="text-xs font-bold min-w-[1.25rem] text-center">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateQuantity(item.cartKey, 1)
+                                }
+                                className="p-1 hover:text-indigo-600 transition cursor-pointer"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Cart Footer */}
+            {cart.length > 0 && (
+              <div className="border-t p-5 bg-slate-50 select-none space-y-4">
+                <div className="space-y-1 text-xs text-slate-600">
+                  <div className="flex justify-between">
+                    <span>Cart Subtotal</span>
+                    <span>Rs. {cartSubtotal.toFixed(2)}</span>
+                  </div>
+
+                  {isVolumeDiscountEligible && (
+                    <div className="flex justify-between text-emerald-600 font-bold">
+                      <span>
+                        Volume Discount (
+                        {pricingRules.volumeDiscount.discountPercentage}%)
+                      </span>
+                      <span>-Rs. {volumeDiscountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {pricingRules &&
+                    pricingRules.volumeDiscount &&
+                    !isVolumeDiscountEligible && (
+                      <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-[10px] text-indigo-700 font-semibold flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>
+                          Tip: Order {pricingRules.volumeDiscount.thresholdQty}{" "}
+                          units or more to get a{" "}
+                          {pricingRules.volumeDiscount.discountPercentage}% bulk
+                          discount!
+                        </span>
+                      </div>
+                    )}
+
+                  <div className="flex justify-between text-sm font-black text-slate-950 pt-2 border-t border-slate-200">
+                    <span>Estimated Total</span>
+                    <span>Rs. {cartTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCheckout}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition cursor-pointer active:scale-[0.99]"
+                >
+                  Proceed to Checkout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
