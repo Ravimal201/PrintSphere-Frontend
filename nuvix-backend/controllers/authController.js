@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
@@ -318,11 +319,13 @@ exports.trackUserActivity = async (req, res) => {
       return res.status(400).json({ message: "Action is required" });
     }
 
+    const isValidProductId = productId && mongoose.Types.ObjectId.isValid(productId);
+
     await UserActivity.create({
       userId: userId || undefined,
       sessionId: sessionId || undefined,
       action,
-      productId: productId || undefined,
+      productId: isValidProductId ? productId : undefined,
       category: category || undefined,
       searchTerm: searchTerm ? searchTerm.trim().toLowerCase() : undefined
     });
@@ -628,6 +631,8 @@ exports.createOrder = async (req, res) => {
     const { items, subtotal, printCost, complexityFee, totalCost, shippingAddress } = req.body;
 
     const normalizedItems = (items || []).map((item) => {
+      const isValidProdId = item.productId && mongoose.Types.ObjectId.isValid(item.productId);
+      const isValidDesignId = item.designId && mongoose.Types.ObjectId.isValid(item.designId);
       const size = item.size || item.selectedSize || "M";
       const color = resolveColorName(item.color || item.selectedColor || "White");
       const gsm = formatGsm(item.gsm || item.material || "GSM 180");
@@ -642,6 +647,8 @@ exports.createOrder = async (req, res) => {
 
       return {
         ...item,
+        productId: isValidProdId ? item.productId : undefined,
+        designId: isValidDesignId ? item.designId : undefined,
         itemType,
         quantity,
         size,
