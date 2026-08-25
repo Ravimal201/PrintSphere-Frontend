@@ -4,6 +4,7 @@ import { useGLTF, useFBX, Html } from "@react-three/drei";
 import { createPortal, useThree } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
+import ThreeErrorBoundary from "../components/ThreeErrorBoundary";
 import { Maximize2, RotateCw, Trash2 } from "lucide-react";
 
 // Helper to convert vectors/eulers to arrays
@@ -69,7 +70,12 @@ function SafeDecal({
     parent.matrixWorld.identity();
 
     const posVec = new THREE.Vector3().fromArray(vecToArray(position));
-    const scaleVec = new THREE.Vector3().fromArray(vecToArray(scale));
+    const rawScaleArr = vecToArray(scale);
+    const scaleVec = new THREE.Vector3(
+      Number(rawScaleArr[0]) || 0.3,
+      Number(rawScaleArr[1]) || 0.3,
+      Math.max(0.6, Number(rawScaleArr[2]) || 0.25)
+    );
 
     if (isNaN(posVec.x) || !isFinite(posVec.x)) posVec.x = 0;
     if (isNaN(posVec.y) || !isFinite(posVec.y)) posVec.y = 0;
@@ -77,7 +83,7 @@ function SafeDecal({
 
     if (isNaN(scaleVec.x) || !isFinite(scaleVec.x) || scaleVec.x <= 0) scaleVec.x = 0.3;
     if (isNaN(scaleVec.y) || !isFinite(scaleVec.y) || scaleVec.y <= 0) scaleVec.y = 0.3;
-    if (isNaN(scaleVec.z) || !isFinite(scaleVec.z) || scaleVec.z <= 0) scaleVec.z = 0.25;
+    if (isNaN(scaleVec.z) || !isFinite(scaleVec.z) || scaleVec.z <= 0) scaleVec.z = 0.6;
 
     if (!parent.geometry || !parent.geometry.attributes || !parent.geometry.attributes.position) {
       return;
@@ -169,6 +175,7 @@ function SafeDecal({
   }, [
     decalMesh,
     mesh,
+    map,
     retryCount,
     ...vecToArray(position),
     ...vecToArray(scale),
@@ -180,11 +187,121 @@ function SafeDecal({
       ref={setDecalMesh}
       geometry={geometry || undefined}
       name="decal"
+      renderOrder={100}
       {...props}
       userData={{ isDecal: true, ...props.userData }}
     >
       {children}
     </mesh>
+  );
+}
+
+// Dedicated Sub-component for Decal selection outlines & control handles
+function DecalHelperControls({
+  groupRef,
+  position,
+  rotation,
+  scale,
+  meshWorldScale,
+  onScaleDown,
+  onRotateDown,
+  onDeleteClick,
+  onDecalPointerDown
+}) {
+  const halfW = (scale[0] || 0.3) / 2;
+  const halfH = (scale[1] || 0.3) / 2;
+  const borderPoints = useMemo(() => [
+    new THREE.Vector3(-halfW, halfH, 0),
+    new THREE.Vector3(halfW, halfH, 0),
+    new THREE.Vector3(halfW, -halfH, 0),
+    new THREE.Vector3(-halfW, -halfH, 0),
+    new THREE.Vector3(-halfW, halfH, 0)
+  ], [halfW, halfH]);
+
+  const borderGeometry = useMemo(() => {
+    const geom = new THREE.BufferGeometry();
+    geom.setFromPoints(borderPoints);
+    return geom;
+  }, [borderPoints]);
+
+  return (
+    <group ref={groupRef} position={position} rotation={rotation}>
+      {/* Clean rectangular border without diagonal line */}
+      <line name="decal-helper" geometry={borderGeometry} userData={{ isDecal: true }}>
+        <lineBasicMaterial
+          color="#4f46e5"
+          linewidth={1.5}
+          transparent
+          opacity={0.8}
+          depthWrite={false}
+        />
+      </line>
+
+      {/* Invisible Drag Helper Plane (extends drag zone to the entire outline area when selected) */}
+      <mesh
+        name="decal-drag-plane"
+        userData={{ isDecal: true }}
+        position={[0, 0, 0.005]}
+        onPointerDown={onDecalPointerDown}
+      >
+        <planeGeometry args={[scale[0] || 0.3, scale[1] || 0.3]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Scale Handle (Bottom Right) */}
+      <group position={[(scale[0] || 0.3) / 2, -(scale[1] || 0.3) / 2, 0.01]}>
+        <Html center>
+          <div
+            onPointerDown={onScaleDown}
+            onPointerOver={() => {
+              document.body.style.cursor = "nwse-resize";
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "auto";
+            }}
+            className="flex items-center justify-center w-6 h-6 bg-indigo-600 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+          >
+            <Maximize2 className="w-3 h-3" />
+          </div>
+        </Html>
+      </group>
+
+      {/* Rotate Handle (Top Center) */}
+      <group position={[0, (scale[1] || 0.3) / 2 + 0.025 / (meshWorldScale.y || 1), 0.01]}>
+        <Html center>
+          <div
+            onPointerDown={onRotateDown}
+            onPointerOver={() => {
+              document.body.style.cursor = "grab";
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "auto";
+            }}
+            className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+          >
+            <RotateCw className="w-3 h-3" />
+          </div>
+        </Html>
+      </group>
+
+      {/* Delete Handle (Top Left) */}
+      <group position={[-(scale[0] || 0.3) / 2, (scale[1] || 0.3) / 2, 0.01]}>
+        <Html center>
+          <div
+            onPointerDown={onDeleteClick}
+            onPointerOver={() => {
+              document.body.style.cursor = "pointer";
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "auto";
+            }}
+            className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+          >
+            <Trash2 className="w-3 h-3" />
+          </div>
+        </Html>
+      </group>
+    </group>
   );
 }
 
@@ -480,26 +597,41 @@ function DecalItem({
   // Force update world matrices to avoid stale/identity matrix values
   rootScene.updateMatrixWorld(true);
   const mesh = targetMesh.current;
+  if (!mesh || !(mesh instanceof THREE.Mesh) || !mesh.geometry) return null;
 
-  mesh.geometry.computeBoundingBox();
-  const localBox = mesh.geometry.boundingBox;
+  try {
+    mesh.geometry.computeBoundingBox();
+  } catch (e) {
+    // Ignore bounding box error
+  }
+  const localBox = mesh.geometry.boundingBox || new THREE.Box3();
   const localCenter = new THREE.Vector3();
   localBox.getCenter(localCenter);
 
   // 1. Convert layer.position (stored in scene-group space) to mesh local space
-  const groupPos = new THREE.Vector3().fromArray(layer.position);
+  const rawPos = vecToArray(layer.position || [0, 0, 0]);
+  const groupPos = new THREE.Vector3(Number(rawPos[0]) || 0, Number(rawPos[1]) || 0, Number(rawPos[2]) || 0);
   const worldPos = groupPos.clone().applyMatrix4(scene.matrixWorld);
   const localPos = worldPos.clone().applyMatrix4(mesh.matrixWorld.clone().invert());
-  const decalPos = [localPos.x, localPos.y, localPos.z];
+  const decalPos = [
+    isNaN(localPos.x) ? 0 : localPos.x,
+    isNaN(localPos.y) ? 0 : localPos.y,
+    isNaN(localPos.z) ? 0 : localPos.z
+  ];
 
   // 2. Convert layer.scale (stored in scene-group space) to mesh local scale
-  const groupScale = new THREE.Vector3().fromArray(layer.scale);
-  const meshWorldScale = new THREE.Vector3();
+  const rawScale = vecToArray(layer.scale || [0.3, 0.3, 0.25]);
+  const groupScale = new THREE.Vector3(
+    Math.max(0.01, Number(rawScale[0]) || 0.3),
+    Math.max(0.01, Number(rawScale[1]) || 0.3),
+    Math.max(0.01, Number(rawScale[2]) || 0.25)
+  );
+  const meshWorldScale = new THREE.Vector3(1, 1, 1);
   mesh.getWorldScale(meshWorldScale);
   const decalScale = [
-    groupScale.x / (meshWorldScale.x || 1),
-    groupScale.y / (meshWorldScale.y || 1),
-    groupScale.z / (meshWorldScale.z || 1)
+    Math.max(0.01, groupScale.x / (meshWorldScale.x || 1)),
+    Math.max(0.01, groupScale.y / (meshWorldScale.y || 1)),
+    Math.max(0.01, groupScale.z / (meshWorldScale.z || 1))
   ];
 
   // Copy parent fabric texture settings and normal map (wrinkles) to decal
@@ -512,9 +644,10 @@ function DecalItem({
   const metalness = parentMat?.metalness ?? 0.0;
 
   // Convert layer.rotation (stored in scene group-space YXZ Euler angles) to a local euler angle
+  const rawRot = vecToArray(layer.rotation || [0, 0, 0]);
   const sceneQuaternion = new THREE.Quaternion().setFromRotationMatrix(scene.matrixWorld);
   const layerQuaternion = new THREE.Quaternion().setFromEuler(
-    new THREE.Euler(layer.rotation[0], layer.rotation[1], layer.rotation[2], "YXZ")
+    new THREE.Euler(Number(rawRot[0]) || 0, Number(rawRot[1]) || 0, Number(rawRot[2]) || 0, "YXZ")
   );
   const worldQuaternion = sceneQuaternion.clone().multiply(layerQuaternion);
   const meshQuaternion = new THREE.Quaternion().setFromRotationMatrix(mesh.matrixWorld);
@@ -557,7 +690,7 @@ function DecalItem({
       const y = vec.dot(basisY);
 
       dragStartRotationAngleRef.current = Math.atan2(x, y);
-      dragStartDecalRollRef.current = layer.rotation[2] || 0;
+      dragStartDecalRollRef.current = layer.rotation?.[2] || 0;
     }
   };
 
@@ -593,7 +726,8 @@ function DecalItem({
 
     rootScene.updateMatrixWorld(true);
 
-    const groupPos = new THREE.Vector3().fromArray(layer.position);
+    const rawPos = vecToArray(layer.position || [0, 0, 0]);
+    const groupPos = new THREE.Vector3(Number(rawPos[0]) || 0, Number(rawPos[1]) || 0, Number(rawPos[2]) || 0);
     const activeLayerWorldPoint = groupPos.clone().applyMatrix4(scene.matrixWorld);
 
     if (hitPoint) {
@@ -605,16 +739,6 @@ function DecalItem({
     setIsDragging(true);
     if (onInteractionStart) onInteractionStart();
   };
-  // Define points for a clean rectangular outline (no diagonal lines)
-  const halfW = decalScale[0] / 2;
-  const halfH = decalScale[1] / 2;
-  const borderPoints = [
-    new THREE.Vector3(-halfW, halfH, 0),
-    new THREE.Vector3(halfW, halfH, 0),
-    new THREE.Vector3(halfW, -halfH, 0),
-    new THREE.Vector3(-halfW, -halfH, 0),
-    new THREE.Vector3(-halfW, halfH, 0)
-  ];
 
   return (
     <group>
@@ -623,110 +747,41 @@ function DecalItem({
         mesh={targetMesh}
         position={decalPos}
         rotation={rotEuler}
-        scale={decalScale}
+        scale={[decalScale[0], decalScale[1], Math.max(0.6, decalScale[2] * 3)]}
         map={texture}
+        renderOrder={100}
         userData={{ isDecal: true, layerId: layer.id }}
         onPointerDown={handleDecalPointerDown}
       >
         <meshStandardMaterial
+          key={layer.url || layer.text || layer.id}
           map={texture}
-          transparent
-          polygonOffset
-          polygonOffsetFactor={-4}
-          polygonOffsetUnits={-4}
-          normalMap={normalMap}
-          normalScale={normalScale}
-          roughnessMap={roughnessMap}
-          metalnessMap={metalnessMap}
-          roughness={roughness}
-          metalness={metalness}
+          transparent={true}
+          polygonOffset={true}
+          polygonOffsetFactor={-10}
+          polygonOffsetUnits={-10}
+          roughness={0.7}
+          metalness={0.0}
           side={THREE.DoubleSide}
           depthTest={true}
           depthWrite={false}
+          toneMapped={false}
         />
       </SafeDecal>
  
       {/* Interactive Bounding outline and control handles when selected */}
       {isSelected && (
-        <group ref={groupRef} position={decalPos} rotation={rotEuler}>
-          {/* Clean rectangular border without diagonal line */}
-          <line name="decal-helper" userData={{ isDecal: true }}>
-            <bufferGeometry attach="geometry" onUpdate={(self) => self.setFromPoints(borderPoints)} />
-            <lineBasicMaterial
-              attach="material"
-              color="#4f46e5"
-              linewidth={1.5}
-              transparent
-              opacity={0.8}
-              depthWrite={false}
-            />
-          </line>
-
-          {/* Invisible Drag Helper Plane (extends drag zone to the entire outline area when selected) */}
-          <mesh
-            name="decal-drag-plane"
-            userData={{ isDecal: true }}
-            position={[0, 0, 0.005]}
-            onPointerDown={handleDecalPointerDown}
-          >
-            <planeGeometry args={[decalScale[0], decalScale[1]]} />
-            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-          </mesh>
-
-          {/* Scale Handle (Bottom Right) */}
-          <group position={[decalScale[0] / 2, -decalScale[1] / 2, 0.01]}>
-            <Html center>
-              <div
-                onPointerDown={handleScaleDown}
-                onPointerOver={() => {
-                  document.body.style.cursor = "nwse-resize";
-                }}
-                onPointerOut={() => {
-                  document.body.style.cursor = "auto";
-                }}
-                className="flex items-center justify-center w-6 h-6 bg-indigo-600 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
-              >
-                <Maximize2 className="w-3 h-3" />
-              </div>
-            </Html>
-          </group>
-
-          {/* Rotate Handle (Top Center) */}
-          <group position={[0, decalScale[1] / 2 + 0.025 / (meshWorldScale.y || 1), 0.01]}>
-            <Html center>
-              <div
-                onPointerDown={handleRotateDown}
-                onPointerOver={() => {
-                  document.body.style.cursor = "grab";
-                }}
-                onPointerOut={() => {
-                  document.body.style.cursor = "auto";
-                }}
-                className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
-              >
-                <RotateCw className="w-3 h-3" />
-              </div>
-            </Html>
-          </group>
-
-          {/* Delete Handle (Top Left) */}
-          <group position={[-decalScale[0] / 2, decalScale[1] / 2, 0.01]}>
-            <Html center>
-              <div
-                onPointerDown={handleDeleteClick}
-                onPointerOver={() => {
-                  document.body.style.cursor = "pointer";
-                }}
-                onPointerOut={() => {
-                  document.body.style.cursor = "auto";
-                }}
-                className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
-              >
-                <Trash2 className="w-3 h-3" />
-              </div>
-            </Html>
-          </group>
-        </group>
+        <DecalHelperControls
+          groupRef={groupRef}
+          position={decalPos}
+          rotation={rotEuler}
+          scale={decalScale}
+          meshWorldScale={meshWorldScale}
+          onScaleDown={handleScaleDown}
+          onRotateDown={handleRotateDown}
+          onDeleteClick={handleDeleteClick}
+          onDecalPointerDown={handleDecalPointerDown}
+        />
       )}
     </group>
   );
@@ -1119,18 +1174,20 @@ export default function ShirtModel({
           return (
             <group key={layer.id}>
               {createPortal(
-                <DecalItem
-                  layer={layer}
-                  isSelected={selectedLayerId === layer.id}
-                  targetMesh={meshRef}
-                  onUpdateLayers={onUpdateLayers}
-                  onDeleteLayer={onDeleteLayer}
-                  scene={scene}
-                  onInteractionStart={onInteractionStart}
-                  onInteractionEnd={onInteractionEnd}
-                  modelPath={modelPath}
-                  onSelectLayer={onSelectLayer}
-                />,
+                <ThreeErrorBoundary fallback={null}>
+                  <DecalItem
+                    layer={layer}
+                    isSelected={selectedLayerId === layer.id}
+                    targetMesh={meshRef}
+                    onUpdateLayers={onUpdateLayers}
+                    onDeleteLayer={onDeleteLayer}
+                    scene={scene}
+                    onInteractionStart={onInteractionStart}
+                    onInteractionEnd={onInteractionEnd}
+                    modelPath={modelPath}
+                    onSelectLayer={onSelectLayer}
+                  />
+                </ThreeErrorBoundary>,
                 targetMesh
               )}
             </group>

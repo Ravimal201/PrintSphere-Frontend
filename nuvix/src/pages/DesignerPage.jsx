@@ -3,6 +3,7 @@ import Scene from "../three/Scene";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { removeImageBackground } from "../utils/backgroundRemoval";
 import {
   Layers,
   Type,
@@ -548,6 +549,11 @@ export default function DesignerPage() {
     return [];
   });
   const [userImages, setUserImages] = useState([]);
+  const [autoRemoveBgOnUpload, setAutoRemoveBgOnUpload] = useState(false);
+  const [processingImageId, setProcessingImageId] = useState(null);
+  const [isLayerRemovingBg, setIsLayerRemovingBg] = useState(false);
+  const [isUploadingWithBg, setIsUploadingWithBg] = useState(false);
+  const [bgStatusMessage, setBgStatusMessage] = useState("");
 
   const saveUserImagesToStorage = (imagesList, user = currentUser) => {
     const userId = user?.id || user?._id || "guest";
@@ -779,14 +785,37 @@ export default function DesignerPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const dataUrl = reader.result;
+    reader.onloadend = async () => {
+      let dataUrl = reader.result;
       if (!dataUrl) return;
 
       const imageName = file.name.substring(0, 15);
+
+      if (autoRemoveBgOnUpload) {
+        setIsUploadingWithBg(true);
+        setBgStatusMessage("AI removing background on upload...");
+        try {
+          const transparentUrl = await removeImageBackground(dataUrl, {}, (p) => {
+            if (p.percentage) {
+              setBgStatusMessage(`Removing background (${p.percentage}%)...`);
+            }
+          });
+          dataUrl = transparentUrl;
+          setBgStatusMessage("Background removed successfully!");
+          setTimeout(() => setBgStatusMessage(""), 3000);
+        } catch (bgErr) {
+          console.error("Auto background removal failed:", bgErr);
+          setBgStatusMessage("Failed to remove background, using original image.");
+          setTimeout(() => setBgStatusMessage(""), 3000);
+        } finally {
+          setIsUploadingWithBg(false);
+        }
+      }
+
+      const finalName = autoRemoveBgOnUpload ? `${imageName.replace(/\s*\(No BG\)/g, "")} (No BG)` : imageName;
       const newImportedImg = {
         id: `user-img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        name: imageName,
+        name: finalName,
         url: dataUrl,
         timestamp: Date.now()
       };
@@ -800,23 +829,24 @@ export default function DesignerPage() {
 
       const img = new Image();
       img.onload = () => {
-        const aspect = (img.width && img.height) ? (img.width / img.height) : 1;
+        const aspect = (img.width && img.height && img.height > 0) ? (img.width / img.height) : 1;
+        const validAspect = (aspect > 0 && isFinite(aspect)) ? aspect : 1;
         const scaleX = 0.3;
-        const scaleY = 0.3 / (aspect || 1);
+        const scaleY = Math.min(0.6, Math.max(0.08, 0.3 / validAspect));
 
         const id = `img-${Date.now()}`;
         const { position, rotation } = getInitialPositionAndRotation();
         const newLayer = {
           id,
           type: "image",
-          name: imageName,
+          name: finalName,
           url: dataUrl,
           visible: true,
           locked: false,
-          position,
-          rotation,
+          position: Array.isArray(position) ? position : [0, 0, 0],
+          rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
           scale: [scaleX, scaleY, 0.25],
-          aspectRatio: aspect
+          aspectRatio: validAspect
         };
         setLayers((prev) => [...prev, newLayer]);
         selectLayer(id);
@@ -828,12 +858,12 @@ export default function DesignerPage() {
         const newLayer = {
           id,
           type: "image",
-          name: imageName,
+          name: finalName,
           url: dataUrl,
           visible: true,
           locked: false,
-          position,
-          rotation,
+          position: Array.isArray(position) ? position : [0, 0, 0],
+          rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
           scale: [0.3, 0.3, 0.25],
           aspectRatio: 1
         };
@@ -844,6 +874,88 @@ export default function DesignerPage() {
     };
     reader.readAsDataURL(file);
     e.target.value = ""; // Reset input so same image can be re-uploaded if desired
+  };
+
+  const handleRemoveBgForUserImage = async (imgObj) => {
+    if (processingImageId) return;
+    try {
+      setProcessingImageId(imgObj.id);
+      setBgStatusMessage("AI Isolating subject...");
+      const transparentUrl = await removeImageBackground(imgObj.url, {}, (p) => {
+        if (p.percentage) {
+          setBgStatusMessage(`Removing background (${p.percentage}%)...`);
+        }
+      });
+
+      const cleanName = `${imgObj.name.replace(/\s*\(No BG\)/g, "")} (No BG)`;
+      const newProcessedImg = {
+        id: `user-img-${Date.now()}-nobg`,
+        name: cleanName,
+        url: transparentUrl,
+        timestamp: Date.now()
+      };
+
+      setUserImages((prev) => {
+        const updated = [newProcessedImg, ...prev];
+        saveUserImagesToStorage(updated);
+        return updated;
+      });
+
+      // Auto add new transparent version to 3D canvas
+      addPresetImage(transparentUrl, cleanName);
+
+      setBgStatusMessage("Background removed & applied to canvas!");
+      setTimeout(() => setBgStatusMessage(""), 3500);
+    } catch (err) {
+      console.error("Failed to remove background from image:", err);
+      alert("Could not remove background from this image. Please ensure the image has a clear subject.");
+    } finally {
+      setProcessingImageId(null);
+    }
+  };
+
+  const handleRemoveBgForActiveLayer = async () => {
+    if (!activeLayer || (activeLayer.type !== "image" && activeLayer.type !== "logo") || !activeLayer.url || isLayerRemovingBg) return;
+    try {
+      setIsLayerRemovingBg(true);
+      setBgStatusMessage("AI Removing background from active layer...");
+      const transparentUrl = await removeImageBackground(activeLayer.url, {}, (p) => {
+        if (p.percentage) {
+          setBgStatusMessage(`Removing background (${p.percentage}%)...`);
+        }
+      });
+
+      const updatedName = `${(activeLayer.name || "Layer").replace(/\s*\(No BG\)/g, "")} (No BG)`;
+
+      setLayers((prev) =>
+        prev.map((l) =>
+          l.id === activeLayer.id
+            ? { ...l, url: transparentUrl, name: updatedName }
+            : l
+        )
+      );
+
+      const newProcessedImg = {
+        id: `user-img-${Date.now()}-layer-nobg`,
+        name: updatedName,
+        url: transparentUrl,
+        timestamp: Date.now()
+      };
+      setUserImages((prev) => {
+        const filtered = prev.filter((img) => img.url !== transparentUrl);
+        const updated = [newProcessedImg, ...filtered];
+        saveUserImagesToStorage(updated);
+        return updated;
+      });
+
+      setBgStatusMessage("Layer background removed successfully!");
+      setTimeout(() => setBgStatusMessage(""), 3500);
+    } catch (err) {
+      console.error("Failed to remove layer background:", err);
+      alert("Could not remove background from this layer. Please try another image.");
+    } finally {
+      setIsLayerRemovingBg(false);
+    }
   };
 
   const handleRemoveUserImage = (imageId) => {
@@ -866,9 +978,10 @@ export default function DesignerPage() {
   const addPresetImage = (url, name) => {
     const img = new Image();
     img.onload = () => {
-      const aspect = (img.width && img.height) ? (img.width / img.height) : 1;
+      const aspect = (img.width && img.height && img.height > 0) ? (img.width / img.height) : 1;
+      const validAspect = (aspect > 0 && isFinite(aspect)) ? aspect : 1;
       const scaleX = 0.3;
-      const scaleY = 0.3 / (aspect || 1);
+      const scaleY = Math.min(0.6, Math.max(0.08, 0.3 / validAspect));
 
       const id = `img-${Date.now()}`;
       const { position, rotation } = getInitialPositionAndRotation();
@@ -879,10 +992,10 @@ export default function DesignerPage() {
         url,
         visible: true,
         locked: false,
-        position,
-        rotation,
+        position: Array.isArray(position) ? position : [0, 0, 0],
+        rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
         scale: [scaleX, scaleY, 0.25],
-        aspectRatio: aspect
+        aspectRatio: validAspect
       };
       setLayers((prev) => [...prev, newLayer]);
       selectLayer(id);
@@ -898,8 +1011,8 @@ export default function DesignerPage() {
         url,
         visible: true,
         locked: false,
-        position,
-        rotation,
+        position: Array.isArray(position) ? position : [0, 0, 0],
+        rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
         scale: [0.3, 0.3, 0.25],
         aspectRatio: 1
       };
@@ -1237,6 +1350,26 @@ export default function DesignerPage() {
                       <span className="text-xs font-bold">Upload Image</span>
                     </label>
                   </div>
+
+                  <label className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-indigo-50/60 border border-indigo-100/80 hover:bg-indigo-50 transition cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoRemoveBgOnUpload}
+                      onChange={(e) => setAutoRemoveBgOnUpload(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                    />
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                      <span className="text-[11px] font-bold text-indigo-950 truncate">Auto-remove background on upload</span>
+                    </div>
+                  </label>
+
+                  {isUploadingWithBg && (
+                    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-indigo-100/70 border border-indigo-200 text-indigo-800 text-xs font-bold animate-pulse">
+                      <Loader2 className="h-4 w-4 animate-spin shrink-0 text-indigo-600" />
+                      <span>{bgStatusMessage || "AI Isolating image subject..."}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -1261,37 +1394,64 @@ export default function DesignerPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
-                      {userImages.map((img) => (
-                        <div
-                          key={img.id}
-                          className="relative group p-2 border border-slate-200 rounded-xl hover:border-indigo-500 bg-white transition flex flex-col items-center gap-1.5 shadow-xs"
-                        >
-                          <button
-                            onClick={() => addPresetImage(img.url, img.name)}
-                            className="w-full flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
-                            title="Click to add to T-shirt canvas"
+                      {userImages.map((img) => {
+                        const isProcessing = processingImageId === img.id;
+                        return (
+                          <div
+                            key={img.id}
+                            className="relative group p-2 border border-slate-200 rounded-xl hover:border-indigo-500 bg-white transition flex flex-col items-center gap-1.5 shadow-xs overflow-hidden"
                           >
-                            <img
-                              src={img.url}
-                              alt={img.name}
-                              className="h-14 w-full object-contain bg-slate-50 rounded-lg p-1 border border-slate-100"
-                            />
-                            <span className="text-[10px] font-bold text-center text-slate-700 line-clamp-1 w-full px-1">
-                              {img.name}
-                            </span>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveUserImage(img.id);
-                            }}
-                            className="absolute top-1 right-1 h-6 w-6 rounded-full bg-slate-900/80 hover:bg-rose-600 text-white flex items-center justify-center transition opacity-0 group-hover:opacity-100 shadow-md cursor-pointer"
-                            title="Remove image from library"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
+                            {isProcessing && (
+                              <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center gap-1.5">
+                                <Loader2 className="h-5 w-5 text-indigo-600 animate-spin" />
+                                <span className="text-[9px] font-bold text-indigo-700 leading-tight">AI Removing BG...</span>
+                              </div>
+                            )}
+                            <button
+                              onClick={() => addPresetImage(img.url, img.name)}
+                              disabled={isProcessing}
+                              className="w-full flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
+                              title="Click to add to T-shirt canvas"
+                            >
+                              <img
+                                src={img.url}
+                                alt={img.name}
+                                className="h-14 w-full object-contain bg-slate-50 rounded-lg p-1 border border-slate-100"
+                              />
+                              <span className="text-[10px] font-bold text-center text-slate-700 line-clamp-1 w-full px-1">
+                                {img.name}
+                              </span>
+                            </button>
+                            <div className="flex items-center gap-1 w-full pt-1 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveBgForUserImage(img);
+                                }}
+                                disabled={isProcessing}
+                                className="flex-1 py-1 px-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="Remove background with AI"
+                              >
+                                <Sparkles className="h-3 w-3 text-indigo-600 shrink-0" />
+                                <span>Cutout</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveUserImage(img.id);
+                                }}
+                                disabled={isProcessing}
+                                className="h-6 w-6 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 flex items-center justify-center transition cursor-pointer shrink-0"
+                                title="Remove image from library"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1466,6 +1626,12 @@ export default function DesignerPage() {
             </div>
 
             <div className="flex-1 flex items-center justify-center min-h-0 relative">
+              {bgStatusMessage && (
+                <div className="absolute top-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold shadow-lg animate-fade-in pointer-events-none">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-400 animate-spin" />
+                  <span>{bgStatusMessage}</span>
+                </div>
+              )}
               <Scene
                 modelPath={selectedModel?.path || "/images/models/male normal t-shirt1.glb"}
                 shirtColor={shirtColor}
@@ -1727,6 +1893,41 @@ export default function DesignerPage() {
                         />
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {(activeLayer.type === "image" || activeLayer.type === "logo") && (
+                  <div className="p-3.5 rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-indigo-50/30 space-y-2.5 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4 text-indigo-600" />
+                        AI Background Remover
+                      </span>
+                      <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Free AI
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Isolate the subject & remove the background from this graphic directly in your browser.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRemoveBgForActiveLayer}
+                      disabled={isLayerRemovingBg}
+                      className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition duration-200 cursor-pointer"
+                    >
+                      {isLayerRemovingBg ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>{bgStatusMessage || "Removing Background..."}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          <span>Remove Background</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
 
