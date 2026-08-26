@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { useGLTF, useFBX, Html } from "@react-three/drei";
-import { createPortal, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
 import ThreeErrorBoundary from "../components/ThreeErrorBoundary";
@@ -16,184 +16,6 @@ function vecToArray(vec = [0, 0, 0]) {
   } else {
     return [vec, vec, vec];
   }
-}
-
-// Custom raycaster to force handles to the front of intersections, preventing shirt mesh from blocking clicks
-function forceOnTopRaycast(raycaster, intersects) {
-  const localIntersects = [];
-  THREE.Mesh.prototype.raycast.call(this, raycaster, localIntersects);
-  for (let i = 0; i < localIntersects.length; i++) {
-    localIntersects[i].distance = 0.0001; // extremely close, sorting first
-    intersects.push(localIntersects[i]);
-  }
-}
-
-
-// Custom Safe Decal Component to prevent React 19/R3F null ref crashes
-function SafeDecal({
-  mesh,
-  position,
-  rotation,
-  scale,
-  children,
-  polygonOffsetFactor = -10,
-  depthTest = false,
-  map,
-  ...props
-}) {
-  const [decalMesh, setDecalMesh] = useState(null);
-  const [geometry, setGeometry] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
-
-  // Manually remove decal from parent on unmount to ensure cleanup
-  useEffect(() => {
-    return () => {
-      if (decalMesh && decalMesh.parent) {
-        decalMesh.parent.remove(decalMesh);
-      }
-    };
-  }, [decalMesh]);
-
-  useEffect(() => {
-    if (!decalMesh) return;
-
-    const parent = (mesh && mesh.current) || decalMesh.parent;
-    if (!parent || !(parent instanceof THREE.Mesh)) {
-      return;
-    }
-
-    // Force matrix update on parent before calculating DecalGeometry
-    parent.updateMatrixWorld(true);
-
-    // Save parent's matrixWorld and identity it for DecalGeometry calculation
-    const matrixWorld = parent.matrixWorld.clone();
-    parent.matrixWorld.identity();
-
-    const posVec = new THREE.Vector3().fromArray(vecToArray(position));
-    const rawScaleArr = vecToArray(scale);
-    const scaleVec = new THREE.Vector3(
-      Number(rawScaleArr[0]) || 0.3,
-      Number(rawScaleArr[1]) || 0.3,
-      Math.max(0.6, Number(rawScaleArr[2]) || 0.25)
-    );
-
-    if (isNaN(posVec.x) || !isFinite(posVec.x)) posVec.x = 0;
-    if (isNaN(posVec.y) || !isFinite(posVec.y)) posVec.y = 0;
-    if (isNaN(posVec.z) || !isFinite(posVec.z)) posVec.z = 0;
-
-    if (isNaN(scaleVec.x) || !isFinite(scaleVec.x) || scaleVec.x <= 0) scaleVec.x = 0.3;
-    if (isNaN(scaleVec.y) || !isFinite(scaleVec.y) || scaleVec.y <= 0) scaleVec.y = 0.3;
-    if (isNaN(scaleVec.z) || !isFinite(scaleVec.z) || scaleVec.z <= 0) scaleVec.z = 0.6;
-
-    if (!parent.geometry || !parent.geometry.attributes || !parent.geometry.attributes.position) {
-      return;
-    }
-
-    let rotEuler;
-    if (!rotation || typeof rotation === 'number') {
-      const o = new THREE.Object3D();
-      o.position.copy(posVec);
-
-      if (parent.geometry.attributes.normal === undefined) {
-        try {
-          parent.geometry.computeVertexNormals();
-        } catch (e) {
-          console.warn("Could not compute vertex normals:", e);
-        }
-      }
-      
-      const vertices = parent.geometry.attributes.position.array;
-      const normal = parent.geometry.attributes.normal.array;
-      
-      let distance = Infinity;
-      let closestNormal = new THREE.Vector3();
-      const ox = o.position.x;
-      const oy = o.position.y;
-      const oz = o.position.z;
-      const vLength = vertices.length;
-      let chosenIdx = -1;
-      
-      for (let i = 0; i < vLength; i += 3) {
-        const x = vertices[i];
-        const y = vertices[i + 1];
-        const z = vertices[i + 2];
-        const xDiff = x - ox;
-        const yDiff = y - oy;
-        const zDiff = z - oz;
-        const distSquared = xDiff * xDiff + yDiff * yDiff + zDiff * zDiff;
-        if (distSquared < distance) {
-          distance = distSquared;
-          chosenIdx = i;
-        }
-      }
-      
-      closestNormal.fromArray(normal, chosenIdx);
-      o.lookAt(o.position.clone().add(closestNormal));
-      o.rotateZ(Math.PI);
-      o.rotateY(Math.PI);
-      if (typeof rotation === 'number') o.rotateZ(rotation);
-      rotEuler = o.rotation.clone();
-    } else if (rotation instanceof THREE.Euler) {
-      rotEuler = rotation;
-    } else {
-      rotEuler = new THREE.Euler().fromArray(vecToArray(rotation));
-    }
-
-    let geom = null;
-    let timerId = null;
-
-    try {
-      geom = new DecalGeometry(parent, posVec, rotEuler, scaleVec);
-      
-      // If geometry generation resulted in zero triangles due to initial matrix timing, retry after 50ms
-      if (!geom.attributes.position || geom.attributes.position.count === 0) {
-        geom.dispose();
-        geom = null;
-        if (retryCount < 5) {
-          timerId = setTimeout(() => setRetryCount(c => c + 1), 50);
-        }
-      } else {
-        setGeometry(geom);
-      }
-    } catch (err) {
-      console.error("SafeDecal geometry generation failed:", err);
-      if (retryCount < 5) {
-        timerId = setTimeout(() => setRetryCount(c => c + 1), 50);
-      }
-    }
-
-    // Restore parent's matrixWorld
-    parent.matrixWorld.copy(matrixWorld);
-
-    return () => {
-      if (timerId) clearTimeout(timerId);
-      setGeometry(null);
-      if (geom) {
-        geom.dispose();
-      }
-    };
-  }, [
-    decalMesh,
-    mesh,
-    map,
-    retryCount,
-    ...vecToArray(position),
-    ...vecToArray(scale),
-    ...vecToArray(rotation)
-  ]);
-
-  return (
-    <mesh
-      ref={setDecalMesh}
-      geometry={geometry || undefined}
-      name="decal"
-      renderOrder={100}
-      {...props}
-      userData={{ isDecal: true, ...props.userData }}
-    >
-      {children}
-    </mesh>
-  );
 }
 
 // Dedicated Sub-component for Decal selection outlines & control handles
@@ -267,7 +89,7 @@ function DecalHelperControls({
       </group>
 
       {/* Rotate Handle (Top Center) */}
-      <group position={[0, (scale[1] || 0.3) / 2 + 0.025 / (meshWorldScale.y || 1), 0.01]}>
+      <group position={[0, (scale[1] || 0.3) / 2 + 0.04, 0.01]}>
         <Html center>
           <div
             onPointerDown={onRotateDown}
@@ -305,7 +127,7 @@ function DecalHelperControls({
   );
 }
 
-// Sub-component to manage texture loading and rendering for each decal layer
+// Sub-component to manage texture loading, 3D decal mesh on targetMesh, and helper controls
 function DecalItem({
   layer,
   isSelected,
@@ -387,23 +209,21 @@ function DecalItem({
     if (texture) {
       const flipX = layer.flipX ?? false;
       const flipY = layer.flipY ?? false;
-      
+
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
       texture.center.set(0.5, 0.5);
-      
+
       // DecalGeometry defaults to mirroring horizontally, so default repeat.x is -1.
-      // flipX = true toggles horizontal mirror.
-      // flipY = true toggles vertical mirror.
       const repeatX = flipX ? 1 : -1;
       const repeatY = flipY ? -1 : 1;
-      
+
       texture.repeat.set(repeatX, repeatY);
       texture.needsUpdate = true;
     }
   }, [texture, layer.flipX, layer.flipY]);
 
-  // Listen to mouse pointer events globally on the window to prevent lagging/losing focus
+  // Listen to mouse pointer events globally on window
   useEffect(() => {
     if (!isDragging && !isScaling && !isRotating) return;
 
@@ -411,7 +231,6 @@ function DecalItem({
       if (!targetMesh?.current) return;
       const mesh = targetMesh.current;
 
-      // Calculate NDC mouse coordinates
       const canvas = gl.domElement;
       const rect = canvas.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -469,7 +288,7 @@ function DecalItem({
                   return {
                     ...l,
                     position: [scenePoint.x, scenePoint.y, scenePoint.z],
-                    rotation: [rotation.x, rotation.y, l.rotation[2] || 0],
+                    rotation: [rotation.x, rotation.y, l.rotation?.[2] || 0],
                     projectedForModel: modelPath,
                     targetMeshName: hitMesh.name
                   };
@@ -495,22 +314,23 @@ function DecalItem({
         raycaster.ray.intersectPlane(plane, intersectionPoint);
 
         const localPoint = groupRef.current.worldToLocal(intersectionPoint.clone());
-        const meshWorldScale = new THREE.Vector3();
-        mesh.getWorldScale(meshWorldScale);
 
         if (isScaling) {
-          const newLocalScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
+          const newWorldScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
           const aspect = layer.aspectRatio || (layer.scale[0] / layer.scale[1]) || 1;
-          const newLocalScaleY = newLocalScaleX / aspect;
+          const newWorldScaleY = newWorldScaleX / aspect;
 
-          const newGroupScaleX = newLocalScaleX * meshWorldScale.x;
-          const newGroupScaleY = newLocalScaleY * meshWorldScale.y;
+          const sceneWorldScale = new THREE.Vector3();
+          scene.getWorldScale(sceneWorldScale);
+
+          const newGroupScaleX = newWorldScaleX / (sceneWorldScale.x || 1);
+          const newGroupScaleY = newWorldScaleY / (sceneWorldScale.y || 1);
 
           if (onUpdateLayers) {
             onUpdateLayers((prev) =>
               prev.map((l) =>
                 l.id === layer.id
-                  ? { ...l, scale: [newGroupScaleX, newGroupScaleY, l.scale[2]] }
+                  ? { ...l, scale: [newGroupScaleX, newGroupScaleY, l.scale[2] || 0.25] }
                   : l
               )
             );
@@ -582,77 +402,145 @@ function DecalItem({
     targetMesh
   ]);
 
-  // Clean up the handles group when deselected or unmounted
-  useEffect(() => {
-    const currentGroup = groupRef.current;
-    return () => {
-      if (currentGroup && currentGroup.parent) {
-        currentGroup.parent.remove(currentGroup);
-      }
-    };
-  }, [isSelected]);
+  const mesh = targetMesh?.current;
 
-  if (layer.visible === false || !texture || !targetMesh?.current || !scene) return null;
-
-  // Force update world matrices to avoid stale/identity matrix values
-  rootScene.updateMatrixWorld(true);
-  const mesh = targetMesh.current;
-  if (!mesh || !(mesh instanceof THREE.Mesh) || !mesh.geometry) return null;
-
-  try {
-    mesh.geometry.computeBoundingBox();
-  } catch (e) {
-    // Ignore bounding box error
-  }
-  const localBox = mesh.geometry.boundingBox || new THREE.Box3();
-  const localCenter = new THREE.Vector3();
-  localBox.getCenter(localCenter);
-
-  // 1. Convert layer.position (stored in scene-group space) to mesh local space
+  // Convert layer transforms to targetMesh local space for DecalGeometry
   const rawPos = vecToArray(layer.position || [0, 0, 0]);
   const groupPos = new THREE.Vector3(Number(rawPos[0]) || 0, Number(rawPos[1]) || 0, Number(rawPos[2]) || 0);
-  const worldPos = groupPos.clone().applyMatrix4(scene.matrixWorld);
-  const localPos = worldPos.clone().applyMatrix4(mesh.matrixWorld.clone().invert());
-  const decalPos = [
-    isNaN(localPos.x) ? 0 : localPos.x,
-    isNaN(localPos.y) ? 0 : localPos.y,
-    isNaN(localPos.z) ? 0 : localPos.z
-  ];
 
-  // 2. Convert layer.scale (stored in scene-group space) to mesh local scale
   const rawScale = vecToArray(layer.scale || [0.3, 0.3, 0.25]);
   const groupScale = new THREE.Vector3(
     Math.max(0.01, Number(rawScale[0]) || 0.3),
     Math.max(0.01, Number(rawScale[1]) || 0.3),
     Math.max(0.01, Number(rawScale[2]) || 0.25)
   );
-  const meshWorldScale = new THREE.Vector3(1, 1, 1);
-  mesh.getWorldScale(meshWorldScale);
-  const decalScale = [
-    Math.max(0.01, groupScale.x / (meshWorldScale.x || 1)),
-    Math.max(0.01, groupScale.y / (meshWorldScale.y || 1)),
-    Math.max(0.01, groupScale.z / (meshWorldScale.z || 1))
-  ];
 
-  // Copy parent fabric texture settings and normal map (wrinkles) to decal
-  const parentMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-  const normalMap = parentMat?.normalMap || null;
-  const roughnessMap = parentMat?.roughnessMap || null;
-  const metalnessMap = parentMat?.metalnessMap || null;
-  const normalScale = parentMat?.normalScale || new THREE.Vector2(1, 1);
-  const roughness = parentMat?.roughness ?? 0.8;
-  const metalness = parentMat?.metalness ?? 0.0;
-
-  // Convert layer.rotation (stored in scene group-space YXZ Euler angles) to a local euler angle
   const rawRot = vecToArray(layer.rotation || [0, 0, 0]);
+
+  // Decal mesh lifecycle on targetMesh
+  useEffect(() => {
+    if (!mesh || !(mesh instanceof THREE.Mesh) || !texture || layer.visible === false || !scene) {
+      return;
+    }
+
+    rootScene.updateMatrixWorld(true);
+    scene.updateMatrixWorld(true);
+    mesh.updateMatrixWorld(true);
+
+    const worldPos = groupPos.clone().applyMatrix4(scene.matrixWorld);
+    const localPos = worldPos.clone().applyMatrix4(mesh.matrixWorld.clone().invert());
+    const decalPosVec = new THREE.Vector3(
+      isNaN(localPos.x) ? 0 : localPos.x,
+      isNaN(localPos.y) ? 0 : localPos.y,
+      isNaN(localPos.z) ? 0 : localPos.z
+    );
+
+    const meshWorldScale = new THREE.Vector3(1, 1, 1);
+    mesh.getWorldScale(meshWorldScale);
+    const decalScaleVec = new THREE.Vector3(
+      Math.max(0.01, groupScale.x / (meshWorldScale.x || 1)),
+      Math.max(0.01, groupScale.y / (meshWorldScale.y || 1)),
+      Math.max(0.6, (groupScale.z / (meshWorldScale.z || 1)) * 3)
+    );
+
+    const sceneQuaternion = new THREE.Quaternion().setFromRotationMatrix(scene.matrixWorld);
+    const layerQuaternion = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(Number(rawRot[0]) || 0, Number(rawRot[1]) || 0, Number(rawRot[2]) || 0, "YXZ")
+    );
+    const worldQuaternion = sceneQuaternion.clone().multiply(layerQuaternion);
+    const meshQuaternion = new THREE.Quaternion().setFromRotationMatrix(mesh.matrixWorld);
+    const localQuaternion = meshQuaternion.clone().invert().multiply(worldQuaternion);
+    const rotEuler = new THREE.Euler().setFromQuaternion(localQuaternion, "YXZ");
+
+    const matrixWorld = mesh.matrixWorld.clone();
+    mesh.matrixWorld.identity();
+
+    let geom = null;
+    let decalMeshObj = null;
+
+    try {
+      geom = new DecalGeometry(mesh, decalPosVec, rotEuler, decalScaleVec);
+
+      if (geom.attributes.position && geom.attributes.position.count > 0) {
+        const mat = new THREE.MeshStandardMaterial({
+          map: texture,
+          transparent: true,
+          polygonOffset: true,
+          polygonOffsetFactor: -10,
+          polygonOffsetUnits: -10,
+          roughness: 0.7,
+          metalness: 0.0,
+          side: THREE.DoubleSide,
+          depthTest: true,
+          depthWrite: false,
+          toneMapped: false
+        });
+
+        decalMeshObj = new THREE.Mesh(geom, mat);
+        decalMeshObj.name = "decal";
+        decalMeshObj.renderOrder = 100;
+        decalMeshObj.userData = { isDecal: true, layerId: layer.id };
+
+        mesh.add(decalMeshObj);
+      } else {
+        if (geom) geom.dispose();
+      }
+    } catch (err) {
+      console.warn("DecalGeometry generation failed:", err);
+    } finally {
+      mesh.matrixWorld.copy(matrixWorld);
+    }
+
+    return () => {
+      if (decalMeshObj) {
+        if (mesh) mesh.remove(decalMeshObj);
+        if (decalMeshObj.geometry) decalMeshObj.geometry.dispose();
+        if (decalMeshObj.material) decalMeshObj.material.dispose();
+      }
+    };
+  }, [
+    mesh,
+    texture,
+    layer.visible,
+    layer.id,
+    scene,
+    rawPos[0],
+    rawPos[1],
+    rawPos[2],
+    rawScale[0],
+    rawScale[1],
+    rawScale[2],
+    rawRot[0],
+    rawRot[1],
+    rawRot[2]
+  ]);
+
+  if (!isSelected || layer.visible === false || !mesh || !(mesh instanceof THREE.Mesh) || !scene) {
+    return null;
+  }
+
+  // Calculate world coordinates for the helper controls outline
+  rootScene.updateMatrixWorld(true);
+  scene.updateMatrixWorld(true);
+
+  const worldPos = groupPos.clone().applyMatrix4(scene.matrixWorld);
   const sceneQuaternion = new THREE.Quaternion().setFromRotationMatrix(scene.matrixWorld);
   const layerQuaternion = new THREE.Quaternion().setFromEuler(
     new THREE.Euler(Number(rawRot[0]) || 0, Number(rawRot[1]) || 0, Number(rawRot[2]) || 0, "YXZ")
   );
   const worldQuaternion = sceneQuaternion.clone().multiply(layerQuaternion);
-  const meshQuaternion = new THREE.Quaternion().setFromRotationMatrix(mesh.matrixWorld);
-  const localQuaternion = meshQuaternion.clone().invert().multiply(worldQuaternion);
-  const rotEuler = new THREE.Euler().setFromQuaternion(localQuaternion, "YXZ");
+  const worldEuler = new THREE.Euler().setFromQuaternion(worldQuaternion, "YXZ");
+
+  const sceneWorldScale = new THREE.Vector3(1, 1, 1);
+  scene.getWorldScale(sceneWorldScale);
+  const helperScale = [
+    groupScale.x * sceneWorldScale.x,
+    groupScale.y * sceneWorldScale.y,
+    1
+  ];
+
+  const meshWorldScale = new THREE.Vector3(1, 1, 1);
+  mesh.getWorldScale(meshWorldScale);
 
   const handleScaleDown = (e) => {
     e.stopPropagation();
@@ -726,8 +614,6 @@ function DecalItem({
 
     rootScene.updateMatrixWorld(true);
 
-    const rawPos = vecToArray(layer.position || [0, 0, 0]);
-    const groupPos = new THREE.Vector3(Number(rawPos[0]) || 0, Number(rawPos[1]) || 0, Number(rawPos[2]) || 0);
     const activeLayerWorldPoint = groupPos.clone().applyMatrix4(scene.matrixWorld);
 
     if (hitPoint) {
@@ -741,67 +627,19 @@ function DecalItem({
   };
 
   return (
-    <group>
-      {/* 3D Projected Decal on target Mesh */}
-      <SafeDecal
-        mesh={targetMesh}
-        position={decalPos}
-        rotation={rotEuler}
-        scale={[decalScale[0], decalScale[1], Math.max(0.6, decalScale[2] * 3)]}
-        map={texture}
-        renderOrder={100}
-        userData={{ isDecal: true, layerId: layer.id }}
-        onPointerDown={handleDecalPointerDown}
-      >
-        <meshStandardMaterial
-          key={layer.url || layer.text || layer.id}
-          map={texture}
-          transparent={true}
-          polygonOffset={true}
-          polygonOffsetFactor={-10}
-          polygonOffsetUnits={-10}
-          roughness={0.7}
-          metalness={0.0}
-          side={THREE.DoubleSide}
-          depthTest={true}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </SafeDecal>
- 
-      {/* Interactive Bounding outline and control handles when selected */}
-      {isSelected && (
-        <DecalHelperControls
-          groupRef={groupRef}
-          position={decalPos}
-          rotation={rotEuler}
-          scale={decalScale}
-          meshWorldScale={meshWorldScale}
-          onScaleDown={handleScaleDown}
-          onRotateDown={handleRotateDown}
-          onDeleteClick={handleDeleteClick}
-          onDecalPointerDown={handleDecalPointerDown}
-        />
-      )}
-    </group>
+    <DecalHelperControls
+      groupRef={groupRef}
+      position={[worldPos.x, worldPos.y, worldPos.z]}
+      rotation={worldEuler}
+      scale={helperScale}
+      meshWorldScale={meshWorldScale}
+      onScaleDown={handleScaleDown}
+      onRotateDown={handleRotateDown}
+      onDeleteClick={handleDeleteClick}
+      onDecalPointerDown={handleDecalPointerDown}
+    />
   );
 }
-
-const fallbackLayer = {
-  id: "fallback-text-layer",
-  type: "text",
-  name: "Fallback Text",
-  text: "PrintSphere",
-  fontFamily: "Outfit",
-  color: "#4f46e5",
-  bold: true,
-  italic: false,
-  visible: true,
-  locked: true,
-  position: [0, 0.05, 0.16],
-  rotation: [0, 0, 0],
-  scale: [0.4, 0.12, 0.25]
-};
 
 // Subcomponents to dynamically load and clone GLTF (.glb, .gltf) or FBX (.fbx) models
 function ModelSceneLoader({ modelPath, onSceneReady }) {
@@ -1144,8 +982,6 @@ export default function ShirtModel({
     }
   }, [meshLoaded, scene, localLayers, onUpdateLayers, modelPath]);
 
-  const activeLayer = localLayers.find((l) => l.id === selectedLayerId);
-
   return (
     <group ref={rootGroupRef}>
       <ModelSceneLoader modelPath={resolvedModelPath} onSceneReady={handleSceneReady} />
@@ -1155,7 +991,7 @@ export default function ShirtModel({
         />
       )}
 
-      {/* Render decals inside target mesh portals so they inherit their local coordinates */}
+      {/* Render decals & control helpers cleanly without portals */}
       {meshLoaded && activeScene === scene && bodyMeshRef.current && (
         localLayers.map((layer) => {
           let targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
@@ -1172,25 +1008,20 @@ export default function ShirtModel({
 
           const meshRef = { current: targetMesh };
           return (
-            <group key={layer.id}>
-              {createPortal(
-                <ThreeErrorBoundary fallback={null}>
-                  <DecalItem
-                    layer={layer}
-                    isSelected={selectedLayerId === layer.id}
-                    targetMesh={meshRef}
-                    onUpdateLayers={onUpdateLayers}
-                    onDeleteLayer={onDeleteLayer}
-                    scene={scene}
-                    onInteractionStart={onInteractionStart}
-                    onInteractionEnd={onInteractionEnd}
-                    modelPath={modelPath}
-                    onSelectLayer={onSelectLayer}
-                  />
-                </ThreeErrorBoundary>,
-                targetMesh
-              )}
-            </group>
+            <ThreeErrorBoundary key={layer.id} fallback={null}>
+              <DecalItem
+                layer={layer}
+                isSelected={selectedLayerId === layer.id}
+                targetMesh={meshRef}
+                onUpdateLayers={onUpdateLayers}
+                onDeleteLayer={onDeleteLayer}
+                scene={scene}
+                onInteractionStart={onInteractionStart}
+                onInteractionEnd={onInteractionEnd}
+                modelPath={modelPath}
+                onSelectLayer={onSelectLayer}
+              />
+            </ThreeErrorBoundary>
           );
         })
       )}
