@@ -63,11 +63,18 @@ function DecalHelperControls({
       <mesh
         name="decal-drag-plane"
         userData={{ isDecal: true }}
-        position={[0, 0, 0.005]}
+        position={[0, 0, -0.005]}
         onPointerDown={onDecalPointerDown}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          document.body.style.cursor = "grab";
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = "auto";
+        }}
       >
         <planeGeometry args={[scale[0] || 0.3, scale[1] || 0.3]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
 
       {/* Scale Handle (Bottom Right) */}
@@ -240,10 +247,11 @@ function DecalItem({
       raycaster.setFromCamera(mouseVec, camera);
 
       if (isDragging) {
+        document.body.style.cursor = "grabbing";
         const intersects = raycaster.intersectObjects(scene.children, true);
         const validHit = intersects.find((hit) => {
           const child = hit.object;
-          if (!child.isMesh || child.name === "decal" || child.name === "decal-helper" || child.userData?.isDecal) {
+          if (!child.isMesh || child.name === "decal" || child.name === "decal-helper" || child.name === "decal-drag-plane" || child.userData?.isDecal) {
             return false;
           }
           const nameLower = child.name.toLowerCase();
@@ -259,11 +267,7 @@ function DecalItem({
 
           rootScene.updateMatrixWorld(true);
 
-          const targetDecalWorldPoint = hit.point.clone();
-          if (dragStartWorldOffsetRef.current) {
-            targetDecalWorldPoint.sub(dragStartWorldOffsetRef.current);
-          }
-          const scenePoint = scene.worldToLocal(targetDecalWorldPoint.clone());
+          const scenePoint = scene.worldToLocal(hit.point.clone());
 
           let normal = hit.face?.normal || new THREE.Vector3(0, 0, 1);
           const worldNormal = normal.clone().transformDirection(hitMesh.matrixWorld);
@@ -316,21 +320,15 @@ function DecalItem({
         const localPoint = groupRef.current.worldToLocal(intersectionPoint.clone());
 
         if (isScaling) {
-          const newWorldScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
+          const newScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
           const aspect = layer.aspectRatio || (layer.scale[0] / layer.scale[1]) || 1;
-          const newWorldScaleY = newWorldScaleX / aspect;
-
-          const sceneWorldScale = new THREE.Vector3();
-          scene.getWorldScale(sceneWorldScale);
-
-          const newGroupScaleX = newWorldScaleX / (sceneWorldScale.x || 1);
-          const newGroupScaleY = newWorldScaleY / (sceneWorldScale.y || 1);
+          const newScaleY = newScaleX / aspect;
 
           if (onUpdateLayers) {
             onUpdateLayers((prev) =>
               prev.map((l) =>
                 l.id === layer.id
-                  ? { ...l, scale: [newGroupScaleX, newGroupScaleY, l.scale[2] || 0.25] }
+                  ? { ...l, scale: [newScaleX, newScaleY, l.scale[2] || 0.25] }
                   : l
               )
             );
@@ -372,6 +370,7 @@ function DecalItem({
       setIsDragging(false);
       setIsScaling(false);
       setIsRotating(false);
+      document.body.style.cursor = "auto";
       dragStartWorldOffsetRef.current = null;
       dragStartPlaneRef.current = null;
       dragStartWorldPosRef.current = null;
@@ -515,7 +514,7 @@ function DecalItem({
     rawRot[2]
   ]);
 
-  if (!isSelected || layer.visible === false || !mesh || !(mesh instanceof THREE.Mesh) || !scene) {
+  if (layer.visible === false || !mesh || !(mesh instanceof THREE.Mesh) || !scene) {
     return null;
   }
 
@@ -531,16 +530,43 @@ function DecalItem({
   const worldQuaternion = sceneQuaternion.clone().multiply(layerQuaternion);
   const worldEuler = new THREE.Euler().setFromQuaternion(worldQuaternion, "YXZ");
 
-  const sceneWorldScale = new THREE.Vector3(1, 1, 1);
-  scene.getWorldScale(sceneWorldScale);
   const helperScale = [
-    groupScale.x * sceneWorldScale.x,
-    groupScale.y * sceneWorldScale.y,
+    groupScale.x,
+    groupScale.y,
     1
   ];
 
   const meshWorldScale = new THREE.Vector3(1, 1, 1);
   mesh.getWorldScale(meshWorldScale);
+
+  if (!isSelected) {
+    return (
+      <group position={[worldPos.x, worldPos.y, worldPos.z]} rotation={worldEuler}>
+        <mesh
+          userData={{ isDecal: true }}
+          position={[0, 0, -0.005]}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            if (onSelectLayer) onSelectLayer(layer.id);
+            if (!layer.locked) {
+              setIsDragging(true);
+              if (onInteractionStart) onInteractionStart();
+            }
+          }}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            document.body.style.cursor = "pointer";
+          }}
+          onPointerOut={() => {
+            document.body.style.cursor = "auto";
+          }}
+        >
+          <planeGeometry args={[helperScale[0] || 0.3, helperScale[1] || 0.3]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+    );
+  }
 
   const handleScaleDown = (e) => {
     e.stopPropagation();
@@ -599,28 +625,6 @@ function DecalItem({
       onSelectLayer(layer.id);
     }
     if (layer.locked) return;
-
-    const intersection = e.intersections?.find(
-      (intersect) =>
-        intersect.object &&
-        intersect.object.name !== "decal" &&
-        intersect.object.name !== "decal-helper" &&
-        intersect.object.name !== "decal-helper-handle" &&
-        intersect.object.name !== "decal-drag-plane" &&
-        !intersect.object.userData?.isDecal
-    );
-
-    const hitPoint = intersection ? intersection.point.clone() : null;
-
-    rootScene.updateMatrixWorld(true);
-
-    const activeLayerWorldPoint = groupPos.clone().applyMatrix4(scene.matrixWorld);
-
-    if (hitPoint) {
-      dragStartWorldOffsetRef.current = new THREE.Vector3().subVectors(hitPoint, activeLayerWorldPoint);
-    } else {
-      dragStartWorldOffsetRef.current = new THREE.Vector3(0, 0, 0);
-    }
 
     setIsDragging(true);
     if (onInteractionStart) onInteractionStart();
