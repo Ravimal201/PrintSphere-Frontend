@@ -353,11 +353,16 @@ function DecalItem({
 
               if (onUpdateLayers) {
                 onUpdateLayers((prev) =>
-                  prev.map((l) =>
-                    l.id === layer.id
-                      ? { ...l, rotation: [l.rotation[0], l.rotation[1], newRoll] }
-                      : l
-                  )
+                  prev.map((l) => {
+                    if (l.id === layer.id) {
+                      const curRot = Array.isArray(l.rotation) ? l.rotation : [0, 0, 0];
+                      return {
+                        ...l,
+                        rotation: [curRot[0] || 0, curRot[1] || 0, newRoll]
+                      };
+                    }
+                    return l;
+                  })
                 );
               }
             }
@@ -596,15 +601,23 @@ function DecalItem({
       dragStartBasisXRef.current = basisX;
       dragStartBasisYRef.current = basisY;
 
+      // Update raycaster accurately from the click event coordinates
+      const canvas = gl.domElement;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+
       const intersectionPoint = new THREE.Vector3();
-      raycaster.ray.intersectPlane(plane, intersectionPoint);
-
-      const vec = intersectionPoint.clone().sub(decalWorldPos);
-      const x = vec.dot(basisX);
-      const y = vec.dot(basisY);
-
-      dragStartRotationAngleRef.current = Math.atan2(x, y);
-      dragStartDecalRollRef.current = layer.rotation?.[2] || 0;
+      if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+        const vec = intersectionPoint.clone().sub(decalWorldPos);
+        const x = vec.dot(basisX);
+        const y = vec.dot(basisY);
+        dragStartRotationAngleRef.current = Math.atan2(x, y);
+      } else {
+        dragStartRotationAngleRef.current = 0;
+      }
+      dragStartDecalRollRef.current = (layer.rotation && Array.isArray(layer.rotation)) ? (layer.rotation[2] || 0) : 0;
     }
   };
 
