@@ -773,8 +773,8 @@ export default function DesignerPage() {
       italic: false,
       visible: true,
       locked: false,
-      position,
-      rotation,
+      position: Array.isArray(position) ? position : [0, 0, 0],
+      rotation: [rotation[0] || 0, rotation[1] || 0, 0],
       scale: [0.3, 0.1, 0.25]
     };
     setLayers([...layers, newLayer]);
@@ -1932,11 +1932,12 @@ export default function DesignerPage() {
                 )}
 
                 <div className="space-y-2 pt-3 border-t">
-                  <label className="text-xs font-bold text-slate-500 block">Flip Operations</label>
-                  <div className="flex gap-2">
+                  <label className="text-xs font-bold text-slate-500 block">Flip & Quick Rotate</label>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
+                      type="button"
                       onClick={() => updateActiveLayer("flipX", !activeLayer.flipX)}
-                      className={`flex-1 py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
                         activeLayer.flipX
                           ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
                           : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
@@ -1946,8 +1947,9 @@ export default function DesignerPage() {
                       Flip Horizontal
                     </button>
                     <button
+                      type="button"
                       onClick={() => updateActiveLayer("flipY", !activeLayer.flipY)}
-                      className={`flex-1 py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
                         activeLayer.flipY
                           ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
                           : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
@@ -1955,6 +1957,38 @@ export default function DesignerPage() {
                     >
                       <FlipVertical className="h-4 w-4" />
                       Flip Vertical
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curRot = Array.isArray(activeLayer.rotation) ? activeLayer.rotation : [0, 0, 0];
+                        const rad = curRot[2] || 0;
+                        const deg = Math.round((rad * 180) / Math.PI);
+                        const nextDeg = ((((deg - 90 + 180) % 360) + 360) % 360) - 180;
+                        updateActiveLayer("rotation", [curRot[0] || 0, curRot[1] || 0, (nextDeg * Math.PI) / 180]);
+                      }}
+                      className="py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer bg-white"
+                      title="Rotate 90 degrees counter-clockwise"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 text-indigo-600" />
+                      Rotate -90°
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curRot = Array.isArray(activeLayer.rotation) ? activeLayer.rotation : [0, 0, 0];
+                        const rad = curRot[2] || 0;
+                        const deg = Math.round((rad * 180) / Math.PI);
+                        const nextDeg = ((((deg + 90 + 180) % 360) + 360) % 360) - 180;
+                        updateActiveLayer("rotation", [curRot[0] || 0, curRot[1] || 0, (nextDeg * Math.PI) / 180]);
+                      }}
+                      className="py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer bg-white"
+                      title="Rotate 90 degrees clockwise"
+                    >
+                      <RotateCw className="h-3.5 w-3.5 text-indigo-600" />
+                      Rotate +90°
                     </button>
                   </div>
                 </div>
@@ -2014,61 +2048,72 @@ export default function DesignerPage() {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {(() => {
-                      const rad = activeLayer.rotation?.[2] || 0;
+                      const curRot = Array.isArray(activeLayer.rotation) ? activeLayer.rotation : [0, 0, 0];
+                      const rad = curRot[2] || 0;
                       const rawDeg = Math.round((rad * 180) / Math.PI);
                       const currentDeg = ((((rawDeg + 180) % 360) + 360) % 360) - 180;
+
+                      const setAngleDeg = (deg) => {
+                        let normalized = Number(deg);
+                        if (isNaN(normalized)) normalized = 0;
+                        if (normalized < -180) normalized = -180;
+                        if (normalized > 180) normalized = 180;
+                        const newRad = (normalized * Math.PI) / 180;
+                        updateActiveLayer("rotation", [curRot[0] || 0, curRot[1] || 0, newRad]);
+                      };
+
                       return (
                         <>
                           <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                            <span className="flex items-center gap-1"><RotateCw className="h-3.5 w-3.5" /> Rotation</span>
+                            <span className="flex items-center gap-1"><RotateCw className="h-3.5 w-3.5 text-indigo-600" /> Image Rotation</span>
                             <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setAngleDeg(currentDeg - 15)}
+                                className="w-6 h-6 rounded border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center cursor-pointer"
+                                title="Nudge -15°"
+                              >
+                                -
+                              </button>
                               <input
                                 type="number"
                                 min="-180"
                                 max="180"
                                 value={currentDeg}
-                                onChange={(e) => {
-                                  let deg = Number(e.target.value);
-                                  if (isNaN(deg)) deg = 0;
-                                  if (deg < -180) deg = -180;
-                                  if (deg > 180) deg = 180;
-                                  const newRad = deg * (Math.PI / 180);
-                                  updateActiveLayer("rotation", [activeLayer.rotation[0], activeLayer.rotation[1], newRad]);
-                                }}
-                                className="w-16 px-1.5 py-0.5 text-center text-xs font-bold border border-slate-200 rounded-lg focus:border-indigo-500 focus:outline-hidden bg-white text-slate-800"
+                                onChange={(e) => setAngleDeg(e.target.value)}
+                                className="w-14 px-1 py-0.5 text-center text-xs font-bold border border-slate-200 rounded-lg focus:border-indigo-500 focus:outline-hidden bg-white text-slate-800"
                               />
-                              <span>°</span>
+                              <span className="text-xs font-bold text-slate-500">°</span>
+                              <button
+                                type="button"
+                                onClick={() => setAngleDeg(currentDeg + 15)}
+                                className="w-6 h-6 rounded border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center cursor-pointer"
+                                title="Nudge +15°"
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
+
                           <input
                             type="range"
                             min="-180"
                             max="180"
                             step="1"
                             value={currentDeg}
-                            onChange={(e) => {
-                              const deg = Number(e.target.value);
-                              const newRad = deg * (Math.PI / 180);
-                              updateActiveLayer("rotation", [activeLayer.rotation[0], activeLayer.rotation[1], newRad]);
-                            }}
-                            className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                            onChange={(e) => setAngleDeg(e.target.value)}
+                            className="w-full accent-indigo-600 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer"
                           />
-                          <div className="grid grid-cols-4 gap-1 pt-1">
-                            {[-90, 0, 90, 180].map((preset) => (
+
+                          <div className="grid grid-cols-5 gap-1 pt-1">
+                            {[-180, -90, 0, 90, 180].map((preset) => (
                               <button
                                 key={preset}
                                 type="button"
-                                onClick={() => {
-                                  const presetRad = preset * (Math.PI / 180);
-                                  updateActiveLayer("rotation", [
-                                    activeLayer.rotation[0],
-                                    activeLayer.rotation[1],
-                                    presetRad
-                                  ]);
-                                }}
-                                className={`py-1 text-[10px] font-semibold rounded-md border transition-colors ${
+                                onClick={() => setAngleDeg(preset)}
+                                className={`py-1 text-[10px] font-semibold rounded-md border transition-colors cursor-pointer ${
                                   currentDeg === preset
                                     ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-bold"
                                     : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
