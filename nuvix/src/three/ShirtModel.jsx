@@ -32,12 +32,14 @@ function DecalHelperControls({
 }) {
   const halfW = (scale[0] || 0.3) / 2;
   const halfH = (scale[1] || 0.3) / 2;
+  const zOffset = -0.006; // slight outward offset so it's always clearly in front of the shirt surface
+
   const borderPoints = useMemo(() => [
-    new THREE.Vector3(-halfW, halfH, 0),
-    new THREE.Vector3(halfW, halfH, 0),
-    new THREE.Vector3(halfW, -halfH, 0),
-    new THREE.Vector3(-halfW, -halfH, 0),
-    new THREE.Vector3(-halfW, halfH, 0)
+    new THREE.Vector3(-halfW, halfH, zOffset),
+    new THREE.Vector3(halfW, halfH, zOffset),
+    new THREE.Vector3(halfW, -halfH, zOffset),
+    new THREE.Vector3(-halfW, -halfH, zOffset),
+    new THREE.Vector3(-halfW, halfH, zOffset)
   ], [halfW, halfH]);
 
   const borderGeometry = useMemo(() => {
@@ -48,13 +50,14 @@ function DecalHelperControls({
 
   return (
     <group ref={groupRef} position={position} rotation={rotation}>
-      {/* Clean rectangular border without diagonal line */}
-      <line name="decal-helper" geometry={borderGeometry} userData={{ isDecal: true }}>
+      {/* Clean rectangular border with depthTest disabled and high renderOrder so it never sinks into mesh */}
+      <line name="decal-helper" geometry={borderGeometry} renderOrder={999} userData={{ isDecal: true }}>
         <lineBasicMaterial
-          color="#4f46e5"
-          linewidth={1.5}
+          color="#3b82f6"
+          linewidth={2}
           transparent
-          opacity={0.8}
+          opacity={0.95}
+          depthTest={false}
           depthWrite={false}
         />
       </line>
@@ -78,7 +81,7 @@ function DecalHelperControls({
       </mesh>
 
       {/* Scale Handle (Bottom Right) */}
-      <group position={[(scale[0] || 0.3) / 2, -(scale[1] || 0.3) / 2, 0.01]}>
+      <group position={[(scale[0] || 0.3) / 2, -(scale[1] || 0.3) / 2, -0.012]}>
         <Html center>
           <div
             onPointerDown={onScaleDown}
@@ -88,7 +91,7 @@ function DecalHelperControls({
             onPointerOut={() => {
               document.body.style.cursor = "auto";
             }}
-            className="flex items-center justify-center w-6 h-6 bg-indigo-600 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+            className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none cursor-pointer hover:scale-105 transition-transform"
           >
             <Maximize2 className="w-3 h-3" />
           </div>
@@ -96,7 +99,7 @@ function DecalHelperControls({
       </group>
 
       {/* Rotate Handle (Top Center) */}
-      <group position={[0, (scale[1] || 0.3) / 2 + 0.04, 0.01]}>
+      <group position={[0, (scale[1] || 0.3) / 2 + 0.04, -0.012]}>
         <Html center>
           <div
             onPointerDown={onRotateDown}
@@ -106,7 +109,7 @@ function DecalHelperControls({
             onPointerOut={() => {
               document.body.style.cursor = "auto";
             }}
-            className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+            className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none cursor-pointer hover:scale-105 transition-transform"
           >
             <RotateCw className="w-3 h-3" />
           </div>
@@ -114,7 +117,7 @@ function DecalHelperControls({
       </group>
 
       {/* Delete Handle (Top Left) */}
-      <group position={[-(scale[0] || 0.3) / 2, (scale[1] || 0.3) / 2, 0.01]}>
+      <group position={[-(scale[0] || 0.3) / 2, (scale[1] || 0.3) / 2, -0.012]}>
         <Html center>
           <div
             onPointerDown={onDeleteClick}
@@ -124,7 +127,7 @@ function DecalHelperControls({
             onPointerOut={() => {
               document.body.style.cursor = "auto";
             }}
-            className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-md border border-white transform scale-80 select-none cursor-pointer"
+            className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none cursor-pointer hover:scale-105 transition-transform"
           >
             <Trash2 className="w-3 h-3" />
           </div>
@@ -137,6 +140,7 @@ function DecalHelperControls({
 // Sub-component to manage texture loading, 3D decal mesh on targetMesh, and helper controls
 function DecalItem({
   layer,
+  layerIndex = 0,
   isSelected,
   targetMesh,
   onUpdateLayers,
@@ -187,6 +191,29 @@ function DecalItem({
             loadedTex.colorSpace = THREE.SRGBColorSpace;
             loadedTex.needsUpdate = true;
             setTexture(loadedTex);
+
+            if (loadedTex.image?.width && loadedTex.image?.height) {
+              const naturalAspect = loadedTex.image.width / loadedTex.image.height;
+              if (naturalAspect > 0 && isFinite(naturalAspect)) {
+                if (!layer.aspectRatio || Math.abs(layer.aspectRatio - naturalAspect) > 0.02) {
+                  if (onUpdateLayers) {
+                    onUpdateLayers((prev) =>
+                      prev.map((l) => {
+                        if (l.id === layer.id) {
+                          const scaleX = l.scale?.[0] || 0.3;
+                          return {
+                            ...l,
+                            aspectRatio: naturalAspect,
+                            scale: [scaleX, scaleX / naturalAspect, l.scale?.[2] || 0.25]
+                          };
+                        }
+                        return l;
+                      })
+                    );
+                  }
+                }
+              }
+            }
           } else {
             loadedTex.dispose();
           }
@@ -466,12 +493,13 @@ function DecalItem({
       geom = new DecalGeometry(mesh, decalPosVec, rotEuler, decalScaleVec);
 
       if (geom.attributes.position && geom.attributes.position.count > 0) {
+        const offsetFactor = -10 - (layerIndex || 0) * 2;
         const mat = new THREE.MeshStandardMaterial({
           map: texture,
           transparent: true,
           polygonOffset: true,
-          polygonOffsetFactor: -10,
-          polygonOffsetUnits: -10,
+          polygonOffsetFactor: offsetFactor,
+          polygonOffsetUnits: offsetFactor,
           roughness: 0.7,
           metalness: 0.0,
           side: THREE.DoubleSide,
@@ -482,7 +510,7 @@ function DecalItem({
 
         decalMeshObj = new THREE.Mesh(geom, mat);
         decalMeshObj.name = "decal";
-        decalMeshObj.renderOrder = 100;
+        decalMeshObj.renderOrder = 100 + (layerIndex || 0);
         decalMeshObj.userData = { isDecal: true, layerId: layer.id };
 
         mesh.add(decalMeshObj);
@@ -1010,7 +1038,7 @@ export default function ShirtModel({
 
       {/* Render decals & control helpers cleanly without portals */}
       {meshLoaded && activeScene === scene && bodyMeshRef.current && (
-        localLayers.map((layer) => {
+        localLayers.map((layer, layerIndex) => {
           let targetMesh = (layer.targetMeshName && scene.getObjectByName(layer.targetMeshName)) || bodyMeshRef.current;
           let isTargetInScene = false;
           if (targetMesh) {
@@ -1028,6 +1056,7 @@ export default function ShirtModel({
             <ThreeErrorBoundary key={layer.id} fallback={null}>
               <DecalItem
                 layer={layer}
+                layerIndex={layerIndex}
                 isSelected={selectedLayerId === layer.id}
                 targetMesh={meshRef}
                 onUpdateLayers={onUpdateLayers}

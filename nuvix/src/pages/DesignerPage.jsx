@@ -37,7 +37,11 @@ import {
   Redo2,
   Plus,
   RefreshCw,
-  Loader2
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  ChevronsUp,
+  ChevronsDown
 } from "lucide-react";
 
 const shirtColors = [
@@ -1097,6 +1101,71 @@ export default function DesignerPage() {
     selectLayer(id);
   };
 
+  const moveLayerUp = (id) => {
+    setLayers((prev) => {
+      const idx = prev.findIndex((l) => l.id === id);
+      if (idx < 0 || idx === prev.length - 1) return prev;
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[idx + 1];
+      next[idx + 1] = temp;
+      return next;
+    });
+  };
+
+  const moveLayerDown = (id) => {
+    setLayers((prev) => {
+      const idx = prev.findIndex((l) => l.id === id);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[idx - 1];
+      next[idx - 1] = temp;
+      return next;
+    });
+  };
+
+  const bringLayerToFront = (id) => {
+    setLayers((prev) => {
+      const target = prev.find((l) => l.id === id);
+      if (!target) return prev;
+      return [...prev.filter((l) => l.id !== id), target];
+    });
+  };
+
+  const sendLayerToBack = (id) => {
+    setLayers((prev) => {
+      const target = prev.find((l) => l.id === id);
+      if (!target) return prev;
+      return [target, ...prev.filter((l) => l.id !== id)];
+    });
+  };
+
+  const moveLayerToSide = (layerId, side = "front") => {
+    const isBack = side === "back";
+    const theta = isBack ? Math.PI : 0;
+    const targetZ = isBack ? -0.16 : 0.16;
+
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id === layerId) {
+          const curRot = Array.isArray(l.rotation) ? l.rotation : [0, 0, 0];
+          return {
+            ...l,
+            position: [l.position?.[0] || 0, l.position?.[1] || 0, targetZ],
+            rotation: [curRot[0] || 0, theta, curRot[2] || 0],
+            projectedForModel: null // Trigger fresh re-projection onto the new face of the model
+          };
+        }
+        return l;
+      })
+    );
+
+    // Also rotate the 3D turntable so the user immediately views the chosen side
+    setActiveView(side);
+    setModelRotation(theta);
+  };
+
   const getLayerPrintArea = (layer) => {
     if (!layer.visible) return 0;
     const widthInches = layer.scale[0] * 25;
@@ -1769,8 +1838,12 @@ export default function DesignerPage() {
                       <p className="text-[10px] text-slate-300 mt-1">Use the tools panel on the left to add text or images.</p>
                     </div>
                   ) : (
-                    layers.map((layer) => {
+                    layers.map((layer, idx) => {
                       const isSelected = selectedLayerId === layer.id;
+                      const isFirst = idx === 0;
+                      const isLast = idx === layers.length - 1;
+                      const isBack = (layer.position?.[2] || 0) < 0;
+
                       return (
                         <div
                           key={layer.id}
@@ -1780,7 +1853,29 @@ export default function DesignerPage() {
                               : "border-slate-100 hover:bg-slate-50"
                             }`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {/* Reorder Up/Down arrows */}
+                            <div className="flex flex-col gap-0.5" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                disabled={isLast}
+                                onClick={() => moveLayerUp(layer.id)}
+                                className="p-0.5 rounded hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
+                                title="Move Forward (Above)"
+                              >
+                                <ArrowUp className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isFirst}
+                                onClick={() => moveLayerDown(layer.id)}
+                                className="p-0.5 rounded hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
+                                title="Move Backward (Below)"
+                              >
+                                <ArrowDown className="h-3 w-3" />
+                              </button>
+                            </div>
+
                             {layer.type === "text" ? (
                               <Type className="h-4 w-4 text-indigo-500 shrink-0" />
                             ) : (
@@ -1790,7 +1885,12 @@ export default function DesignerPage() {
                               <p className={`text-xs font-bold truncate ${isSelected ? "text-indigo-600" : ""}`}>
                                 {layer.name}
                               </p>
-                              <span className="text-[10px] text-slate-400 capitalize">{layer.type} Layer</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[10px] text-slate-400 capitalize">{layer.type}</span>
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-sm bg-slate-100 text-slate-600 uppercase">
+                                  {isBack ? "Back" : "Front"}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
@@ -1798,12 +1898,14 @@ export default function DesignerPage() {
                             <button
                               onClick={() => toggleLayerVisibility(layer.id)}
                               className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                              title={layer.visible ? "Hide Layer" : "Show Layer"}
                             >
                               {layer.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5 text-rose-500" />}
                             </button>
                             <button
                               onClick={() => toggleLayerLock(layer.id)}
                               className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                              title={layer.locked ? "Unlock Layer" : "Lock Layer"}
                             >
                               {layer.locked ? <Lock className="h-3.5 w-3.5 text-amber-500" /> : <Unlock className="h-3.5 w-3.5" />}
                             </button>
@@ -1817,6 +1919,7 @@ export default function DesignerPage() {
                             <button
                               onClick={() => deleteLayer(layer.id)}
                               className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600"
+                              title="Delete Layer"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -1989,6 +2092,88 @@ export default function DesignerPage() {
                     >
                       <RotateCw className="h-3.5 w-3.5 text-indigo-600" />
                       Rotate +90°
+                    </button>
+                  </div>
+                </div>
+
+                {/* Placement (Front / Back of Shirt) */}
+                <div className="space-y-2.5 pt-3 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500">T-Shirt Placement</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 uppercase">
+                      {(activeLayer.position?.[2] || 0) < 0 ? "Back Side" : "Front Side"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => moveLayerToSide(activeLayer.id, "front")}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition duration-200 cursor-pointer ${
+                        (activeLayer.position?.[2] || 0) >= 0
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                          : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
+                      }`}
+                    >
+                      <span>Move to Front</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLayerToSide(activeLayer.id, "back")}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition duration-200 cursor-pointer ${
+                        (activeLayer.position?.[2] || 0) < 0
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                          : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
+                      }`}
+                    >
+                      <span>Move to Back</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Layer Stacking Order (Z-Index / Reordering) */}
+                <div className="space-y-2 pt-3 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-indigo-600" />
+                      Layer Stacking Order
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => bringLayerToFront(activeLayer.id)}
+                      className="py-2 px-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition bg-white cursor-pointer"
+                      title="Bring this layer to the very top"
+                    >
+                      <ChevronsUp className="h-3.5 w-3.5 text-indigo-600" />
+                      Bring to Front
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendLayerToBack(activeLayer.id)}
+                      className="py-2 px-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition bg-white cursor-pointer"
+                      title="Send this layer to the very bottom"
+                    >
+                      <ChevronsDown className="h-3.5 w-3.5 text-indigo-600" />
+                      Send to Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLayerUp(activeLayer.id)}
+                      className="py-2 px-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition bg-white cursor-pointer"
+                      title="Move forward 1 step"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5 text-indigo-600" />
+                      Move Forward
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLayerDown(activeLayer.id)}
+                      className="py-2 px-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition bg-white cursor-pointer"
+                      title="Move backward 1 step"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5 text-indigo-600" />
+                      Move Backward
                     </button>
                   </div>
                 </div>
