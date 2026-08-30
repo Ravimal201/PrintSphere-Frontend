@@ -35,6 +35,8 @@ import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
 import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
+import TShirtStyleCard from "../components/TShirtStyleCard";
+import Store3DCardPreview from "../components/Store3DCardPreview";
 
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
@@ -2916,110 +2918,66 @@ export default function ManagerPage() {
             </div>
 
             {styles.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-sm text-slate-500 font-semibold">
-                  No T-Shirt styles configured.
+              <div className="text-center py-16 bg-white border border-slate-200 rounded-3xl p-8 shadow-xs">
+                <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+                  <Layers className="h-6 w-6" />
+                </div>
+                <h4 className="font-extrabold text-slate-800 text-base mb-1">
+                  No T-Shirt styles configured
+                </h4>
+                <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto mb-4">
+                  Add 3D T-Shirt styles with custom 3D model meshes, GSM pricing tiers, and brand color palettes.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingStyle(null);
+                    setStyleForm({
+                      name: "",
+                      path: "/images/models/male normal t-shirt1.glb",
+                      type: "Crew Neck",
+                      gsmPrices: [
+                        { gsm: "GSM 180", price: 1200 },
+                        { gsm: "GSM 220", price: 1500 },
+                      ],
+                      colors: [
+                        { name: "White", value: "#ffffff" },
+                        { name: "Black", value: "#111827" },
+                      ],
+                    });
+                    setShowStyleModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add First Style
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {styles.map((style) => (
-                  <div
+                  <TShirtStyleCard
                     key={style._id}
-                    className="border rounded-2xl p-5 hover:shadow-md transition bg-slate-50/50 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between border-b pb-3 mb-3">
-                        <div>
-                          <h4 className="font-extrabold text-slate-900 text-base">
-                            {style.name || style.type || "Crew Neck"}
-                          </h4>
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-mono break-all mb-3.5">
-                        Model Path:{" "}
-                        <span className="text-slate-600 font-semibold">
-                          {style.path}
-                        </span>
-                      </p>
-                      <div className="mb-3.5">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1.5">
-                          Weights & Pricing
-                        </span>
-                        <div className="flex flex-col gap-1.5">
-                          {(style.gsmPrices && style.gsmPrices.length > 0
-                            ? style.gsmPrices
-                            : (style.gsms || []).map((g) => ({
+                    style={style}
+                    onEdit={(styleToEdit) => {
+                      setEditingStyle(styleToEdit);
+                      setStyleForm({
+                        name: styleToEdit.name,
+                        path: styleToEdit.path,
+                        type: styleToEdit.type || "Crew Neck",
+                        gsmPrices:
+                          styleToEdit.gsmPrices && styleToEdit.gsmPrices.length > 0
+                            ? styleToEdit.gsmPrices
+                            : (styleToEdit.gsms || []).map((g) => ({
                                 gsm: g,
-                                price: style.price || 1200,
-                              }))
-                          ).map((gp, i) => (
-                            <div
-                              key={i}
-                              className="flex justify-between items-center text-[11px] font-semibold text-slate-700 bg-white border px-2.5 py-1.5 rounded-xl shadow-2xs"
-                            >
-                              <span>{gp.gsm}</span>
-                              <span className="text-indigo-650 font-bold">
-                                Rs. {(gp.price || 0).toFixed(2)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mb-3.5">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1">
-                          Colors ({style.colors?.length || 0})
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                          {(style.colors || []).map((color, i) => (
-                            <div
-                              key={i}
-                              className="group relative flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 shadow-2xs"
-                              style={{ backgroundColor: color.value }}
-                              title={`${color.name} (${color.value})`}
-                            >
-                              <span className="pointer-events-none absolute -bottom-6 left-1/2 -translate-x-1/2 rounded bg-slate-950 px-1.5 py-0.5 text-[8px] font-bold text-white opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-10">
-                                {color.name}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 border-t pt-4 mt-4">
-                      <button
-                        onClick={() => {
-                          setEditingStyle(style);
-                          setStyleForm({
-                            name: style.name,
-                            path: style.path,
-                            type: style.type || "Crew Neck",
-                            gsmPrices:
-                              style.gsmPrices && style.gsmPrices.length > 0
-                                ? style.gsmPrices
-                                : (style.gsms || []).map((g) => ({
-                                    gsm: g,
-                                    price: style.price || 1200,
-                                  })),
-                            colors: style.colors || [],
-                          });
-                          setShowStyleModal(true);
-                        }}
-                        className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold transition cursor-pointer"
-                      >
-                        <Edit2 className="h-3 w-3" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteStyle(style._id)}
-                        className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition cursor-pointer"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+                                price: styleToEdit.price || 1200,
+                              })),
+                        colors: styleToEdit.colors || [],
+                      });
+                      setShowStyleModal(true);
+                    }}
+                    onDelete={handleDeleteStyle}
+                  />
                 ))}
               </div>
             )}
@@ -3318,6 +3276,38 @@ export default function ManagerPage() {
                   {stylesError}
                 </div>
               )}
+
+              {/* Live Frozen 3D Preview */}
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-1.5">
+                  3D Model Preview (Frozen)
+                </label>
+                <Store3DCardPreview
+                  product={{
+                    title: styleForm.name || "Style Preview",
+                    tShirtType: styleForm.name || styleForm.type || "Crew Neck",
+                    path:
+                      styleForm.path ||
+                      "/images/models/male normal t-shirt1.glb",
+                    modelPath:
+                      styleForm.path ||
+                      "/images/models/male normal t-shirt1.glb",
+                    colors: (styleForm.colors || []).map((c) =>
+                      typeof c === "string" ? c : c.value,
+                    ),
+                  }}
+                  activeColor={
+                    styleForm.colors?.[0]
+                      ? typeof styleForm.colors[0] === "string"
+                        ? styleForm.colors[0]
+                        : styleForm.colors[0].value
+                      : "#ffffff"
+                  }
+                  showControls={true}
+                  hideBadge={false}
+                  className="h-44 w-full rounded-2xl bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-100 border border-slate-200/80 shadow-inner"
+                />
+              </div>
 
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">

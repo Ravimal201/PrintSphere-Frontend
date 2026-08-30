@@ -58,6 +58,9 @@ export default function Store3DCardPreview({
     if (product.modelPath && typeof product.modelPath === "string" && (product.modelPath.toLowerCase().endsWith(".glb") || product.modelPath.toLowerCase().endsWith(".gltf") || product.modelPath.toLowerCase().endsWith(".fbx"))) {
       return product.modelPath;
     }
+    if (product.path && typeof product.path === "string" && (product.path.toLowerCase().endsWith(".glb") || product.path.toLowerCase().endsWith(".gltf") || product.path.toLowerCase().endsWith(".fbx"))) {
+      return product.path;
+    }
     if (product.modelUrl && typeof product.modelUrl === "string" && (product.modelUrl.toLowerCase().endsWith(".glb") || product.modelUrl.toLowerCase().endsWith(".gltf") || product.modelUrl.toLowerCase().endsWith(".fbx"))) {
       return product.modelUrl;
     }
