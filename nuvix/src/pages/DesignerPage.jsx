@@ -737,6 +737,8 @@ export default function DesignerPage() {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
         e.preventDefault();
         handleRedo();
+      } else if (e.key === "Escape") {
+        selectLayer(null);
       }
     };
 
@@ -748,7 +750,11 @@ export default function DesignerPage() {
 
   const selectLayer = (id) => {
     setSelectedLayerId(id);
-    setRightTab("properties");
+    if (id) {
+      setRightTab("properties");
+    } else {
+      setRightTab("layers");
+    }
   };
 
   const activeLayer = layers.find((l) => l.id === selectedLayerId);
@@ -1651,7 +1657,14 @@ export default function DesignerPage() {
             )}
           </aside>
 
-          <main className="flex-1 flex flex-col justify-between p-8 relative overflow-hidden bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20">
+          <main
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                selectLayer(null);
+              }
+            }}
+            className="flex-1 flex flex-col justify-between p-8 relative overflow-hidden bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20"
+          >
 
             <div className="absolute top-8 left-8 flex items-center gap-2 bg-white/80 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none">
               {["front", "back", "left", "right"].map((view) => (

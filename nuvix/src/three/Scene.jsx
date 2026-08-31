@@ -78,6 +78,11 @@ export default function Scene({
       onCreated={({ gl }) => {
         if (gl?.shadowMap) gl.shadowMap.type = THREE.PCFShadowMap;
       }}
+      onPointerMissed={(e) => {
+        if (onSelectLayer) {
+          onSelectLayer(null);
+        }
+      }}
       className="w-full h-full"
     >
       {/* Studio Lighting */}
