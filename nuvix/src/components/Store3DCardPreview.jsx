@@ -1,40 +1,157 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import * as THREE from "three";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import ShirtModel from "../three/ShirtModel";
 import StudioEnvironment from "../three/StudioEnvironment";
 import TShirt2D from "./TShirt2D";
 import ThreeErrorBoundary from "./ThreeErrorBoundary";
 import { Sparkles, Image as ImageIcon } from "lucide-react";
 
-// Global cache for frozen 3D model snapshot images
-const snapshotCache = new Map();
+// Global cache for verified non-empty frozen 3D model snapshot images
+export const snapshotCache = new Map();
 
-// R3F Helper component to trigger single-frame render and capture Data URL snapshot
+export const get3DModelPath = (product) => {
+  if (!product) return "/images/models/male normal t-shirt1.glb";
+  if (product.modelPath && typeof product.modelPath === "string" && (product.modelPath.toLowerCase().endsWith(".glb") || product.modelPath.toLowerCase().endsWith(".gltf") || product.modelPath.toLowerCase().endsWith(".fbx"))) {
+    return product.modelPath;
+  }
+  if (product.path && typeof product.path === "string" && (product.path.toLowerCase().endsWith(".glb") || product.path.toLowerCase().endsWith(".gltf") || product.path.toLowerCase().endsWith(".fbx"))) {
+    return product.path;
+  }
+  if (product.modelUrl && typeof product.modelUrl === "string" && (product.modelUrl.toLowerCase().endsWith(".glb") || product.modelUrl.toLowerCase().endsWith(".gltf") || product.modelUrl.toLowerCase().endsWith(".fbx"))) {
+    return product.modelUrl;
+  }
+  const textStr = (
+    product.tShirtType ||
+    product.shirtType ||
+    product.type ||
+    product.model ||
+    product.title ||
+    product.name ||
+    product.category ||
+    ""
+  ).toLowerCase();
+
+  if (textStr.includes("female") || textStr.includes("women") || textStr.includes("v-neck") || textStr.includes("woman")) {
+    return "/images/models/female normal t-shirt.glb";
+  }
+  if (textStr.includes("long sleeve") || textStr.includes("long-sleeve")) {
+    return "/images/models/long_sleeve_t-_shirt.glb";
+  }
+  if (textStr.includes("oversized")) {
+    return "/images/models/oversized t-sdirt1.glb";
+  }
+  if (textStr.includes("hoodie") || textStr.includes("polo")) {
+    return "/images/models/t_shirt_hoodie.glb";
+  }
+  if (textStr.includes("fbx") || textStr.includes("classic")) {
+    return "/images/models/T SHIRT.fbx";
+  }
+  return "/images/models/male normal t-shirt1.glb";
+};
+
+export const get3DLayers = (product) => {
+  if (!product) return [];
+  if (product.layers && Array.isArray(product.layers) && product.layers.length > 0) {
+    return product.layers.map((l, idx) => ({
+      id: l.id || `layer-${idx}`,
+      type: l.type || "image",
+      name: l.name || (l.type === "text" ? "Custom Text" : "Custom Logo"),
+      text: l.text || "",
+      fontFamily: l.fontFamily || "Outfit",
+      color: l.color || "#1e293b",
+      bold: Boolean(l.bold),
+      italic: Boolean(l.italic),
+      url: l.url || l.image || l.src || "",
+      visible: l.visible !== undefined ? Boolean(l.visible) : true,
+      locked: false,
+      flipX: Boolean(l.flipX),
+      flipY: Boolean(l.flipY),
+      position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
+      rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
+      scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
+      projectedForModel: l.projectedForModel || null,
+      targetMeshName: l.targetMeshName || null
+    }));
+  }
+  const designImg = product.images?.[0] || product.thumbnailUrl || product.designUrl;
+  if (designImg && designImg !== "/images/dumyImage.png") {
+    return [
+      {
+        id: "logo-layer",
+        type: "image",
+        url: designImg,
+        visible: true,
+        locked: false,
+        position: [0, 0.1, 0.15],
+        rotation: [0, 0, 0],
+        scale: [0.35, 0.35, 0.35],
+      },
+    ];
+  }
+  return [];
+};
+
+export const get3DSnapshotCacheKey = (product, activeColor, viewAngle = "front") => {
+  const modelPathStr = get3DModelPath(product);
+  const shirtColor = activeColor || product?.fabricColor || product?.colors?.[0] || "#ffffff";
+  const designImg = product?.images?.[0] || product?.thumbnailUrl;
+  const productId = product?._id || product?.id || product?.title || "prod";
+  const layersKey = (product?.layers && Array.isArray(product.layers))
+    ? product.layers.map(l => `${l.id || l.type}_${l.position?.join(',') || ''}_${l.scale?.join(',') || ''}`).join(';')
+    : (designImg || "");
+  return `${productId}_${modelPathStr}_${shirtColor}_${viewAngle}_${layersKey}`;
+};
+
+export const download3DSnapshotAsPng = (dataUrl, fileName = "3d-tshirt-preview.png") => {
+  if (!dataUrl || dataUrl.length < 1000) return false;
+  try {
+    const link = document.createElement("a");
+    link.download = fileName;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  } catch (err) {
+    console.error("Error downloading 3D snapshot:", err);
+    return false;
+  }
+};
+
+// R3F Helper component that actively waits for 3D GLTF meshes and textures before capturing snapshot
 function SnapshotCapturer({ onCapture }) {
   const { gl, scene, camera } = useThree();
-  const hasCapturedRef = useRef(false);
+  const frameCount = useRef(0);
+  const capturedRef = useRef(false);
 
-  useEffect(() => {
-    hasCapturedRef.current = false;
-    // Wait for initial render frame and textures to settle before capturing snapshot
-    const timer = setTimeout(() => {
-      if (!hasCapturedRef.current) {
-        try {
-          gl.render(scene, camera);
-          const dataUrl = gl.domElement.toDataURL("image/png");
-          if (dataUrl && dataUrl.length > 200) {
-            hasCapturedRef.current = true;
-            onCapture(dataUrl);
-          }
-        } catch (err) {
-          console.warn("Could not capture 3D snapshot:", err);
-        }
+  useFrame(() => {
+    if (capturedRef.current) return;
+    frameCount.current += 1;
+
+    // Check if 3D mesh has actually loaded into the scene
+    let hasLoadedMesh = false;
+    scene.traverse((obj) => {
+      if (obj.isMesh && obj.geometry && obj.visible) {
+        hasLoadedMesh = true;
       }
-    }, 120);
+    });
 
-    return () => clearTimeout(timer);
-  }, [gl, scene, camera, onCapture]);
+    // Wait at least 15 active render frames after mesh is loaded to ensure textures/lighting have rendered
+    if (hasLoadedMesh && frameCount.current >= 15) {
+      try {
+        gl.render(scene, camera);
+        const dataUrl = gl.domElement.toDataURL("image/png");
+        // Ensure dataUrl has real image content (> 5000 chars)
+        if (dataUrl && dataUrl.length > 5000) {
+          capturedRef.current = true;
+          onCapture(dataUrl);
+        }
+      } catch (err) {
+        console.warn("Could not capture 3D snapshot:", err);
+      }
+    }
+  });
 
   return null;
 }
@@ -47,128 +164,54 @@ export default function Store3DCardPreview({
   hideBadge = false,
   className = "",
   fixedView = "front",
+  onSnapshotReady
 }) {
   const [internalViewAngle, setInternalViewAngle] = useState(fixedView || "front");
   const [isHovered, setIsHovered] = useState(false);
 
   const viewAngle = showControls ? internalViewAngle : (fixedView || "front");
+  const normalizedAngle = (viewAngle === "side" ? "left" : viewAngle || "front").toLowerCase();
 
-  const getModelPath = () => {
-    if (!product) return "/images/models/male normal t-shirt1.glb";
-    if (product.modelPath && typeof product.modelPath === "string" && (product.modelPath.toLowerCase().endsWith(".glb") || product.modelPath.toLowerCase().endsWith(".gltf") || product.modelPath.toLowerCase().endsWith(".fbx"))) {
-      return product.modelPath;
-    }
-    if (product.path && typeof product.path === "string" && (product.path.toLowerCase().endsWith(".glb") || product.path.toLowerCase().endsWith(".gltf") || product.path.toLowerCase().endsWith(".fbx"))) {
-      return product.path;
-    }
-    if (product.modelUrl && typeof product.modelUrl === "string" && (product.modelUrl.toLowerCase().endsWith(".glb") || product.modelUrl.toLowerCase().endsWith(".gltf") || product.modelUrl.toLowerCase().endsWith(".fbx"))) {
-      return product.modelUrl;
-    }
-    const textStr = (
-      product.tShirtType ||
-      product.shirtType ||
-      product.type ||
-      product.model ||
-      product.title ||
-      product.name ||
-      product.category ||
-      ""
-    ).toLowerCase();
-
-    if (textStr.includes("female") || textStr.includes("women") || textStr.includes("v-neck") || textStr.includes("woman")) {
-      return "/images/models/female normal t-shirt.glb";
-    }
-    if (textStr.includes("long sleeve") || textStr.includes("long-sleeve")) {
-      return "/images/models/long_sleeve_t-_shirt.glb";
-    }
-    if (textStr.includes("oversized")) {
-      return "/images/models/oversized t-sdirt1.glb";
-    }
-    if (textStr.includes("hoodie") || textStr.includes("polo")) {
-      return "/images/models/t_shirt_hoodie.glb";
-    }
-    if (textStr.includes("fbx") || textStr.includes("classic")) {
-      return "/images/models/T SHIRT.fbx";
-    }
-    return "/images/models/male normal t-shirt1.glb";
-  };
-
-  const getLayers = () => {
-    if (!product) return [];
-    if (product.layers && Array.isArray(product.layers) && product.layers.length > 0) {
-      return product.layers.map((l, idx) => ({
-        id: l.id || `layer-${idx}`,
-        type: l.type || "image",
-        name: l.name || (l.type === "text" ? "Custom Text" : "Custom Logo"),
-        text: l.text || "",
-        fontFamily: l.fontFamily || "Outfit",
-        color: l.color || "#1e293b",
-        bold: Boolean(l.bold),
-        italic: Boolean(l.italic),
-        url: l.url || l.image || l.src || "",
-        visible: l.visible !== undefined ? Boolean(l.visible) : true,
-        locked: false,
-        flipX: Boolean(l.flipX),
-        flipY: Boolean(l.flipY),
-        position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
-        rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
-        scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
-        projectedForModel: l.projectedForModel || null,
-        targetMeshName: l.targetMeshName || null
-      }));
-    }
-    const designImg = product.images?.[0] || product.thumbnailUrl || product.designUrl;
-    if (designImg && designImg !== "/images/dumyImage.png") {
-      return [
-        {
-          id: "logo-layer",
-          type: "image",
-          url: designImg,
-          visible: true,
-          locked: false,
-          position: [0, 0.1, 0.15],
-          rotation: [0, 0, 0],
-          scale: [0.35, 0.35, 0.35],
-        },
-      ];
-    }
-    return [];
-  };
-
-  const modelPathStr = getModelPath();
+  const modelPathStr = get3DModelPath(product);
   const shirtColor = activeColor || product?.fabricColor || product?.colors?.[0] || "#ffffff";
   const designImg = product?.images?.[0] || product?.thumbnailUrl;
-  const productId = product?._id || product?.id || product?.title || "prod";
-  const layersKey = (product?.layers && Array.isArray(product.layers))
-    ? product.layers.map(l => `${l.id || l.type}_${l.position?.join(',') || ''}_${l.scale?.join(',') || ''}`).join(';')
-    : (designImg || "");
-  const cacheKey = `${productId}_${modelPathStr}_${shirtColor}_${viewAngle}_${layersKey}`;
+  const cacheKey = get3DSnapshotCacheKey(product, shirtColor, normalizedAngle);
 
-  const [snapshotUrl, setSnapshotUrl] = useState(() => snapshotCache.get(cacheKey) || null);
-  const [isCapturing, setIsCapturing] = useState(!snapshotCache.has(cacheKey));
+  const [snapshotUrl, setSnapshotUrl] = useState(() => {
+    const cached = snapshotCache.get(cacheKey);
+    return cached && cached.length > 5000 ? cached : null;
+  });
 
   useEffect(() => {
-    if (snapshotCache.has(cacheKey)) {
-      setSnapshotUrl(snapshotCache.get(cacheKey));
-      setIsCapturing(false);
+    const cached = snapshotCache.get(cacheKey);
+    if (cached && cached.length > 5000) {
+      setSnapshotUrl(cached);
+      if (onSnapshotReady) {
+        onSnapshotReady(normalizedAngle, cached);
+      }
     } else {
       setSnapshotUrl(null);
-      setIsCapturing(true);
     }
-  }, [cacheKey]);
+  }, [cacheKey, normalizedAngle, onSnapshotReady]);
 
   const handleCapture = (dataUrl) => {
-    snapshotCache.set(cacheKey, dataUrl);
-    setSnapshotUrl(dataUrl);
-    setIsCapturing(false);
+    if (dataUrl && dataUrl.length > 5000) {
+      snapshotCache.set(cacheKey, dataUrl);
+      setSnapshotUrl(dataUrl);
+      if (onSnapshotReady) {
+        onSnapshotReady(normalizedAngle, dataUrl);
+      }
+    }
   };
 
   // Convert viewAngle string to model Y rotation
   let rotationY = 0;
-  if (viewAngle === "back") {
+  if (normalizedAngle === "back") {
     rotationY = Math.PI;
-  } else if (viewAngle === "side") {
+  } else if (normalizedAngle === "left") {
     rotationY = Math.PI / 2;
+  } else if (normalizedAngle === "right") {
+    rotationY = -Math.PI / 2;
   }
 
   const defaultClasses = "relative rounded-2xl bg-gradient-to-b from-slate-50 via-slate-100/60 to-slate-100 h-52 w-full overflow-hidden border border-slate-200/80 cursor-pointer group/card select-none shadow-2xs hover:border-indigo-300 transition duration-300 flex items-center justify-center p-3";
@@ -181,7 +224,7 @@ export default function Store3DCardPreview({
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
     >
-      {/* 3 View Buttons Overlay at top of card on hover */}
+      {/* 4 View Buttons Overlay at top of card on hover */}
       {showControls && (
         <div
           className={`absolute top-2.5 inset-x-0 z-30 flex justify-center items-center transition-all duration-300 pointer-events-none ${
@@ -194,9 +237,10 @@ export default function Store3DCardPreview({
             {[
               { id: "front", label: "Front" },
               { id: "back", label: "Back" },
-              { id: "side", label: "Side" },
+              { id: "left", label: "Left" },
+              { id: "right", label: "Right" },
             ].map((view) => {
-              const isActive = viewAngle === view.id;
+              const isActive = normalizedAngle === view.id;
               return (
                 <button
                   key={view.id}
@@ -219,33 +263,32 @@ export default function Store3DCardPreview({
         </div>
       )}
 
-      {/* Render Frozen 3D Image Snapshot when captured */}
-      {snapshotUrl ? (
+      {/* Render Frozen 3D Image Snapshot when valid snapshot captured */}
+      {snapshotUrl && snapshotUrl.length > 5000 ? (
         <div className="w-full h-full flex items-center justify-center pointer-events-none transition-transform duration-300 group-hover/card:scale-105">
           <img
             src={snapshotUrl}
-            alt={`${product?.title || "3D T-shirt"} - ${viewAngle} view`}
+            alt={`${product?.title || "3D T-shirt"} - ${normalizedAngle} view`}
             className="max-h-full max-w-full object-contain filter drop-shadow-xl select-none"
           />
         </div>
       ) : (
-        /* Offscreen/Temporary 3D Canvas Snapshot Generator */
+        /* Real-time 3D Canvas rendering smoothly */
         <div className="relative w-full h-full flex items-center justify-center">
-          {/* Subtle background fallback while rendering single frame snapshot */}
+          {/* Fallback 2D Vector background while initial 3D GLTF loads */}
           <div className="absolute inset-0 flex items-center justify-center opacity-60 pointer-events-none">
             <TShirt2D
               color={shirtColor}
               designUrl={designImg}
-              layers={getLayers()}
-              view={viewAngle}
-              className="h-40 w-40 filter blur-[1px] grayscale-[20%]"
+              layers={get3DLayers(product)}
+              view={normalizedAngle}
+              className="h-40 w-40 filter blur-[0.5px]"
             />
           </div>
 
-          {/* 3D Canvas running on-demand to capture snapshot frame */}
+          {/* Active 3D WebGL Canvas */}
           <div className="w-full h-full opacity-95">
             <Canvas
-              frameloop="demand"
               gl={{ preserveDrawingBuffer: true, antialias: true }}
               camera={{ position: [0, 0.1, 4.0], fov: 38 }}
               shadows
@@ -263,9 +306,9 @@ export default function Store3DCardPreview({
                   <StudioEnvironment />
                   <group rotation={[0, rotationY, 0]}>
                     <ShirtModel
-                      modelPath={getModelPath()}
+                      modelPath={modelPathStr}
                       shirtColor={shirtColor}
-                      layers={getLayers()}
+                      layers={get3DLayers(product)}
                       selectedLayerId={null}
                       onSelectLayer={() => {}}
                       onUpdateLayers={() => {}}
@@ -284,7 +327,7 @@ export default function Store3DCardPreview({
         <div className="absolute bottom-2 right-2 z-10 pointer-events-none">
           <span className="px-2 py-0.5 bg-slate-900/60 backdrop-blur-xs text-slate-200 text-[9px] font-bold rounded-md uppercase tracking-wider border border-white/10 flex items-center gap-1 shadow-xs">
             <ImageIcon className="h-2.5 w-2.5 text-indigo-400" />
-            3D PREVIEW • {viewAngle.toUpperCase()}
+            3D PREVIEW • {normalizedAngle.toUpperCase()}
           </span>
         </div>
       )}
