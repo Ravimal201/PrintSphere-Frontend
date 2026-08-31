@@ -1033,6 +1033,11 @@ export default function ShirtModel({
       {scene && (
         <primitive
           object={scene}
+          onPointerDown={(e) => {
+            if (onSelectLayer) {
+              onSelectLayer(null);
+            }
+          }}
         />
       )}
 
