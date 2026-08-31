@@ -1,8 +1,13 @@
-
 import React, { useState, useEffect, useRef } from "react";
-import { X, ZoomIn, Download, RefreshCw, Layers, Sparkles, Camera, CheckCircle, Loader2, Edit } from "lucide-react";
+import { X, ZoomIn, Download, RefreshCw, Layers, Sparkles, Camera, CheckCircle, Loader2, Edit, FileCode } from "lucide-react";
 
 import Scene from "../three/Scene";
+import {
+  downloadTShirtPreviewAsPng,
+  downloadDirectAsset,
+  download3DSnapshotWithFormat,
+  downloadDesignAsJson
+} from "../utils/tshirtPreviewExporter";
 
 const colorMap = {
   white: "#ffffff",
@@ -123,6 +128,7 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
   const [modelRotation, setModelRotation] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureFeedback, setCaptureFeedback] = useState("");
+  const [exportFormat, setExportFormat] = useState("png"); // "png" | "jpg" | "webp"
   const canvasContainerRef = useRef(null);
 
   useEffect(() => {
@@ -144,11 +150,8 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
   };
 
   const resolvedColor = getColorValue(design.fabricColor || design.color || design.selectedColor);
-
   const resolvedModelPath = getModelPath(design);
   const layers = getLayersFromDesign(design);
-
-  
   const titleName = (design.tShirtType || design.title || "custom-shirt").replace(/[^a-z0-9]/gi, "-").toLowerCase();
 
   // Capture current canvas view as PNG
@@ -164,31 +167,47 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
     }
   };
 
-  const handleDownloadActiveScreenshot = () => {
+  const handleDownloadActiveScreenshot = async () => {
     setIsCapturing(true);
-    setTimeout(() => {
-      const dataUrl = captureCurrentCanvasScreenshot();
-      if (dataUrl) {
-        const link = document.createElement("a");
-        link.download = `${titleName}-${activeSide}-view-3d.png`;
-        link.href = dataUrl;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    setCaptureFeedback(`Capturing ${activeSide} view (${exportFormat.toUpperCase()})...`);
 
-        setCaptureFeedback(`Downloaded ${activeSide} view!`);
+    // Give time for any pending animation frame to complete
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    try {
+      const dataUrl = captureCurrentCanvasScreenshot();
+      const baseName = `${titleName}-${activeSide}-view-3d`;
+
+      if (dataUrl && dataUrl.length > 500) {
+        await download3DSnapshotWithFormat(dataUrl, baseName, exportFormat);
+        setCaptureFeedback(`Downloaded ${activeSide} view (${exportFormat.toUpperCase()})!`);
         setTimeout(() => setCaptureFeedback(""), 2500);
       } else {
-        alert("Unable to capture canvas snapshot. Please try again.");
+        // Fallback to high-res canvas renderer
+        await downloadTShirtPreviewAsPng({
+          color: resolvedColor,
+          layers: layers,
+          designUrl: design.thumbnailUrl,
+          view: activeSide,
+          title: titleName,
+          orderShortId: "3d-preview",
+          format: exportFormat
+        });
+        setCaptureFeedback(`Downloaded ${activeSide} view (${exportFormat.toUpperCase()})!`);
+        setTimeout(() => setCaptureFeedback(""), 2500);
       }
+    } catch (err) {
+      console.error("Screenshot error:", err);
+      alert("Error capturing screenshot.");
+    } finally {
       setIsCapturing(false);
-    }, 150);
+    }
   };
 
   // Sequential capture of all 4 views (front, back, left, right)
   const handleDownloadAllAngles = async () => {
     setIsCapturing(true);
-    setCaptureFeedback("Generating 4-angle screenshot pack...");
+    setCaptureFeedback(`Generating 4-angle pack (${exportFormat.toUpperCase()})...`);
 
     const sides = [
       { side: "front", rot: 0 },
@@ -201,19 +220,31 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
       for (const item of sides) {
         setActiveSide(item.side);
         setModelRotation(item.rot);
-        // Wait for WebGL render & smooth transition
-        await new Promise((resolve) => setTimeout(resolve, 350));
+        setCaptureFeedback(`Capturing ${item.side} (${exportFormat.toUpperCase()})...`);
+
+        // Wait for WebGL rotation transition to fully settle
+        await new Promise((resolve) => setTimeout(resolve, 600));
+
         const dataUrl = captureCurrentCanvasScreenshot();
-        if (dataUrl) {
-          const link = document.createElement("a");
-          link.download = `${titleName}-${item.side}-view-3d.png`;
-          link.href = dataUrl;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+        const baseName = `${titleName}-${item.side}-view-3d`;
+
+        if (dataUrl && dataUrl.length > 500) {
+          await download3DSnapshotWithFormat(dataUrl, baseName, exportFormat);
+        } else {
+          // Fallback to high-res canvas composite renderer
+          await downloadTShirtPreviewAsPng({
+            color: resolvedColor,
+            layers: layers,
+            designUrl: design.thumbnailUrl,
+            view: item.side,
+            title: titleName,
+            orderShortId: "3d-pack",
+            format: exportFormat
+          });
         }
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
-      setCaptureFeedback("All 4 views downloaded successfully!");
+      setCaptureFeedback(`All 4 views downloaded in ${exportFormat.toUpperCase()}!`);
       setTimeout(() => setCaptureFeedback(""), 3000);
     } catch (err) {
       console.error("Batch angle capture error:", err);
@@ -223,6 +254,25 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
     }
   };
 
+  // Export Design Blueprint JSON
+  const handleExportBlueprint = () => {
+    const payload = {
+      title: design.title || design.tShirtType || "Custom T-Shirt",
+      tShirtType: design.tShirtType,
+      modelPath: resolvedModelPath,
+      fabricColor: resolvedColor,
+      material: design.material,
+      size: design.size,
+      layers: layers,
+      thumbnailUrl: design.thumbnailUrl,
+      exportedAt: new Date().toISOString()
+    };
+    const success = downloadDesignAsJson(payload, `${titleName}-3d-blueprint.json`);
+    if (success) {
+      setCaptureFeedback("Downloaded 3D Blueprint JSON!");
+      setTimeout(() => setCaptureFeedback(""), 3000);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -281,10 +331,10 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
           </div>
 
           {/* Bottom Bar: Zoom Controls & Capture buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 z-10">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 z-10 flex-wrap">
             
             {/* Zoom Slider */}
-            <div className="flex items-center gap-2.5 bg-white/90 backdrop-blur-xs border border-slate-200 rounded-2xl px-3.5 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-2 bg-white/90 backdrop-blur-xs border border-slate-200 rounded-2xl px-3 py-1.5 shadow-2xs">
               <ZoomIn className="h-3.5 w-3.5 text-slate-400" />
               <input
                 type="range"
@@ -293,7 +343,7 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
                 step="0.05"
                 value={zoomLevel}
                 onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
-                className="w-20 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                className="w-16 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
               />
               <span className="text-[10px] font-black text-slate-700">{Math.round(zoomLevel * 100)}%</span>
               <button
@@ -308,13 +358,31 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
               </button>
             </div>
 
+            {/* Format Selector Pills */}
+            <div className="flex items-center bg-white/90 backdrop-blur-xs border border-slate-200 rounded-xl p-0.5 text-[10px] font-bold shadow-2xs">
+              <span className="px-1.5 text-[9px] text-slate-400 font-extrabold uppercase">Type:</span>
+              {["png", "jpg", "webp"].map((fmt) => (
+                <button
+                  key={fmt}
+                  onClick={() => setExportFormat(fmt)}
+                  className={`px-2 py-0.5 rounded-lg uppercase font-black transition cursor-pointer ${
+                    exportFormat === fmt
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                >
+                  {fmt}
+                </button>
+              ))}
+            </div>
+
             {/* Screenshot Download Actions */}
             <div className="flex items-center gap-2">
               <button
                 disabled={isCapturing}
                 onClick={handleDownloadActiveScreenshot}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer"
-                title={`Download high-res PNG screenshot of ${activeSide} view`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer"
+                title={`Download 3D screenshot of ${activeSide} view as .${exportFormat}`}
               >
                 {isCapturing ? <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" /> : <Camera className="h-3.5 w-3.5 text-indigo-600" />}
                 <span>Screenshot ({activeSide})</span>
@@ -323,11 +391,11 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
               <button
                 disabled={isCapturing}
                 onClick={handleDownloadAllAngles}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50 cursor-pointer"
-                title="Automatically capture and download all 4 views (Front, Back, Left, Right)"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50 cursor-pointer"
+                title={`Automatically capture and download all 4 views as .${exportFormat}`}
               >
                 <Download className="h-3.5 w-3.5" />
-                <span>Download All 4 Angles</span>
+                <span>All 4 Angles ({exportFormat.toUpperCase()})</span>
               </button>
             </div>
           </div>
@@ -346,8 +414,6 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
 
           <div className="space-y-6 overflow-y-auto pr-1">
             {/* Header with Title, Customize button and Close button */}
-
-        
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-base font-black text-slate-900 leading-tight capitalize">
@@ -358,6 +424,13 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleExportBlueprint}
+                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer"
+                  title="Export 3D Design Blueprint JSON"
+                >
+                  <FileCode className="h-4 w-4" />
+                </button>
                 <button
                   onClick={handleCustomize}
                   className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
@@ -428,16 +501,13 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
                       </div>
 
                       {layer.url && layer.url !== "/images/dumyImage.png" && (
-                        <a
-                          href={layer.url}
-                          download={`${titleName}-asset-${idx + 1}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-2 py-1 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-600 hover:text-indigo-700 transition flex items-center gap-1 shrink-0"
+                        <button
+                          onClick={() => downloadDirectAsset(layer.url, `${titleName}-asset-${idx + 1}.png`)}
+                          className="px-2 py-1 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-600 hover:text-indigo-700 transition flex items-center gap-1 shrink-0 cursor-pointer"
                           title="Download original graphic file"
                         >
                           <Download className="h-3 w-3" /> Asset
-                        </a>
+                        </button>
                       )}
                     </div>
                   ))}
@@ -445,7 +515,6 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize }) 
               )}
             </div>
           </div>
-
 
           {/* Footer with Customize Action & Estimated Cost */}
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-3 select-none">
