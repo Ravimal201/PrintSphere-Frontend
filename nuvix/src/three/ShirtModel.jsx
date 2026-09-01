@@ -5,7 +5,7 @@ import { useThree } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
 import ThreeErrorBoundary from "../components/ThreeErrorBoundary";
-import { Maximize2, RotateCw, Trash2 } from "lucide-react";
+import { Maximize2, RotateCw, Trash2, Lock, Unlock } from "lucide-react";
 
 // Helper to convert vectors/eulers to arrays
 function vecToArray(vec = [0, 0, 0]) {
@@ -25,10 +25,12 @@ function DecalHelperControls({
   rotation,
   scale,
   meshWorldScale,
+  isLocked = false,
   onScaleDown,
   onRotateDown,
   onDeleteClick,
-  onDecalPointerDown
+  onDecalPointerDown,
+  onContextMenu
 }) {
   const halfW = (scale[0] || 0.3) / 2;
   const halfH = (scale[1] || 0.3) / 2;
@@ -53,7 +55,7 @@ function DecalHelperControls({
       {/* Clean rectangular border with depthTest disabled and high renderOrder so it never sinks into mesh */}
       <line name="decal-helper" geometry={borderGeometry} renderOrder={999} userData={{ isDecal: true }}>
         <lineBasicMaterial
-          color="#3b82f6"
+          color={isLocked ? "#f59e0b" : "#3b82f6"}
           linewidth={2}
           transparent
           opacity={0.95}
@@ -62,15 +64,28 @@ function DecalHelperControls({
         />
       </line>
 
-      {/* Invisible Drag Helper Plane (extends drag zone to the entire outline area when selected) */}
+      {/* Invisible Drag & Context Menu Helper Plane (extends drag & click zone to the entire outline area when selected) */}
       <mesh
         name="decal-drag-plane"
         userData={{ isDecal: true }}
         position={[0, 0, -0.005]}
-        onPointerDown={onDecalPointerDown}
+        onPointerDown={(e) => {
+          if (e.button === 2) return; // ignore right click for drag start
+          onDecalPointerDown?.(e);
+        }}
+        onContextMenu={(e) => {
+          e.stopPropagation();
+          if (e.nativeEvent) {
+            e.nativeEvent.preventDefault();
+            e.nativeEvent.stopPropagation();
+          }
+          if (onContextMenu) {
+            onContextMenu(e);
+          }
+        }}
         onPointerOver={(e) => {
           e.stopPropagation();
-          document.body.style.cursor = "grab";
+          document.body.style.cursor = isLocked ? "not-allowed" : "grab";
         }}
         onPointerOut={() => {
           document.body.style.cursor = "auto";
@@ -80,41 +95,67 @@ function DecalHelperControls({
         <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Scale Handle (Bottom Right) */}
-      <group position={[(scale[0] || 0.3) / 2, -(scale[1] || 0.3) / 2, -0.012]}>
-        <Html center>
-          <div
-            onPointerDown={onScaleDown}
-            onPointerOver={() => {
-              document.body.style.cursor = "nwse-resize";
-            }}
-            onPointerOut={() => {
-              document.body.style.cursor = "auto";
-            }}
-            className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none cursor-pointer hover:scale-105 transition-transform"
-          >
-            <Maximize2 className="w-3 h-3" />
-          </div>
-        </Html>
-      </group>
+      {/* Lock Indicator Handle (Top Right) */}
+      {isLocked && (
+        <group position={[(scale[0] || 0.3) / 2, (scale[1] || 0.3) / 2 + 0.04, -0.012]}>
+          <Html center>
+            <div
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onContextMenu) onContextMenu(e);
+              }}
+              className="flex items-center gap-1 px-2 py-0.5 bg-amber-500 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none text-[10px] font-bold"
+              title="Locked - Right click for options"
+            >
+              <Lock className="w-3 h-3" />
+              <span>Locked</span>
+            </div>
+          </Html>
+        </group>
+      )}
 
-      {/* Rotate Handle (Top Center) */}
-      <group position={[0, (scale[1] || 0.3) / 2 + 0.04, -0.012]}>
-        <Html center>
-          <div
-            onPointerDown={onRotateDown}
-            onPointerOver={() => {
-              document.body.style.cursor = "grab";
-            }}
-            onPointerOut={() => {
-              document.body.style.cursor = "auto";
-            }}
-            className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none cursor-pointer hover:scale-105 transition-transform"
-          >
-            <RotateCw className="w-3 h-3" />
-          </div>
-        </Html>
-      </group>
+      {/* Scale Handle (Bottom Right) - only when unlocked */}
+      {!isLocked && (
+        <group position={[(scale[0] || 0.3) / 2, -(scale[1] || 0.3) / 2, -0.012]}>
+          <Html center>
+            <div
+              onPointerDown={onScaleDown}
+              onPointerOver={() => {
+                document.body.style.cursor = "nwse-resize";
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "auto";
+              }}
+              className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none cursor-pointer hover:scale-105 transition-transform"
+              title="Scale Object"
+            >
+              <Maximize2 className="w-3 h-3" />
+            </div>
+          </Html>
+        </group>
+      )}
+
+      {/* Rotate Handle (Top Center) - only when unlocked */}
+      {!isLocked && (
+        <group position={[0, (scale[1] || 0.3) / 2 + 0.04, -0.012]}>
+          <Html center>
+            <div
+              onPointerDown={onRotateDown}
+              onPointerOver={() => {
+                document.body.style.cursor = "grab";
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "auto";
+              }}
+              className="flex items-center justify-center w-6 h-6 bg-emerald-500 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none cursor-pointer hover:scale-105 transition-transform"
+              title="Rotate Object"
+            >
+              <RotateCw className="w-3 h-3" />
+            </div>
+          </Html>
+        </group>
+      )}
 
       {/* Delete Handle (Top Left) */}
       <group position={[-(scale[0] || 0.3) / 2, (scale[1] || 0.3) / 2, -0.012]}>
@@ -128,6 +169,7 @@ function DecalHelperControls({
               document.body.style.cursor = "auto";
             }}
             className="flex items-center justify-center w-6 h-6 bg-rose-500 text-white rounded-full shadow-lg border-2 border-white transform scale-90 select-none cursor-pointer hover:scale-105 transition-transform"
+            title="Delete Object"
           >
             <Trash2 className="w-3 h-3" />
           </div>
@@ -149,7 +191,8 @@ function DecalItem({
   onInteractionStart,
   onInteractionEnd,
   modelPath,
-  onSelectLayer
+  onSelectLayer,
+  onContextMenuLayer
 }) {
   const { scene: rootScene, camera, raycaster, gl } = useThree();
   const [texture, setTexture] = useState(null);
@@ -535,6 +578,8 @@ function DecalItem({
     texture,
     layer.visible,
     layer.id,
+    layer.locked,
+    layerIndex,
     scene,
     rawPos[0],
     rawPos[1],
@@ -579,6 +624,7 @@ function DecalItem({
           userData={{ isDecal: true }}
           position={[0, 0, -0.005]}
           onPointerDown={(e) => {
+            if (e.button === 2) return; // Right click should not start drag
             e.stopPropagation();
             if (onSelectLayer) onSelectLayer(layer.id);
             if (!layer.locked) {
@@ -586,9 +632,24 @@ function DecalItem({
               if (onInteractionStart) onInteractionStart();
             }
           }}
+          onContextMenu={(e) => {
+            e.stopPropagation();
+            if (e.nativeEvent) {
+              e.nativeEvent.preventDefault();
+              e.nativeEvent.stopPropagation();
+            }
+            if (onSelectLayer) onSelectLayer(layer.id);
+            if (onContextMenuLayer) {
+              onContextMenuLayer({
+                layerId: layer.id,
+                x: e.clientX ?? e.nativeEvent?.clientX ?? 0,
+                y: e.clientY ?? e.nativeEvent?.clientY ?? 0
+              });
+            }
+          }}
           onPointerOver={(e) => {
             e.stopPropagation();
-            document.body.style.cursor = "pointer";
+            document.body.style.cursor = layer.locked ? "not-allowed" : "pointer";
           }}
           onPointerOut={() => {
             document.body.style.cursor = "auto";
@@ -671,6 +732,24 @@ function DecalItem({
     if (onInteractionStart) onInteractionStart();
   };
 
+  const handleContextMenu = (e) => {
+    e.stopPropagation();
+    if (e.nativeEvent) {
+      e.nativeEvent.preventDefault();
+      e.nativeEvent.stopPropagation();
+    }
+    if (onSelectLayer) {
+      onSelectLayer(layer.id);
+    }
+    if (onContextMenuLayer) {
+      onContextMenuLayer({
+        layerId: layer.id,
+        x: e.clientX ?? e.nativeEvent?.clientX ?? 0,
+        y: e.clientY ?? e.nativeEvent?.clientY ?? 0
+      });
+    }
+  };
+
   return (
     <DecalHelperControls
       groupRef={groupRef}
@@ -678,10 +757,12 @@ function DecalItem({
       rotation={worldEuler}
       scale={helperScale}
       meshWorldScale={meshWorldScale}
+      isLocked={Boolean(layer.locked)}
       onScaleDown={handleScaleDown}
       onRotateDown={handleRotateDown}
       onDeleteClick={handleDeleteClick}
       onDecalPointerDown={handleDecalPointerDown}
+      onContextMenu={handleContextMenu}
     />
   );
 }
@@ -722,7 +803,8 @@ export default function ShirtModel({
   onUpdateLayers,
   onDeleteLayer,
   onInteractionStart,
-  onInteractionEnd
+  onInteractionEnd,
+  onContextMenuLayer
 }) {
   const resolvedModelPath = (typeof modelPath === "string" && (
     modelPath.toLowerCase().endsWith(".glb") ||
@@ -1071,6 +1153,7 @@ export default function ShirtModel({
                 onInteractionEnd={onInteractionEnd}
                 modelPath={modelPath}
                 onSelectLayer={onSelectLayer}
+                onContextMenuLayer={onContextMenuLayer}
               />
             </ThreeErrorBoundary>
           );

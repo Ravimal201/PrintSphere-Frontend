@@ -719,6 +719,31 @@ export default function DesignerPage() {
     }, 100);
   };
 
+  const [selectedLayerId, setSelectedLayerId] = useState(null);
+  const [quantity, setQuantity] = useState(1);
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, layerId: null });
+
+  const handleOpenContextMenu = ({ layerId, x, y }) => {
+    if (layerId) {
+      selectLayer(layerId);
+    }
+    const menuWidth = 230;
+    const menuHeight = 350;
+    const clampedX = Math.min(Math.max(10, x), window.innerWidth - menuWidth - 10);
+    const clampedY = Math.min(Math.max(10, y), window.innerHeight - menuHeight - 10);
+
+    setContextMenu({
+      visible: true,
+      x: clampedX,
+      y: clampedY,
+      layerId: layerId || selectedLayerId
+    });
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu({ visible: false, x: 0, y: 0, layerId: null });
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const activeTag = document.activeElement?.tagName?.toLowerCase();
@@ -738,15 +763,46 @@ export default function DesignerPage() {
         e.preventDefault();
         handleRedo();
       } else if (e.key === "Escape") {
-        selectLayer(null);
+        if (contextMenu.visible) {
+          handleCloseContextMenu();
+        } else {
+          selectLayer(null);
+        }
+      } else if (selectedLayerId && (e.key === "]" || (e.ctrlKey && e.key === "]"))) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          bringLayerToFront(selectedLayerId);
+        } else {
+          moveLayerUp(selectedLayerId);
+        }
+      } else if (selectedLayerId && (e.key === "[" || (e.ctrlKey && e.key === "["))) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          sendLayerToBack(selectedLayerId);
+        } else {
+          moveLayerDown(selectedLayerId);
+        }
+      } else if (selectedLayerId && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        toggleLayerLock(selectedLayerId);
+      } else if (selectedLayerId && (e.key === "Delete" || e.key === "Backspace")) {
+        deleteLayer(selectedLayerId);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [historyIndex, history]);
-  const [selectedLayerId, setSelectedLayerId] = useState(null);
-  const [quantity, setQuantity] = useState(1);
+  }, [historyIndex, history, selectedLayerId, contextMenu.visible]);
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu.visible) {
+        handleCloseContextMenu();
+      }
+    };
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, [contextMenu.visible]);
 
   const selectLayer = (id) => {
     setSelectedLayerId(id);
@@ -1725,6 +1781,7 @@ export default function DesignerPage() {
                 onUpdateLayers={setLayers}
                 onDeleteLayer={deleteLayer}
                 modelRotation={modelRotation}
+                onContextMenuLayer={handleOpenContextMenu}
               />
             </div>
 
@@ -1861,6 +1918,15 @@ export default function DesignerPage() {
                         <div
                           key={layer.id}
                           onClick={() => selectLayer(layer.id)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleOpenContextMenu({
+                              layerId: layer.id,
+                              x: e.clientX,
+                              y: e.clientY
+                            });
+                          }}
                           className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition ${isSelected
                               ? "border-indigo-500 bg-indigo-50/10 shadow-sm"
                               : "border-slate-100 hover:bg-slate-50"
@@ -2767,6 +2833,215 @@ export default function DesignerPage() {
           </div>
         </div>
       )}
+      {/* Right-Click Object Context Menu (Layer order & Lock/Unlock) */}
+      {contextMenu.visible && (() => {
+        const targetLayer = layers.find(l => l.id === contextMenu.layerId) || activeLayer;
+        if (!targetLayer) return null;
+
+        return (
+          <div
+            style={{
+              position: "fixed",
+              top: contextMenu.y,
+              left: contextMenu.x,
+              zIndex: 9999
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className="w-60 bg-slate-900/95 backdrop-blur-xl text-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.45)] border border-slate-700/70 p-1.5 animate-in fade-in zoom-in-95 duration-100 select-none ring-1 ring-white/10"
+          >
+            {/* Header with Layer Name & Status */}
+            <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {targetLayer.type === "text" ? (
+                  <Type className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5 text-teal-400 shrink-0" />
+                )}
+                <span className="text-xs font-bold text-slate-200 truncate">
+                  {targetLayer.name || (targetLayer.type === "text" ? "Text Layer" : "Image Layer")}
+                </span>
+              </div>
+              {targetLayer.locked && (
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wide shrink-0">
+                  <Lock className="h-2.5 w-2.5" />
+                  Locked
+                </span>
+              )}
+            </div>
+
+            {/* Actions list */}
+            <div className="py-1 space-y-0.5 text-xs font-semibold text-slate-200">
+              {/* Bring Forward */}
+              <button
+                type="button"
+                onClick={() => {
+                  moveLayerUp(targetLayer.id);
+                  handleCloseContextMenu();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-indigo-600/30 hover:text-white transition cursor-pointer text-left group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <ArrowUp className="h-4 w-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                  Bring Forward
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">]</span>
+              </button>
+
+              {/* Send Backward */}
+              <button
+                type="button"
+                onClick={() => {
+                  moveLayerDown(targetLayer.id);
+                  handleCloseContextMenu();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-indigo-600/30 hover:text-white transition cursor-pointer text-left group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <ArrowDown className="h-4 w-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                  Send Backward
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">[</span>
+              </button>
+
+              {/* Bring to Front */}
+              <button
+                type="button"
+                onClick={() => {
+                  bringLayerToFront(targetLayer.id);
+                  handleCloseContextMenu();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-indigo-600/30 hover:text-white transition cursor-pointer text-left group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <ChevronsUp className="h-4 w-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                  Bring to Front
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">⇧]</span>
+              </button>
+
+              {/* Send to Back */}
+              <button
+                type="button"
+                onClick={() => {
+                  sendLayerToBack(targetLayer.id);
+                  handleCloseContextMenu();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-indigo-600/30 hover:text-white transition cursor-pointer text-left group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <ChevronsDown className="h-4 w-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                  Send to Back
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">⇧[</span>
+              </button>
+
+              <div className="h-px bg-slate-800 my-1" />
+
+              {/* Lock / Unlock Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  toggleLayerLock(targetLayer.id);
+                  handleCloseContextMenu();
+                }}
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition cursor-pointer text-left font-bold group ${
+                  targetLayer.locked
+                    ? "hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300"
+                    : "hover:bg-amber-500/20 text-amber-400 hover:text-amber-300"
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  {targetLayer.locked ? (
+                    <>
+                      <Unlock className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                      Unlock Object
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                      Lock Object
+                    </>
+                  )}
+                </span>
+                <span className="text-[10px] opacity-70 font-mono">Ctrl+L</span>
+              </button>
+
+              <div className="h-px bg-slate-800 my-1" />
+
+              {/* Flip Horizontal */}
+              <button
+                type="button"
+                onClick={() => {
+                  setLayers(prev =>
+                    prev.map(l => l.id === targetLayer.id ? { ...l, flipX: !l.flipX } : l)
+                  );
+                  handleCloseContextMenu();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer text-left group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <FlipHorizontal className="h-4 w-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                  Flip Horizontal
+                </span>
+              </button>
+
+              {/* Flip Vertical */}
+              <button
+                type="button"
+                onClick={() => {
+                  setLayers(prev =>
+                    prev.map(l => l.id === targetLayer.id ? { ...l, flipY: !l.flipY } : l)
+                  );
+                  handleCloseContextMenu();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer text-left group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <FlipVertical className="h-4 w-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                  Flip Vertical
+                </span>
+              </button>
+
+              {/* Duplicate */}
+              <button
+                type="button"
+                onClick={() => {
+                  duplicateLayer(targetLayer);
+                  handleCloseContextMenu();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer text-left group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Copy className="h-4 w-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                  Duplicate Layer
+                </span>
+              </button>
+
+              <div className="h-px bg-slate-800 my-1" />
+
+              {/* Delete Object */}
+              <button
+                type="button"
+                onClick={() => {
+                  deleteLayer(targetLayer.id);
+                  handleCloseContextMenu();
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition cursor-pointer text-left font-bold group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Trash2 className="h-4 w-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                  Delete Object
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">Del</span>
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
