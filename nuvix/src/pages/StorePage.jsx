@@ -589,6 +589,125 @@ export default function StorePage() {
               </button>
             </div>
 
+            {/* RECOMMENDATIONS CAROUSEL PANELS */}
+            {!loading && products.length > 0 && (
+              <div className="space-y-8">
+                {/* Popular recommendations */}
+                {popularProducts.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Sparkles className="h-4.5 w-4.5 text-amber-500 animate-pulse" />
+                      Popular Choices & Highly Recommended
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                      {popularProducts.slice(0, 4).map((p) => {
+                        const finalPrice =
+                          p.basePrice * (1 - (p.discount || 0) / 100);
+                        return (
+                          <div
+                            key={p._id}
+                            className="bg-white border rounded-2xl p-3 shadow-xs hover:border-amber-200 transition flex items-center gap-3 cursor-pointer group"
+                            onClick={() => setSelected3DProduct(p)}
+                          >
+                            <TShirt2D
+                              color={p.colors?.[0]}
+                              designUrl={p.images?.[0]}
+                              className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0 group-hover:scale-105 transition"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-amber-600 transition">
+                                {p.title}
+                              </h4>
+                              <span className="text-[9px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full inline-block mt-0.5 truncate max-w-full">
+                                Popular Choice
+                              </span>
+                              <div className="flex justify-between items-center mt-1">
+                                <span className="text-xs font-black text-slate-955">
+                                  Rs. {finalPrice.toFixed(2)}
+                                </span>
+                                <div className="flex items-center gap-1 text-[10px]">
+                                  <Star className={`h-3 w-3 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                                  <span className={p.ratingsCount > 0 ? "font-bold text-slate-800" : "text-slate-400"}>
+                                    {p.ratingsCount > 0 ? (p.averageRating ? p.averageRating.toFixed(1) : "0.0") : "0 review"}
+                                  </span>
+                                  <span className="text-slate-400 font-semibold">({p.ratingsCount || 0})</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Frequently Ordered recommendations (Only for Logged-In Users) */}
+                {isLoggedInUser && (
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Star className="h-4.5 w-4.5 text-indigo-500" />
+                      Frequently Ordered Items based on Activity
+                    </h3>
+
+                    {frequentlyOrdered.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                        {frequentlyOrdered.slice(0, 4).map((p) => {
+                          const finalPrice =
+                            p.basePrice * (1 - (p.discount || 0) / 100);
+                          return (
+                            <div
+                              key={p._id}
+                              className="bg-white border rounded-2xl p-3 shadow-xs hover:border-indigo-200 transition flex items-center gap-3 cursor-pointer group"
+                              onClick={() => setSelected3DProduct(p)}
+                            >
+                              <TShirt2D
+                                color={p.colors?.[0]}
+                                designUrl={p.images?.[0]}
+                                className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0 group-hover:scale-105 transition"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-indigo-600 transition">
+                                  {p.title}
+                                </h4>
+                                <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full inline-block mt-0.5 truncate max-w-full">
+                                  {p.recommendationReason || "Recommended for you"}
+                                </span>
+                                <div className="flex justify-between items-center mt-1">
+                                  <span className="text-xs font-black text-slate-955">
+                                    Rs. {finalPrice.toFixed(2)}
+                                  </span>
+                                  <div className="flex items-center gap-1 text-[10px]">
+                                    <Star className={`h-3 w-3 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                                    <span className={p.ratingsCount > 0 ? "font-bold text-slate-800" : "text-slate-400"}>
+                                      {p.ratingsCount > 0 ? (p.averageRating ? p.averageRating.toFixed(1) : "0.0") : "0 review"}
+                                    </span>
+                                    <span className="text-slate-400 font-semibold">({p.ratingsCount || 0})</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Fresh user state (No activity yet) */
+                      <div className="bg-gradient-to-r from-indigo-50/80 via-purple-50/50 to-indigo-50/80 border border-indigo-100/80 rounded-2xl p-6 text-center shadow-xs">
+                        <div className="mx-auto w-12 h-12 bg-indigo-600/10 rounded-full flex items-center justify-center mb-2.5">
+                          <Sparkles className="h-6 w-6 text-indigo-600 animate-bounce" />
+                        </div>
+                        <h4 className="text-sm font-extrabold text-slate-900">
+                          We are studying your fashion preferences!
+                        </h4>
+                        <p className="text-[11px] text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                          Start exploring catalog products, searching your favorite styles, viewing 3D previews, or adding items to your cart. Your personalized activity feed will dynamically update here based on your unique behavior!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Filter controls panel */}
             <div className="bg-white border rounded-3xl p-6 shadow-sm select-none">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-900 mb-4 border-b pb-2">
@@ -772,7 +891,7 @@ export default function StorePage() {
                             <div>
                               {hasDiscount ? (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-sm font-black text-slate-950">
+                                  <span className="text-sm font-black text-slate-955">
                                     Rs. {finalPrice.toFixed(2)}
                                   </span>
                                   <span className="text-[10px] text-slate-400 line-through">
@@ -780,7 +899,7 @@ export default function StorePage() {
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-sm font-black text-slate-950">
+                                <span className="text-sm font-black text-slate-955">
                                   Rs. {p.basePrice.toFixed(2)}
                                 </span>
                               )}
@@ -803,125 +922,6 @@ export default function StorePage() {
                     );
                   })}
                 </div>
-              </div>
-            )}
-
-            {/* RECOMMENDATIONS CAROUSEL PANELS */}
-            {!loading && products.length > 0 && (
-              <div className="space-y-8 pt-8 border-t">
-                {/* Popular recommendations */}
-                {popularProducts.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <Sparkles className="h-4.5 w-4.5 text-amber-500 animate-pulse" />
-                      Popular Choices & Highly Recommended
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                      {popularProducts.slice(0, 4).map((p) => {
-                        const finalPrice =
-                          p.basePrice * (1 - (p.discount || 0) / 100);
-                        return (
-                          <div
-                            key={p._id}
-                            className="bg-white border rounded-2xl p-3 shadow-xs hover:border-amber-200 transition flex items-center gap-3 cursor-pointer group"
-                            onClick={() => setSelected3DProduct(p)}
-                          >
-                            <TShirt2D
-                              color={p.colors?.[0]}
-                              designUrl={p.images?.[0]}
-                              className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0 group-hover:scale-105 transition"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-amber-600 transition">
-                                {p.title}
-                              </h4>
-                              <span className="text-[9px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full inline-block mt-0.5 truncate max-w-full">
-                                Popular Choice
-                              </span>
-                              <div className="flex justify-between items-center mt-1">
-                                <span className="text-xs font-black text-slate-955">
-                                  Rs. {finalPrice.toFixed(2)}
-                                </span>
-                                <div className="flex items-center gap-1 text-[10px]">
-                                  <Star className={`h-3 w-3 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
-                                  <span className={p.ratingsCount > 0 ? "font-bold text-slate-800" : "text-slate-400"}>
-                                    {p.ratingsCount > 0 ? (p.averageRating ? p.averageRating.toFixed(1) : "0.0") : "0 review"}
-                                  </span>
-                                  <span className="text-slate-400 font-semibold">({p.ratingsCount || 0})</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Frequently Ordered recommendations (Only for Logged-In Users) */}
-                {isLoggedInUser && (
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <Star className="h-4.5 w-4.5 text-indigo-500" />
-                      Frequently Ordered Items based on Activity
-                    </h3>
-
-                    {frequentlyOrdered.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                        {frequentlyOrdered.slice(0, 4).map((p) => {
-                          const finalPrice =
-                            p.basePrice * (1 - (p.discount || 0) / 100);
-                          return (
-                            <div
-                              key={p._id}
-                              className="bg-white border rounded-2xl p-3 shadow-xs hover:border-indigo-200 transition flex items-center gap-3 cursor-pointer group"
-                              onClick={() => setSelected3DProduct(p)}
-                            >
-                              <TShirt2D
-                                color={p.colors?.[0]}
-                                designUrl={p.images?.[0]}
-                                className="h-12 w-12 bg-slate-50 rounded-lg border shrink-0 group-hover:scale-105 transition"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-indigo-600 transition">
-                                  {p.title}
-                                </h4>
-                                <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full inline-block mt-0.5 truncate max-w-full">
-                                  {p.recommendationReason || "Recommended for you"}
-                                </span>
-                                <div className="flex justify-between items-center mt-1">
-                                  <span className="text-xs font-black text-slate-955">
-                                    Rs. {finalPrice.toFixed(2)}
-                                  </span>
-                                  <div className="flex items-center gap-1 text-[10px]">
-                                    <Star className={`h-3 w-3 ${p.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
-                                    <span className={p.ratingsCount > 0 ? "font-bold text-slate-800" : "text-slate-400"}>
-                                      {p.ratingsCount > 0 ? (p.averageRating ? p.averageRating.toFixed(1) : "0.0") : "0 review"}
-                                    </span>
-                                    <span className="text-slate-400 font-semibold">({p.ratingsCount || 0})</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      /* Fresh user state (No activity yet) */
-                      <div className="bg-gradient-to-r from-indigo-50/80 via-purple-50/50 to-indigo-50/80 border border-indigo-100/80 rounded-2xl p-6 text-center shadow-xs">
-                        <div className="mx-auto w-12 h-12 bg-indigo-600/10 rounded-full flex items-center justify-center mb-2.5">
-                          <Sparkles className="h-6 w-6 text-indigo-600 animate-bounce" />
-                        </div>
-                        <h4 className="text-sm font-extrabold text-slate-900">
-                          We are studying your fashion preferences!
-                        </h4>
-                        <p className="text-[11px] text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                          Start exploring catalog products, searching your favorite styles, viewing 3D previews, or adding items to your cart. Your personalized activity feed will dynamically update here based on your unique behavior!
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
