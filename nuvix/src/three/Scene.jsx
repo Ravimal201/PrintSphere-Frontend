@@ -58,7 +58,8 @@ export default function Scene({
   onUpdateLayers,
   onDeleteLayer,
   modelRotation = 0,
-  orbitEnabled = false
+  orbitEnabled = false,
+  onContextMenuLayer
 }) {
   const groupRef = useRef();
   const controlsRef = useRef();
@@ -82,6 +83,9 @@ export default function Scene({
         if (onSelectLayer) {
           onSelectLayer(null);
         }
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
       }}
       className="w-full h-full"
     >
@@ -119,6 +123,7 @@ export default function Scene({
               onDeleteLayer={onDeleteLayer}
               onInteractionStart={() => setIsInteracting(true)}
               onInteractionEnd={() => setIsInteracting(false)}
+              onContextMenuLayer={onContextMenuLayer}
             />
           </group>
         </Suspense>
