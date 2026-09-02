@@ -41,7 +41,9 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronsUp,
-  ChevronsDown
+  ChevronsDown,
+  Sun,
+  Moon
 } from "lucide-react";
 
 const shirtColors = [
@@ -215,6 +217,19 @@ export default function DesignerPage() {
   const [availableStyles, setAvailableStyles] = useState(tShirtModels);
   const [showCartRedirectModal, setShowCartRedirectModal] = useState(false);
   const [addedItemDetails, setAddedItemDetails] = useState({ name: "", size: "" });
+
+  const [isDarkStudio, setIsDarkStudio] = useState(() => {
+    const saved = localStorage.getItem("printsphere_studio_theme");
+    return saved ? saved === "dark" : false;
+  });
+
+  const toggleStudioTheme = () => {
+    setIsDarkStudio((prev) => {
+      const next = !prev;
+      localStorage.setItem("printsphere_studio_theme", next ? "dark" : "light");
+      return next;
+    });
+  };
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -1719,10 +1734,16 @@ export default function DesignerPage() {
                 selectLayer(null);
               }
             }}
-            className="flex-1 flex flex-col justify-between p-8 relative overflow-hidden bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20"
+            className={`flex-1 flex flex-col justify-between p-8 relative overflow-hidden transition-colors duration-300 ${
+              isDarkStudio
+                ? "bg-gradient-to-tr from-slate-950 via-slate-900 to-slate-950"
+                : "bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20"
+            }`}
           >
 
-            <div className="absolute top-8 left-8 flex items-center gap-2 bg-white/80 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none">
+            <div className={`absolute top-8 left-8 flex items-center gap-2 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none transition-colors duration-200 ${
+              isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
+            }`}>
               {["front", "back", "left", "right"].map((view) => (
                 <button
                   key={view}
@@ -1733,22 +1754,29 @@ export default function DesignerPage() {
                     else if (view === "left") setModelRotation(Math.PI / 2);
                     else if (view === "right") setModelRotation(-Math.PI / 2);
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${activeView === view
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+                    activeView === view
                       ? "bg-indigo-600 text-white shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                    }`}
+                      : isDarkStudio
+                        ? "text-slate-400 hover:text-slate-200"
+                        : "text-slate-500 hover:text-slate-800"
+                  }`}
                 >
                   {view}
                 </button>
               ))}
             </div>
 
-            {/* Canvas Quick Undo / Redo Controls */}
-            <div className="absolute top-8 right-8 flex items-center gap-1 bg-white/80 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none">
+            {/* Canvas Quick Undo / Redo & Studio Theme Controls */}
+            <div className={`absolute top-8 right-8 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none transition-colors duration-200 ${
+              isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
+            }`}>
               <button
                 onClick={handleUndo}
                 disabled={!canUndo}
-                className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed"
+                className={`p-2 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed ${
+                  isDarkStudio ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                }`}
                 title="Undo (Ctrl+Z)"
               >
                 <Undo2 className="h-4 w-4" />
@@ -1756,10 +1784,22 @@ export default function DesignerPage() {
               <button
                 onClick={handleRedo}
                 disabled={!canRedo}
-                className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed"
+                className={`p-2 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed ${
+                  isDarkStudio ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                }`}
                 title="Redo (Ctrl+Y)"
               >
                 <Redo2 className="h-4 w-4" />
+              </button>
+              <div className={`w-px h-5 mx-0.5 ${isDarkStudio ? "bg-slate-700" : "bg-slate-200"}`} />
+              <button
+                onClick={toggleStudioTheme}
+                className={`p-2 rounded-lg transition cursor-pointer ${
+                  isDarkStudio ? "text-amber-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                }`}
+                title={isDarkStudio ? "Switch to Light Studio" : "Switch to Dark Studio"}
+              >
+                {isDarkStudio ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-indigo-600" />}
               </button>
             </div>
 
@@ -1785,9 +1825,11 @@ export default function DesignerPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-3 max-w-sm mx-auto w-full bg-white border p-4 rounded-2xl shadow-sm select-none z-10">
+            <div className={`flex flex-col gap-3 max-w-sm mx-auto w-full border p-4 rounded-2xl shadow-sm select-none z-10 transition-colors duration-200 ${
+              isDarkStudio ? "bg-slate-900/90 border-slate-700/80 text-slate-200" : "bg-white border-slate-200 text-slate-800"
+            }`}>
               {/* View Zoom Control */}
-              <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+              <div className={`flex items-center justify-between text-xs font-bold ${isDarkStudio ? "text-slate-400" : "text-slate-500"}`}>
                 <span className="flex items-center gap-1">
                   <ZoomIn className="h-3.5 w-3.5" /> View Zoom
                 </span>
@@ -1796,7 +1838,9 @@ export default function DesignerPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.15))}
-                  className="p-1 rounded-lg border hover:bg-slate-50 text-slate-600 font-bold"
+                  className={`p-1 rounded-lg border font-bold ${
+                    isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                  }`}
                 >
                   -
                 </button>
@@ -1807,11 +1851,15 @@ export default function DesignerPage() {
                   step="0.05"
                   value={zoomLevel}
                   onChange={(e) => setZoomLevel(Number(e.target.value))}
-                  className="flex-1 accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                  className={`flex-1 accent-indigo-600 h-1 rounded-lg appearance-none cursor-pointer ${
+                    isDarkStudio ? "bg-slate-700" : "bg-slate-100"
+                  }`}
                 />
                 <button
                   onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.15))}
-                  className="p-1 rounded-lg border hover:bg-slate-50 text-slate-600 font-bold"
+                  className={`p-1 rounded-lg border font-bold ${
+                    isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                  }`}
                 >
                   +
                 </button>
@@ -1821,7 +1869,9 @@ export default function DesignerPage() {
                     setActiveView("front");
                     setModelRotation(0);
                   }}
-                  className="p-1 rounded-lg border hover:bg-slate-50 text-slate-500"
+                  className={`p-1 rounded-lg border ${
+                    isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-400" : "border-slate-200 hover:bg-slate-50 text-slate-500"
+                  }`}
                   title="Reset View"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
@@ -1829,8 +1879,8 @@ export default function DesignerPage() {
               </div>
 
               {/* Model Rotation Control Panel */}
-              <div className="border-t pt-2 mt-1">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500 mb-1.5">
+              <div className={`border-t pt-2 mt-1 ${isDarkStudio ? "border-slate-800" : "border-slate-100"}`}>
+                <div className={`flex items-center justify-between text-xs font-bold mb-1.5 ${isDarkStudio ? "text-slate-400" : "text-slate-500"}`}>
                   <span className="flex items-center gap-1">
                     <RotateCw className="h-3.5 w-3.5" /> Model Rotation
                   </span>
@@ -1843,7 +1893,9 @@ export default function DesignerPage() {
                       setModelRotation(newRot);
                       updateActiveViewFromAngle(newRot);
                     }}
-                    className="p-1 rounded-lg border hover:bg-slate-50 text-slate-600 font-bold"
+                    className={`p-1 rounded-lg border font-bold ${
+                      isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                    }`}
                   >
                     -
                   </button>
@@ -1859,7 +1911,9 @@ export default function DesignerPage() {
                       setModelRotation(rad);
                       updateActiveViewFromAngle(rad);
                     }}
-                    className="flex-1 accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                    className={`flex-1 accent-indigo-600 h-1 rounded-lg appearance-none cursor-pointer ${
+                      isDarkStudio ? "bg-slate-700" : "bg-slate-100"
+                    }`}
                   />
                   <button
                     onClick={() => {
@@ -1867,7 +1921,9 @@ export default function DesignerPage() {
                       setModelRotation(newRot);
                       updateActiveViewFromAngle(newRot);
                     }}
-                    className="p-1 rounded-lg border hover:bg-slate-50 text-slate-600 font-bold"
+                    className={`p-1 rounded-lg border font-bold ${
+                      isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                    }`}
                   >
                     +
                   </button>
