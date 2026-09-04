@@ -43,7 +43,9 @@ import {
   ChevronsUp,
   ChevronsDown,
   Sun,
-  Moon
+  Moon,
+  Shirt,
+  Ruler
 } from "lucide-react";
 
 const shirtColors = [
@@ -518,7 +520,7 @@ export default function DesignerPage() {
     }
   };
 
-  const [leftTab, setLeftTab] = useState("edit");
+  const [activeLeftPanel, setActiveLeftPanel] = useState("style");
   const [rightTab, setRightTab] = useState("layers");
   const [shirtColor, setShirtColor] = useState(() => initialDraft?.fabricColor || initialDraft?.color || "#ffffff");
   const [selectedModel, setSelectedModel] = useState(() => initialModel);
@@ -859,6 +861,28 @@ export default function DesignerPage() {
       scale: [0.3, 0.1, 0.25]
     };
     setLayers([...layers, newLayer]);
+    selectLayer(id);
+  };
+
+  const addStyledTextLayer = ({ text = "Custom Text", fontFamily = "Inter", color = "#1e293b", bold = false, italic = false, scale = [0.35, 0.12, 0.25] }) => {
+    const id = `text-${Date.now()}`;
+    const { position, rotation } = getInitialPositionAndRotation();
+    const newLayer = {
+      id,
+      type: "text",
+      name: text.substring(0, 15),
+      text,
+      fontFamily,
+      color,
+      bold,
+      italic,
+      visible: true,
+      locked: false,
+      position: Array.isArray(position) ? position : [0, 0, 0],
+      rotation: [rotation[0] || 0, rotation[1] || 0, 0],
+      scale
+    };
+    setLayers((prev) => [...prev, newLayer]);
     selectLayer(id);
   };
 
@@ -1447,286 +1471,491 @@ export default function DesignerPage() {
 
         <div className="flex-1 flex overflow-hidden">
 
-          <aside className="w-80 border-r bg-white flex flex-col select-none shrink-0 overflow-y-auto">
-            <div className="flex border-b text-center shrink-0">
-              <button
-                onClick={() => setLeftTab("edit")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${leftTab === "edit"
-                    ? "border-indigo-600 text-indigo-600"
-                    : "border-transparent text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                T-Shirt Style
-              </button>
-              <button
-                onClick={() => setLeftTab("add")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${leftTab === "add"
-                    ? "border-indigo-600 text-indigo-600"
-                    : "border-transparent text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                Add Elements
-              </button>
+          {/* Canva-Style Sidebar Icon Strip */}
+          <aside className="w-20 border-r border-slate-200 bg-white flex flex-col items-center py-4 select-none shrink-0 z-20 shadow-xs justify-between">
+            <div className="w-full flex flex-col items-center space-y-1.5">
+              {[
+                { id: "style", label: "Style", icon: Shirt, subtitle: "T-Shirt Style" },
+                { id: "gsm", label: "GSM", icon: Scale, subtitle: "Fabric GSM" },
+                { id: "colors", label: "Colors", icon: Palette, subtitle: "Fabric Color" },
+                { id: "sizes", label: "Sizes", icon: Ruler, subtitle: "Garment Sizes" },
+                { id: "uploads", label: "Uploads", icon: Upload, subtitle: "Image Uploads" },
+                { id: "text", label: "Text", icon: Type, subtitle: "Typography" },
+                { id: "logos", label: "Logos", icon: Sparkles, subtitle: "Preset Logos" }
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeLeftPanel === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveLeftPanel(prev => prev === item.id ? null : item.id)}
+                    className={`w-[68px] py-2.5 px-1 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer relative group ${
+                      isActive
+                        ? "bg-indigo-50/90 text-indigo-600 font-bold shadow-xs ring-1 ring-indigo-200"
+                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 font-medium"
+                    }`}
+                    title={item.subtitle}
+                  >
+                    {isActive && (
+                      <div className="absolute -left-1 top-2.5 bottom-2.5 w-1 bg-indigo-600 rounded-r-full shadow-sm" />
+                    )}
+                    <div className={`p-1.5 rounded-xl transition-transform duration-200 ${
+                      isActive ? "bg-indigo-600 text-white shadow-xs" : "group-hover:scale-110"
+                    }`}>
+                      <Icon className="h-4.5 w-4.5" />
+                    </div>
+                    <span className="text-[11px] mt-1 tracking-tight leading-tight">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {leftTab === "add" && (
-              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Design Tools</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={addTextLayer}
-                      className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-slate-100 hover:border-indigo-500 hover:bg-indigo-50/20 transition group"
-                    >
-                      <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-indigo-100/50 transition">
-                        <Type className="h-5 w-5 text-indigo-600" />
-                      </div>
-                      <span className="text-xs font-bold">Add Text</span>
-                    </button>
-                    <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-slate-100 hover:border-indigo-500 hover:bg-indigo-50/20 cursor-pointer transition group">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                      <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-indigo-100/50 transition">
-                        <Upload className="h-5 w-5 text-indigo-600" />
-                      </div>
-                      <span className="text-xs font-bold">Upload Image</span>
-                    </label>
-                  </div>
+            {/* Quick status badge / active info indicator */}
+            <div className="w-full px-2 pt-2 border-t border-slate-100 flex flex-col items-center">
+              <div
+                onClick={() => setActiveLeftPanel(prev => prev === "colors" ? null : "colors")}
+                className="h-6 w-6 rounded-full border-2 border-slate-300 shadow-xs cursor-pointer hover:scale-110 transition"
+                style={{ backgroundColor: shirtColor }}
+                title={`Active Color: ${resolveColorName(shirtColor)}`}
+              />
+              <span className="text-[9px] font-extrabold text-slate-400 mt-1 uppercase tracking-wider">{selectedSize}</span>
+            </div>
+          </aside>
 
-                  <label className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-indigo-50/60 border border-indigo-100/80 hover:bg-indigo-50 transition cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={autoRemoveBgOnUpload}
-                      onChange={(e) => setAutoRemoveBgOnUpload(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-                    />
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                      <span className="text-[11px] font-bold text-indigo-950 truncate">Auto-remove background on upload</span>
-                    </div>
-                  </label>
-
-                  {isUploadingWithBg && (
-                    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-indigo-100/70 border border-indigo-200 text-indigo-800 text-xs font-bold animate-pulse">
-                      <Loader2 className="h-4 w-4 animate-spin shrink-0 text-indigo-600" />
-                      <span>{bgStatusMessage || "AI Isolating image subject..."}</span>
-                    </div>
-                  )}
+          {/* Collapsible Active Drawer Panel */}
+          {activeLeftPanel && (
+            <aside className="w-80 border-r border-slate-200 bg-white flex flex-col select-none shrink-0 overflow-hidden shadow-xs z-10 animate-in slide-in-from-left-2 duration-200">
+              {/* Panel Header with Close Button */}
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/40">
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 leading-tight">
+                    {activeLeftPanel === "style" && "T-Shirt Style"}
+                    {activeLeftPanel === "gsm" && "Fabric Weight (GSM)"}
+                    {activeLeftPanel === "colors" && "Fabric Color"}
+                    {activeLeftPanel === "sizes" && "Select Size"}
+                    {activeLeftPanel === "uploads" && "Images & Uploads"}
+                    {activeLeftPanel === "text" && "Add Typography"}
+                    {activeLeftPanel === "logos" && "Preset Logos & Graphics"}
+                  </h2>
+                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                    {activeLeftPanel === "style" && "Choose 3D model & silhouette"}
+                    {activeLeftPanel === "gsm" && "Fabric density & base pricing"}
+                    {activeLeftPanel === "colors" && "Pick standard or model-exclusive shades"}
+                    {activeLeftPanel === "sizes" && "Garment dimensions & fitting"}
+                    {activeLeftPanel === "uploads" && "Upload custom art & AI cutouts"}
+                    {activeLeftPanel === "text" && "Custom text layers & styled presets"}
+                    {activeLeftPanel === "logos" && "Sample stamps and brand assets"}
+                  </p>
                 </div>
+                <button
+                  onClick={() => setActiveLeftPanel(null)}
+                  className="p-1.5 rounded-xl hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                  title="Close Panel (X)"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </button>
+              </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      My Uploaded Images ({userImages.length})
-                    </h3>
-                    {userImages.length > 0 && (
-                      <button
-                        onClick={handleClearAllUserImages}
-                        className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold transition cursor-pointer"
-                      >
-                        Clear All
-                      </button>
-                    )}
-                  </div>
-                  {userImages.length === 0 ? (
-                    <div className="p-4 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                      <Upload className="h-5 w-5 text-slate-300 mx-auto mb-1" />
-                      <p className="text-xs text-slate-400 font-medium">No uploaded images yet</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Use "Upload Image" above to import graphics into your library for easy reuse.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {userImages.map((img) => {
-                        const isProcessing = processingImageId === img.id;
+              {/* Panel Body */}
+              <div className="p-5 flex-1 overflow-y-auto space-y-5">
+                {/* 1. T-Shirt Style */}
+                {activeLeftPanel === "style" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {availableStyles.map((model) => {
+                        const isSelected = selectedModel?.path === model.path;
                         return (
-                          <div
-                            key={img.id}
-                            className="relative group p-2 border border-slate-200 rounded-xl hover:border-indigo-500 bg-white transition flex flex-col items-center gap-1.5 shadow-xs overflow-hidden"
+                          <button
+                            key={model.name}
+                            onClick={() => {
+                              setSelectedModel(model);
+                              setShirtType(model.type);
+                              if (model.colors && model.colors.length > 0) {
+                                setShirtColor(model.colors[0].value);
+                              }
+                              const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
+                                ? model.gsmPrices.map(gp => gp.gsm)
+                                : (model.gsms || []);
+                              if (modelGSMs.length > 0) {
+                                setShirtMaterial(modelGSMs[0]);
+                              }
+                            }}
+                            className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
+                              isSelected
+                                ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
+                                : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
+                            }`}
                           >
-                            {isProcessing && (
-                              <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center gap-1.5">
-                                <Loader2 className="h-5 w-5 text-indigo-600 animate-spin" />
-                                <span className="text-[9px] font-bold text-indigo-700 leading-tight">AI Removing BG...</span>
-                              </div>
-                            )}
-                            <button
-                              onClick={() => addPresetImage(img.url, img.name)}
-                              disabled={isProcessing}
-                              className="w-full flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
-                              title="Click to add to T-shirt canvas"
-                            >
-                              <img
-                                src={img.url}
-                                alt={img.name}
-                                className="h-14 w-full object-contain bg-slate-50 rounded-lg p-1 border border-slate-100"
-                              />
-                              <span className="text-[10px] font-bold text-center text-slate-700 line-clamp-1 w-full px-1">
-                                {img.name}
-                              </span>
-                            </button>
-                            <div className="flex items-center gap-1 w-full pt-1 border-t border-slate-100">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveBgForUserImage(img);
-                                }}
-                                disabled={isProcessing}
-                                className="flex-1 py-1 px-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
-                                title="Remove background with AI"
-                              >
-                                <Sparkles className="h-3 w-3 text-indigo-600 shrink-0" />
-                                <span>Cutout</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveUserImage(img.id);
-                                }}
-                                disabled={isProcessing}
-                                className="h-6 w-6 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 flex items-center justify-center transition cursor-pointer shrink-0"
-                                title="Remove image from library"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
+                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center text-2xl mb-2 transition ${
+                              isSelected ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-500"
+                            }`}>
+                              👕
                             </div>
-                          </div>
+                            <span className={`text-[11px] font-bold text-center leading-tight truncate w-full ${
+                              isSelected ? "text-indigo-950" : "text-slate-800"
+                            }`}>
+                              {model.name}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">
+                              {model.type}
+                            </span>
+                          </button>
                         );
                       })}
                     </div>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Presets & Logos</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {presetLogos.map((logo) => (
-                      <button
-                        key={logo.name}
-                        onClick={() => addPresetImage(logo.url, logo.name)}
-                        className="p-2 border rounded-xl hover:border-indigo-500 hover:bg-slate-50 transition flex flex-col items-center gap-2 cursor-pointer"
-                      >
-                        <img src={logo.url} alt={logo.name} className="h-12 w-12 object-contain bg-slate-50 rounded p-1" />
-                        <span className="text-[10px] font-bold text-center text-slate-500 line-clamp-1">{logo.name}</span>
-                      </button>
-                    ))}
                   </div>
-                </div>
+                )}
 
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric Color</h3>
-                  <div className="flex flex-wrap gap-2.5">
-                    {(selectedModel?.colors && selectedModel.colors.length > 0 ? selectedModel.colors : shirtColors).map((color) => (
-                      <button
-                        key={color.name}
-                        onClick={() => setShirtColor(color.value)}
-                        className={`h-7 w-7 rounded-full border-2 transition-transform ${shirtColor === color.value
-                            ? "scale-125 border-indigo-600 shadow-lg"
-                            : "border-slate-200 hover:scale-110"
-                          }`}
-                        style={{ backgroundColor: color.value }}
-                        title={color.name}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+                {/* 2. Fabric GSM */}
+                {activeLeftPanel === "gsm" && (
+                  <div className="space-y-3">
+                    {(selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0
+                      ? selectedModel.gsmPrices.map(gp => gp.gsm)
+                      : (selectedModel?.gsms || ["180GSM", "220 GSM", "280GSM", "320GSM"])
+                    ).map((gsm) => {
+                      const isSelected = shirtMaterial === gsm;
+                      const priceLabel = getGsmPriceLabel(gsm);
+                      const clean = formatGsm(gsm);
+                      let gsmDesc = "Lightweight & soft breathable cotton";
+                      if (clean.includes("220")) gsmDesc = "Midweight premium structured fabric";
+                      if (clean.includes("280")) gsmDesc = "Heavyweight durable cotton blend";
+                      if (clean.includes("320")) gsmDesc = "Ultra heavyweight luxury streetwear";
 
-            {leftTab === "edit" && (
-              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-                <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">T-Shirt Style (3D Model)</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {availableStyles.map((model) => {
-                      const isSelected = selectedModel?.path === model.path;
                       return (
                         <button
-                          key={model.name}
-                          onClick={() => {
-                            setSelectedModel(model);
-                            setShirtType(model.type);
-                            if (model.colors && model.colors.length > 0) {
-                              setShirtColor(model.colors[0].value);
-                            }
-                            const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
-                              ? model.gsmPrices.map(gp => gp.gsm)
-                              : (model.gsms || []);
-                            if (modelGSMs.length > 0) {
-                              setShirtMaterial(modelGSMs[0]);
-                            }
-                          }}
-                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-left transition duration-200 ${isSelected
-                              ? "border-indigo-600 bg-indigo-50/20 ring-1 ring-indigo-600 font-bold"
-                              : "border-slate-100 hover:bg-slate-50 hover:border-slate-200"
-                            }`}
+                          key={gsm}
+                          onClick={() => setShirtMaterial(gsm)}
+                          className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
+                            isSelected
+                              ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
+                              : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
+                          }`}
                         >
-                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xl mb-2 transition ${isSelected ? "bg-indigo-600 text-white" : "bg-slate-50 text-slate-400"
-                            }`}>
-                            👕
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-extrabold ${isSelected ? "text-indigo-950" : "text-slate-900"}`}>
+                                {gsm}
+                              </span>
+                              {isSelected && (
+                                <span className="h-4 w-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-500 font-medium leading-tight">
+                              {gsmDesc}
+                            </p>
                           </div>
-                          <div className="flex flex-col items-center w-full">
-                            <span className="text-[11px] font-bold text-slate-800 text-center leading-tight truncate w-full">{model.name}</span>
-                            <span className="text-[9px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">{model.type}</span>
+                          <div className="text-right shrink-0 pl-2">
+                            <span className="text-xs font-black text-indigo-600">{priceLabel}</span>
                           </div>
                         </button>
                       );
                     })}
                   </div>
-                </div>
+                )}
 
-                <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Fabric GSM (Weight & Price)</h3>
-                  {(selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0
-                    ? selectedModel.gsmPrices.map(gp => gp.gsm)
-                    : (selectedModel?.gsms || ["180GSM", "220 GSM", "280GSM", "320GSM"])
-                  ).map((gsm) => {
-                    const priceLabel = getGsmPriceLabel(gsm);
-                    return (
-                      <button
-                        key={gsm}
-                        onClick={() => setShirtMaterial(gsm)}
-                        className={`w-full flex items-center justify-between p-4 rounded-xl border text-sm font-semibold transition ${shirtMaterial === gsm
-                            ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 font-bold"
-                            : "border-slate-100 hover:bg-slate-50"
-                          }`}
-                      >
-                        <span>{gsm}</span>
-                        <span className="text-xs text-indigo-650 font-bold">{priceLabel}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* 3. Colors */}
+                {activeLeftPanel === "colors" && (
+                  <div className="space-y-4">
+                    {/* Active Selected Color Pill */}
+                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="h-9 w-9 rounded-xl border-2 border-slate-300 shadow-xs"
+                          style={{ backgroundColor: shirtColor }}
+                        />
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">
+                            {resolveColorName(shirtColor)}
+                          </p>
+                          <span className="text-[10px] text-slate-400 font-mono uppercase">{shirtColor}</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 uppercase">
+                        Current
+                      </span>
+                    </div>
 
-                <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Select Size</h3>
-                  <div className="flex gap-2">
-                    {["S", "M", "L", "XL", "XXL"].map((size) => {
-                      const isSelected = selectedSize === size;
-                      return (
-                        <button
-                          key={size}
-                          onClick={() => setSelectedSize(size)}
-                          className={`flex-1 py-2 rounded-xl border text-xs font-extrabold transition ${isSelected
-                              ? "border-indigo-600 bg-indigo-50/20 text-indigo-700"
-                              : "border-slate-100 hover:bg-slate-50 text-slate-600"
-                            }`}
-                        >
-                          {size}
-                        </button>
-                      );
-                    })}
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Palette Presets</span>
+                      <div className="grid grid-cols-4 gap-2.5">
+                        {(selectedModel?.colors && selectedModel.colors.length > 0 ? selectedModel.colors : shirtColors).map((color) => {
+                          const isSelected = shirtColor.toLowerCase() === color.value.toLowerCase();
+                          return (
+                            <button
+                              key={color.name}
+                              onClick={() => setShirtColor(color.value)}
+                              className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500"
+                                  : "border-slate-200/70 hover:bg-slate-50 hover:border-slate-300"
+                              }`}
+                              title={color.name}
+                            >
+                              <div
+                                className="h-7 w-7 rounded-full border shadow-xs transition-transform"
+                                style={{ backgroundColor: color.value }}
+                              />
+                              <span className="text-[9px] font-bold text-slate-700 truncate w-full text-center">
+                                {color.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
+                {/* 4. Sizes */}
+                {activeLeftPanel === "sizes" && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Available Sizes</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((size) => {
+                          const isSelected = selectedSize === size;
+                          return (
+                            <button
+                              key={size}
+                              onClick={() => setSelectedSize(size)}
+                              className={`py-3 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                                isSelected
+                                  ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                                  : "border-slate-200 hover:bg-slate-50 text-slate-700 bg-white"
+                              }`}
+                            >
+                              <span className="text-sm leading-none">{size}</span>
+                              <span className={`text-[9px] uppercase font-semibold ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
+                                Regular
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-2">
+                      <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                        <Ruler className="h-4 w-4 text-indigo-600" />
+                        <span>Sizing Guide Overview</span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 space-y-1">
+                        <p><strong>Chest:</strong> 38-40" for Size M | 42-44" for Size L</p>
+                        <p><strong>Length:</strong> 28" for Standard fit</p>
+                        <p className="text-[10px] text-slate-400 pt-1">Pre-shrunk 100% combed cotton jersey.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Uploads */}
+                {activeLeftPanel === "uploads" && (
+                  <div className="space-y-5">
+                    {/* Upload button & options */}
+                    <div className="space-y-3">
+                      <label className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl border-2 border-dashed border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/20 cursor-pointer transition-all duration-200 group bg-slate-50/50 text-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                        <div className="h-12 w-12 rounded-2xl bg-white shadow-xs border border-slate-100 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition duration-200 text-indigo-600">
+                          <Upload className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-black text-slate-800 block">Click to Upload Image</span>
+                          <span className="text-[10px] text-slate-400 font-medium">PNG, JPG, SVG or WEBP</span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-indigo-50/60 border border-indigo-100/80 hover:bg-indigo-50 transition cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={autoRemoveBgOnUpload}
+                          onChange={(e) => setAutoRemoveBgOnUpload(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                        />
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                          <span className="text-[11px] font-bold text-indigo-950 truncate">Auto-remove background on upload</span>
+                        </div>
+                      </label>
+
+                      {isUploadingWithBg && (
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl bg-indigo-100/70 border border-indigo-200 text-indigo-800 text-xs font-bold animate-pulse">
+                          <Loader2 className="h-4 w-4 animate-spin shrink-0 text-indigo-600" />
+                          <span>{bgStatusMessage || "AI Isolating image subject..."}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* My Uploaded Images Library */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          My Images ({userImages.length})
+                        </h3>
+                        {userImages.length > 0 && (
+                          <button
+                            onClick={handleClearAllUserImages}
+                            className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold transition cursor-pointer"
+                          >
+                            Clear All
+                          </button>
+                        )}
+                      </div>
+
+                      {userImages.length === 0 ? (
+                        <div className="p-5 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                          <Upload className="h-5 w-5 text-slate-300 mx-auto mb-1.5" />
+                          <p className="text-xs text-slate-400 font-medium">No uploaded images yet</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Uploaded images will be saved here for quick reuse.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          {userImages.map((img) => {
+                            const isProcessing = processingImageId === img.id;
+                            return (
+                              <div
+                                key={img.id}
+                                className="relative group p-2 border border-slate-200 rounded-2xl hover:border-indigo-500 bg-white transition flex flex-col items-center gap-1.5 shadow-xs overflow-hidden"
+                              >
+                                {isProcessing && (
+                                  <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center gap-1.5">
+                                    <Loader2 className="h-5 w-5 text-indigo-600 animate-spin" />
+                                    <span className="text-[9px] font-bold text-indigo-700 leading-tight">AI Removing BG...</span>
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => addPresetImage(img.url, img.name)}
+                                  disabled={isProcessing}
+                                  className="w-full flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
+                                  title="Click to add to T-shirt canvas"
+                                >
+                                  <img
+                                    src={img.url}
+                                    alt={img.name}
+                                    className="h-14 w-full object-contain bg-slate-50 rounded-xl p-1 border border-slate-100"
+                                  />
+                                  <span className="text-[10px] font-bold text-center text-slate-700 line-clamp-1 w-full px-1">
+                                    {img.name}
+                                  </span>
+                                </button>
+                                <div className="flex items-center gap-1 w-full pt-1 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveBgForUserImage(img);
+                                    }}
+                                    disabled={isProcessing}
+                                    className="flex-1 py-1 px-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                                    title="Remove background with AI"
+                                  >
+                                    <Sparkles className="h-3 w-3 text-indigo-600 shrink-0" />
+                                    <span>Cutout</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveUserImage(img.id);
+                                    }}
+                                    disabled={isProcessing}
+                                    className="h-6 w-6 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 flex items-center justify-center transition cursor-pointer shrink-0"
+                                    title="Remove image from library"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. Text */}
+                {activeLeftPanel === "text" && (
+                  <div className="space-y-4">
+                    <button
+                      onClick={addTextLayer}
+                      className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    >
+                      <Type className="h-4 w-4" />
+                      <span>+ Add Text to T-Shirt</span>
+                    </button>
+
+                    <div className="space-y-2.5 pt-2">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Styled Text Presets</span>
+                      <div className="space-y-2">
+                        {[
+                          { title: "Bold Headline", text: "HEAVY DUTY", font: "Montserrat", bold: true, color: "#111827", previewStyle: "font-black tracking-tight" },
+                          { title: "Vintage Script", text: "Original Vibe", font: "Pacifico", bold: false, color: "#4f46e5", previewStyle: "font-normal italic" },
+                          { title: "Regal Serif", text: "ESTABLISHED 2026", font: "Cinzel", bold: true, color: "#1e293b", previewStyle: "font-bold tracking-widest uppercase" },
+                          { title: "Athletic Team", text: "CHAMPIONS 99", font: "Inter", bold: true, color: "#dc2626", previewStyle: "font-black uppercase tracking-wider" },
+                          { title: "Modern Minimalist", text: "pure essence", font: "Outfit", bold: false, color: "#334155", previewStyle: "font-medium lowercase tracking-wide" }
+                        ].map((preset) => (
+                          <button
+                            key={preset.title}
+                            onClick={() => addStyledTextLayer({
+                              text: preset.text,
+                              fontFamily: preset.font,
+                              bold: preset.bold,
+                              color: preset.color
+                            })}
+                            className="w-full p-3 rounded-2xl border border-slate-200/80 hover:border-indigo-500 hover:bg-indigo-50/20 text-left transition-all duration-200 group flex items-center justify-between cursor-pointer bg-white"
+                          >
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{preset.title}</p>
+                              <p
+                                className={`text-sm text-slate-800 group-hover:text-indigo-600 transition-colors ${preset.previewStyle}`}
+                                style={{ fontFamily: preset.font }}
+                              >
+                                {preset.text}
+                              </p>
+                            </div>
+                            <span className="text-xs text-slate-400 group-hover:text-indigo-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                              + Add
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. Preset Logos & Graphics */}
+                {activeLeftPanel === "logos" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      {presetLogos.map((logo) => (
+                        <button
+                          key={logo.name}
+                          onClick={() => addPresetImage(logo.url, logo.name)}
+                          className="p-3 border border-slate-200/80 rounded-2xl hover:border-indigo-500 hover:bg-slate-50 transition-all flex flex-col items-center gap-2 cursor-pointer bg-white group shadow-2xs"
+                        >
+                          <img
+                            src={logo.url}
+                            alt={logo.name}
+                            className="h-14 w-14 object-contain bg-slate-50 rounded-xl p-1.5 group-hover:scale-105 transition-transform"
+                          />
+                          <span className="text-[10px] font-bold text-center text-slate-700 line-clamp-1 group-hover:text-indigo-600">
+                            {logo.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </aside>
+            </aside>
+          )}
 
           <main
             onClick={(e) => {
