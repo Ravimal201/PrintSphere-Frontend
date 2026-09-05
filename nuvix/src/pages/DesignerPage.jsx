@@ -45,7 +45,10 @@ import {
   Sun,
   Moon,
   Shirt,
-  Ruler
+  Ruler,
+  Minus,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 const shirtColors = [
@@ -527,6 +530,7 @@ export default function DesignerPage() {
   const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
   const [shirtType, setShirtType] = useState(() => initialModel?.type || "Crew Neck");
   const [shirtMaterial, setShirtMaterial] = useState(() => initialDraft?.material || "GSM 180");
+  const [isGsmSelectorOpen, setIsGsmSelectorOpen] = useState(false);
   const [activeView, setActiveView] = useState("front");
   const [modelRotation, setModelRotation] = useState(0); // in radians
   const [zoomLevel, setZoomLevel] = useState(0.85);
@@ -1331,6 +1335,19 @@ export default function DesignerPage() {
     return `Rs. ${(basePrice + details.premium).toFixed(2)}`;
   };
 
+  const getModelGsmOptions = () => {
+    if (selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0) {
+      return selectedModel.gsmPrices.map((gp) => gp.gsm);
+    }
+    if (selectedModel?.gsms && selectedModel.gsms.length > 0) {
+      return selectedModel.gsms.map((g) => formatGsm(g));
+    }
+    if (selectedModel?.gsm) {
+      return [formatGsm(selectedModel.gsm)];
+    }
+    return ["GSM 180", "GSM 220", "GSM 280", "GSM 320"];
+  };
+
   const unitPrice = getBasePrice() + getPrintAreaCost();
 
   const discountMultiplier = quantity >= pricingRules.volumeDiscountThreshold
@@ -1963,14 +1980,330 @@ export default function DesignerPage() {
                 selectLayer(null);
               }
             }}
-            className={`flex-1 flex flex-col justify-between p-8 relative overflow-hidden transition-colors duration-300 ${
+            className={`flex-1 flex flex-col relative overflow-hidden transition-colors duration-300 ${
               isDarkStudio
                 ? "bg-gradient-to-tr from-slate-950 via-slate-900 to-slate-950"
                 : "bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20"
             }`}
           >
+            {/* Top Properties Panel Toolbar */}
+            <div
+              className={`w-full px-5 py-2.5 border-b backdrop-blur-md z-20 flex items-center justify-between gap-3 select-none shrink-0 transition-colors duration-200 overflow-x-auto ${
+                isDarkStudio
+                  ? "bg-slate-900/90 border-slate-800 text-slate-200"
+                  : "bg-white/90 border-slate-200/80 text-slate-800 shadow-2xs"
+              }`}
+            >
+              {activeLayer ? (
+                <div className="flex items-center gap-2.5 w-full min-w-max">
+                  {/* 1. Layer Info & Placement Side */}
+                  <div className="flex items-center gap-1.5 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                    <button
+                      onClick={() => selectLayer(null)}
+                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                      title="Deselect Layer (Esc)"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
 
-            <div className={`absolute top-8 left-8 flex items-center gap-2 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none transition-colors duration-200 ${
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-bold text-xs">
+                      {activeLayer.type === "text" ? (
+                        <Type className="h-3.5 w-3.5 shrink-0" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                      <span className="capitalize">{activeLayer.type}</span>
+                    </div>
+
+                    {/* Placement side toggle pill */}
+                    <button
+                      type="button"
+                      onClick={() => moveLayerToSide(activeLayer.id, (activeLayer.position?.[2] || 0) < 0 ? "front" : "back")}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        (activeLayer.position?.[2] || 0) < 0
+                          ? "bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 hover:bg-purple-200"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                      }`}
+                      title="Toggle between Front and Back placement on the shirt"
+                    >
+                      <Shirt className="h-3.5 w-3.5" />
+                      <span>Side: {(activeLayer.position?.[2] || 0) < 0 ? "Back" : "Front"}</span>
+                    </button>
+                  </div>
+
+                  {/* 2. Layer Type Controls (Text vs Image) */}
+                  {activeLayer.type === "text" ? (
+                    <div className="flex items-center gap-2 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                      {/* Text inline input */}
+                      <input
+                        type="text"
+                        value={activeLayer.text}
+                        onChange={(e) => {
+                          updateActiveLayer("text", e.target.value);
+                          updateActiveLayer("name", e.target.value.substring(0, 15) || "Text");
+                        }}
+                        placeholder="Text..."
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:border-indigo-500 focus:outline-hidden w-28 md:w-36 transition"
+                        title="Edit Text Content"
+                      />
+
+                      {/* Font Family select */}
+                      <select
+                        value={activeLayer.fontFamily || "Outfit"}
+                        onChange={(e) => updateActiveLayer("fontFamily", e.target.value)}
+                        className="px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:border-indigo-500 focus:outline-hidden transition cursor-pointer"
+                        title="Font Family"
+                      >
+                        {fontFamilies.map((font) => (
+                          <option key={font} value={font} style={{ fontFamily: font }}>
+                            {font}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Bold & Italic buttons */}
+                      <button
+                        type="button"
+                        onClick={() => updateActiveLayer("bold", !activeLayer.bold)}
+                        className={`w-7 h-7 rounded-lg border text-xs font-black flex items-center justify-center transition cursor-pointer ${
+                          activeLayer.bold
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                            : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                        }`}
+                        title="Bold"
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateActiveLayer("italic", !activeLayer.italic)}
+                        className={`w-7 h-7 rounded-lg border text-xs font-black italic flex items-center justify-center transition cursor-pointer ${
+                          activeLayer.italic
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                            : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                        }`}
+                        title="Italic"
+                      >
+                        I
+                      </button>
+
+                      {/* Text Color input */}
+                      <div className="flex items-center gap-1" title="Text Color">
+                        <input
+                          type="color"
+                          value={activeLayer.color || "#1e293b"}
+                          onChange={(e) => updateActiveLayer("color", e.target.value)}
+                          className="w-7 h-7 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 cursor-pointer bg-white dark:bg-slate-800"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                      {/* AI Background Remover */}
+                      <button
+                        type="button"
+                        onClick={handleRemoveBgForActiveLayer}
+                        disabled={isLayerRemovingBg}
+                        className="px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-60 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                        title="AI Background Remover"
+                      >
+                        {isLayerRemovingBg ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                        )}
+                        <span>AI Remove BG</span>
+                      </button>
+
+                      {/* Scale / Size quick stepper */}
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const curScale = activeLayer.scale[0];
+                            const newScale = Math.max(0.1, curScale - 0.05);
+                            const aspect = activeLayer.aspectRatio || (activeLayer.scale[0] / activeLayer.scale[1]) || 1;
+                            updateActiveLayer("scale", [newScale, newScale / aspect, activeLayer.scale[2]]);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+                          title="Decrease Size"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 w-9 text-center">
+                          {Math.round(activeLayer.scale[0] * 100)}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const curScale = activeLayer.scale[0];
+                            const newScale = Math.min(1.2, curScale + 0.05);
+                            const aspect = activeLayer.aspectRatio || (activeLayer.scale[0] / activeLayer.scale[1]) || 1;
+                            updateActiveLayer("scale", [newScale, newScale / aspect, activeLayer.scale[2]]);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+                          title="Increase Size"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Transforms: Rotate & Flip */}
+                  <div className="flex items-center gap-1.5 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curRot = Array.isArray(activeLayer.rotation) ? activeLayer.rotation : [0, 0, 0];
+                        const rad = curRot[2] || 0;
+                        const deg = Math.round((rad * 180) / Math.PI);
+                        const nextDeg = ((((deg - 90 + 180) % 360) + 360) % 360) - 180;
+                        updateActiveLayer("rotation", [curRot[0] || 0, curRot[1] || 0, (nextDeg * Math.PI) / 180]);
+                      }}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                      title="Rotate -90°"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curRot = Array.isArray(activeLayer.rotation) ? activeLayer.rotation : [0, 0, 0];
+                        const rad = curRot[2] || 0;
+                        const deg = Math.round((rad * 180) / Math.PI);
+                        const nextDeg = ((((deg + 90 + 180) % 360) + 360) % 360) - 180;
+                        updateActiveLayer("rotation", [curRot[0] || 0, curRot[1] || 0, (nextDeg * Math.PI) / 180]);
+                      }}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                      title="Rotate +90°"
+                    >
+                      <RotateCw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    </button>
+
+                    {/* Flip Horizontal & Vertical */}
+                    <button
+                      type="button"
+                      onClick={() => updateActiveLayer("flipX", !activeLayer.flipX)}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                        activeLayer.flipX
+                          ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-600 dark:text-indigo-400 font-bold"
+                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                      }`}
+                      title="Flip Horizontally"
+                    >
+                      <FlipHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateActiveLayer("flipY", !activeLayer.flipY)}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                        activeLayer.flipY
+                          ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-600 dark:text-indigo-400 font-bold"
+                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                      }`}
+                      title="Flip Vertically"
+                    >
+                      <FlipVertical className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* 4. Layer Stacking Order */}
+                  <div className="flex items-center gap-1 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => bringLayerToFront(activeLayer.id)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                      title="Bring to Front"
+                    >
+                      <ChevronsUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLayerUp(activeLayer.id)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                      title="Move Forward"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLayerDown(activeLayer.id)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                      title="Move Backward"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendLayerToBack(activeLayer.id)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                      title="Send to Back"
+                    >
+                      <ChevronsDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* 5. Lock, Duplicate, Delete */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleLayerLock(activeLayer.id)}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                        activeLayer.locked
+                          ? "bg-amber-50 dark:bg-amber-950/60 border-amber-300 text-amber-600 dark:text-amber-400"
+                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                      }`}
+                      title={activeLayer.locked ? "Unlock Layer" : "Lock Layer"}
+                    >
+                      {activeLayer.locked ? <Lock className="h-3.5 w-3.5 text-amber-500" /> : <Unlock className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => duplicateLayer(activeLayer)}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                      title="Duplicate Layer"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteLayer(activeLayer.id)}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                      title="Delete Layer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                      <Shirt className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>{selectedModel?.name || shirtType}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                      <div
+                        className="h-3.5 w-3.5 rounded-full border border-slate-300 shadow-2xs"
+                        style={{ backgroundColor: shirtColor }}
+                      />
+                      <span>{resolveColorName(shirtColor)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
+                      <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>{formatGsm(shirtMaterial)}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden md:block">
+                    💡 Select any layer on the 3D model or layers tab to edit properties
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Canvas Angle View Controls */}
+            <div className={`absolute top-16 left-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${
               isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
             }`}>
               {["front", "back", "left", "right"].map((view) => (
@@ -1983,9 +2316,9 @@ export default function DesignerPage() {
                     else if (view === "left") setModelRotation(Math.PI / 2);
                     else if (view === "right") setModelRotation(-Math.PI / 2);
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+                  className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
                     activeView === view
-                      ? "bg-indigo-600 text-white shadow-sm"
+                      ? "bg-indigo-600 text-white shadow-xs"
                       : isDarkStudio
                         ? "text-slate-400 hover:text-slate-200"
                         : "text-slate-500 hover:text-slate-800"
@@ -1997,7 +2330,7 @@ export default function DesignerPage() {
             </div>
 
             {/* Canvas Quick Undo / Redo & Studio Theme Controls */}
-            <div className={`absolute top-8 right-8 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none transition-colors duration-200 ${
+            <div className={`absolute top-16 right-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${
               isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
             }`}>
               <button
@@ -2161,36 +2494,39 @@ export default function DesignerPage() {
             </div>
           </main>
 
-          <aside className="w-80 border-l bg-white flex flex-col select-none shrink-0 overflow-y-auto">
+          <aside className="w-72 md:w-76 border-l bg-white flex flex-col select-none shrink-0 h-full overflow-hidden">
             <div className="flex border-b text-center shrink-0">
               <button
                 onClick={() => setRightTab("layers")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${rightTab === "layers"
-                    ? "border-indigo-600 text-indigo-600"
+                className={`flex-1 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${rightTab === "layers"
+                    ? "border-indigo-600 text-indigo-600 bg-indigo-50/30"
                     : "border-transparent text-slate-400 hover:text-slate-600"
                   }`}
               >
-                Layers
+                <Layers className="h-3.5 w-3.5" />
+                <span>Layers ({layers.length})</span>
               </button>
               <button
                 onClick={() => setRightTab("properties")}
-                className={`flex-1 py-3 text-sm font-bold transition-all border-b-2 ${rightTab === "properties"
-                    ? "border-indigo-600 text-indigo-600"
+                className={`flex-1 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${rightTab === "properties"
+                    ? "border-indigo-600 text-indigo-600 bg-indigo-50/30"
                     : "border-transparent text-slate-400 hover:text-slate-600"
                   }`}
                 disabled={!selectedLayerId}
               >
-                Properties
+                <Sliders className="h-3.5 w-3.5" />
+                <span>Properties</span>
               </button>
             </div>
 
             {rightTab === "layers" && (
-              <div className="p-5 flex-1 overflow-y-auto space-y-4">
-                <div className="space-y-2">
+              <div className="p-4 flex-1 overflow-y-auto space-y-2 min-h-0">
+                <div className="space-y-1.5">
                   {layers.length === 0 ? (
-                    <div className="p-6 text-center border-2 border-dashed border-slate-100 rounded-2xl">
-                      <p className="text-xs text-slate-400 font-medium">No design elements added yet.</p>
-                      <p className="text-[10px] text-slate-300 mt-1">Use the tools panel on the left to add text or images.</p>
+                    <div className="p-8 text-center border-2 border-dashed border-slate-100 rounded-2xl">
+                      <Layers className="h-8 w-8 mx-auto text-slate-200 mb-2" />
+                      <p className="text-xs text-slate-500 font-bold">No design elements added</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Use the left panel to add typography, graphics, or images.</p>
                     </div>
                   ) : (
                     layers.map((layer, idx) => {
@@ -2212,9 +2548,9 @@ export default function DesignerPage() {
                               y: e.clientY
                             });
                           }}
-                          className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition ${isSelected
-                              ? "border-indigo-500 bg-indigo-50/10 shadow-sm"
-                              : "border-slate-100 hover:bg-slate-50"
+                          className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isSelected
+                              ? "border-indigo-500 bg-indigo-50/20 ring-1 ring-indigo-500/30 shadow-xs"
+                              : "border-slate-100 hover:border-slate-200 hover:bg-slate-50/70"
                             }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -2241,24 +2577,28 @@ export default function DesignerPage() {
                             </div>
 
                             {layer.type === "text" ? (
-                              <Type className="h-4 w-4 text-indigo-500 shrink-0" />
+                              <div className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                                <Type className="h-3.5 w-3.5" />
+                              </div>
                             ) : (
-                              <Upload className="h-4 w-4 text-teal-500 shrink-0" />
+                              <div className="h-7 w-7 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                                <Upload className="h-3.5 w-3.5" />
+                              </div>
                             )}
                             <div className="leading-tight min-w-0">
-                              <p className={`text-xs font-bold truncate ${isSelected ? "text-indigo-600" : ""}`}>
+                              <p className={`text-xs font-bold truncate max-w-[120px] ${isSelected ? "text-indigo-600" : "text-slate-800"}`}>
                                 {layer.name}
                               </p>
-                              <div className="flex items-center gap-1.5 mt-0.5">
+                              <div className="flex items-center gap-1 mt-0.5">
                                 <span className="text-[10px] text-slate-400 capitalize">{layer.type}</span>
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-sm bg-slate-100 text-slate-600 uppercase">
+                                <span className="text-[8px] font-bold px-1.5 py-0.2 rounded-sm bg-slate-100 text-slate-600 uppercase">
                                   {isBack ? "Back" : "Front"}
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => toggleLayerVisibility(layer.id)}
                               className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
@@ -2297,8 +2637,8 @@ export default function DesignerPage() {
             )}
 
             {rightTab === "properties" && activeLayer && (
-              <div className="p-5 flex-1 overflow-y-auto space-y-5">
-                <div className="flex items-center justify-between border-b pb-3 shrink-0">
+              <div className="p-4 flex-1 overflow-y-auto space-y-4 min-h-0">
+                <div className="flex items-center justify-between border-b pb-2.5 shrink-0">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Editing Layer</span>
                   <button onClick={() => setRightTab("layers")} className="p-1 rounded-lg hover:bg-slate-50">
                     <X className="h-4 w-4 text-slate-400" />
@@ -2316,7 +2656,7 @@ export default function DesignerPage() {
                           updateActiveLayer("text", e.target.value);
                           updateActiveLayer("name", e.target.value.substring(0, 15));
                         }}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
                       />
                     </div>
 
@@ -2404,7 +2744,7 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => updateActiveLayer("flipX", !activeLayer.flipX)}
-                      className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
                         activeLayer.flipX
                           ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
                           : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
@@ -2416,7 +2756,7 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => updateActiveLayer("flipY", !activeLayer.flipY)}
-                      className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
                         activeLayer.flipY
                           ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
                           : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
@@ -2680,52 +3020,107 @@ export default function DesignerPage() {
               </div>
             )}
 
-            <div className="p-5 border-t bg-slate-50/50 space-y-4 shrink-0">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                  <span>Print Area (Estimated)</span>
-                  <span>{totalPrintArea.toFixed(2)} in²</span>
-                </div>
+            {/* Compact Print Specs Summary */}
+            <div className="px-4 py-2.5 border-t bg-slate-50/70 space-y-2 shrink-0">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                <span>Print Area: {totalPrintArea.toFixed(1)} in²</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${designComplexity === "High"
+                    ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
+                    : designComplexity === "Medium"
+                      ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
+                      : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                  }`}>
+                  {designComplexity}
+                </span>
+              </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
-                    <span>Print Coverage</span>
-                    <span>{coveragePercentage.toFixed(1)}%</span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all duration-300"
-                      style={{ width: `${coveragePercentage}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500 pt-1">
-                  <span>Design Complexity</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${designComplexity === "High"
-                      ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
-                      : designComplexity === "Medium"
-                        ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
-                        : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                    }`}>
-                    {designComplexity}
-                  </span>
-                </div>
+              <div className="h-1.5 w-full bg-slate-200/80 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all duration-300"
+                  style={{ width: `${coveragePercentage}%` }}
+                />
               </div>
             </div>
 
-            <div className="p-5 border-t bg-white space-y-4 shrink-0">
-              <div className="space-y-2.5">
+            <div className="p-4 border-t bg-white space-y-3 shrink-0">
+              {/* Collapsible GSM Selector Section */}
+              <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 overflow-hidden transition-all duration-200">
+                <button
+                  type="button"
+                  onClick={() => setIsGsmSelectorOpen(!isGsmSelectorOpen)}
+                  className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-100/70 transition cursor-pointer"
+                  title={isGsmSelectorOpen ? "Collapse GSM options" : "Click to view/change Fabric GSM"}
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                    <Scale className="h-3.5 w-3.5 text-indigo-600" />
+                    <span>Fabric GSM</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full ring-1 ring-indigo-200/70">
+                      {formatGsm(shirtMaterial)} · {getGsmPriceLabel(shirtMaterial)}
+                    </span>
+                    {isGsmSelectorOpen ? (
+                      <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Collapsible Content */}
+                {isGsmSelectorOpen && (
+                  <div className="p-2.5 pt-1 border-t border-slate-200/60 grid grid-cols-2 gap-1.5 animate-in slide-in-from-top-1 duration-150">
+                    {getModelGsmOptions().map((gsmOption) => {
+                      const isSelected =
+                        shirtMaterial.replace(/\s+/g, "").toUpperCase() ===
+                        gsmOption.replace(/\s+/g, "").toUpperCase();
+                      const priceFormatted = getGsmPriceLabel(gsmOption);
+                      return (
+                        <button
+                          key={gsmOption}
+                          type="button"
+                          onClick={() => setShirtMaterial(gsmOption)}
+                          className={`flex flex-col p-1.5 rounded-lg text-left transition-all border cursor-pointer ${
+                            isSelected
+                              ? "border-indigo-600 bg-white ring-2 ring-indigo-500/20 shadow-xs"
+                              : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300 text-slate-600"
+                          }`}
+                          title={`Select ${gsmOption} (${priceFormatted})`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className={`text-[10px] font-extrabold leading-tight ${isSelected ? "text-indigo-950" : "text-slate-800"}`}>
+                              {gsmOption}
+                            </span>
+                            {isSelected && (
+                              <span className="h-3 w-3 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[7px] font-bold">
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-[9px] font-semibold mt-0.5 ${isSelected ? "text-indigo-600 font-bold" : "text-slate-500"}`}>
+                            {priceFormatted}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                  <span>Base Price ({selectedModel?.name || shirtType})</span>
-                  <span>Rs. {getBasePrice().toFixed(2)}</span>
+                  <span className="flex items-center gap-1 truncate max-w-[190px]" title={`Base Price (${selectedModel?.name || shirtType} · ${formatGsm(shirtMaterial)})`}>
+                    <span>Base Price</span>
+                    <span className="text-[10px] text-slate-400 font-normal">({formatGsm(shirtMaterial)})</span>
+                  </span>
+                  <span className="font-bold text-slate-800 shrink-0">Rs. {getBasePrice().toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                   <span>Print Area ({totalPrintArea.toFixed(1)} in²)</span>
                   <span>Rs. {getPrintAreaCost().toFixed(2)}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-1">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-0.5">
                   <span>Quantity</span>
                   <div className="flex items-center gap-2">
                     <button
@@ -2734,7 +3129,7 @@ export default function DesignerPage() {
                     >
                       -
                     </button>
-                    <span className="font-bold text-slate-700 w-4 text-center">{quantity}</span>
+                    <span className="font-bold text-slate-700 w-4 text-center text-xs">{quantity}</span>
                     <button
                       onClick={() => setQuantity(quantity + 1)}
                       className="h-6 w-6 rounded border flex items-center justify-center font-bold text-slate-600 hover:bg-slate-50"
@@ -2751,7 +3146,7 @@ export default function DesignerPage() {
                   </div>
                 )}
 
-                <div className="border-t pt-3 flex items-baseline justify-between select-none">
+                <div className="border-t pt-2.5 flex items-baseline justify-between select-none">
                   <span className="text-sm font-extrabold text-slate-900">Total Price</span>
                   <div className="text-right">
                     <p className="text-xl font-black text-slate-900 leading-none">Rs. {totalCost.toFixed(2)}</p>
