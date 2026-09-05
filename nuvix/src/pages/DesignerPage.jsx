@@ -45,7 +45,8 @@ import {
   Sun,
   Moon,
   Shirt,
-  Ruler
+  Ruler,
+  Minus
 } from "lucide-react";
 
 const shirtColors = [
@@ -1331,6 +1332,19 @@ export default function DesignerPage() {
     return `Rs. ${(basePrice + details.premium).toFixed(2)}`;
   };
 
+  const getModelGsmOptions = () => {
+    if (selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0) {
+      return selectedModel.gsmPrices.map((gp) => gp.gsm);
+    }
+    if (selectedModel?.gsms && selectedModel.gsms.length > 0) {
+      return selectedModel.gsms.map((g) => formatGsm(g));
+    }
+    if (selectedModel?.gsm) {
+      return [formatGsm(selectedModel.gsm)];
+    }
+    return ["GSM 180", "GSM 220", "GSM 280", "GSM 320"];
+  };
+
   const unitPrice = getBasePrice() + getPrintAreaCost();
 
   const discountMultiplier = quantity >= pricingRules.volumeDiscountThreshold
@@ -1963,14 +1977,330 @@ export default function DesignerPage() {
                 selectLayer(null);
               }
             }}
-            className={`flex-1 flex flex-col justify-between p-8 relative overflow-hidden transition-colors duration-300 ${
+            className={`flex-1 flex flex-col relative overflow-hidden transition-colors duration-300 ${
               isDarkStudio
                 ? "bg-gradient-to-tr from-slate-950 via-slate-900 to-slate-950"
                 : "bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20"
             }`}
           >
+            {/* Top Properties Panel Toolbar */}
+            <div
+              className={`w-full px-5 py-2.5 border-b backdrop-blur-md z-20 flex items-center justify-between gap-3 select-none shrink-0 transition-colors duration-200 overflow-x-auto ${
+                isDarkStudio
+                  ? "bg-slate-900/90 border-slate-800 text-slate-200"
+                  : "bg-white/90 border-slate-200/80 text-slate-800 shadow-2xs"
+              }`}
+            >
+              {activeLayer ? (
+                <div className="flex items-center gap-2.5 w-full min-w-max">
+                  {/* 1. Layer Info & Placement Side */}
+                  <div className="flex items-center gap-1.5 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                    <button
+                      onClick={() => selectLayer(null)}
+                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+                      title="Deselect Layer (Esc)"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
 
-            <div className={`absolute top-8 left-8 flex items-center gap-2 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none transition-colors duration-200 ${
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-bold text-xs">
+                      {activeLayer.type === "text" ? (
+                        <Type className="h-3.5 w-3.5 shrink-0" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                      <span className="capitalize">{activeLayer.type}</span>
+                    </div>
+
+                    {/* Placement side toggle pill */}
+                    <button
+                      type="button"
+                      onClick={() => moveLayerToSide(activeLayer.id, (activeLayer.position?.[2] || 0) < 0 ? "front" : "back")}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        (activeLayer.position?.[2] || 0) < 0
+                          ? "bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 hover:bg-purple-200"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                      }`}
+                      title="Toggle between Front and Back placement on the shirt"
+                    >
+                      <Shirt className="h-3.5 w-3.5" />
+                      <span>Side: {(activeLayer.position?.[2] || 0) < 0 ? "Back" : "Front"}</span>
+                    </button>
+                  </div>
+
+                  {/* 2. Layer Type Controls (Text vs Image) */}
+                  {activeLayer.type === "text" ? (
+                    <div className="flex items-center gap-2 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                      {/* Text inline input */}
+                      <input
+                        type="text"
+                        value={activeLayer.text}
+                        onChange={(e) => {
+                          updateActiveLayer("text", e.target.value);
+                          updateActiveLayer("name", e.target.value.substring(0, 15) || "Text");
+                        }}
+                        placeholder="Text..."
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:border-indigo-500 focus:outline-hidden w-28 md:w-36 transition"
+                        title="Edit Text Content"
+                      />
+
+                      {/* Font Family select */}
+                      <select
+                        value={activeLayer.fontFamily || "Outfit"}
+                        onChange={(e) => updateActiveLayer("fontFamily", e.target.value)}
+                        className="px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:border-indigo-500 focus:outline-hidden transition cursor-pointer"
+                        title="Font Family"
+                      >
+                        {fontFamilies.map((font) => (
+                          <option key={font} value={font} style={{ fontFamily: font }}>
+                            {font}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Bold & Italic buttons */}
+                      <button
+                        type="button"
+                        onClick={() => updateActiveLayer("bold", !activeLayer.bold)}
+                        className={`w-7 h-7 rounded-lg border text-xs font-black flex items-center justify-center transition cursor-pointer ${
+                          activeLayer.bold
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                            : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                        }`}
+                        title="Bold"
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateActiveLayer("italic", !activeLayer.italic)}
+                        className={`w-7 h-7 rounded-lg border text-xs font-black italic flex items-center justify-center transition cursor-pointer ${
+                          activeLayer.italic
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                            : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                        }`}
+                        title="Italic"
+                      >
+                        I
+                      </button>
+
+                      {/* Text Color input */}
+                      <div className="flex items-center gap-1" title="Text Color">
+                        <input
+                          type="color"
+                          value={activeLayer.color || "#1e293b"}
+                          onChange={(e) => updateActiveLayer("color", e.target.value)}
+                          className="w-7 h-7 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 cursor-pointer bg-white dark:bg-slate-800"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                      {/* AI Background Remover */}
+                      <button
+                        type="button"
+                        onClick={handleRemoveBgForActiveLayer}
+                        disabled={isLayerRemovingBg}
+                        className="px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-60 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                        title="AI Background Remover"
+                      >
+                        {isLayerRemovingBg ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                        )}
+                        <span>AI Remove BG</span>
+                      </button>
+
+                      {/* Scale / Size quick stepper */}
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const curScale = activeLayer.scale[0];
+                            const newScale = Math.max(0.1, curScale - 0.05);
+                            const aspect = activeLayer.aspectRatio || (activeLayer.scale[0] / activeLayer.scale[1]) || 1;
+                            updateActiveLayer("scale", [newScale, newScale / aspect, activeLayer.scale[2]]);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+                          title="Decrease Size"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 w-9 text-center">
+                          {Math.round(activeLayer.scale[0] * 100)}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const curScale = activeLayer.scale[0];
+                            const newScale = Math.min(1.2, curScale + 0.05);
+                            const aspect = activeLayer.aspectRatio || (activeLayer.scale[0] / activeLayer.scale[1]) || 1;
+                            updateActiveLayer("scale", [newScale, newScale / aspect, activeLayer.scale[2]]);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+                          title="Increase Size"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Transforms: Rotate & Flip */}
+                  <div className="flex items-center gap-1.5 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curRot = Array.isArray(activeLayer.rotation) ? activeLayer.rotation : [0, 0, 0];
+                        const rad = curRot[2] || 0;
+                        const deg = Math.round((rad * 180) / Math.PI);
+                        const nextDeg = ((((deg - 90 + 180) % 360) + 360) % 360) - 180;
+                        updateActiveLayer("rotation", [curRot[0] || 0, curRot[1] || 0, (nextDeg * Math.PI) / 180]);
+                      }}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                      title="Rotate -90°"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curRot = Array.isArray(activeLayer.rotation) ? activeLayer.rotation : [0, 0, 0];
+                        const rad = curRot[2] || 0;
+                        const deg = Math.round((rad * 180) / Math.PI);
+                        const nextDeg = ((((deg + 90 + 180) % 360) + 360) % 360) - 180;
+                        updateActiveLayer("rotation", [curRot[0] || 0, curRot[1] || 0, (nextDeg * Math.PI) / 180]);
+                      }}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                      title="Rotate +90°"
+                    >
+                      <RotateCw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    </button>
+
+                    {/* Flip Horizontal & Vertical */}
+                    <button
+                      type="button"
+                      onClick={() => updateActiveLayer("flipX", !activeLayer.flipX)}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                        activeLayer.flipX
+                          ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-600 dark:text-indigo-400 font-bold"
+                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                      }`}
+                      title="Flip Horizontally"
+                    >
+                      <FlipHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateActiveLayer("flipY", !activeLayer.flipY)}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                        activeLayer.flipY
+                          ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-600 dark:text-indigo-400 font-bold"
+                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                      }`}
+                      title="Flip Vertically"
+                    >
+                      <FlipVertical className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* 4. Layer Stacking Order */}
+                  <div className="flex items-center gap-1 pr-2.5 border-r border-slate-200 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => bringLayerToFront(activeLayer.id)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                      title="Bring to Front"
+                    >
+                      <ChevronsUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLayerUp(activeLayer.id)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                      title="Move Forward"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLayerDown(activeLayer.id)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                      title="Move Backward"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendLayerToBack(activeLayer.id)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                      title="Send to Back"
+                    >
+                      <ChevronsDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* 5. Lock, Duplicate, Delete */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleLayerLock(activeLayer.id)}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                        activeLayer.locked
+                          ? "bg-amber-50 dark:bg-amber-950/60 border-amber-300 text-amber-600 dark:text-amber-400"
+                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                      }`}
+                      title={activeLayer.locked ? "Unlock Layer" : "Lock Layer"}
+                    >
+                      {activeLayer.locked ? <Lock className="h-3.5 w-3.5 text-amber-500" /> : <Unlock className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => duplicateLayer(activeLayer)}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                      title="Duplicate Layer"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteLayer(activeLayer.id)}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                      title="Delete Layer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                      <Shirt className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>{selectedModel?.name || shirtType}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                      <div
+                        className="h-3.5 w-3.5 rounded-full border border-slate-300 shadow-2xs"
+                        style={{ backgroundColor: shirtColor }}
+                      />
+                      <span>{resolveColorName(shirtColor)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
+                      <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>{formatGsm(shirtMaterial)}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden md:block">
+                    💡 Select any layer on the 3D model or layers tab to edit properties
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Canvas Angle View Controls */}
+            <div className={`absolute top-16 left-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${
               isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
             }`}>
               {["front", "back", "left", "right"].map((view) => (
@@ -1983,9 +2313,9 @@ export default function DesignerPage() {
                     else if (view === "left") setModelRotation(Math.PI / 2);
                     else if (view === "right") setModelRotation(-Math.PI / 2);
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition ${
+                  className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
                     activeView === view
-                      ? "bg-indigo-600 text-white shadow-sm"
+                      ? "bg-indigo-600 text-white shadow-xs"
                       : isDarkStudio
                         ? "text-slate-400 hover:text-slate-200"
                         : "text-slate-500 hover:text-slate-800"
@@ -1997,7 +2327,7 @@ export default function DesignerPage() {
             </div>
 
             {/* Canvas Quick Undo / Redo & Studio Theme Controls */}
-            <div className={`absolute top-8 right-8 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-sm z-10 select-none transition-colors duration-200 ${
+            <div className={`absolute top-16 right-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${
               isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
             }`}>
               <button
@@ -2715,10 +3045,62 @@ export default function DesignerPage() {
             </div>
 
             <div className="p-5 border-t bg-white space-y-4 shrink-0">
+              {/* GSM Selector & Display Section */}
+              <div className="space-y-2 bg-slate-50/90 p-3 rounded-2xl border border-slate-200/80">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                    <Scale className="h-3.5 w-3.5 text-indigo-600" />
+                    <span>Fabric GSM</span>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full ring-1 ring-indigo-200/70">
+                    Active: {formatGsm(shirtMaterial)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                  {getModelGsmOptions().map((gsmOption) => {
+                    const isSelected =
+                      shirtMaterial.replace(/\s+/g, "").toUpperCase() ===
+                      gsmOption.replace(/\s+/g, "").toUpperCase();
+                    const priceFormatted = getGsmPriceLabel(gsmOption);
+                    return (
+                      <button
+                        key={gsmOption}
+                        type="button"
+                        onClick={() => setShirtMaterial(gsmOption)}
+                        className={`flex flex-col p-2 rounded-xl text-left transition-all border cursor-pointer ${
+                          isSelected
+                            ? "border-indigo-600 bg-white ring-2 ring-indigo-500/20 shadow-xs"
+                            : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300 text-slate-600"
+                        }`}
+                        title={`Select ${gsmOption} (${priceFormatted})`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className={`text-[11px] font-extrabold leading-tight ${isSelected ? "text-indigo-950" : "text-slate-800"}`}>
+                            {gsmOption}
+                          </span>
+                          {isSelected && (
+                            <span className="h-3.5 w-3.5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[8px] font-bold">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] font-semibold mt-0.5 ${isSelected ? "text-indigo-600 font-bold" : "text-slate-500"}`}>
+                          {priceFormatted}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                  <span>Base Price ({selectedModel?.name || shirtType})</span>
-                  <span>Rs. {getBasePrice().toFixed(2)}</span>
+                  <span className="flex items-center gap-1 truncate max-w-[200px]" title={`Base Price (${selectedModel?.name || shirtType} · ${formatGsm(shirtMaterial)})`}>
+                    <span>Base Price</span>
+                    <span className="text-[11px] text-slate-400 font-normal">({selectedModel?.name || shirtType} · {formatGsm(shirtMaterial)})</span>
+                  </span>
+                  <span className="font-bold text-slate-800 shrink-0">Rs. {getBasePrice().toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                   <span>Print Area ({totalPrintArea.toFixed(1)} in²)</span>
