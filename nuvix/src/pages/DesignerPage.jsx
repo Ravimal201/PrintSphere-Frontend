@@ -1358,6 +1358,56 @@ export default function DesignerPage() {
 
   const totalCost = unitPrice * quantity * discountMultiplier;
 
+  const handleAddToCartAndCheckout = () => {
+    const designId = `custom-${Date.now()}`;
+    const cartKey = `${designId}-${selectedSize}-${shirtColor}`;
+
+    const savedCart = localStorage.getItem("printsphere_cart");
+    let currentCart = [];
+    if (savedCart) {
+      try {
+        currentCart = JSON.parse(savedCart);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const allModelColors = [
+      ...(selectedModel?.colors || []),
+      ...shirtColors
+    ];
+    const matchedColorObj = allModelColors.find(c => c.value && c.value.toLowerCase() === shirtColor.toLowerCase());
+    const resolvedColorNameStr = matchedColorObj ? matchedColorObj.name : resolveColorName(shirtColor);
+
+    const cartItem = {
+      cartKey,
+      designId: designId,
+      productId: null,
+      title: `${selectedModel?.name || shirtType} (Custom Design)`,
+      basePrice: unitPrice,
+      discount: 0,
+      category: "Customized",
+      size: selectedSize,
+      color: resolvedColorNameStr,
+      material: formatGsm(shirtMaterial),
+      gsm: formatGsm(shirtMaterial),
+      tShirtType: shirtType,
+      tShirtStyle: shirtType || selectedModel?.name || "Crew Neck",
+      quantity: quantity,
+      image: "/images/dumyImage.png",
+      isCustom: true,
+      layers: layers
+    };
+
+    localStorage.setItem("printsphere_cart", JSON.stringify([...currentCart, cartItem]));
+    setAddedItemDetails({
+      name: selectedModel?.name || shirtType,
+      size: selectedSize
+    });
+    setIsPreviewModalOpen(false);
+    setShowCartRedirectModal(true);
+  };
+
   return (
     <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
 
@@ -1464,16 +1514,6 @@ export default function DesignerPage() {
               <ShoppingBag className="h-3.5 w-3.5" />
               <span>Cart ({quantity})</span>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsPreviewModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-bold shadow-2xs transition cursor-pointer"
-              title="Preview final 3D design from all angles"
-            >
-              <Eye className="h-4 w-4 text-indigo-600" />
-              <span>Preview</span>
-            </button>
 
             <button
               onClick={() => {
@@ -2342,26 +2382,10 @@ export default function DesignerPage() {
               ))}
             </div>
 
-            {/* Canvas Quick Undo / Redo, Preview & Studio Theme Controls */}
+            {/* Canvas Quick Undo / Redo & Studio Theme Controls */}
             <div className={`absolute top-16 right-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${
               isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
             }`}>
-              <button
-                type="button"
-                onClick={() => setIsPreviewModalOpen(true)}
-                className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
-                  isDarkStudio
-                    ? "bg-indigo-950/70 text-indigo-300 hover:bg-indigo-900/80 border border-indigo-800/60"
-                    : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
-                }`}
-                title="Full 3D Final Preview & Angle Inspection"
-              >
-                <Eye className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Preview</span>
-              </button>
-
-              <div className={`w-px h-5 mx-0.5 ${isDarkStudio ? "bg-slate-700" : "bg-slate-200"}`} />
-
               <button
                 onClick={handleUndo}
                 disabled={!canUndo}
@@ -3195,54 +3219,7 @@ export default function DesignerPage() {
                 </button>
 
                 <button
-                  onClick={() => {
-                    const designId = `custom-${Date.now()}`;
-                    const cartKey = `${designId}-${selectedSize}-${shirtColor}`;
-
-                    const savedCart = localStorage.getItem("printsphere_cart");
-                    let currentCart = [];
-                    if (savedCart) {
-                      try {
-                        currentCart = JSON.parse(savedCart);
-                      } catch (e) {
-                        console.error(e);
-                      }
-                    }
-
-                    const allModelColors = [
-                      ...(selectedModel?.colors || []),
-                      ...shirtColors
-                    ];
-                    const matchedColorObj = allModelColors.find(c => c.value && c.value.toLowerCase() === shirtColor.toLowerCase());
-                    const resolvedColorNameStr = matchedColorObj ? matchedColorObj.name : resolveColorName(shirtColor);
-
-                    const cartItem = {
-                      cartKey,
-                      designId: designId,
-                      productId: null,
-                      title: `${selectedModel?.name || shirtType} (Custom Design)`,
-                      basePrice: unitPrice,
-                      discount: 0,
-                      category: "Customized",
-                      size: selectedSize,
-                      color: resolvedColorNameStr,
-                      material: formatGsm(shirtMaterial),
-                      gsm: formatGsm(shirtMaterial),
-                      tShirtType: shirtType,
-                      tShirtStyle: shirtType || selectedModel?.name || "Crew Neck",
-                      quantity: quantity,
-                      image: "/images/dumyImage.png",
-                      isCustom: true,
-                      layers: layers
-                    };
-
-                    localStorage.setItem("printsphere_cart", JSON.stringify([...currentCart, cartItem]));
-                    setAddedItemDetails({
-                      name: selectedModel?.name || shirtType,
-                      size: selectedSize
-                    });
-                    setShowCartRedirectModal(true);
-                  }}
+                  onClick={handleAddToCartAndCheckout}
                   className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight cursor-pointer active:scale-[0.99]"
                 >
                   <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Continue to Checkout</span>
@@ -3767,6 +3744,7 @@ export default function DesignerPage() {
       <TShirt3DModal
         isOpen={isPreviewModalOpen}
         onClose={() => setIsPreviewModalOpen(false)}
+        allowDownloads={false}
         design={{
           title: `${selectedModel?.name || shirtType} (Custom Design)`,
           tShirtType: selectedModel?.name || shirtType,
@@ -3781,6 +3759,7 @@ export default function DesignerPage() {
           thumbnailUrl: generateDesignThumbnail(layers)
         }}
         onCustomize={() => setIsPreviewModalOpen(false)}
+        onCheckout={handleAddToCartAndCheckout}
       />
     </div>
   );
