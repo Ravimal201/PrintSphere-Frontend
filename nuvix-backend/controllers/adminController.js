@@ -279,31 +279,59 @@ exports.getAnalytics = async (req, res) => {
       }
     });
 
-    // 6. Plain T-Shirt Stock Inventory
-    let inventoryItems = await Inventory.find({ itemType: "Plain T-Shirt" });
-    if (inventoryItems.length === 0) {
-      inventoryItems = await Inventory.find();
-    }
-    const formattedInventory = inventoryItems.map(item => {
-      let status = "Good";
+    // 6. Comprehensive Inventory (T-Shirts, Ink, Packaging, Consumables)
+    const allInventoryDocs = await Inventory.find().sort({ itemType: 1, color: 1 });
+
+    const formatInvItem = (item) => {
+      let category = "tshirt";
+      let name = "";
       const threshold = item.minThreshold || 10;
+      let status = "Good";
       if (item.quantity <= threshold) {
         status = "Critical";
       } else if (item.quantity <= threshold * 2) {
         status = "Warning";
       }
-      const maxQty = Math.max(item.quantity * 1.5, 200);
+
+      if (item.itemType === "Plain T-Shirt") {
+        category = "tshirt";
+        name = `${item.tShirtType || "Plain T-Shirt"} (${item.color || "White"}, Size ${item.size || "M"}${item.gsm ? `, ${item.gsm}` : ""})`;
+      } else if (item.itemType === "Printing Ink") {
+        category = "ink";
+        name = `Printing Ink - ${item.color || "Color"}`;
+      } else if (["Transfer Paper", "Custom Consumable"].includes(item.itemType)) {
+        category = "ink";
+        name = `${item.itemType}${item.color && item.color !== "White" ? ` (${item.color})` : ""}`;
+      } else {
+        category = "packaging";
+        name = `${item.itemType}${item.color && item.color !== "White" ? ` (${item.color})` : ""}`;
+      }
+
+      const maxQty = Math.max(item.quantity * 1.4, threshold * 3, 100);
+
       return {
         _id: item._id,
-        name: `${item.tShirtType || "Plain T-Shirt"} (${item.material || "Cotton"}, ${item.color || "White"})`,
+        itemType: item.itemType,
+        tShirtType: item.tShirtType,
+        category,
+        name,
         qty: item.quantity,
+        quantity: item.quantity,
         max: Math.round(maxQty),
+        minThreshold: threshold,
         status,
         color: item.color,
         size: item.size,
-        gsm: item.gsm
+        gsm: item.gsm,
+        material: item.material,
+        lastRestocked: item.lastRestocked
       };
-    });
+    };
+
+    const formattedAllInventory = allInventoryDocs.map(formatInvItem);
+    const tShirtInventory = formattedAllInventory.filter(i => i.category === "tshirt");
+    const inkInventory = formattedAllInventory.filter(i => i.category === "ink");
+    const packagingInventory = formattedAllInventory.filter(i => i.category === "packaging");
 
     // 7. Operational Statistics
     const activeOrdersCount = allOrders.filter(o => ["Processing", "Printing", "Shipped"].includes(o.orderStatus)).length;
@@ -317,7 +345,10 @@ exports.getAnalytics = async (req, res) => {
       popularColors: popularColors.slice(0, 4),
       bestSellers,
       monthlyTrends: trends,
-      inventory: formattedInventory,
+      inventory: formattedAllInventory,
+      tShirtInventory,
+      inkInventory,
+      packagingInventory,
       operationalStats: {
         activeOrders: activeOrdersCount,
         completedOrders: completedOrdersCount,
