@@ -95,6 +95,7 @@ export default function AdminPage() {
   };
 
   const fetchAnalytics = async () => {
+    setAnalyticsLoading(true);
     const token = localStorage.getItem("token");
     try {
       const response = await axios.get(`${API_BASE_URL}/admin/analytics`, {
@@ -615,7 +616,7 @@ export default function AdminPage() {
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Gross Revenue</span>
             <p className="text-2xl font-black text-slate-900 mt-1">
-              {analyticsLoading ? "Loading..." : `Rs. ${(analytics?.grossRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+              {analyticsLoading ? "Loading..." : `Rs. ${(analytics?.grossRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </p>
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold">
               <TrendingUp className="h-3.5 w-3.5" />
@@ -662,9 +663,18 @@ export default function AdminPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border rounded-3xl p-6 shadow-sm">
               <div>
                 <h2 className="text-xl font-black text-slate-900">Analytics & Reports</h2>
-                <p className="text-xs text-slate-400 mt-1">Review real-time performance, revenues, and sales trends.</p>
+                <p className="text-xs text-slate-400 mt-1">Review real-time performance, revenues, and sales trends from the database.</p>
               </div>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={fetchAnalytics}
+                  disabled={analyticsLoading}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl shadow-sm transition disabled:opacity-50"
+                  title="Refresh analytics data"
+                >
+                  <RefreshCw className={`h-4 w-4 ${analyticsLoading ? "animate-spin text-indigo-600" : ""}`} />
+                  Refresh Data
+                </button>
                 <button
                   onClick={handlePrintPDF}
                   disabled={analyticsLoading}
@@ -716,7 +726,7 @@ export default function AdminPage() {
                     {points.map((pt, idx) => (
                       <g key={idx}>
                         <circle cx={pt.x} cy={pt.y} r="5" fill="#4f46e5" className="cursor-pointer" />
-                        <title>{pt.month} {pt.year}: Rs. {pt.total.toLocaleString()}</title>
+                        <title>{pt.month} {pt.year}: Rs. {pt.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</title>
                       </g>
                     ))}
                   </svg>
@@ -746,15 +756,18 @@ export default function AdminPage() {
                       <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
                     </div>
                   ) : (analytics?.popularColors || []).map((item) => {
-                    const bgClass = item.color.toLowerCase() === "white" 
-                      ? "bg-slate-200" 
-                      : item.color.toLowerCase() === "black" 
-                      ? "bg-slate-900" 
-                      : item.color.toLowerCase() === "navy blue" 
-                      ? "bg-indigo-950" 
-                      : item.color.toLowerCase() === "red" 
-                      ? "bg-rose-600" 
-                      : "bg-indigo-600";
+                    const isHex = item.color.startsWith("#");
+                    const bgClass = !isHex ? (
+                      item.color.toLowerCase() === "white" 
+                        ? "bg-slate-200" 
+                        : item.color.toLowerCase() === "black" 
+                        ? "bg-slate-900" 
+                        : item.color.toLowerCase() === "navy blue" 
+                        ? "bg-indigo-950" 
+                        : item.color.toLowerCase() === "red" 
+                        ? "bg-rose-600" 
+                        : "bg-indigo-600"
+                    ) : "";
                     
                     const maxCount = Math.max(...(analytics?.popularColors || []).map(c => c.count), 1);
                     const pct = Math.round((item.count / maxCount) * 100);
@@ -763,7 +776,10 @@ export default function AdminPage() {
                       <div key={item.color} className="space-y-1.5">
                         <div className="flex justify-between text-xs font-bold text-slate-600">
                           <span className="flex items-center gap-2">
-                            <span className={`h-3.5 w-3.5 rounded-full border ${bgClass}`} />
+                            <span 
+                              className={`h-3.5 w-3.5 rounded-full border ${bgClass}`}
+                              style={isHex ? { backgroundColor: item.color } : {}}
+                            />
                             {item.color}
                           </span>
                           <span>{item.count} items ({pct}%)</span>
@@ -785,20 +801,28 @@ export default function AdminPage() {
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-slate-50">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Customizer Bounce Rate</span>
-                    <p className="text-xl font-bold text-slate-800 mt-1">24.2%</p>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Active Orders in Pipeline</span>
+                    <p className="text-xl font-bold text-slate-800 mt-1">
+                      {analyticsLoading ? "..." : (analytics?.operationalStats?.activeOrders ?? 0)}
+                    </p>
                   </div>
                   <div className="p-4 rounded-2xl bg-slate-50">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Cart Conversion</span>
-                    <p className="text-xl font-bold text-slate-800 mt-1">3.48%</p>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Fulfilled Orders</span>
+                    <p className="text-xl font-bold text-slate-800 mt-1">
+                      {analyticsLoading ? "..." : (analytics?.operationalStats?.completedOrders ?? 0)}
+                    </p>
                   </div>
                   <div className="p-4 rounded-2xl bg-slate-50">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Avg Printing Time</span>
-                    <p className="text-xl font-bold text-slate-800 mt-1">18 mins</p>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Avg Order Value</span>
+                    <p className="text-xl font-bold text-slate-800 mt-1">
+                      {analyticsLoading ? "..." : `Rs. ${(analytics?.operationalStats?.avgOrderValue || 0).toLocaleString()}`}
+                    </p>
                   </div>
                   <div className="p-4 rounded-2xl bg-slate-50">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Server Load</span>
-                    <p className="text-xl font-bold text-slate-800 mt-1">12% CPU</p>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Custom Designs</span>
+                    <p className="text-xl font-bold text-slate-800 mt-1">
+                      {analyticsLoading ? "..." : (analytics?.customDesigns || 0).toLocaleString()}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -986,42 +1010,50 @@ export default function AdminPage() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start select-none">
             {/* Plain Shirt Stock levels */}
             <div className="bg-white border rounded-3xl p-6 shadow-sm space-y-6">
-              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                <Inbox className="h-5 w-5 text-indigo-600" />
-                Plain Shirt Stock Levels
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                  <Inbox className="h-5 w-5 text-indigo-600" />
+                  Plain Shirt Stock Levels
+                </h3>
+                <button onClick={fetchAnalytics} className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1">
+                  <RefreshCw className={`h-3 w-3 ${analyticsLoading ? "animate-spin" : ""}`} /> Refresh
+                </button>
+              </div>
               
-              <div className="space-y-4">
-                {[
-                  { name: "Crew Neck (Cotton, White)", qty: 240, max: 300, status: "Good" },
-                  { name: "Polo Shirt (Organic Cotton, Black)", qty: 120, max: 200, status: "Good" },
-                  { name: "V-Neck Shirt (Cotton, Navy)", qty: 8, max: 150, status: "Critical" },
-                  { name: "Crew Neck (Polyester, Grey)", qty: 28, max: 150, status: "Warning" }
-                ].map((item) => (
-                  <div key={item.name} className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-slate-700">{item.name}</span>
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
-                        item.status === "Critical" 
-                          ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100 animate-pulse" 
-                          : item.status === "Warning" 
-                          ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100" 
-                          : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                      }`}>
-                        {item.qty} / {item.max} ({item.status})
-                      </span>
-                    </div>
-                    <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${
-                        item.status === "Critical" 
-                          ? "bg-rose-500" 
-                          : item.status === "Warning" 
-                          ? "bg-amber-500" 
-                          : "bg-emerald-500"
-                      }`} style={{ width: `${(item.qty / item.max) * 100}%` }} />
-                    </div>
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                {analyticsLoading ? (
+                  <div className="py-8 flex justify-center">
+                    <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
                   </div>
-                ))}
+                ) : (!analytics?.inventory || analytics.inventory.length === 0) ? (
+                  <p className="text-xs text-slate-400 text-center py-4 font-semibold">No inventory records found.</p>
+                ) : (
+                  analytics.inventory.map((item) => (
+                    <div key={item._id || item.name} className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-700">{item.name}</span>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
+                          item.status === "Critical" 
+                            ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100 animate-pulse" 
+                            : item.status === "Warning" 
+                            ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100" 
+                            : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                        }`}>
+                          {item.qty} / {item.max} ({item.status})
+                        </span>
+                      </div>
+                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${
+                          item.status === "Critical" 
+                            ? "bg-rose-500" 
+                            : item.status === "Warning" 
+                            ? "bg-amber-500" 
+                            : "bg-emerald-500"
+                        }`} style={{ width: `${Math.min(100, Math.round((item.qty / item.max) * 100))}%` }} />
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
