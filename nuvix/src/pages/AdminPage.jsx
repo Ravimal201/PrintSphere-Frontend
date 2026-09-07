@@ -2,15 +2,21 @@ import { useState, useEffect } from "react";
 import { 
   Users, UserPlus, Lock, Trash2, Key, Mail, Phone, Shield, LogOut, 
   Loader2, AlertCircle, CheckCircle, BarChart3, TrendingUp, Inbox, 
-  Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check, Bell, Download, FileText
+  Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check, Bell, Download, FileText,
+  Droplets, Package, Box, Filter, Search, Tag, Plus, X
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
+import { formatGsm } from "../utils/colorHelper";
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("analytics"); // "analytics" | "staff" | "inventory" | "settings" | "notifications"
+  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState("ALL"); // "ALL" | "TSHIRTS" | "INK" | "PAPERS_PACKAGING"
+  const [inventorySizeFilter, setInventorySizeFilter] = useState("ALL");
+  const [inventoryColorFilter, setInventoryColorFilter] = useState("ALL");
+  const [inventorySearchQuery, setInventorySearchQuery] = useState("");
 
   // Staff list state
   const [staff, setStaff] = useState([]);
@@ -44,6 +50,29 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
+  // Inventory & Styles states (exact mirror of Manager Dashboard inventory)
+  const [inventory, setInventory] = useState([]);
+  const [styles, setStyles] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [restockQuantities, setRestockQuantities] = useState({});
+  const [editingThresholdId, setEditingThresholdId] = useState(null);
+  const [thresholdInputs, setThresholdInputs] = useState({});
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [inventoryForm, setInventoryForm] = useState({
+    itemType: "Plain T-Shirt",
+    materialCategory: "Transfer Paper",
+    tShirtType: "",
+    color: "#ffffff",
+    colorName: "White",
+    size: "M",
+    material: "GSM 180",
+    quantity: 50,
+    minThreshold: 15,
+  });
+  const [inventoryActionLoading, setInventoryActionLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState("");
+  const [newInkColor, setNewInkColor] = useState({ name: "Cyan (C)", value: "#00ffff" });
+
   // Check authentication and load data on mount
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -61,6 +90,7 @@ export default function AdminPage() {
         setIsAdmin(true);
         fetchStaff();
         fetchAnalytics();
+        fetchInventory();
         fetchNotifications();
         // Poll notifications every 10 seconds
         intervalId = setInterval(fetchNotifications, 10000);
@@ -106,6 +136,181 @@ export default function AdminPage() {
       console.error("Fetch analytics error:", err);
     } finally {
       setAnalyticsLoading(false);
+    }
+  };
+
+  const fetchInventory = async () => {
+    setInventoryLoading(true);
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      const [invRes, stylesRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/manager/inventory`, { headers }),
+        axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers }).catch(() => ({ data: [] }))
+      ]);
+      if (invRes.data && Array.isArray(invRes.data)) {
+        setInventory(invRes.data);
+      }
+      if (stylesRes.data && Array.isArray(stylesRes.data)) {
+        setStyles(stylesRes.data);
+      }
+    } catch (err) {
+      console.error("Fetch inventory error:", err);
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+  const handleRestockQuantity = async (itemId) => {
+    const restockVal = Number(restockQuantities[itemId]);
+    if (Number.isNaN(restockVal)) {
+      alert("Please enter a valid number");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    try {
+      const item = inventory.find((i) => i._id === itemId);
+      const currentQty = item?.quantity ?? 0;
+      const newQty = currentQty + restockVal;
+
+      if (newQty < 0) {
+        alert("Stock is insufficient to remove that quantity");
+        return;
+      }
+
+      const res = await axios.put(
+        `${API_BASE_URL}/manager/inventory/${itemId}`,
+        { quantity: newQty },
+        { headers }
+      );
+
+      setInventory((prev) =>
+        prev.map((i) => (i._id === itemId ? res.data.item : i))
+      );
+      setRestockQuantities((prev) => ({ ...prev, [itemId]: "" }));
+      alert(
+        restockVal < 0
+          ? "Stock removed successfully!"
+          : "Stock added successfully!"
+      );
+      fetchAnalytics();
+    } catch (err) {
+      console.error("Restock error:", err);
+      alert(
+        err.response?.data?.message || "Failed to update inventory quantity"
+      );
+    }
+  };
+
+  const handleUpdateMinThreshold = async (itemId) => {
+    const thresholdValue = Number(thresholdInputs[itemId]);
+    if (Number.isNaN(thresholdValue) || thresholdValue < 0) {
+      alert("Please enter a valid minimum threshold");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    try {
+      const res = await axios.put(
+        `${API_BASE_URL}/manager/inventory/${itemId}`,
+        { minThreshold: thresholdValue },
+        { headers }
+      );
+
+      setInventory((prev) =>
+        prev.map((i) => (i._id === itemId ? res.data.item : i))
+      );
+      setEditingThresholdId(null);
+      alert("Minimum threshold updated successfully!");
+      fetchAnalytics();
+    } catch (err) {
+      console.error("Threshold update error:", err);
+      alert(
+        err.response?.data?.message || "Failed to update minimum threshold"
+      );
+    }
+  };
+
+  const handleDeleteInventory = async (itemId) => {
+    if (!window.confirm("Are you sure you want to delete this inventory item?")) return;
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      await axios.delete(`${API_BASE_URL}/manager/inventory/${itemId}`, { headers });
+      setInventory((prev) => prev.filter((i) => i._id !== itemId));
+      alert("Inventory item deleted successfully!");
+      fetchAnalytics();
+    } catch (err) {
+      console.error("Delete inventory error:", err);
+      alert(err.response?.data?.message || "Failed to delete inventory item");
+    }
+  };
+
+  const handleSaveInventory = async (e) => {
+    e.preventDefault();
+    setInventoryError("");
+    setInventoryActionLoading(true);
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    try {
+      const selectedStyleObj = styles.find(
+        (s) => (s.name || s.type) === inventoryForm.tShirtType
+      );
+      const styleName = inventoryForm.tShirtType || (styles[0]?.name || styles[0]?.type || "Crew Neck");
+      const chosenGsm = formatGsm(inventoryForm.material || selectedStyleObj?.gsmPrices?.[0]?.gsm || selectedStyleObj?.gsms?.[0] || "GSM 180");
+
+      let finalItemType = inventoryForm.itemType || "Plain T-Shirt";
+      if (inventoryForm.itemType === "Materials") {
+        finalItemType = inventoryForm.materialCategory || "Transfer Paper";
+      }
+
+      let chosenColor = inventoryForm.colorName || inventoryForm.color || "Cyan (C)";
+
+      const payload = {
+        itemType: finalItemType,
+        tShirtType: inventoryForm.itemType === "Plain T-Shirt" ? styleName : undefined,
+        color: (inventoryForm.itemType === "Plain T-Shirt" || inventoryForm.itemType === "Printing Ink")
+          ? chosenColor
+          : undefined,
+        size: inventoryForm.itemType === "Plain T-Shirt" ? (inventoryForm.size || "M") : undefined,
+        material: inventoryForm.itemType === "Plain T-Shirt" ? chosenGsm : undefined,
+        quantity: Number(inventoryForm.quantity) >= 0 ? Number(inventoryForm.quantity) : 0,
+        minThreshold: Number(inventoryForm.minThreshold) > 0 ? Number(inventoryForm.minThreshold) : 15,
+      };
+
+      const res = await axios.post(`${API_BASE_URL}/manager/inventory`, payload, { headers });
+
+      if (res.data && res.data.item) {
+        setInventory((prev) => [res.data.item, ...prev.filter((i) => i._id !== res.data.item._id)]);
+      }
+
+      await fetchInventory();
+      fetchAnalytics();
+
+      setShowInventoryModal(false);
+      setInventoryForm({
+        itemType: "Plain T-Shirt",
+        materialCategory: "Transfer Paper",
+        tShirtType: "",
+        color: "#ffffff",
+        colorName: "White",
+        size: "M",
+        material: "GSM 180",
+        quantity: 50,
+        minThreshold: 15,
+      });
+      alert("Inventory item added successfully!");
+    } catch (err) {
+      console.error("Save inventory item error:", err);
+      setInventoryError(err.response?.data?.message || "Failed to add inventory item.");
+    } finally {
+      setInventoryActionLoading(false);
     }
   };
 
@@ -1007,83 +1212,629 @@ export default function AdminPage() {
 
         {/* ================= TAB 3: PRODUCTS & INVENTORY ================= */}
         {activeTab === "inventory" && (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start select-none">
-            {/* Plain Shirt Stock levels */}
-            <div className="bg-white border rounded-3xl p-6 shadow-sm space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                  <Inbox className="h-5 w-5 text-indigo-600" />
-                  Plain Shirt Stock Levels
-                </h3>
-                <button onClick={fetchAnalytics} className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1">
-                  <RefreshCw className={`h-3 w-3 ${analyticsLoading ? "animate-spin" : ""}`} /> Refresh
-                </button>
-              </div>
-              
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                {analyticsLoading ? (
-                  <div className="py-8 flex justify-center">
-                    <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
-                  </div>
-                ) : (!analytics?.inventory || analytics.inventory.length === 0) ? (
-                  <p className="text-xs text-slate-400 text-center py-4 font-semibold">No inventory records found.</p>
-                ) : (
-                  analytics.inventory.map((item) => (
-                    <div key={item._id || item.name} className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-slate-700">{item.name}</span>
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
-                          item.status === "Critical" 
-                            ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100 animate-pulse" 
-                            : item.status === "Warning" 
-                            ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100" 
-                            : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                        }`}>
-                          {item.qty} / {item.max} ({item.status})
-                        </span>
-                      </div>
-                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${
-                          item.status === "Critical" 
-                            ? "bg-rose-500" 
-                            : item.status === "Warning" 
-                            ? "bg-amber-500" 
-                            : "bg-emerald-500"
-                        }`} style={{ width: `${Math.min(100, Math.round((item.qty / item.max) * 100))}%` }} />
+          <div className="space-y-8 select-none">
+            {/* Inventory KPI Summary Cards */}
+            {(() => {
+              const invData = inventory.length > 0 ? inventory : (analytics?.inventory || []);
+              const tShirts = invData.filter(i => i.itemType === "Plain T-Shirt" || i.itemType?.toLowerCase().includes("t-shirt"));
+              const inks = invData.filter(i => i.itemType === "Printing Ink" || i.itemType?.toLowerCase().includes("ink"));
+              const packaging = invData.filter(i => {
+                const typeLower = (i.itemType || "").toLowerCase();
+                return (
+                  typeLower.includes("transfer") ||
+                  typeLower.includes("paper") ||
+                  typeLower.includes("package") ||
+                  typeLower.includes("packaging") ||
+                  typeLower.includes("tape") ||
+                  typeLower.includes("stick") ||
+                  typeLower.includes("label") ||
+                  typeLower.includes("sticker") ||
+                  i.itemType === "Materials"
+                );
+              });
+              const lowStock = invData.filter(i => (i.quantity ?? 0) <= (i.minThreshold ?? 10));
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white border rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">T-Shirt Stock</span>
+                      <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                        <Tag className="h-4 w-4" />
                       </div>
                     </div>
-                  ))
-                )}
+                    <p className="text-2xl font-black text-slate-900 mt-2">
+                      {inventoryLoading && invData.length === 0 ? "..." : tShirts.reduce((sum, i) => sum + (i.quantity ?? 0), 0).toLocaleString()}
+                    </p>
+                    <span className="text-[11px] text-slate-400 font-semibold">Across {tShirts.length} style/size variations</span>
+                  </div>
+
+                  <div className="bg-white border rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Ink & Consumables</span>
+                      <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                        <Droplets className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 mt-2">
+                      {inventoryLoading && invData.length === 0 ? "..." : inks.reduce((sum, i) => sum + (i.quantity ?? 0), 0).toLocaleString()}
+                    </p>
+                    <span className="text-[11px] text-slate-400 font-semibold">{inks.length} DTG inks & fluids</span>
+                  </div>
+
+                  <div className="bg-white border rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Packaging Supplies</span>
+                      <div className="p-2 rounded-xl bg-teal-50 text-teal-600">
+                        <Package className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 mt-2">
+                      {inventoryLoading && invData.length === 0 ? "..." : packaging.reduce((sum, i) => sum + (i.quantity ?? 0), 0).toLocaleString()}
+                    </p>
+                    <span className="text-[11px] text-slate-400 font-semibold">{packaging.length} items (boxes, papers & tapes)</span>
+                  </div>
+
+                  <div className="bg-white border rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Low Stock Warnings</span>
+                      <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+                        <AlertCircle className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <p className="text-2xl font-black text-rose-600 mt-2">
+                      {inventoryLoading && invData.length === 0 ? "..." : lowStock.length}
+                    </p>
+                    <span className="text-[11px] text-slate-400 font-semibold">Items below safety threshold</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Main Warehouse Inventory Table & Controls */}
+            <div className="bg-white border rounded-3xl p-6 shadow-sm space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                    <Inbox className="h-5 w-5 text-indigo-600" />
+                    Manage Inventory Stock & Restocking
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Categorized stock control for garment blanks, printing inks, and packaging supplies.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => {
+                      fetchInventory();
+                      fetchAnalytics();
+                    }}
+                    disabled={inventoryLoading}
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
+                    title="Refresh data"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${inventoryLoading ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={() => {
+                      const defaultStyleName = styles[0]?.name || styles[0]?.type || "Crew Neck";
+                      const defaultStyle = styles.find((s) => (s.name || s.type) === defaultStyleName);
+                      const firstGsm = formatGsm(defaultStyle?.gsmPrices?.[0]?.gsm || defaultStyle?.gsms?.[0] || "GSM 180");
+                      setInventoryForm({
+                        itemType: inventoryCategoryFilter === "INK"
+                          ? "Printing Ink"
+                          : inventoryCategoryFilter === "PAPERS_PACKAGING"
+                          ? "Transfer Paper"
+                          : "Plain T-Shirt",
+                        materialCategory: "Transfer Paper",
+                        tShirtType: defaultStyleName,
+                        color: defaultStyle?.colors?.[0]?.value || "#ffffff",
+                        colorName: defaultStyle?.colors?.[0]?.name || "White",
+                        size: "M",
+                        material: firstGsm,
+                        quantity: 50,
+                        minThreshold: 15,
+                      });
+                      setInventoryError("");
+                      setShowInventoryModal(true);
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer shrink-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add New Inventory
+                  </button>
+                </div>
               </div>
+
+              {/* 4 Main Category Filter Pills */}
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
+                {(() => {
+                  const invList = inventory.length > 0 ? inventory : (analytics?.inventory || []);
+                  return [
+                    { id: "ALL", label: "All Stock Items", icon: Layers },
+                    { id: "TSHIRTS", label: "T-Shirts", icon: Tag },
+                    { id: "INK", label: "Printing Ink", icon: Droplets },
+                    { id: "PAPERS_PACKAGING", label: "Transfer Papers & Packaging", icon: Package },
+                  ].map((cat) => {
+                    const isActive = inventoryCategoryFilter === cat.id;
+                    let count = invList.length;
+                    if (cat.id === "TSHIRTS") {
+                      count = invList.filter(
+                        (i) => i.itemType === "Plain T-Shirt" || i.itemType?.toLowerCase().includes("t-shirt")
+                      ).length;
+                    } else if (cat.id === "INK") {
+                      count = invList.filter(
+                        (i) => i.itemType === "Printing Ink" || i.itemType?.toLowerCase().includes("ink")
+                      ).length;
+                    } else if (cat.id === "PAPERS_PACKAGING") {
+                      count = invList.filter((i) => {
+                        const typeLower = (i.itemType || "").toLowerCase();
+                        return (
+                          typeLower.includes("transfer") ||
+                          typeLower.includes("paper") ||
+                          typeLower.includes("package") ||
+                          typeLower.includes("packaging") ||
+                          typeLower.includes("tape") ||
+                          typeLower.includes("stick") ||
+                          typeLower.includes("label") ||
+                          typeLower.includes("sticker") ||
+                          i.itemType === "Materials"
+                        );
+                      }).length;
+                    }
+
+                    const IconComp = cat.icon;
+
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          setInventoryCategoryFilter(cat.id);
+                          setInventorySizeFilter("ALL");
+                          setInventoryColorFilter("ALL");
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          isActive
+                            ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/10"
+                            : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
+                        }`}
+                      >
+                        <IconComp className="h-3.5 w-3.5" />
+                        <span>{cat.label}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            isActive
+                              ? "bg-indigo-500 text-white"
+                              : "bg-slate-200 text-slate-700"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Filter Control Bar (Size, Color, Search based on active category) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/80 p-3.5 border rounded-2xl">
+                {/* Size Filter */}
+                {inventoryCategoryFilter === "ALL" || inventoryCategoryFilter === "TSHIRTS" ? (
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                      Filter by Size
+                    </label>
+                    <select
+                      value={inventorySizeFilter}
+                      onChange={(e) => setInventorySizeFilter(e.target.value)}
+                      className="w-full px-3 py-1.5 border rounded-xl text-xs font-semibold bg-white focus:outline-indigo-500"
+                    >
+                      <option value="ALL">All Sizes</option>
+                      {["S", "M", "L", "XL", "XXL", "3XL"].map((sz) => (
+                        <option key={sz} value={sz}>
+                          Size {sz}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="hidden sm:block" />
+                )}
+
+                {/* Color Filter */}
+                {inventoryCategoryFilter === "ALL" || inventoryCategoryFilter === "TSHIRTS" || inventoryCategoryFilter === "INK" ? (
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                      Filter by Color
+                    </label>
+                    <select
+                      value={inventoryColorFilter}
+                      onChange={(e) => setInventoryColorFilter(e.target.value)}
+                      className="w-full px-3 py-1.5 border rounded-xl text-xs font-semibold bg-white focus:outline-indigo-500"
+                    >
+                      <option value="ALL">All Colors</option>
+                      {Array.from(
+                        new Set(
+                          (inventory.length > 0 ? inventory : (analytics?.inventory || []))
+                            .filter((i) => {
+                              if (inventoryCategoryFilter === "TSHIRTS") {
+                                return i.itemType === "Plain T-Shirt" || i.itemType?.toLowerCase().includes("t-shirt");
+                              }
+                              if (inventoryCategoryFilter === "INK") {
+                                return i.itemType === "Printing Ink" || i.itemType?.toLowerCase().includes("ink");
+                              }
+                              return true;
+                            })
+                            .map((i) => i.color)
+                            .filter((c) => c && typeof c === "string" && c.trim() !== "")
+                        )
+                      ).map((colorVal) => (
+                        <option key={colorVal} value={colorVal}>
+                          {colorVal}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="hidden sm:block" />
+                )}
+
+                {/* Search Query */}
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                    Search Stock Items
+                  </label>
+                  <div className="relative">
+                    <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search stock..."
+                      value={inventorySearchQuery}
+                      onChange={(e) => setInventorySearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-7 py-1.5 border rounded-xl text-xs font-semibold bg-white focus:outline-indigo-500"
+                    />
+                    {inventorySearchQuery && (
+                      <button
+                        onClick={() => setInventorySearchQuery("")}
+                        className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Exact Manager Table Rendering */}
+              {(() => {
+                const rawInv = inventory.length > 0 ? inventory : (analytics?.inventory || []);
+                const filteredInventory = rawInv.filter((item) => {
+                  // 1. Category Filter
+                  if (inventoryCategoryFilter === "TSHIRTS") {
+                    if (item.itemType !== "Plain T-Shirt" && !item.itemType?.toLowerCase().includes("t-shirt")) {
+                      return false;
+                    }
+                  } else if (inventoryCategoryFilter === "INK") {
+                    if (item.itemType !== "Printing Ink" && !item.itemType?.toLowerCase().includes("ink")) {
+                      return false;
+                    }
+                  } else if (inventoryCategoryFilter === "PAPERS_PACKAGING") {
+                    const typeLower = (item.itemType || "").toLowerCase();
+                    if (
+                      !typeLower.includes("transfer") &&
+                      !typeLower.includes("paper") &&
+                      !typeLower.includes("package") &&
+                      !typeLower.includes("packaging") &&
+                      !typeLower.includes("tape") &&
+                      !typeLower.includes("stick") &&
+                      !typeLower.includes("label") &&
+                      !typeLower.includes("sticker") &&
+                      item.itemType !== "Materials"
+                    ) {
+                      return false;
+                    }
+                  }
+
+                  // 2. Size Filter
+                  if (inventorySizeFilter !== "ALL") {
+                    if (item.size !== inventorySizeFilter) {
+                      return false;
+                    }
+                  }
+
+                  // 3. Color Filter
+                  if (inventoryColorFilter !== "ALL") {
+                    if ((item.color || "").toLowerCase() !== inventoryColorFilter.toLowerCase()) {
+                      return false;
+                    }
+                  }
+
+                  // 4. Search Filter
+                  if (inventorySearchQuery.trim()) {
+                    const q = inventorySearchQuery.toLowerCase();
+                    const matchName = (item.itemType || "").toLowerCase().includes(q);
+                    const matchType = (item.tShirtType || "").toLowerCase().includes(q);
+                    const matchColor = (item.color || "").toLowerCase().includes(q);
+                    const matchSize = (item.size || "").toLowerCase().includes(q);
+                    const matchMat = (item.material || "").toLowerCase().includes(q);
+                    const matchGsm = (item.gsm || "").toLowerCase().includes(q);
+                    if (!matchName && !matchType && !matchColor && !matchSize && !matchMat && !matchGsm) {
+                      return false;
+                    }
+                  }
+
+                  return true;
+                });
+
+                if (inventoryLoading && rawInv.length === 0) {
+                  return (
+                    <div className="py-20 flex justify-center">
+                      <Loader2 className="h-7 w-7 text-indigo-600 animate-spin" />
+                    </div>
+                  );
+                }
+
+                if (filteredInventory.length === 0) {
+                  return (
+                    <div className="text-center py-16 border border-dashed border-slate-200 rounded-2xl">
+                      <p className="text-sm text-slate-500 font-semibold">
+                        No stock items found matching your filters.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setInventoryCategoryFilter("ALL");
+                          setInventorySizeFilter("ALL");
+                          setInventoryColorFilter("ALL");
+                          setInventorySearchQuery("");
+                        }}
+                        className="mt-3 text-xs font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                      >
+                        Reset filters
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                          <th className="pb-3">Item Name</th>
+
+                          {/* All Items tab columns */}
+                          {inventoryCategoryFilter === "ALL" && (
+                            <>
+                              <th className="pb-3">Style / Details</th>
+                              <th className="pb-3">Size / Color</th>
+                            </>
+                          )}
+
+                          {/* Category 1: T-Shirts columns */}
+                          {inventoryCategoryFilter === "TSHIRTS" && (
+                            <>
+                              <th className="pb-3">Style</th>
+                              <th className="pb-3">GSM Weight</th>
+                              <th className="pb-3">Size</th>
+                              <th className="pb-3">Color</th>
+                            </>
+                          )}
+
+                          {/* Category 2: Printing Ink columns */}
+                          {inventoryCategoryFilter === "INK" && (
+                            <th className="pb-3">Color</th>
+                          )}
+
+                          {/* Category 3: Transfer Papers & Packaging has no extra columns */}
+
+                          <th className="pb-3">Current Stock</th>
+                          <th className="pb-3">Min Threshold</th>
+                          <th className="pb-3">Status</th>
+                          <th className="pb-3 text-right">Actions & Restock</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredInventory.map((item) => {
+                          const qty = item.quantity ?? item.qty ?? 0;
+                          const threshold = item.minThreshold ?? 10;
+                          const isLow = qty <= threshold;
+                          return (
+                            <tr
+                              key={item._id}
+                              className="border-b last:border-b-0 hover:bg-slate-50/50 transition"
+                            >
+                              <td className="py-4 font-bold text-slate-900">
+                                {item.itemType}
+                              </td>
+
+                              {/* All Items tab Data */}
+                              {inventoryCategoryFilter === "ALL" && (
+                                <>
+                                  <td className="py-4 text-xs text-slate-600 font-medium">
+                                    <span className="font-bold text-slate-800">
+                                      {item.tShirtType || "Generic Consumable"}
+                                    </span>{" "}
+                                    {item.material ? `(${item.material})` : ""}
+                                  </td>
+                                  <td className="py-4 text-xs text-slate-500 font-medium">
+                                    {item.size || item.color
+                                      ? `${item.color || ""} ${item.size ? `— Size ${item.size}` : ""}`
+                                      : "—"}
+                                  </td>
+                                </>
+                              )}
+
+                              {/* Category 1: T-Shirts Data */}
+                              {inventoryCategoryFilter === "TSHIRTS" && (
+                                <>
+                                  <td className="py-4 text-xs font-semibold text-slate-800">
+                                    {item.tShirtType || "Crew Neck"}
+                                  </td>
+                                  <td className="py-4 text-xs text-slate-600 font-medium">
+                                    {formatGsm(item.material || item.gsm || "GSM 180")}
+                                  </td>
+                                  <td className="py-4 text-xs text-slate-600 font-medium">
+                                    {item.size || "M"}
+                                  </td>
+                                  <td className="py-4 text-xs font-semibold text-slate-800">
+                                    {item.color || "White"}
+                                  </td>
+                                </>
+                              )}
+
+                              {/* Category 2: Printing Ink Data */}
+                              {inventoryCategoryFilter === "INK" && (
+                                <td className="py-4 text-xs font-semibold text-slate-800">
+                                  {item.color || "Cyan/Magenta/Yellow/Black"}
+                                </td>
+                              )}
+
+                              {/* Category 3: Transfer Papers & Packaging has no extra columns */}
+
+                              {/* Common Stock & Restock Controls */}
+                              <td className="py-4 text-xs font-bold text-slate-900">
+                                {qty} units
+                              </td>
+                              <td className="py-4 text-xs text-slate-400">
+                                {editingThresholdId === item._id ? (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={
+                                        thresholdInputs[item._id] ??
+                                        threshold
+                                      }
+                                      onChange={(e) =>
+                                        setThresholdInputs((prev) => ({
+                                          ...prev,
+                                          [item._id]: e.target.value,
+                                        }))
+                                      }
+                                      className="w-16 px-2 py-1 text-xs border rounded-xl text-center"
+                                    />
+                                    <button
+                                      onClick={() =>
+                                        handleUpdateMinThreshold(item._id)
+                                      }
+                                      className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 cursor-pointer"
+                                      title="Save threshold"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingThresholdId(null)}
+                                      className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer"
+                                      title="Cancel"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span>{threshold} units</span>
+                                    <button
+                                      onClick={() => {
+                                        setEditingThresholdId(item._id);
+                                        setThresholdInputs((prev) => ({
+                                          ...prev,
+                                          [item._id]: threshold,
+                                        }));
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-[10px] font-bold cursor-pointer"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-4 text-xs">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                    isLow
+                                      ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
+                                      : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                                  }`}
+                                >
+                                  {isLow ? "Low stock" : "In Stock"}
+                                </span>
+                              </td>
+                              <td className="py-4 text-right">
+                                <div className="inline-flex items-center gap-2 justify-end">
+                                  <input
+                                    type="number"
+                                    placeholder="+ Qty"
+                                    value={restockQuantities[item._id] || ""}
+                                    onChange={(e) =>
+                                      setRestockQuantities((prev) => ({
+                                        ...prev,
+                                        [item._id]: e.target.value,
+                                      }))
+                                    }
+                                    className="w-16 px-2 py-1 text-xs border rounded-xl text-center font-semibold"
+                                  />
+                                  <button
+                                    onClick={() => handleRestockQuantity(item._id)}
+                                    className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-bold transition cursor-pointer"
+                                  >
+                                    {(() => {
+                                      const value = Number(
+                                        restockQuantities[item._id] ?? "",
+                                      );
+                                      if (!Number.isNaN(value) && value < 0) {
+                                        return "Remove";
+                                      }
+                                      return "Add";
+                                    })()}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteInventory(item._id)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                                    title="Delete item"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* Popular products list */}
+            {/* Best-Selling Products Leaderboard */}
             <div className="bg-white border rounded-3xl p-6 shadow-sm">
               <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2 mb-6">
                 <ShoppingCart className="h-5 w-5 text-indigo-600" />
-                Best-Selling Products
+                Best-Selling Products & Custom Designs Leaderboard
               </h3>
               
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {analyticsLoading ? (
-                  <div className="py-8 flex justify-center">
+                  <div className="py-8 flex justify-center col-span-full">
                     <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
                   </div>
                 ) : !analytics?.bestSellers || analytics.bestSellers.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-4 font-semibold">No sales data recorded yet.</p>
+                  <p className="text-xs text-slate-400 text-center py-4 font-semibold col-span-full">No sales data recorded yet.</p>
                 ) : (
                   analytics.bestSellers.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between border-b pb-3 last:border-b-0 last:pb-0">
+                    <div key={item.name} className="flex items-center justify-between p-4 rounded-2xl border bg-slate-50/50 hover:bg-slate-50 transition">
                       <div className="flex items-center gap-3">
-                        <span className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center">
+                        <span className="h-7 w-7 rounded-xl bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
                           #{item.rank}
                         </span>
                         <div className="leading-tight">
-                          <p className="text-xs font-bold text-slate-900">{item.name}</p>
-                          <span className="text-[10px] text-slate-400">{item.sales} sold</span>
+                          <p className="text-xs font-bold text-slate-900 truncate max-w-[180px]">{item.name}</p>
+                          <span className="text-[10px] text-slate-400">{item.sales} units sold</span>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-slate-800">{item.revenue}</span>
+                      <span className="text-xs font-bold text-indigo-700">{item.revenue}</span>
                     </div>
                   ))
                 )}
@@ -1262,8 +2013,421 @@ export default function AdminPage() {
           </div>
         )}
 
-
       </div>
+
+      {/* ================= MODAL: ADD INVENTORY ================= */}
+      {showInventoryModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="font-bold text-sm uppercase tracking-wider">
+                  Add New Inventory Stock
+                </h3>
+                <p className="text-[10px] text-indigo-300 mt-0.5">
+                  Stock Control & T-Shirt Style Inventory
+                </p>
+              </div>
+              <button
+                onClick={() => setShowInventoryModal(false)}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveInventory}
+              className="p-6 space-y-4 overflow-y-auto flex-1 text-slate-800"
+            >
+              {inventoryError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl text-xs font-semibold">
+                  {inventoryError}
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                  Inventory Item Type
+                </label>
+                <select
+                  value={inventoryForm.itemType}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    const defaultStyleName = styles[0]?.name || styles[0]?.type || "Crew Neck";
+                    const defaultStyle = styles.find((s) => (s.name || s.type) === defaultStyleName);
+                    setInventoryForm((prev) => ({
+                      ...prev,
+                      itemType: newType,
+                      materialCategory: "Transfer Paper",
+                      tShirtType: newType === "Plain T-Shirt" ? defaultStyleName : "",
+                      colorName: newType === "Printing Ink" ? "Cyan (C)" : (defaultStyle?.colors?.[0]?.name || "White"),
+                      color: newType === "Printing Ink" ? "Cyan (C)" : (defaultStyle?.colors?.[0]?.value || "#ffffff"),
+                    }));
+                  }}
+                  className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                >
+                  <option value="Plain T-Shirt">T-Shirt (Garment Stock)</option>
+                  <option value="Printing Ink">Printing Ink</option>
+                  <option value="Materials">Materials & Packaging Supplies</option>
+                </select>
+              </div>
+
+              {/* Sub-Material Selection when itemType === "Materials" */}
+              {inventoryForm.itemType === "Materials" && (
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    Select Material Category
+                  </label>
+                  <select
+                    value={inventoryForm.materialCategory || "Transfer Paper"}
+                    onChange={(e) =>
+                      setInventoryForm((prev) => ({
+                        ...prev,
+                        materialCategory: e.target.value,
+                      }))
+                    }
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                  >
+                    <option value="Transfer Paper">Transfer Paper</option>
+                    <option value="Packaging Material">Packaging Material</option>
+                    <option value="Stick Tapes">Stick Tapes</option>
+                    <option value="Label Stickers">Label Stickers</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Printing Ink Color Selection Box */}
+              {inventoryForm.itemType === "Printing Ink" && (
+                <div className="space-y-3 bg-slate-50 p-4 border rounded-2xl">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                    Select Printing Ink Color Preset
+                  </label>
+
+                  {/* Essential Ink Presets List */}
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {[
+                      {
+                        name: "Cyan (C)",
+                        value: "#00FFFF",
+                        desc: "A bright, greenish-blue ink that filters out red light.",
+                      },
+                      {
+                        name: "Magenta (M)",
+                        value: "#FF00FF",
+                        desc: "A vivid purplish-pink ink that filters out green light.",
+                      },
+                      {
+                        name: "Yellow (Y)",
+                        value: "#FFFF00",
+                        desc: "A bright yellow ink that filters out blue light.",
+                      },
+                      {
+                        name: "Key / Black (K)",
+                        value: "#111827",
+                        desc: "Key / Black process ink for deep shadows and line work.",
+                      },
+                      {
+                        name: "White",
+                        value: "#FFFFFF",
+                        desc: "White underbase ink for dark garment printing.",
+                      },
+                      {
+                        name: "Spot Red",
+                        value: "#EF4444",
+                        desc: "Vivid spot red screen printing ink.",
+                      },
+                      {
+                        name: "Spot Blue",
+                        value: "#3B82F6",
+                        desc: "Royal spot blue screen printing ink.",
+                      },
+                      {
+                        name: "Spot Green",
+                        value: "#22C55E",
+                        desc: "Bright spot green printing ink.",
+                      },
+                      {
+                        name: "Metallic Gold",
+                        value: "#EAB308",
+                        desc: "Shimmering metallic gold specialty ink.",
+                      },
+                      {
+                        name: "Metallic Silver",
+                        value: "#94A3B8",
+                        desc: "Metallic silver shimmer specialty ink.",
+                      },
+                    ].map((ink) => {
+                      const isSelected =
+                        inventoryForm.colorName === ink.name || inventoryForm.color === ink.name;
+                      return (
+                        <button
+                          key={ink.name}
+                          type="button"
+                          onClick={() => {
+                            setNewInkColor({ name: ink.name, value: ink.value });
+                            setInventoryForm((prev) => ({
+                              ...prev,
+                              colorName: ink.name,
+                              color: ink.name,
+                            }));
+                          }}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                            isSelected
+                              ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50/80 shadow-xs"
+                              : "border-slate-200 bg-white hover:bg-slate-100/70"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className="h-4 w-4 rounded-full border border-slate-300 shrink-0"
+                              style={{ backgroundColor: ink.value }}
+                            />
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">
+                                {ink.name}
+                              </p>
+                              <p className="text-[10px] text-slate-500 font-medium">
+                                {ink.desc}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-indigo-600 shrink-0 ml-2" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Selected Ink Color Preview Badge */}
+                  {inventoryForm.colorName && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
+                      <span className="text-[10px] font-bold text-slate-400">Selected Ink:</span>
+                      <div className="flex items-center gap-1.5 bg-white border border-indigo-200 rounded-full px-3 py-1 text-xs shadow-2xs">
+                        <span
+                          className="h-3.5 w-3.5 rounded-full border border-slate-300 shrink-0"
+                          style={{ backgroundColor: newInkColor.value }}
+                        />
+                        <span className="font-bold text-indigo-950">
+                          {inventoryForm.colorName}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {inventoryForm.itemType === "Plain T-Shirt" && (
+                <>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                      Select T-Shirt Style / Type
+                    </label>
+                    <select
+                      value={inventoryForm.tShirtType || (styles[0]?.name || styles[0]?.type || "Crew Neck")}
+                      onChange={(e) => {
+                        const styleVal = e.target.value;
+                        const matchStyle = styles.find(
+                          (s) => (s.name || s.type) === styleVal
+                        );
+                        const firstGsm = formatGsm(matchStyle?.gsmPrices?.[0]?.gsm || matchStyle?.gsms?.[0] || "GSM 180");
+                        setInventoryForm((prev) => ({
+                          ...prev,
+                          tShirtType: styleVal,
+                          colorName: matchStyle?.colors?.[0]?.name || "White",
+                          color: matchStyle?.colors?.[0]?.value || "#ffffff",
+                          material: firstGsm,
+                        }));
+                      }}
+                      className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                    >
+                      {styles.length > 0 ? (
+                        styles.map((s) => (
+                          <option key={s._id} value={s.name || s.type}>
+                            {s.name || s.type}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Crew Neck">Crew Neck</option>
+                          <option value="V-Neck">V-Neck</option>
+                          <option value="Polo">Polo</option>
+                          <option value="Oversized">Oversized</option>
+                          <option value="Hoodie">Hoodie</option>
+                          <option value="Long Sleeve">Long Sleeve</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1.5">
+                      Allowed Style Color
+                    </label>
+                    {(() => {
+                      const curStyle = styles.find(
+                        (s) => (s.name || s.type) === (inventoryForm.tShirtType || styles[0]?.name || styles[0]?.type)
+                      );
+                      const availableColors = curStyle?.colors || [
+                        { name: "White", value: "#ffffff" },
+                        { name: "Black", value: "#111827" },
+                      ];
+                      return (
+                        <div className="flex flex-wrap gap-2">
+                          {availableColors.map((c, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() =>
+                                setInventoryForm((prev) => ({
+                                  ...prev,
+                                  colorName: c.name,
+                                  color: c.value,
+                                }))
+                              }
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer ${
+                                inventoryForm.colorName === c.name
+                                  ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50 text-indigo-950 font-bold"
+                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              <span
+                                className="h-3.5 w-3.5 rounded-full border border-slate-300 shrink-0"
+                                style={{ backgroundColor: c.value }}
+                              />
+                              <span>{c.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                        Size
+                      </label>
+                      <select
+                        value={inventoryForm.size}
+                        onChange={(e) =>
+                          setInventoryForm((prev) => ({
+                            ...prev,
+                            size: e.target.value,
+                          }))
+                        }
+                        className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                      >
+                        {["S", "M", "L", "XL", "XXL", "3XL"].map((sz) => (
+                          <option key={sz} value={sz}>
+                            Size {sz}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                        GSM Weight
+                      </label>
+                      {(() => {
+                        const curStyle = styles.find(
+                          (s) => (s.name || s.type) === (inventoryForm.tShirtType || styles[0]?.name || styles[0]?.type)
+                        );
+                        const styleGsms = curStyle?.gsmPrices && curStyle.gsmPrices.length > 0
+                          ? curStyle.gsmPrices.map((gp) => formatGsm(gp.gsm))
+                          : (curStyle?.gsms && curStyle.gsms.length > 0 ? curStyle.gsms.map(formatGsm) : ["GSM 180", "GSM 200", "GSM 220", "GSM 240"]);
+
+                        return (
+                          <select
+                            value={inventoryForm.material}
+                            onChange={(e) =>
+                              setInventoryForm((prev) => ({
+                                ...prev,
+                                material: e.target.value,
+                              }))
+                            }
+                            className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold bg-white"
+                          >
+                            {styleGsms.map((gsmVal) => (
+                              <option key={gsmVal} value={gsmVal}>
+                                {gsmVal}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    Initial Stock Qty
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={inventoryForm.quantity}
+                    onChange={(e) =>
+                      setInventoryForm((prev) => ({
+                        ...prev,
+                        quantity: e.target.value,
+                      }))
+                    }
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    Min Stock Threshold
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={inventoryForm.minThreshold}
+                    onChange={(e) =>
+                      setInventoryForm((prev) => ({
+                        ...prev,
+                        minThreshold: e.target.value,
+                      }))
+                    }
+                    className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowInventoryModal(false)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={inventoryActionLoading}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {inventoryActionLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Save Inventory Stock"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
     </>
   );
@@ -1288,26 +2452,6 @@ function Palette(props) {
       <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
       <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
       <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.63-.77 1.63-1.7 0-.44-.18-.85-.47-1.17-.3-.3-.48-.73-.48-1.19 0-.92.75-1.64 1.64-1.64H17c3.86 0 7-3.14 7-7 0-4.96-4.49-9-10-9z"/>
-    </svg>
-  );
-}
-
-function X(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
     </svg>
   );
 }
