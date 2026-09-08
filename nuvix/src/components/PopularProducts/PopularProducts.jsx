@@ -638,6 +638,12 @@ export default function PopularProducts() {
 
   const handleCustomizeDesign = () => {
     if (!selected3DProduct) return;
+    const token = localStorage.getItem("token");
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
+      window.location.href = "/login?redirect=/designer";
+      return;
+    }
     const designToLoad = {
       ...selected3DProduct,
       fabricColor: modalColor,

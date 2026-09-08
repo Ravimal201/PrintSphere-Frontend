@@ -8,6 +8,17 @@ export default function GNavbar() {
     window.location.href = "/store";
   };
 
+  const handleDesignerClick = (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
+      window.location.href = "/login?redirect=/designer";
+    } else {
+      window.location.href = "/designer";
+    }
+  };
+
   return (
     <nav className="w-full bg-white shadow-sm sticky top-0 z-30">
       <div className="flex items-center justify-between px-4 md:px-8 py-1">
@@ -24,7 +35,7 @@ export default function GNavbar() {
           <a href="/" className="hover:text-indigo-600 transition">Home</a>
           <a href="/about" className="hover:text-indigo-600 transition">About</a>
           <a href="/store" onClick={handleStoreClick} className="hover:text-indigo-600 transition">Store</a>
-          <a href="/designer" className="hover:text-indigo-600 transition">3D Designer</a>
+          <a href="/designer" onClick={handleDesignerClick} className="hover:text-indigo-600 transition">3D Designer</a>
           <a href="/contact" className="hover:text-indigo-600 transition">Contact Us</a>
         </div>
 
@@ -55,7 +66,7 @@ export default function GNavbar() {
           <a href="/" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Home</a>
           <a href="/about" className="block text-gray-700 font-medium hover:text-indigo-600 transition">About</a>
           <a href="/store" onClick={handleStoreClick} className="block text-gray-700 font-medium hover:text-indigo-600 transition">Store</a>
-          <a href="/designer" className="block text-gray-700 font-medium hover:text-indigo-600 transition">3D Designer</a>
+          <a href="/designer" onClick={handleDesignerClick} className="block text-gray-700 font-medium hover:text-indigo-600 transition">3D Designer</a>
           <a href="/contact" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Contact Us</a>     
           <a href="/support" className="block text-gray-700 font-medium hover:text-indigo-600 transition">Help</a>
           <div className="flex gap-2 pt-2">

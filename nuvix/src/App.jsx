@@ -58,10 +58,22 @@ function App() {
   }
 
   if (path === "/designer" || path.startsWith("/designer/")) {
+    const token = localStorage.getItem("token");
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
+      window.location.href = "/login?redirect=/designer";
+      return null;
+    }
     return <DesignerPage />;
   }
 
   if (path === "/editer" || path.startsWith("/editer/")) {
+    const token = localStorage.getItem("token");
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
+      window.location.href = "/login?redirect=/designer";
+      return null;
+    }
     return <EtiterPage />;
   }
 

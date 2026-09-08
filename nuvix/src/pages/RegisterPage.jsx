@@ -40,8 +40,16 @@ export default function RegisterPage() {
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("user", JSON.stringify(response.data.user));
 
-      // Redirect customer to store home
-      window.location.href = "/customer-home";
+      // Extract optional redirect parameter
+      const params = new URLSearchParams(window.location.search);
+      const redirectUrl = params.get("redirect");
+
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      } else {
+        // Redirect customer to store home
+        window.location.href = "/customer-home";
+      }
     } catch (err) {
       console.error(err);
       setError(

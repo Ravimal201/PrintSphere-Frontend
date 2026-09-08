@@ -141,6 +141,12 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
   if (!isOpen || !design) return null;
 
   const handleCustomize = () => {
+    const token = localStorage.getItem("token");
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
+      window.location.href = "/login?redirect=/designer";
+      return;
+    }
     if (onCustomize) {
       onCustomize(design);
     } else {
