@@ -239,6 +239,13 @@ export default function DesignerPage() {
   };
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    const isAuthenticated = token && token !== "null" && token !== "undefined";
+    if (!isAuthenticated) {
+      window.location.href = "/login?redirect=/designer";
+      return;
+    }
+
     const userStr = localStorage.getItem("user");
     if (userStr) {
       try {
