@@ -310,6 +310,7 @@ export default function DesignerPage() {
               scale: Array.isArray(l.scale) ? l.scale : [0.3, 0.3, 0.25]
             }));
             setLayers(normalizedLayers);
+            autoSaveImagesFromLayers(normalizedLayers);
           }
           if (design.fabricColor) setShirtColor(design.fabricColor);
           
@@ -582,37 +583,123 @@ export default function DesignerPage() {
     }
     return [];
   });
-  const [userImages, setUserImages] = useState([]);
+
+  const getUserImagesStorageKey = (user = currentUser) => {
+    const userId = user?.id || user?._id || (typeof window !== "undefined" && localStorage.getItem("user") ? (JSON.parse(localStorage.getItem("user") || "{}").id || JSON.parse(localStorage.getItem("user") || "{}")._id) : null) || "guest";
+    return `printsphere_user_images_${userId}`;
+  };
+
+  const saveUserImagesToStorage = (imagesList, user = currentUser) => {
+    const key = getUserImagesStorageKey(user);
+    const guestKey = "printsphere_user_images_guest";
+    let listToSave = Array.isArray(imagesList) ? [...imagesList] : [];
+    // Keep reasonable count of recent images to prevent excessive storage
+    if (listToSave.length > 35) {
+      listToSave = listToSave.slice(0, 35);
+    }
+    let saved = false;
+    while (!saved && listToSave.length > 0) {
+      try {
+        const json = JSON.stringify(listToSave);
+        localStorage.setItem(key, json);
+        if (key !== guestKey) {
+          localStorage.setItem(guestKey, json);
+        }
+        saved = true;
+      } catch (err) {
+        console.warn("Storage quota exceeded while saving user images, pruning oldest item...", err);
+        listToSave.pop();
+      }
+    }
+  };
+
+  const [userImages, setUserImages] = useState(() => {
+    try {
+      let saved = null;
+      const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        const uid = u?.id || u?._id;
+        if (uid) saved = localStorage.getItem(`printsphere_user_images_${uid}`);
+      }
+      if (!saved && typeof window !== "undefined") {
+        saved = localStorage.getItem("printsphere_user_images_guest");
+      }
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Error reading initial user images:", e);
+      return [];
+    }
+  });
+
+  const autoSaveImageToLibrary = (imageUrl, imageName = "Imported Graphic") => {
+    if (!imageUrl || typeof imageUrl !== "string") return;
+    if (imageUrl.startsWith("/images/dumyImage") || imageUrl.startsWith("/logos/")) return;
+
+    setUserImages((prev) => {
+      const filtered = prev.filter((img) => img.url !== imageUrl);
+      const newImg = {
+        id: `user-img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: imageName || "Imported Graphic",
+        url: imageUrl,
+        timestamp: Date.now()
+      };
+      const updated = [newImg, ...filtered];
+      saveUserImagesToStorage(updated);
+      return updated;
+    });
+  };
+
+  const autoSaveImagesFromLayers = (layerList) => {
+    if (!Array.isArray(layerList)) return;
+    layerList.forEach((l) => {
+      if ((l.type === "image" || l.type === "logo") && l.url) {
+        autoSaveImageToLibrary(l.url, l.name);
+      }
+    });
+  };
+
   const [autoRemoveBgOnUpload, setAutoRemoveBgOnUpload] = useState(false);
   const [processingImageId, setProcessingImageId] = useState(null);
   const [isLayerRemovingBg, setIsLayerRemovingBg] = useState(false);
   const [isUploadingWithBg, setIsUploadingWithBg] = useState(false);
   const [bgStatusMessage, setBgStatusMessage] = useState("");
-
-  const saveUserImagesToStorage = (imagesList, user = currentUser) => {
-    const userId = user?.id || user?._id || "guest";
-    const storageKey = `printsphere_user_images_${userId}`;
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(imagesList));
-    } catch (err) {
-      console.error("Error saving user images to localStorage:", err);
-    }
-  };
+  const [isDraggingFileOver, setIsDraggingFileOver] = useState(false);
 
   useEffect(() => {
     const userId = currentUser?.id || currentUser?._id || "guest";
     const storageKey = `printsphere_user_images_${userId}`;
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        setUserImages(JSON.parse(saved));
-      } catch (err) {
-        console.error("Error parsing saved user images:", err);
+    const guestKey = "printsphere_user_images_guest";
+    
+    try {
+      const userSaved = localStorage.getItem(storageKey);
+      const guestSaved = localStorage.getItem(guestKey);
+      const userList = userSaved ? JSON.parse(userSaved) : [];
+      const guestList = guestSaved ? JSON.parse(guestSaved) : [];
+      
+      // Merge guest images into user images without duplicates
+      const merged = [...userList];
+      guestList.forEach((gImg) => {
+        if (!merged.some((uImg) => uImg.url === gImg.url)) {
+          merged.push(gImg);
+        }
+      });
+      
+      if (merged.length > 0) {
+        setUserImages(merged);
+        saveUserImagesToStorage(merged, currentUser);
       }
-    } else {
-      setUserImages([]);
+    } catch (err) {
+      console.error("Error parsing saved user images:", err);
     }
   }, [currentUser]);
+
+  // Auto-save any image layers present on initial load
+  useEffect(() => {
+    if (initialDraft?.layers && Array.isArray(initialDraft.layers)) {
+      autoSaveImagesFromLayers(initialDraft.layers);
+    }
+  }, []);
 
 
   // --- Undo / Redo History State ---
@@ -899,17 +986,16 @@ export default function DesignerPage() {
     selectLayer(id);
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
+  const processAndImportFile = (file, autoRemoveBg = autoRemoveBgOnUpload) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = async () => {
       let dataUrl = reader.result;
       if (!dataUrl) return;
 
-      const imageName = file.name.substring(0, 15);
+      const imageName = (file.name || "Imported Graphic").substring(0, 15);
 
-      if (autoRemoveBgOnUpload) {
+      if (autoRemoveBg) {
         setIsUploadingWithBg(true);
         setBgStatusMessage("AI removing background on upload...");
         try {
@@ -930,20 +1016,10 @@ export default function DesignerPage() {
         }
       }
 
-      const finalName = autoRemoveBgOnUpload ? `${imageName.replace(/\s*\(No BG\)/g, "")} (No BG)` : imageName;
-      const newImportedImg = {
-        id: `user-img-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        name: finalName,
-        url: dataUrl,
-        timestamp: Date.now()
-      };
+      const finalName = autoRemoveBg ? `${imageName.replace(/\s*\(No BG\)/g, "")} (No BG)` : imageName;
 
-      setUserImages((prev) => {
-        const filtered = prev.filter((img) => img.url !== dataUrl);
-        const updated = [newImportedImg, ...filtered];
-        saveUserImagesToStorage(updated);
-        return updated;
-      });
+      // Auto save imported image into library for quick reuse
+      autoSaveImageToLibrary(dataUrl, finalName);
 
       const img = new Image();
       img.onload = () => {
@@ -991,8 +1067,34 @@ export default function DesignerPage() {
       img.src = dataUrl;
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processAndImportFile(file, autoRemoveBgOnUpload);
     e.target.value = ""; // Reset input so same image can be re-uploaded if desired
   };
+
+  // Clipboard Paste listener (Ctrl+V anywhere in designer)
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            processAndImportFile(file, autoRemoveBgOnUpload);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [autoRemoveBgOnUpload]);
 
   const handleRemoveBgForUserImage = async (imgObj) => {
     if (processingImageId) return;
@@ -1556,7 +1658,7 @@ export default function DesignerPage() {
                 { id: "gsm", label: "GSM", icon: Scale, subtitle: "Fabric GSM" },
                 { id: "colors", label: "Colors", icon: Palette, subtitle: "Fabric Color" },
                 { id: "sizes", label: "Sizes", icon: Ruler, subtitle: "Garment Sizes" },
-                { id: "uploads", label: "Uploads", icon: Upload, subtitle: "Image Uploads" },
+                { id: "uploads", label: "Uploads", icon: Upload, subtitle: "Image Uploads", count: userImages.length },
                 { id: "text", label: "Text", icon: Type, subtitle: "Typography" },
                 { id: "logos", label: "Logos", icon: Sparkles, subtitle: "Preset Logos" }
               ].map((item) => {
@@ -1576,10 +1678,15 @@ export default function DesignerPage() {
                     {isActive && (
                       <div className="absolute -left-1 top-2.5 bottom-2.5 w-1 bg-indigo-600 rounded-r-full shadow-sm" />
                     )}
-                    <div className={`p-1.5 rounded-xl transition-transform duration-200 ${
+                    <div className={`p-1.5 rounded-xl transition-transform duration-200 relative ${
                       isActive ? "bg-indigo-600 text-white shadow-xs" : "group-hover:scale-110"
                     }`}>
                       <Icon className="h-4.5 w-4.5" />
+                      {Boolean(item.count) && !isActive && (
+                        <span className="absolute -top-1 -right-1 h-3.5 min-w-[14px] px-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center ring-1 ring-white shadow-xs">
+                          {item.count > 9 ? "9+" : item.count}
+                        </span>
+                      )}
                     </div>
                     <span className="text-[11px] mt-1 tracking-tight leading-tight">{item.label}</span>
                   </button>
@@ -1832,7 +1939,21 @@ export default function DesignerPage() {
                   <div className="space-y-5">
                     {/* Upload button & options */}
                     <div className="space-y-3">
-                      <label className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl border-2 border-dashed border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/20 cursor-pointer transition-all duration-200 group bg-slate-50/50 text-center">
+                      <label 
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const file = e.dataTransfer?.files?.[0];
+                          if (file && file.type.startsWith("image/")) {
+                            processAndImportFile(file, autoRemoveBgOnUpload);
+                          }
+                        }}
+                        className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl border-2 border-dashed border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/20 cursor-pointer transition-all duration-200 group bg-slate-50/50 text-center relative"
+                      >
                         <input
                           type="file"
                           accept="image/*"
@@ -1843,8 +1964,8 @@ export default function DesignerPage() {
                           <Upload className="h-6 w-6" />
                         </div>
                         <div>
-                          <span className="text-xs font-black text-slate-800 block">Click to Upload Image</span>
-                          <span className="text-[10px] text-slate-400 font-medium">PNG, JPG, SVG or WEBP</span>
+                          <span className="text-xs font-black text-slate-800 block">Click or Drop Image Here</span>
+                          <span className="text-[10px] text-slate-400 font-medium">PNG, JPG, SVG or WEBP (or Paste Ctrl+V)</span>
                         </div>
                       </label>
 
@@ -1872,9 +1993,16 @@ export default function DesignerPage() {
                     {/* My Uploaded Images Library */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                          My Images ({userImages.length})
-                        </h3>
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                            <span>My Images</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700">{userImages.length}</span>
+                          </h3>
+                          <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Auto-saved to your library</span>
+                          </p>
+                        </div>
                         {userImages.length > 0 && (
                           <button
                             onClick={handleClearAllUserImages}
@@ -1889,10 +2017,10 @@ export default function DesignerPage() {
                         <div className="p-5 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
                           <Upload className="h-5 w-5 text-slate-300 mx-auto mb-1.5" />
                           <p className="text-xs text-slate-400 font-medium">No uploaded images yet</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">Uploaded images will be saved here for quick reuse.</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Imported images will be auto-saved here for quick reuse across sessions.</p>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1">
                           {userImages.map((img) => {
                             const isProcessing = processingImageId === img.id;
                             return (
@@ -1909,7 +2037,7 @@ export default function DesignerPage() {
                                 <button
                                   onClick={() => addPresetImage(img.url, img.name)}
                                   disabled={isProcessing}
-                                  className="w-full flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer"
+                                  className="w-full flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer group-hover:opacity-95"
                                   title="Click to add to T-shirt canvas"
                                 >
                                   <img
@@ -2038,6 +2166,22 @@ export default function DesignerPage() {
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 selectLayer(null);
+              }
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (!isDraggingFileOver) setIsDraggingFileOver(true);
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget)) return;
+              setIsDraggingFileOver(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingFileOver(false);
+              const file = e.dataTransfer?.files?.[0];
+              if (file && file.type.startsWith("image/")) {
+                processAndImportFile(file, autoRemoveBgOnUpload);
               }
             }}
             className={`flex-1 flex flex-col relative overflow-hidden transition-colors duration-300 ${
@@ -2426,6 +2570,15 @@ export default function DesignerPage() {
             </div>
 
             <div className="flex-1 flex items-center justify-center min-h-0 relative">
+              {isDraggingFileOver && (
+                <div className="absolute inset-0 z-50 bg-indigo-950/70 backdrop-blur-xs flex flex-col items-center justify-center text-white border-4 border-dashed border-indigo-400 m-6 rounded-3xl animate-in fade-in zoom-in-95 duration-150 pointer-events-none select-none">
+                  <div className="h-16 w-16 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg mb-3 animate-bounce">
+                    <Upload className="h-8 w-8 text-white" />
+                  </div>
+                  <p className="text-base font-black tracking-tight">Drop Image to Place on T-Shirt</p>
+                  <p className="text-xs text-indigo-200 mt-1">Auto-saves to your image library for reuse</p>
+                </div>
+              )}
               {bgStatusMessage && (
                 <div className="absolute top-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold shadow-lg animate-fade-in pointer-events-none">
                   <Sparkles className="h-3.5 w-3.5 text-indigo-400 animate-spin" />
