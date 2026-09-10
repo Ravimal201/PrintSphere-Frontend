@@ -1,6 +1,10 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Order = require("../models/Order");
+const CustomizedDesign = require("../models/CustomizedDesign");
+const Product = require("../models/Product");
+const Inventory = require("../models/Inventory");
 
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
 
@@ -124,136 +128,236 @@ exports.getAnalytics = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Admin role required." });
     }
 
-    // 1. Gross Revenue
-    const paidOrders = await Order.find({ paymentStatus: "Paid" });
-    const grossRevenue = paidOrders.reduce((sum, order) => sum + order.totalCost, 0);
+    // 1. Fetch orders with populated product/design references
+    const allOrders = await Order.find()
+      .populate("items.productId")
+      .populate("items.designId")
+      .sort({ createdAt: -1 });
 
-    // 2. Total Orders
     const totalOrdersCount = await Order.countDocuments();
-
-    // 3. Custom Designs
     const customDesignsCount = await CustomizedDesign.countDocuments();
 
-    // 4. Popular Fabric Colors
-    const popularColors = await Order.aggregate([
-      { $match: { paymentStatus: "Paid" } },
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: "$items.selectedColor",
-          count: { $sum: "$items.quantity" },
-          revenue: { $sum: { $multiply: [ { $ifNull: ["$items.price", 0] }, { $ifNull: ["$items.quantity", 0] } ] } }
+    // 2. Compute Gross Revenue (Only consider paid or active/completed fulfillment orders)
+    const validRevenueOrders = allOrders.filter(o => 
+      o.paymentStatus === "Paid" || 
+      ["Processing", "Printing", "Completed", "Shipped", "Delivered", "Collected"].includes(o.orderStatus)
+    );
+
+    const grossRevenue = validRevenueOrders.reduce((sum, order) => sum + (Number(order.totalCost) || 0), 0);
+
+    // 3. Popular Fabric Colors Breakdown
+    const colorMap = {};
+    validRevenueOrders.forEach(order => {
+      if (order.items && order.items.length > 0) {
+        order.items.forEach(item => {
+          let rawColor = item.selectedColor || item.color || order.color || "White";
+          if (rawColor.startsWith("#")) {
+            const lc = rawColor.toLowerCase();
+            if (lc === "#ffffff" || lc === "#fff") rawColor = "White";
+            else if (lc === "#000000" || lc === "#000" || lc === "#111827" || lc === "#1e293b") rawColor = "Black";
+            else if (lc === "#1e3a8a" || lc === "#172554" || lc === "#1e40af") rawColor = "Navy Blue";
+            else if (lc === "#dc2626" || lc === "#ef4444" || lc === "#b91c1c") rawColor = "Red";
+            else if (lc === "#e5e7eb" || lc === "#9ca3af" || lc === "#64748b") rawColor = "Grey";
+          }
+          const colorName = rawColor.charAt(0).toUpperCase() + rawColor.slice(1);
+          const qty = Number(item.quantity) || 1;
+          const price = Number(item.price || item.unitPrice || 0);
+          const itemRev = price > 0 ? price * qty : ((Number(order.totalCost) || 0) / order.items.length);
+
+          if (!colorMap[colorName]) {
+            colorMap[colorName] = { color: colorName, count: 0, revenue: 0 };
+          }
+          colorMap[colorName].count += qty;
+          colorMap[colorName].revenue += itemRev;
+        });
+      } else {
+        let rawColor = order.color || "White";
+        const colorName = rawColor.charAt(0).toUpperCase() + rawColor.slice(1);
+        const qty = Number(order.quantity) || 1;
+        const rev = Number(order.totalCost) || 0;
+
+        if (!colorMap[colorName]) {
+          colorMap[colorName] = { color: colorName, count: 0, revenue: 0 };
         }
-      },
-      { $sort: { count: -1 } },
-      { $limit: 4 } // Top 4 colors to fit UI
-    ]);
-
-    const formattedColors = popularColors.map(c => ({
-      color: c._id,
-      count: c.count,
-      revenue: c.revenue
-    }));
-
-    // Fill in defaults if not enough colors
-    const defaultColors = ["White", "Black", "Navy Blue", "Red"];
-    defaultColors.forEach((color) => {
-      if (!formattedColors.some(c => c.color.toLowerCase() === color.toLowerCase())) {
-        formattedColors.push({ color, count: 0, revenue: 0 });
+        colorMap[colorName].count += qty;
+        colorMap[colorName].revenue += rev;
       }
     });
 
-    // 5. Best-Selling Products
-    const bestSellers = await Order.aggregate([
-      { $match: { paymentStatus: "Paid" } },
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: {
-            productId: "$items.productId",
-            designId: "$items.designId"
-          },
-          salesCount: { $sum: "$items.quantity" },
-          revenue: { $sum: { $multiply: [ { $ifNull: ["$items.price", 0] }, { $ifNull: ["$items.quantity", 0] } ] } }
-        }
-      },
-      { $sort: { salesCount: -1 } },
-      { $limit: 4 }
-    ]);
-
-    const populatedBestSellers = [];
-    for (let i = 0; i < bestSellers.length; i++) {
-      const item = bestSellers[i];
-      let name = "Customized Design";
-      if (item._id.productId) {
-        const Product = require("../models/Product");
-        const prod = await Product.findById(item._id.productId);
-        if (prod) name = prod.name;
-      } else if (item._id.designId) {
-        const d = await CustomizedDesign.findById(item._id.designId);
-        if (d) name = d.title || "Custom T-Shirt Design";
+    const popularColors = Object.values(colorMap).sort((a, b) => b.count - a.count);
+    const defaultColors = ["White", "Black", "Navy Blue", "Red"];
+    defaultColors.forEach((defColor) => {
+      if (!popularColors.some(c => c.color.toLowerCase() === defColor.toLowerCase())) {
+        popularColors.push({ color: defColor, count: 0, revenue: 0 });
       }
-      populatedBestSellers.push({
-        rank: i + 1,
-        name,
-        sales: item.salesCount,
-        revenue: `Rs. ${item.revenue.toLocaleString()}`
-      });
-    }
+    });
 
-    // 6. Monthly Sales Trends (Past 6 months)
-    const monthlyData = await Order.aggregate([
-      { $match: { paymentStatus: "Paid" } },
-      {
-        $group: {
-          _id: {
-            month: { $month: "$createdAt" },
-            year: { $year: "$createdAt" }
-          },
-          total: { $sum: "$totalCost" }
+    // 4. Best-Selling Products & Custom Designs
+    const productSalesMap = {};
+    validRevenueOrders.forEach(order => {
+      if (order.items && order.items.length > 0) {
+        order.items.forEach(item => {
+          let name = "Customized T-Shirt";
+          let key = "custom";
+          if (item.productId) {
+            if (typeof item.productId === "object" && (item.productId.title || item.productId.name)) {
+              name = item.productId.title || item.productId.name;
+              key = item.productId._id.toString();
+            } else {
+              key = item.productId.toString();
+            }
+          } else if (item.designId) {
+            if (typeof item.designId === "object" && (item.designId.tShirtType || item.designId.title)) {
+              name = item.designId.title || `Custom ${item.designId.tShirtType}`;
+              key = item.designId._id.toString();
+            } else {
+              key = item.designId.toString();
+            }
+          } else if (item.tShirtStyle) {
+            name = `${item.tShirtStyle} Custom Shirt`;
+            key = item.tShirtStyle;
+          } else if (item.itemType) {
+            name = `${item.itemType} T-Shirt`;
+            key = item.itemType;
+          }
+
+          const qty = Number(item.quantity) || 1;
+          const price = Number(item.price || item.unitPrice || 0);
+          const itemRev = price > 0 ? price * qty : ((Number(order.totalCost) || 0) / order.items.length);
+
+          if (!productSalesMap[key]) {
+            productSalesMap[key] = { name, sales: 0, revenue: 0 };
+          }
+          productSalesMap[key].sales += qty;
+          productSalesMap[key].revenue += itemRev;
+        });
+      } else {
+        const name = `${order.tShirtStyle || "Plain"} Custom Shirt`;
+        const key = order.tShirtStyle || "custom";
+        const qty = Number(order.quantity) || 1;
+        const rev = Number(order.totalCost) || 0;
+        if (!productSalesMap[key]) {
+          productSalesMap[key] = { name, sales: 0, revenue: 0 };
         }
-      },
-      { $sort: { "_id.year": -1, "_id.month": -1 } },
-      { $limit: 6 }
-    ]);
+        productSalesMap[key].sales += qty;
+        productSalesMap[key].revenue += rev;
+      }
+    });
 
+    const bestSellers = Object.values(productSalesMap)
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5)
+      .map((item, idx) => ({
+        rank: idx + 1,
+        name: item.name,
+        sales: item.sales,
+        revenue: `Rs. ${item.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      }));
+
+    // 5. Monthly Revenue Trends (Past 6 months)
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const trends = [];
-    const date = new Date();
+    const now = new Date();
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(date.getFullYear(), date.getMonth() - i, 1);
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       trends.push({
         month: monthNames[d.getMonth()],
         year: d.getFullYear(),
-        monthNum: d.getMonth() + 1,
+        monthNum: d.getMonth(),
+        yearNum: d.getFullYear(),
         total: 0
       });
     }
 
-    for (const m of monthlyData) {
-      const match = trends.find(t => t.monthNum === m._id.month && t.year === m._id.year);
+    validRevenueOrders.forEach(order => {
+      const orderDate = new Date(order.createdAt || Date.now());
+      const m = orderDate.getMonth();
+      const y = orderDate.getFullYear();
+      const match = trends.find(t => t.monthNum === m && t.yearNum === y);
       if (match) {
-        match.total = m.total;
+        match.total += Number(order.totalCost) || 0;
       }
-    }
+    });
 
-    const formattedTrends = trends.map(t => ({
-      month: t.month,
-      year: t.year,
-      total: t.total
-    }));
+    // 6. Comprehensive Inventory (T-Shirts, Ink, Packaging, Consumables)
+    const allInventoryDocs = await Inventory.find().sort({ itemType: 1, color: 1 });
+
+    const formatInvItem = (item) => {
+      let category = "tshirt";
+      let name = "";
+      const threshold = item.minThreshold || 10;
+      let status = "Good";
+      if (item.quantity <= threshold) {
+        status = "Critical";
+      } else if (item.quantity <= threshold * 2) {
+        status = "Warning";
+      }
+
+      if (item.itemType === "Plain T-Shirt") {
+        category = "tshirt";
+        name = `${item.tShirtType || "Plain T-Shirt"} (${item.color || "White"}, Size ${item.size || "M"}${item.gsm ? `, ${item.gsm}` : ""})`;
+      } else if (item.itemType === "Printing Ink") {
+        category = "ink";
+        name = `Printing Ink - ${item.color || "Color"}`;
+      } else if (["Transfer Paper", "Custom Consumable"].includes(item.itemType)) {
+        category = "ink";
+        name = `${item.itemType}${item.color && item.color !== "White" ? ` (${item.color})` : ""}`;
+      } else {
+        category = "packaging";
+        name = `${item.itemType}${item.color && item.color !== "White" ? ` (${item.color})` : ""}`;
+      }
+
+      const maxQty = Math.max(item.quantity * 1.4, threshold * 3, 100);
+
+      return {
+        _id: item._id,
+        itemType: item.itemType,
+        tShirtType: item.tShirtType,
+        category,
+        name,
+        qty: item.quantity,
+        quantity: item.quantity,
+        max: Math.round(maxQty),
+        minThreshold: threshold,
+        status,
+        color: item.color,
+        size: item.size,
+        gsm: item.gsm,
+        material: item.material,
+        lastRestocked: item.lastRestocked
+      };
+    };
+
+    const formattedAllInventory = allInventoryDocs.map(formatInvItem);
+    const tShirtInventory = formattedAllInventory.filter(i => i.category === "tshirt");
+    const inkInventory = formattedAllInventory.filter(i => i.category === "ink");
+    const packagingInventory = formattedAllInventory.filter(i => i.category === "packaging");
+
+    // 7. Operational Statistics
+    const activeOrdersCount = allOrders.filter(o => ["Processing", "Printing", "Shipped"].includes(o.orderStatus)).length;
+    const completedOrdersCount = allOrders.filter(o => ["Completed", "Delivered", "Collected"].includes(o.orderStatus)).length;
+    const avgOrderValue = validRevenueOrders.length > 0 ? (grossRevenue / validRevenueOrders.length) : 0;
 
     res.json({
       grossRevenue,
       totalOrders: totalOrdersCount,
       customDesigns: customDesignsCount,
-      popularColors: formattedColors.slice(0, 4),
-      bestSellers: populatedBestSellers,
-      monthlyTrends: formattedTrends
+      popularColors: popularColors.slice(0, 4),
+      bestSellers,
+      monthlyTrends: trends,
+      inventory: formattedAllInventory,
+      tShirtInventory,
+      inkInventory,
+      packagingInventory,
+      operationalStats: {
+        activeOrders: activeOrdersCount,
+        completedOrders: completedOrdersCount,
+        avgOrderValue: Math.round(avgOrderValue)
+      }
     });
   } catch (error) {
     console.error("Get analytics error:", error);
-    res.status(500).json({ message: "Server error while generating analytics" });
+    res.status(500).json({ message: "Server error while generating analytics", error: error.message });
   }
 };
 
