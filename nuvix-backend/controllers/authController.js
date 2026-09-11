@@ -15,6 +15,20 @@ const { resolveColorName, formatGsm } = require("../utils/colorHelper");
 // JWT Secret Key fallback
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
 
+// Helper to verify customer token
+const verifyUserToken = (req) => {
+  const authHeader = req.headers?.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+  const token = authHeader.split(" ")[1];
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    return null;
+  }
+};
+
 // @desc    Register a new customer
 // @route   POST /api/auth/register
 exports.registerCustomer = async (req, res) => {
@@ -212,6 +226,101 @@ exports.getProductReviews = async (req, res) => {
   } catch (error) {
     console.error("Fetch product reviews error:", error);
     res.status(500).json({ message: "Server error while fetching reviews" });
+  }
+};
+
+// @desc    Submit review and rating directly for a product
+// @route   POST /api/auth/products/:productId/reviews
+exports.submitProductReview = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { rating, comment, userName: customUserName } = req.body;
+
+    const numRating = Number(rating);
+    if (!numRating || numRating < 1 || numRating > 5) {
+      return res.status(400).json({ message: "Please provide a valid rating between 1 and 5 stars." });
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found." });
+    }
+
+    let userId = null;
+    let userName = (customUserName || "").trim() || "Verified Buyer";
+
+    // Attempt token verification if user is logged in
+    const decoded = verifyUserToken(req);
+    if (decoded && decoded.id) {
+      userId = decoded.id;
+      const user = await User.findById(decoded.id);
+      if (user) {
+        userName = user.name || userName;
+      }
+    }
+
+    let reviewDoc;
+    if (userId) {
+      reviewDoc = await Review.findOneAndUpdate(
+        { productId, userId },
+        {
+          productId,
+          userId,
+          userName,
+          rating: numRating,
+          comment: (comment || "").trim()
+        },
+        { upsert: true, new: true }
+      );
+    } else {
+      reviewDoc = await Review.create({
+        productId,
+        userName,
+        rating: numRating,
+        comment: (comment || "").trim()
+      });
+    }
+
+    // Recalculate average rating & ratingsCount for this product
+    const allProductReviews = await Review.find({ productId }).sort({ createdAt: -1 });
+    const ratingsCount = allProductReviews.length;
+    const totalRating = allProductReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+    const averageRating = ratingsCount > 0 ? parseFloat((totalRating / ratingsCount).toFixed(1)) : 0;
+
+    await Product.findByIdAndUpdate(productId, {
+      averageRating,
+      ratingsCount
+    });
+
+    // Send notifications to Admin/Manager
+    try {
+      await createNotification({
+        recipientRole: "Admin",
+        title: `New Product Review (${numRating}★)`,
+        message: `${userName} rated "${product.title}" with ${numRating} stars: "${(comment || "").slice(0, 80)}"`,
+        type: "Product Update"
+      });
+
+      await createNotification({
+        recipientRole: "Manager",
+        title: `New Product Review (${numRating}★)`,
+        message: `${userName} rated "${product.title}" with ${numRating} stars: "${(comment || "").slice(0, 80)}"`,
+        type: "Product Update"
+      });
+    } catch (notifErr) {
+      console.error("Failed to create review notification:", notifErr);
+    }
+
+    return res.status(200).json({
+      message: "Thank you for your rating and feedback!",
+      review: reviewDoc,
+      averageRating,
+      ratingsCount,
+      reviews: allProductReviews
+    });
+  } catch (error) {
+    console.error("Submit product review error:", error);
+    return res.status(500).json({ message: "Server error while submitting product review." });
   }
 };
 
@@ -602,20 +711,6 @@ exports.getActivePricingRules = async (req, res) => {
   } catch (error) {
     console.error("Get active pricing rules error:", error);
     res.status(500).json({ message: "Server error while fetching pricing rules" });
-  }
-};
-
-// Helper to verify customer token
-const verifyUserToken = (req) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
-  }
-  const token = authHeader.split(" ")[1];
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (err) {
-    return null;
   }
 };
 
@@ -1232,9 +1327,18 @@ exports.submitOrderReview = async (req, res) => {
       return res.status(400).json({ message: "Please provide a valid rating between 1 and 5 stars." });
     }
 
-    const order = await Order.findOne({ _id: orderId, customerId: decoded.id })
+    let order = await Order.findOne({ _id: orderId, customerId: decoded.id })
       .populate("items.productId")
       .populate("items.designId");
+
+    if (!order) {
+      const fallbackOrder = await Order.findById(orderId)
+        .populate("items.productId")
+        .populate("items.designId");
+      if (fallbackOrder && (!fallbackOrder.customerId || fallbackOrder.customerId.toString() === decoded.id.toString() || decoded.role === "Admin" || decoded.role === "Manager")) {
+        order = fallbackOrder;
+      }
+    }
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });

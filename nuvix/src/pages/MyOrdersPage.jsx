@@ -471,8 +471,8 @@ export default function MyOrdersPage() {
                           </button>
                         )}
 
-                        {/* Collected / Delivered -> Rate Product Button */}
-                        {(order.orderStatus === "Collected" || order.orderStatus === "Delivered") && (
+                        {/* Rate / Review Product Button */}
+                        {order.orderStatus !== "Cancelled" && (
                           !order.review?.rating ? (
                             <button
                               onClick={() => openReviewModal(order)}
@@ -635,7 +635,7 @@ export default function MyOrdersPage() {
                               <p className="text-[11px] text-slate-400 italic">No written comment provided.</p>
                             )}
                           </div>
-                        ) : (order.orderStatus === "Collected" || order.orderStatus === "Delivered") && (
+                        ) : order.orderStatus !== "Cancelled" && (
                           <div className="mt-4 p-3.5 bg-amber-50/60 border border-amber-200/70 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                             <div className="flex items-center gap-2 text-amber-900 font-semibold">
                               <Star className="h-4 w-4 text-amber-500 fill-amber-500 shrink-0" />

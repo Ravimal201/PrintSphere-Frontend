@@ -35,6 +35,7 @@ require("./models/CustomizedDesign");
 require("./models/Notification");
 require("./models/Payment");
 require("./models/UserActivity");
+require("./models/Review");
 
 // Route Imports
 const authRoutes = require("./routes/authRoutes");
