@@ -23,6 +23,7 @@ const {
   markOrderCollected,
   submitOrderReview,
   getProductReviews,
+  submitProductReview,
   getAllCustomerReviews,
   getPlatformStats
 } = require("../controllers/authController");
@@ -36,6 +37,8 @@ router.put("/update-profile", updateUserProfile);
 router.put("/payment-method", updateUserPaymentMethod);
 router.get("/products", getStoreProducts);
 router.get("/products/:productId/reviews", getProductReviews);
+router.post("/products/:productId/reviews", submitProductReview);
+router.post("/products/:productId/review", submitProductReview);
 router.get("/reviews", getAllCustomerReviews);
 router.get("/stats", getPlatformStats);
 router.get("/recommendations", getRecommendations);

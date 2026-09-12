@@ -18,7 +18,9 @@ const {
   getTShirtStyles,
   createTShirtStyle,
   updateTShirtStyle,
-  deleteTShirtStyle
+  deleteTShirtStyle,
+  getReviews,
+  deleteReview
 } = require("../controllers/managerController");
 
 router.get("/pricing-rules", getPricingRules);
@@ -44,5 +46,8 @@ router.get("/tshirt-styles", getTShirtStyles);
 router.post("/tshirt-styles", createTShirtStyle);
 router.put("/tshirt-styles/:id", updateTShirtStyle);
 router.delete("/tshirt-styles/:id", deleteTShirtStyle);
+
+router.get("/reviews", getReviews);
+router.delete("/reviews/:id", deleteReview);
 
 module.exports = router;

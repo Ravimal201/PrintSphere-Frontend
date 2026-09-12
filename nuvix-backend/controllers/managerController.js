@@ -6,6 +6,7 @@ const Inventory = require("../models/Inventory");
 const PricingRules = require("../models/PricingRules");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const TShirtStyle = require("../models/TShirtStyle");
+const Review = require("../models/Review");
 const { createNotification } = require("../utils/notificationHelper");
 const { resolveColorName, normalizeColorStr, formatGsm } = require("../utils/colorHelper");
 
@@ -917,3 +918,98 @@ exports.deleteTShirtStyle = async (req, res) => {
     res.status(500).json({ message: "Server error while deleting tshirt style" });
   }
 };
+
+// ================= REVIEWS & COMMENT MODERATION =================
+
+// @desc    Get all reviews with full references for moderation
+// @route   GET /api/manager/reviews
+exports.getReviews = async (req, res) => {
+  try {
+    if (!verifyManager(req)) {
+      return res.status(403).json({ message: "Access denied. Manager role required." });
+    }
+
+    const reviews = await Review.find()
+      .populate("productId", "title images category basePrice averageRating ratingsCount")
+      .populate("designId", "tShirtType fabricColor thumbnailUrl")
+      .populate("userId", "name email role")
+      .populate("orderId", "_id orderStatus totalAmount createdAt")
+      .sort({ createdAt: -1 });
+
+    const totalReviews = reviews.length;
+    const totalRating = reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+    const averageRating = totalReviews > 0 ? parseFloat((totalRating / totalReviews).toFixed(1)) : 0;
+    const badReviewsCount = reviews.filter((r) => (Number(r.rating) || 0) <= 2).length;
+
+    res.json({
+      reviews,
+      stats: {
+        totalReviews,
+        averageRating,
+        badReviewsCount,
+        breakdown: {
+          1: reviews.filter((r) => r.rating === 1).length,
+          2: reviews.filter((r) => r.rating === 2).length,
+          3: reviews.filter((r) => r.rating === 3).length,
+          4: reviews.filter((r) => r.rating === 4).length,
+          5: reviews.filter((r) => r.rating === 5).length
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Get manager reviews error:", error);
+    res.status(500).json({ message: "Server error while fetching reviews" });
+  }
+};
+
+// @desc    Delete a bad or inappropriate comment / review
+// @route   DELETE /api/manager/reviews/:id
+exports.deleteReview = async (req, res) => {
+  try {
+    if (!verifyManager(req)) {
+      return res.status(403).json({ message: "Access denied. Manager role required." });
+    }
+
+    const { id } = req.params;
+    const review = await Review.findById(id);
+    if (!review) {
+      return res.status(404).json({ message: "Review / comment not found" });
+    }
+
+    const productId = review.productId;
+    const orderId = review.orderId;
+
+    // Remove the review
+    await Review.findByIdAndDelete(id);
+
+    // If review was for a store product, re-calculate rating and count
+    if (productId) {
+      const remainingReviews = await Review.find({ productId });
+      const count = remainingReviews.length;
+      const total = remainingReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+      const avg = count > 0 ? parseFloat((total / count).toFixed(1)) : 0;
+
+      await Product.findByIdAndUpdate(productId, {
+        averageRating: avg,
+        ratingsCount: count
+      });
+    }
+
+    // If review was linked to an order, remove the review subdoc if necessary
+    if (orderId) {
+      await Order.findByIdAndUpdate(orderId, {
+        $unset: { review: 1 }
+      });
+    }
+
+    res.json({
+      message: "Comment / review deleted successfully",
+      deletedReviewId: id,
+      productId: productId || null
+    });
+  } catch (error) {
+    console.error("Delete review error:", error);
+    res.status(500).json({ message: "Server error while deleting review" });
+  }
+};
+

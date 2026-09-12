@@ -22,6 +22,9 @@ import {
   ZoomIn,
   ZoomOut,
   RefreshCw,
+  Edit3,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import axios from "axios";
 import Navbar from "../components/Navbar/RNavbar";
@@ -102,6 +105,30 @@ export default function StorePage() {
   const [modalRotation, setModalRotation] = useState(0);
   const [modalAutoRotate, setModalAutoRotate] = useState(false);
 
+  // Product Review states for modal
+  const [isWritingReview, setIsWritingReview] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewHover, setReviewHover] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewerName, setReviewerName] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewSuccessMsg, setReviewSuccessMsg] = useState("");
+  const [reviewErrorMsg, setReviewErrorMsg] = useState("");
+  const [deletingReviewId, setDeletingReviewId] = useState(null);
+
+  // Check if current user is Manager or Admin
+  const storedCurrentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const isManagerOrAdmin =
+    storedCurrentUser?.role === "Manager" ||
+    storedCurrentUser?.role === "Admin" ||
+    isManagerPreview;
+
   useEffect(() => {
     if (selected3DProduct) {
       setModalColor(selected3DProduct.colors?.[0] || "#ffffff");
@@ -112,6 +139,19 @@ export default function StorePage() {
       setModalZoom(0.85);
       setModalRotation(0);
       setModalAutoRotate(false);
+      setIsWritingReview(false);
+      setReviewRating(5);
+      setReviewHover(0);
+      setReviewComment("");
+      setReviewSuccessMsg("");
+      setReviewErrorMsg("");
+
+      try {
+        const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+        setReviewerName(storedUser.name || "");
+      } catch {
+        setReviewerName("");
+      }
 
       if (selected3DProduct._id) {
         logUserActivity(
@@ -125,6 +165,135 @@ export default function StorePage() {
       }
     }
   }, [selected3DProduct]);
+
+  const handleProductReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!selected3DProduct) return;
+    setSubmittingReview(true);
+    setReviewErrorMsg("");
+    setReviewSuccessMsg("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await axios.post(
+        `${API_BASE_URL}/auth/products/${selected3DProduct._id}/reviews`,
+        {
+          rating: reviewRating,
+          comment: reviewComment,
+          userName: reviewerName.trim() || undefined,
+        },
+        { headers }
+      );
+
+      const { averageRating, ratingsCount, review, reviews } = res.data;
+
+      // Update selected3DProduct reviews list & rating stats
+      setSelected3DProduct((prev) => {
+        if (!prev) return prev;
+        const newReviewList = reviews || [
+          {
+            _id: review?._id || `rev_${Date.now()}`,
+            userName: review?.userName || reviewerName || "Verified Buyer",
+            rating: reviewRating,
+            comment: reviewComment,
+            createdAt: review?.createdAt || new Date().toISOString(),
+          },
+          ...(prev.reviews || []).filter((r) => r._id !== review?._id),
+        ];
+        return {
+          ...prev,
+          averageRating: averageRating ?? reviewRating,
+          ratingsCount: ratingsCount ?? newReviewList.length,
+          reviews: newReviewList,
+        };
+      });
+
+      // Update main products array
+      setProducts((prev) =>
+        prev.map((p) =>
+          p._id === selected3DProduct._id
+            ? {
+                ...p,
+                averageRating: averageRating ?? reviewRating,
+                ratingsCount: ratingsCount ?? ((p.ratingsCount || 0) + 1),
+              }
+            : p
+        )
+      );
+
+      setReviewSuccessMsg("Thank you! Your review has been submitted.");
+      setReviewComment("");
+      setTimeout(() => {
+        setIsWritingReview(false);
+        setReviewSuccessMsg("");
+      }, 2000);
+    } catch (err) {
+      console.error("Submit product review error:", err);
+      setReviewErrorMsg(
+        err.response?.data?.message || "Failed to submit review. Please try again."
+      );
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!reviewId) return;
+    if (!window.confirm("Are you sure you want to delete this comment? This will remove the bad review and update product ratings.")) {
+      return;
+    }
+    try {
+      setDeletingReviewId(reviewId);
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      await axios.delete(`${API_BASE_URL}/manager/reviews/${reviewId}`, { headers });
+
+      // Update selected3DProduct reviews list
+      setSelected3DProduct((prev) => {
+        if (!prev) return prev;
+        const updatedReviews = (prev.reviews || []).filter((r) => r._id !== reviewId);
+        const count = updatedReviews.length;
+        const total = updatedReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+        const averageRating = count > 0 ? parseFloat((total / count).toFixed(1)) : 0;
+        return {
+          ...prev,
+          reviews: updatedReviews,
+          ratingsCount: count,
+          averageRating,
+        };
+      });
+
+      // Update main products array as well
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p._id === selected3DProduct?._id) {
+            const updatedReviews = (p.reviews || []).filter((r) => r._id !== reviewId);
+            const count = updatedReviews.length;
+            const total = updatedReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+            const averageRating = count > 0 ? parseFloat((total / count).toFixed(1)) : 0;
+            return {
+              ...p,
+              reviews: updatedReviews,
+              ratingsCount: count,
+              averageRating,
+            };
+          }
+          return p;
+        })
+      );
+      setReviewSuccessMsg("Comment deleted successfully.");
+      setTimeout(() => setReviewSuccessMsg(""), 3000);
+    } catch (err) {
+      console.error("Failed to delete review:", err);
+      setReviewErrorMsg(
+        err.response?.data?.message || "Failed to delete comment. Manager access required."
+      );
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
 
   useEffect(() => {
     if (!searchTerm.trim()) return;
@@ -1441,47 +1610,219 @@ export default function StorePage() {
                   </div>
                 </div>
 
-                {/* Customer Reviews List */}
-                <div className="space-y-2.5 pt-4 border-t">
+                {/* Customer Reviews List & Interactive Rating Form */}
+                <div className="space-y-3 pt-4 border-t">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Customer Reviews ({selected3DProduct.ratingsCount || 0})
-                    </span>
-                    <div className="flex items-center gap-1 text-xs">
-                      <Star className={`h-3.5 w-3.5 ${selected3DProduct.ratingsCount > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
-                      <span className="font-extrabold text-slate-800">
-                        {selected3DProduct.ratingsCount > 0
-                          ? (selected3DProduct.averageRating ? selected3DProduct.averageRating.toFixed(1) : "0.0")
-                          : "0 review"}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Customer Reviews ({selected3DProduct.ratingsCount || 0})
                       </span>
-                      <span className="text-slate-400 font-bold text-[10px]">({selected3DProduct.ratingsCount || 0})</span>
+                      <div className="flex items-center gap-1 text-xs">
+                        <Star
+                          className={`h-3.5 w-3.5 ${
+                            selected3DProduct.ratingsCount > 0
+                              ? "fill-amber-400 text-amber-400"
+                              : "text-slate-300"
+                          }`}
+                        />
+                        <span className="font-extrabold text-slate-800">
+                          {selected3DProduct.ratingsCount > 0
+                            ? selected3DProduct.averageRating
+                              ? selected3DProduct.averageRating.toFixed(1)
+                              : "0.0"
+                            : "0 review"}
+                        </span>
+                      </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsWritingReview(!isWritingReview);
+                        setReviewErrorMsg("");
+                        setReviewSuccessMsg("");
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition cursor-pointer border border-indigo-100"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      <span>{isWritingReview ? "Close Review Form" : "Write a Review"}</span>
+                    </button>
                   </div>
 
+                  {/* Review Submission Form */}
+                  {isWritingReview && (
+                    <form
+                      onSubmit={handleProductReviewSubmit}
+                      className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3.5 space-y-3 animate-fade-in"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-amber-900 flex items-center gap-1">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                          Rate & Review this Product
+                        </span>
+                        <span className="text-[11px] font-extrabold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full">
+                          {(reviewHover || reviewRating) === 1 && "😞 Poor"}
+                          {(reviewHover || reviewRating) === 2 && "😐 Fair"}
+                          {(reviewHover || reviewRating) === 3 && "🙂 Good"}
+                          {(reviewHover || reviewRating) === 4 && "😊 Very Good"}
+                          {(reviewHover || reviewRating) === 5 && "🤩 Excellent"}
+                        </span>
+                      </div>
+
+                      {/* Interactive Stars */}
+                      <div className="flex items-center gap-1.5">
+                        {[1, 2, 3, 4, 5].map((star) => {
+                          const active = (reviewHover || reviewRating) >= star;
+                          return (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setReviewRating(star)}
+                              onMouseEnter={() => setReviewHover(star)}
+                              onMouseLeave={() => setReviewHover(0)}
+                              className="p-1 rounded-lg transition hover:scale-110 cursor-pointer"
+                            >
+                              <Star
+                                className={`h-6 w-6 transition-colors ${
+                                  active
+                                    ? "fill-amber-400 text-amber-400 drop-shadow-xs"
+                                    : "text-slate-300 hover:text-slate-400"
+                                }`}
+                              />
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Name input */}
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Your Name (e.g. Alex M.)"
+                          value={reviewerName}
+                          onChange={(e) => setReviewerName(e.target.value)}
+                          className="w-full text-xs font-medium px-3 py-2 bg-white rounded-xl border border-amber-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                        />
+                      </div>
+
+                      {/* Comment textarea */}
+                      <div>
+                        <textarea
+                          rows={2}
+                          maxLength={300}
+                          placeholder="What did you think of the design, fabric quality, or style? (Optional)"
+                          value={reviewComment}
+                          onChange={(e) => setReviewComment(e.target.value)}
+                          className="w-full text-xs font-medium px-3 py-2 bg-white rounded-xl border border-amber-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 resize-none leading-relaxed"
+                        />
+                      </div>
+
+                      {reviewErrorMsg && (
+                        <div className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 p-2 rounded-xl flex items-center gap-1.5">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          <span>{reviewErrorMsg}</span>
+                        </div>
+                      )}
+
+                      {reviewSuccessMsg && (
+                        <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded-xl flex items-center gap-1.5">
+                          <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                          <span>{reviewSuccessMsg}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsWritingReview(false)}
+                          className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-amber-100/50 rounded-xl transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={submittingReview}
+                          className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition shadow-xs cursor-pointer disabled:opacity-50"
+                        >
+                          {submittingReview ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>Submitting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-3.5 w-3.5" />
+                              <span>Submit Review</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Existing Reviews List */}
                   {selected3DProduct.reviews && selected3DProduct.reviews.length > 0 ? (
                     <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                       {selected3DProduct.reviews.map((rev, rIdx) => (
-                        <div key={rIdx} className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 space-y-1">
+                        <div
+                          key={rev._id || rIdx}
+                          className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 space-y-1 relative group"
+                        >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-800">{rev.userName || "Verified Buyer"}</span>
-                            <div className="flex text-amber-400">
-                              {[1, 2, 3, 4, 5].map((s) => (
-                                <Star
-                                  key={s}
-                                  className={`h-3 w-3 ${s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
-                                />
-                              ))}
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-800">
+                                {rev.userName || "Verified Buyer"}
+                              </span>
+                              {rev.rating <= 2 && (
+                                <span className="text-[9px] bg-red-50 text-red-600 font-bold px-1.5 py-0.5 rounded border border-red-100">
+                                  Low Rating
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex text-amber-400">
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                  <Star
+                                    key={s}
+                                    className={`h-3 w-3 ${
+                                      s <= rev.rating
+                                        ? "fill-amber-400 text-amber-400"
+                                        : "text-slate-200"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              {isManagerOrAdmin && rev._id && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteReview(rev._id);
+                                  }}
+                                  disabled={deletingReviewId === rev._id}
+                                  title="Manager Action: Delete this comment"
+                                  className="p-1 rounded-md text-red-500 hover:text-white hover:bg-red-500 transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  {deletingReviewId === rev._id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3 w-3" />
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </div>
                           {rev.comment && (
-                            <p className="text-[11px] text-slate-600 italic leading-snug">"{rev.comment}"</p>
+                            <p className="text-[11px] text-slate-600 italic leading-snug">
+                              "{rev.comment}"
+                            </p>
                           )}
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="text-[11px] text-slate-400 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
-                      No customer reviews yet. Be the first to order and review!
+                      No customer reviews yet. Be the first to review this product!
                     </p>
                   )}
                 </div>
