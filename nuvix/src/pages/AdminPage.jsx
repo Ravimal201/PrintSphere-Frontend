@@ -4,7 +4,7 @@ import {
   Loader2, AlertCircle, CheckCircle, BarChart3, TrendingUp, Inbox, 
   Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check, Bell, Download, FileText,
   Droplets, Package, Box, Filter, Search, Tag, Plus, X,
-  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye
+  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye, AlertTriangle, CreditCard, Printer, CheckCheck, Clock
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -48,6 +48,9 @@ export default function AdminPage() {
 
   // Live System Analytics & Notifications State
   const [notifications, setNotifications] = useState([]);
+  const [notificationTypeFilter, setNotificationTypeFilter] = useState("ALL");
+  const [notificationStatusFilter, setNotificationStatusFilter] = useState("ALL"); // "ALL" | "UNREAD" | "READ"
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState("");
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
@@ -1982,95 +1985,322 @@ export default function AdminPage() {
         )}
 
         {/* ================= TAB 5: NOTIFICATIONS ================= */}
-        {activeTab === "notifications" && (
-          <div className="bg-white border rounded-3xl p-6 shadow-sm flex flex-col">
-            <div className="flex items-center justify-between mb-6 select-none">
-              <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                <Bell className="h-5 w-5 text-indigo-600" />
-                Live Notification Center
-              </h3>
-              <div className="space-x-4">
-                <button
-                  onClick={fetchNotifications}
-                  className="text-xs text-indigo-600 font-bold hover:underline"
-                >
-                  Refresh
-                </button>
-                <button
-                  onClick={handleClearAllNotifications}
-                  disabled={notifications.filter(n => !n.isRead).length === 0}
-                  className="text-xs text-slate-500 font-bold hover:underline disabled:opacity-50"
-                >
-                  Mark All Read
-                </button>
-              </div>
-            </div>
+        {activeTab === "notifications" && (() => {
+          const notificationTypeFilters = [
+            { key: "ALL", label: "All Notifications", icon: Bell },
+            { key: "Order Update", label: "Order Updates", icon: ShoppingCart },
+            { key: "Low Stock", label: "Low Stock Alerts", icon: AlertTriangle },
+            { key: "Payment Success", label: "Payment Confirmations", icon: CreditCard },
+            { key: "New Print Task", label: "Print Tasks", icon: Printer },
+          ];
 
-            {notifications.length === 0 ? (
-              <div className="py-20 text-center border-2 border-dashed rounded-2xl select-none">
-                <Bell className="h-8 w-8 text-slate-300 mx-auto mb-2 animate-bounce" />
-                <p className="text-sm text-slate-400 font-semibold">You have no notifications.</p>
-                <p className="text-xs text-slate-300 mt-1">Updates on order activities and alerts will appear here.</p>
-              </div>
-            ) : (
-              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                {notifications.map((item) => {
-                  const isLowStock = item.type === "Low Stock";
-                  const isNewTask = item.type === "New Print Task";
-                  const isPayment = item.type === "Payment Success";
+          const getMeta = (type) => {
+            switch (type) {
+              case "Low Stock":
+                return {
+                  label: "Low Stock Alert",
+                  Icon: AlertTriangle,
+                  badgeClass: "bg-rose-50 border-rose-200 text-rose-700",
+                  iconBg: "bg-rose-100 text-rose-600 border-rose-200",
+                  cardBorder: "border-rose-100 hover:border-rose-300"
+                };
+              case "New Print Task":
+                return {
+                  label: "Print Task",
+                  Icon: Printer,
+                  badgeClass: "bg-purple-50 border-purple-200 text-purple-700",
+                  iconBg: "bg-purple-100 text-purple-600 border-purple-200",
+                  cardBorder: "border-purple-100 hover:border-purple-300"
+                };
+              case "Payment Success":
+                return {
+                  label: "Payment Confirmation",
+                  Icon: CreditCard,
+                  badgeClass: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                  iconBg: "bg-emerald-100 text-emerald-600 border-emerald-200",
+                  cardBorder: "border-emerald-100 hover:border-emerald-300"
+                };
+              case "Order Update":
+                return {
+                  label: "Order Update",
+                  Icon: ShoppingCart,
+                  badgeClass: "bg-blue-50 border-blue-200 text-blue-700",
+                  iconBg: "bg-blue-100 text-blue-600 border-blue-200",
+                  cardBorder: "border-blue-100 hover:border-blue-300"
+                };
+              default:
+                return {
+                  label: type || "System Alert",
+                  Icon: Bell,
+                  badgeClass: "bg-slate-100 border-slate-200 text-slate-700",
+                  iconBg: "bg-slate-100 text-slate-600 border-slate-200",
+                  cardBorder: "border-slate-100 hover:border-slate-300"
+                };
+            }
+          };
 
-                  const badgeColor = isLowStock 
-                    ? "bg-rose-50 border-rose-100 text-rose-600" 
-                    : isNewTask 
-                    ? "bg-purple-50 border-purple-100 text-purple-600" 
-                    : isPayment 
-                    ? "bg-emerald-50 border-emerald-100 text-emerald-600" 
-                    : "bg-blue-50 border-blue-100 text-blue-600";
+          const filteredList = notifications.filter((item) => {
+            // Type filter
+            if (notificationTypeFilter !== "ALL" && item.type !== notificationTypeFilter) {
+              return false;
+            }
+            // Status filter
+            if (notificationStatusFilter === "UNREAD" && item.isRead) {
+              return false;
+            }
+            if (notificationStatusFilter === "READ" && !item.isRead) {
+              return false;
+            }
+            // Search query filter
+            if (notificationSearchQuery.trim()) {
+              const q = notificationSearchQuery.toLowerCase().trim();
+              const matchTitle = (item.title || "").toLowerCase().includes(q);
+              const matchMsg = (item.message || "").toLowerCase().includes(q);
+              const matchType = (item.type || "").toLowerCase().includes(q);
+              if (!matchTitle && !matchMsg && !matchType) return false;
+            }
+            return true;
+          });
 
-                  const timeStr = new Date(item.createdAt).toLocaleString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit"
-                  });
+          const totalUnread = notifications.filter((n) => !n.isRead).length;
 
-                  return (
-                    <div
-                      key={item._id}
-                      className={`flex items-start justify-between p-4 rounded-2xl border transition duration-200 ${
-                        item.isRead ? "bg-slate-50/50 border-slate-100" : "bg-white border-indigo-100/80 shadow-sm"
-                      }`}
-                    >
-                      <div className="flex gap-4">
-                        <span className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-black h-fit uppercase tracking-wider select-none ${badgeColor}`}>
-                          {item.type}
+          return (
+            <div className="bg-white border rounded-3xl p-6 shadow-sm flex flex-col gap-6">
+              {/* Top Header & Global Actions */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Bell className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-slate-950">Live Notification Center</h3>
+                      {totalUnread > 0 ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          {totalUnread} New
                         </span>
-                        <div className="leading-tight">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                            {!item.isRead && (
-                              <span className="h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{item.message}</p>
-                          <span className="text-[10px] text-slate-400 font-bold block mt-2 select-none">{timeStr}</span>
-                        </div>
-                      </div>
-                      {!item.isRead && (
-                        <button
-                          onClick={() => handleMarkAsRead(item._id)}
-                          className="text-[10px] text-indigo-600 font-extrabold hover:underline select-none"
-                        >
-                          Mark Read
-                        </button>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          All Caught Up
+                        </span>
                       )}
                     </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Monitor real-time updates across customer orders, inventory stock levels, payments, and print tasks.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start md:self-auto">
+                  <button
+                    onClick={fetchNotifications}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-100 transition shadow-2xs cursor-pointer"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={handleClearAllNotifications}
+                    disabled={totalUnread === 0}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 rounded-xl border border-slate-200 transition cursor-pointer"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5 text-slate-500" />
+                    Mark All as Read
+                  </button>
+                </div>
+              </div>
+
+              {/* Notification Type Filters (Pills Bar) */}
+              <div className="flex flex-wrap gap-2 items-center">
+                {notificationTypeFilters.map((tab) => {
+                  const Icon = tab.icon;
+                  const count = tab.key === "ALL" 
+                    ? notifications.length 
+                    : notifications.filter((n) => n.type === tab.key).length;
+                  const unreadCount = tab.key === "ALL"
+                    ? notifications.filter((n) => !n.isRead).length
+                    : notifications.filter((n) => n.type === tab.key && !n.isRead).length;
+
+                  const isActive = notificationTypeFilter === tab.key;
+
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setNotificationTypeFilter(tab.key)}
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all select-none cursor-pointer border ${
+                        isActive
+                          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                          : "bg-slate-50/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-slate-200/80"
+                      }`}
+                    >
+                      <Icon className={`h-3.5 w-3.5 ${isActive ? "text-indigo-300" : "text-slate-400"}`} />
+                      <span>{tab.label}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                          isActive
+                            ? "bg-slate-800 text-indigo-200"
+                            : unreadCount > 0
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-slate-200/70 text-slate-600"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
-            )}
-          </div>
-        )}
+
+              {/* Search & Status Controls Toolbar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/70 p-3 rounded-2xl border border-slate-200/70">
+                <div className="relative w-full sm:w-80">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={notificationSearchQuery}
+                    onChange={(e) => setNotificationSearchQuery(e.target.value)}
+                    placeholder="Search by keyword, order #, or title..."
+                    className="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800 placeholder-slate-400"
+                  />
+                  {notificationSearchQuery && (
+                    <button
+                      onClick={() => setNotificationSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+                    Status:
+                  </span>
+                  <div className="inline-flex rounded-xl bg-white border border-slate-200 p-0.5 shadow-2xs">
+                    {[
+                      { key: "ALL", label: "All" },
+                      { key: "UNREAD", label: "Unread" },
+                      { key: "READ", label: "Read" }
+                    ].map((statusOpt) => (
+                      <button
+                        key={statusOpt.key}
+                        onClick={() => setNotificationStatusFilter(statusOpt.key)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          notificationStatusFilter === statusOpt.key
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {statusOpt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Notification List Body */}
+              {notifications.length === 0 ? (
+                <div className="py-20 text-center border-2 border-dashed rounded-2xl select-none bg-slate-50/50">
+                  <Bell className="h-8 w-8 text-slate-300 mx-auto mb-2 animate-bounce" />
+                  <p className="text-sm text-slate-600 font-bold">You have no notifications.</p>
+                  <p className="text-xs text-slate-400 mt-1">Updates on order activities and system alerts will appear here.</p>
+                </div>
+              ) : filteredList.length === 0 ? (
+                <div className="py-16 text-center border-2 border-dashed rounded-2xl select-none bg-slate-50/50 flex flex-col items-center">
+                  <Filter className="h-8 w-8 text-slate-300 mb-2" />
+                  <p className="text-sm text-slate-700 font-bold">No notifications found</p>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                    No notifications match your current filter criteria ({notificationTypeFilter !== "ALL" ? `Type: ${notificationTypeFilter}` : ""} {notificationStatusFilter !== "ALL" ? `Status: ${notificationStatusFilter}` : ""} {notificationSearchQuery ? `Search: "${notificationSearchQuery}"` : ""}).
+                  </p>
+                  <button
+                    onClick={() => {
+                      setNotificationTypeFilter("ALL");
+                      setNotificationStatusFilter("ALL");
+                      setNotificationSearchQuery("");
+                    }}
+                    className="mt-4 px-4 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 transition cursor-pointer"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[620px] overflow-y-auto pr-2 custom-scrollbar">
+                  {filteredList.map((item) => {
+                    const meta = getMeta(item.type);
+                    const Icon = meta.Icon;
+
+                    const timeStr = new Date(item.createdAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    });
+
+                    return (
+                      <div
+                        key={item._id}
+                        className={`flex items-start justify-between p-4 rounded-2xl border transition duration-200 ${
+                          item.isRead
+                            ? "bg-slate-50/60 border-slate-100 opacity-80 hover:opacity-100"
+                            : `bg-white ${meta.cardBorder} shadow-sm ring-1 ring-slate-100`
+                        }`}
+                      >
+                        <div className="flex items-start gap-3.5">
+                          <div className={`h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 mt-0.5 ${meta.iconBg}`}>
+                            <Icon className="h-4.5 w-4.5" />
+                          </div>
+
+                          <div className="leading-tight space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded-lg border text-[10px] font-black uppercase tracking-wider select-none ${meta.badgeClass}`}>
+                                {meta.label}
+                              </span>
+                              <h4 className={`text-sm font-bold ${item.isRead ? "text-slate-700" : "text-slate-950"}`}>
+                                {item.title}
+                              </h4>
+                              {!item.isRead && (
+                                <span className="flex h-2 w-2 relative">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                              {item.message}
+                            </p>
+
+                            <div className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold pt-1 select-none">
+                              <Clock className="h-3 w-3" />
+                              <span>{timeStr}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 ml-3">
+                          {!item.isRead ? (
+                            <button
+                              onClick={() => handleMarkAsRead(item._id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] text-indigo-700 font-bold bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition select-none cursor-pointer"
+                            >
+                              <Check className="h-3 w-3" />
+                              Mark Read
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] text-slate-400 font-semibold bg-slate-100 rounded-md select-none">
+                              <CheckCheck className="h-2.5 w-2.5" />
+                              Read
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ================= TAB 6: CUSTOMER SATISFACTION (READ-ONLY FOR ADMIN) ================= */}
         {activeTab === "satisfaction" && (
