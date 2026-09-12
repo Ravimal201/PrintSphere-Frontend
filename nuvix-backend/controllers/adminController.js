@@ -5,6 +5,7 @@ const Order = require("../models/Order");
 const CustomizedDesign = require("../models/CustomizedDesign");
 const Product = require("../models/Product");
 const Inventory = require("../models/Inventory");
+const Review = require("../models/Review");
 
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
 
@@ -393,4 +394,53 @@ exports.updateStaffPassword = async (req, res) => {
     res.status(500).json({ message: "Server error while updating password" });
   }
 };
+
+// ================= CUSTOMER SATISFACTION & REVIEWS (READ-ONLY FOR ADMIN) =================
+
+// @desc    Get customer satisfaction reviews, metrics & ratings for Admin view (Read-only)
+// @route   GET /api/admin/reviews
+exports.getCustomerSatisfactionReviews = async (req, res) => {
+  try {
+    if (!verifyAdmin(req)) {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
+
+    const reviews = await Review.find()
+      .populate("productId", "title images category basePrice averageRating ratingsCount")
+      .populate("designId", "tShirtType fabricColor thumbnailUrl")
+      .populate("userId", "name email role")
+      .populate("orderId", "_id orderStatus totalAmount createdAt")
+      .sort({ createdAt: -1 });
+
+    const totalReviews = reviews.length;
+    const totalRating = reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+    const averageRating = totalReviews > 0 ? parseFloat((totalRating / totalReviews).toFixed(1)) : 0;
+    const badReviewsCount = reviews.filter((r) => (Number(r.rating) || 0) <= 2).length;
+    const positiveReviewsCount = reviews.filter((r) => (Number(r.rating) || 0) >= 4).length;
+    const neutralReviewsCount = reviews.filter((r) => (Number(r.rating) || 0) === 3).length;
+
+    res.json({
+      reviews,
+      stats: {
+        totalReviews,
+        averageRating,
+        badReviewsCount,
+        positiveReviewsCount,
+        neutralReviewsCount,
+        satisfactionRate: totalReviews > 0 ? Math.round((positiveReviewsCount / totalReviews) * 100) : 100,
+        breakdown: {
+          1: reviews.filter((r) => r.rating === 1).length,
+          2: reviews.filter((r) => r.rating === 2).length,
+          3: reviews.filter((r) => r.rating === 3).length,
+          4: reviews.filter((r) => r.rating === 4).length,
+          5: reviews.filter((r) => r.rating === 5).length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get admin satisfaction reviews error:", error);
+    res.status(500).json({ message: "Server error while fetching satisfaction reviews" });
+  }
+};
+
 

@@ -3,7 +3,8 @@ import {
   Users, UserPlus, Lock, Trash2, Key, Mail, Phone, Shield, LogOut, 
   Loader2, AlertCircle, CheckCircle, BarChart3, TrendingUp, Inbox, 
   Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check, Bell, Download, FileText,
-  Droplets, Package, Box, Filter, Search, Tag, Plus, X
+  Droplets, Package, Box, Filter, Search, Tag, Plus, X,
+  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -73,6 +74,22 @@ export default function AdminPage() {
   const [inventoryError, setInventoryError] = useState("");
   const [newInkColor, setNewInkColor] = useState({ name: "Cyan (C)", value: "#00ffff" });
 
+  // Customer Satisfaction & Reviews states (Read-only for Admin)
+  const [satisfactionReviews, setSatisfactionReviews] = useState([]);
+  const [satisfactionStats, setSatisfactionStats] = useState({
+    totalReviews: 0,
+    averageRating: 0,
+    badReviewsCount: 0,
+    positiveReviewsCount: 0,
+    neutralReviewsCount: 0,
+    satisfactionRate: 100,
+    breakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  });
+  const [satisfactionLoading, setSatisfactionLoading] = useState(false);
+  const [satisfactionFilterRating, setSatisfactionFilterRating] = useState("ALL"); // ALL | BAD | POSITIVE | NEUTRAL | 1 | 2 | 3 | 4 | 5
+  const [satisfactionSearchQuery, setSatisfactionSearchQuery] = useState("");
+  const [satisfactionProductFilter, setSatisfactionProductFilter] = useState("ALL");
+
   // Check authentication and load data on mount
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -92,6 +109,7 @@ export default function AdminPage() {
         fetchAnalytics();
         fetchInventory();
         fetchNotifications();
+        fetchSatisfactionReviews();
         // Poll notifications every 10 seconds
         intervalId = setInterval(fetchNotifications, 10000);
       } else {
@@ -136,6 +154,26 @@ export default function AdminPage() {
       console.error("Fetch analytics error:", err);
     } finally {
       setAnalyticsLoading(false);
+    }
+  };
+
+  const fetchSatisfactionReviews = async () => {
+    setSatisfactionLoading(true);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await axios.get(`${API_BASE_URL}/admin/reviews`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data) {
+        setSatisfactionReviews(res.data.reviews || []);
+        if (res.data.stats) {
+          setSatisfactionStats(res.data.stats);
+        }
+      }
+    } catch (err) {
+      console.error("Fetch satisfaction reviews error:", err);
+    } finally {
+      setSatisfactionLoading(false);
     }
   };
 
@@ -760,6 +798,27 @@ export default function AdminPage() {
             >
               <Inbox className="h-4.5 w-4.5" />
               Products & Inventory
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("satisfaction");
+                fetchSatisfactionReviews();
+              }}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "satisfaction"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "hover:bg-slate-800 hover:text-slate-200"
+              }`}
+            >
+              <span className="flex items-center gap-3.5">
+                <MessageSquare className="h-4.5 w-4.5" />
+                Customer Satisfaction
+              </span>
+              {satisfactionStats.badReviewsCount > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full">
+                  {satisfactionStats.badReviewsCount} low
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab("notifications")}
@@ -2013,6 +2072,457 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ================= TAB 6: CUSTOMER SATISFACTION (READ-ONLY FOR ADMIN) ================= */}
+        {activeTab === "satisfaction" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header with Read-only Indicator */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <MessageSquare className="h-5 w-5" />
+                  </span>
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                    Customer Satisfaction & Ratings Analytics
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  Comprehensive insights into customer feedback, star rating distributions, and overall customer satisfaction.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <span className="px-3 py-1.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-[11px] font-bold flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5 text-slate-500" /> Read-Only Analytics View
+                </span>
+                <button
+                  onClick={fetchSatisfactionReviews}
+                  disabled={satisfactionLoading}
+                  className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${satisfactionLoading ? "animate-spin" : ""}`} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Metric KPI Cards (4 Cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Reviews */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider">Total Customer Reviews</span>
+                  <MessageSquare className="h-4 w-4 text-indigo-500" />
+                </div>
+                <p className="text-2xl font-black text-slate-900">{satisfactionStats.totalReviews}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Total customer submissions recorded</p>
+              </div>
+
+              {/* Average Rating */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider">Average Platform Rating</span>
+                  <div className="flex text-amber-400">
+                    <Star className="h-4 w-4 fill-amber-400" />
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-black text-slate-900">{satisfactionStats.averageRating || 0}</p>
+                  <span className="text-xs text-slate-400 font-bold">/ 5.0</span>
+                </div>
+                <div className="flex text-amber-400 mt-1 gap-0.5">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`h-2.5 w-2.5 ${
+                        s <= Math.round(satisfactionStats.averageRating || 0)
+                          ? "fill-amber-400 text-amber-400"
+                          : "text-slate-200"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Negative / Bad Reviews (1-2 Stars) */}
+              <div
+                onClick={() =>
+                  setSatisfactionFilterRating(
+                    satisfactionFilterRating === "BAD" ? "ALL" : "BAD"
+                  )
+                }
+                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${
+                  satisfactionFilterRating === "BAD"
+                    ? "bg-rose-50 border-rose-300 ring-2 ring-rose-400"
+                    : "bg-white border-slate-200/80 hover:border-rose-200 hover:bg-rose-50/20"
+                }`}
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-rose-600 flex items-center gap-1">
+                    <AlertCircle className="h-3.5 w-3.5" /> Negative / Bad Reviews (1-2★)
+                  </span>
+                  {satisfactionStats.badReviewsCount > 0 && (
+                    <span className="px-1.5 py-0.5 bg-rose-500 text-white text-[9px] font-black rounded-full">
+                      ATTENTION
+                    </span>
+                  )}
+                </div>
+                <p className="text-2xl font-black text-rose-600">{satisfactionStats.badReviewsCount}</p>
+                <p className="text-[10px] text-rose-500 font-semibold mt-0.5">
+                  {satisfactionFilterRating === "BAD" ? "Filtered to bad feedback (click to reset)" : "Click to filter negative complaints"}
+                </p>
+              </div>
+
+              {/* Customer Satisfaction Rate */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider">Customer Satisfaction</span>
+                  <CheckCircle className="h-4 w-4 text-emerald-500" />
+                </div>
+                <p className="text-2xl font-black text-emerald-600">
+                  {satisfactionStats.satisfactionRate}%
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {satisfactionStats.positiveReviewsCount} satisfied customers (4★ & 5★)
+                </p>
+              </div>
+            </div>
+
+            {/* Satisfaction Sentiment & Star Breakdown Distribution */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-4">
+                Rating Distribution & Customer Sentiment Breakdown
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {[
+                  { star: 5, label: "5 Stars (Excellent)", color: "bg-emerald-500", count: satisfactionStats.breakdown?.[5] || 0 },
+                  { star: 4, label: "4 Stars (Good)", color: "bg-teal-500", count: satisfactionStats.breakdown?.[4] || 0 },
+                  { star: 3, label: "3 Stars (Average)", color: "bg-amber-500", count: satisfactionStats.breakdown?.[3] || 0 },
+                  { star: 2, label: "2 Stars (Poor)", color: "bg-orange-500", count: satisfactionStats.breakdown?.[2] || 0 },
+                  { star: 1, label: "1 Star (Very Bad)", color: "bg-rose-500", count: satisfactionStats.breakdown?.[1] || 0 },
+                ].map((item) => {
+                  const pct = satisfactionStats.totalReviews > 0
+                    ? Math.round((item.count / satisfactionStats.totalReviews) * 100)
+                    : 0;
+                  return (
+                    <div
+                      key={item.star}
+                      onClick={() => setSatisfactionFilterRating(String(item.star))}
+                      className={`p-3.5 rounded-2xl border transition cursor-pointer ${
+                        satisfactionFilterRating === String(item.star)
+                          ? "border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-400"
+                          : "border-slate-100 bg-slate-50/60 hover:bg-slate-100/80"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs font-bold mb-1.5">
+                        <span className="flex items-center gap-1 text-slate-800">
+                          <span>{item.star}★</span>
+                          <span className="text-[10px] text-slate-400 font-normal">({item.count})</span>
+                        </span>
+                        <span className="text-slate-900 font-black">{pct}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${item.color} rounded-full transition-all duration-500`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Filter Controls & Search */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                {/* Search Bar */}
+                <div className="relative flex-1">
+                  <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={satisfactionSearchQuery}
+                    onChange={(e) => setSatisfactionSearchQuery(e.target.value)}
+                    placeholder="Search feedback by customer name, keywords (e.g., quality, soft, delivery), or product..."
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-indigo-500 focus:bg-white"
+                  />
+                  {satisfactionSearchQuery && (
+                    <button
+                      onClick={() => setSatisfactionSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter by Product */}
+                <div className="shrink-0 w-full md:w-64">
+                  <select
+                    value={satisfactionProductFilter}
+                    onChange={(e) => setSatisfactionProductFilter(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-indigo-500"
+                  >
+                    <option value="ALL">All Products & Orders</option>
+                    {Array.from(
+                      new Map(
+                        satisfactionReviews
+                          .filter((r) => r.productId?._id)
+                          .map((r) => [r.productId._id, r.productId.title])
+                      ).entries()
+                    ).map(([id, title]) => (
+                      <option key={id} value={id}>
+                        {title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Rating Filter Chips */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <span className="text-[10px] font-black uppercase text-slate-400 mr-2 shrink-0">
+                  Filter By:
+                </span>
+                {[
+                  { key: "ALL", label: `All Feedback (${satisfactionReviews.length})` },
+                  {
+                    key: "BAD",
+                    label: `🚨 Negative / Bad (1-2★) (${satisfactionStats.badReviewsCount})`,
+                    alert: satisfactionStats.badReviewsCount > 0,
+                  },
+                  {
+                    key: "POSITIVE",
+                    label: `⭐ Satisfied (4-5★) (${satisfactionStats.positiveReviewsCount})`,
+                  },
+                  {
+                    key: "NEUTRAL",
+                    label: `➖ Neutral (3★) (${satisfactionStats.neutralReviewsCount})`,
+                  },
+                  { key: "1", label: `1★ (${satisfactionStats.breakdown?.[1] || 0})` },
+                  { key: "2", label: `2★ (${satisfactionStats.breakdown?.[2] || 0})` },
+                  { key: "3", label: `3★ (${satisfactionStats.breakdown?.[3] || 0})` },
+                  { key: "4", label: `4★ (${satisfactionStats.breakdown?.[4] || 0})` },
+                  { key: "5", label: `5★ (${satisfactionStats.breakdown?.[5] || 0})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setSatisfactionFilterRating(tab.key)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
+                      satisfactionFilterRating === tab.key
+                        ? tab.key === "BAD"
+                          ? "bg-rose-600 text-white shadow-sm"
+                          : "bg-indigo-600 text-white shadow-lg"
+                        : tab.alert
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Read-Only Feedback List */}
+            {(() => {
+              const filteredReviews = satisfactionReviews.filter((r) => {
+                const rating = Number(r.rating) || 0;
+                if (satisfactionFilterRating === "BAD" && rating > 2) return false;
+                if (satisfactionFilterRating === "POSITIVE" && rating < 4) return false;
+                if (satisfactionFilterRating === "NEUTRAL" && rating !== 3) return false;
+                if (["1", "2", "3", "4", "5"].includes(satisfactionFilterRating) && String(rating) !== satisfactionFilterRating) return false;
+
+                if (satisfactionSearchQuery.trim()) {
+                  const q = satisfactionSearchQuery.toLowerCase();
+                  const matchName = (r.userName || "").toLowerCase().includes(q);
+                  const matchComment = (r.comment || "").toLowerCase().includes(q);
+                  const matchProd = (r.productId?.title || r.designId?.tShirtType || "").toLowerCase().includes(q);
+                  if (!matchName && !matchComment && !matchProd) return false;
+                }
+
+                if (satisfactionProductFilter !== "ALL") {
+                  const pId = r.productId?._id || r.productId;
+                  if (pId !== satisfactionProductFilter) return false;
+                }
+
+                return true;
+              });
+
+              if (satisfactionLoading) {
+                return (
+                  <div className="bg-white border rounded-3xl p-12 text-center shadow-xs">
+                    <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mx-auto mb-2" />
+                    <p className="text-xs text-slate-500 font-semibold">Loading customer satisfaction reviews...</p>
+                  </div>
+                );
+              }
+
+              if (filteredReviews.length === 0) {
+                return (
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center shadow-xs">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+                      <MessageSquare className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900">No satisfaction feedback found</h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {satisfactionSearchQuery || satisfactionFilterRating !== "ALL" || satisfactionProductFilter !== "ALL"
+                        ? "No reviews match your filter parameters. Try resetting your filter criteria."
+                        : "No customer reviews have been submitted yet."}
+                    </p>
+                    {(satisfactionSearchQuery || satisfactionFilterRating !== "ALL" || satisfactionProductFilter !== "ALL") && (
+                      <button
+                        onClick={() => {
+                          setSatisfactionSearchQuery("");
+                          setSatisfactionFilterRating("ALL");
+                          setSatisfactionProductFilter("ALL");
+                        }}
+                        className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Reset All Filters
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {filteredReviews.map((rev) => {
+                    const rating = Number(rev.rating) || 0;
+                    const isBad = rating <= 2;
+                    const isGood = rating >= 4;
+                    const productName =
+                      rev.productId?.title ||
+                      rev.designId?.tShirtType ||
+                      (rev.orderId ? `Order #${String(rev.orderId._id || rev.orderId).slice(-6).toUpperCase()}` : "Custom Design");
+                    const productImage =
+                      rev.productId?.images?.[0] ||
+                      rev.designId?.thumbnailUrl ||
+                      null;
+
+                    return (
+                      <div
+                        key={rev._id}
+                        className={`bg-white border rounded-2xl p-5 shadow-xs transition hover:shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                          isBad
+                            ? "border-rose-200 bg-rose-50/15"
+                            : isGood
+                            ? "border-emerald-100 bg-white"
+                            : "border-slate-200/80 bg-white"
+                        }`}
+                      >
+                        {/* Customer feedback info */}
+                        <div className="flex-1 space-y-2.5">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            {/* Avatar */}
+                            <div
+                              className={`h-8 w-8 rounded-full text-white font-black text-xs flex items-center justify-center shadow-2xs ${
+                                isBad
+                                  ? "bg-rose-500"
+                                  : isGood
+                                  ? "bg-emerald-500"
+                                  : "bg-indigo-500"
+                              }`}
+                            >
+                              {(rev.userName || "C")[0].toUpperCase()}
+                            </div>
+
+                            <div>
+                              <span className="text-xs font-black text-slate-900">
+                                {rev.userName || "Verified Customer"}
+                              </span>
+                              <span className="text-[10px] text-slate-400 ml-2 font-medium">
+                                {new Date(rev.createdAt).toLocaleDateString("en-US", {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </span>
+                            </div>
+
+                            {/* Stars */}
+                            <div className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
+                              <div className="flex text-amber-400">
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                  <Star
+                                    key={s}
+                                    className={`h-3 w-3 ${
+                                      s <= rev.rating
+                                        ? "fill-amber-400 text-amber-400"
+                                        : "text-slate-200"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-700">
+                                {rev.rating}.0
+                              </span>
+                            </div>
+
+                            {/* Sentiment Badge */}
+                            {isBad ? (
+                              <span className="px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 rounded-md text-[10px] font-black flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" /> Dissatisfied / Complaint
+                              </span>
+                            ) : isGood ? (
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-black flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3" /> Satisfied Customer
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-200 rounded-md text-[10px] font-black">
+                                Neutral Rating
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Customer Comment */}
+                          <div
+                            className={`p-3.5 rounded-xl text-xs leading-relaxed ${
+                              isBad
+                                ? "bg-rose-50/70 border border-rose-100 text-rose-950 font-medium"
+                                : "bg-slate-50 border border-slate-100 text-slate-700"
+                            }`}
+                          >
+                            <p className="italic">
+                              "{rev.comment || "(No written text comment provided, star rating only)"}"
+                            </p>
+                          </div>
+
+                          {/* Product Reference */}
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                            {productImage && (
+                              <img
+                                src={productImage}
+                                alt={productName}
+                                className="h-6 w-6 rounded object-cover border border-slate-200"
+                              />
+                            )}
+                            <span>
+                              Item: <strong className="text-slate-800 font-bold">{productName}</strong>
+                            </span>
+                            {rev.productId?.category && (
+                              <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-semibold text-slate-600">
+                                {rev.productId.category}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Read-only Badge on right */}
+                        <div className="shrink-0 self-end md:self-center">
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200/80">
+                            Read-Only
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* ================= MODAL: ADD INVENTORY ================= */}
