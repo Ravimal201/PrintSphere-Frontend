@@ -42,6 +42,9 @@ import {
   RefreshCw,
   Zap,
   Percent,
+  Star,
+  MessageSquare,
+  ThumbsDown,
 } from "lucide-react";
 import axios from "axios";
 import Scene from "../three/Scene";
@@ -88,6 +91,21 @@ export default function ManagerPage() {
   const [inventory, setInventory] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [pricingRules, setPricingRules] = useState(null);
+
+  // Reviews Moderation states
+  const [reviews, setReviews] = useState([]);
+  const [reviewStats, setReviewStats] = useState({
+    totalReviews: 0,
+    averageRating: 0,
+    badReviewsCount: 0,
+    breakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  });
+  const [reviewFilterRating, setReviewFilterRating] = useState("ALL"); // ALL | BAD | 1 | 2 | 3 | 4 | 5
+  const [reviewSearchQuery, setReviewSearchQuery] = useState("");
+  const [reviewProductFilter, setReviewProductFilter] = useState("ALL");
+  const [deletingReviewId, setDeletingReviewId] = useState(null);
+  const [reviewConfirmDelete, setReviewConfirmDelete] = useState(null);
+  const [reviewNotification, setReviewNotification] = useState(null);
 
   // Fetching loadings
   const [dataLoading, setDataLoading] = useState(false);
@@ -229,6 +247,7 @@ export default function ManagerPage() {
         pricingRes,
         employeesRes,
         stylesRes,
+        reviewsRes,
       ] = await Promise.all([
         axios.get(`${API_BASE_URL}/manager/orders`, { headers }),
         axios.get(`${API_BASE_URL}/manager/products`, { headers }),
@@ -236,6 +255,9 @@ export default function ManagerPage() {
         axios.get(`${API_BASE_URL}/manager/pricing-rules`, { headers }),
         axios.get(`${API_BASE_URL}/manager/employees`, { headers }),
         axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers }),
+        axios
+          .get(`${API_BASE_URL}/manager/reviews`, { headers })
+          .catch(() => ({ data: { reviews: [], stats: {} } })),
       ]);
 
       setOrders(ordersRes.data);
@@ -244,6 +266,12 @@ export default function ManagerPage() {
       setPricingRules(pricingRes.data);
       setEmployees(employeesRes.data);
       setStyles(stylesRes.data);
+      if (reviewsRes.data) {
+        setReviews(reviewsRes.data.reviews || []);
+        if (reviewsRes.data.stats) {
+          setReviewStats(reviewsRes.data.stats);
+        }
+      }
 
       if (pricingRes.data) {
         setPricingForm({
@@ -897,6 +925,75 @@ export default function ManagerPage() {
     return "/images/models/male normal t-shirt1.glb";
   };
 
+  const handleDeleteReview = async (reviewId) => {
+    if (!reviewId) return;
+    try {
+      setDeletingReviewId(reviewId);
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+
+      await axios.delete(`${API_BASE_URL}/manager/reviews/${reviewId}`, { headers });
+
+      const updatedReviews = reviews.filter((r) => r._id !== reviewId);
+      setReviews(updatedReviews);
+
+      const total = updatedReviews.length;
+      const totalRating = updatedReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+      const averageRating = total > 0 ? parseFloat((totalRating / total).toFixed(1)) : 0;
+      const badReviewsCount = updatedReviews.filter((r) => (Number(r.rating) || 0) <= 2).length;
+
+      setReviewStats({
+        totalReviews: total,
+        averageRating,
+        badReviewsCount,
+        breakdown: {
+          1: updatedReviews.filter((r) => r.rating === 1).length,
+          2: updatedReviews.filter((r) => r.rating === 2).length,
+          3: updatedReviews.filter((r) => r.rating === 3).length,
+          4: updatedReviews.filter((r) => r.rating === 4).length,
+          5: updatedReviews.filter((r) => r.rating === 5).length,
+        },
+      });
+
+      const reviewObj = reviews.find((r) => r._id === reviewId);
+      if (reviewObj && reviewObj.productId) {
+        const prodId = reviewObj.productId._id || reviewObj.productId;
+        setProducts((prev) =>
+          prev.map((p) => {
+            if (p._id === prodId) {
+              const pRevs = (p.reviews || []).filter((r) => r._id !== reviewId);
+              const pCount = pRevs.length;
+              const pTot = pRevs.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+              return {
+                ...p,
+                reviews: pRevs,
+                ratingsCount: pCount,
+                averageRating: pCount > 0 ? parseFloat((pTot / pCount).toFixed(1)) : 0,
+              };
+            }
+            return p;
+          })
+        );
+      }
+
+      setReviewConfirmDelete(null);
+      setReviewNotification({
+        type: "success",
+        message: "Bad comment/review deleted successfully.",
+      });
+      setTimeout(() => setReviewNotification(null), 4000);
+    } catch (err) {
+      console.error("Delete review error:", err);
+      setReviewNotification({
+        type: "error",
+        message: err.response?.data?.message || "Failed to delete review.",
+      });
+      setTimeout(() => setReviewNotification(null), 4000);
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-slate-50">
@@ -1013,6 +1110,24 @@ export default function ManagerPage() {
             >
               <Layers className="h-4.5 w-4.5" />
               T-Shirt Styles
+            </button>
+            <button
+              onClick={() => setActiveTab("reviews")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "reviews"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "hover:bg-slate-800 hover:text-slate-200"
+              }`}
+            >
+              <span className="flex items-center gap-3.5">
+                <MessageSquare className="h-4.5 w-4.5" />
+                Reviews & Moderation
+              </span>
+              {reviewStats.badReviewsCount > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full animate-pulse">
+                  {reviewStats.badReviewsCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab("settings")}
@@ -3253,6 +3368,405 @@ export default function ManagerPage() {
             </form>
           </div>
         )}
+
+        {/* ================= TAB 7: REVIEWS & COMMENT MODERATION ================= */}
+        {activeTab === "reviews" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header / Intro */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <MessageSquare className="h-5 w-5" />
+                  </span>
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                    Customer Reviews & Bad Comment Moderation
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  Inspect user feedback, identify low rating complaints, and instantly delete bad or abusive comments to maintain store reputation.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    const token = localStorage.getItem("token");
+                    const headers = { Authorization: `Bearer ${token}` };
+                    try {
+                      const res = await axios.get(`${API_BASE_URL}/manager/reviews`, { headers });
+                      if (res.data) {
+                        setReviews(res.data.reviews || []);
+                        if (res.data.stats) setReviewStats(res.data.stats);
+                      }
+                    } catch (e) {
+                      console.error("Refresh reviews error:", e);
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Refresh Reviews</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Notification alert banner */}
+            {reviewNotification && (
+              <div
+                className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-150 ${
+                  reviewNotification.type === "success"
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : "bg-rose-50 text-rose-800 border border-rose-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {reviewNotification.type === "success" ? (
+                    <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                  )}
+                  <span>{reviewNotification.message}</span>
+                </div>
+                <button
+                  onClick={() => setReviewNotification(null)}
+                  className="text-slate-400 hover:text-slate-600 text-xs p-1"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Metric KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider">Total Reviews</span>
+                  <MessageSquare className="h-4 w-4 text-indigo-500" />
+                </div>
+                <p className="text-2xl font-black text-slate-900">{reviews.length}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Across all products & custom orders</p>
+              </div>
+
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider">Average Rating</span>
+                  <div className="flex text-amber-400">
+                    <Star className="h-4 w-4 fill-amber-400" />
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-black text-slate-900">{reviewStats.averageRating || 0}</p>
+                  <span className="text-xs text-slate-400 font-bold">/ 5.0</span>
+                </div>
+                <div className="flex text-amber-400 mt-1 gap-0.5">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`h-2.5 w-2.5 ${
+                        s <= Math.round(reviewStats.averageRating || 0)
+                          ? "fill-amber-400 text-amber-400"
+                          : "text-slate-200"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div
+                onClick={() => setReviewFilterRating(reviewFilterRating === "BAD" ? "ALL" : "BAD")}
+                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${
+                  reviewFilterRating === "BAD"
+                    ? "bg-rose-50 border-rose-300 ring-2 ring-rose-400"
+                    : "bg-white border-slate-200/80 hover:border-rose-200 hover:bg-rose-50/20"
+                }`}
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-rose-600 flex items-center gap-1">
+                    <ShieldAlert className="h-3.5 w-3.5" /> Bad / Low Ratings (1-2★)
+                  </span>
+                  {reviewStats.badReviewsCount > 0 && (
+                    <span className="px-1.5 py-0.5 bg-rose-500 text-white text-[9px] font-black rounded-full">
+                      ACTION
+                    </span>
+                  )}
+                </div>
+                <p className="text-2xl font-black text-rose-600">{reviewStats.badReviewsCount}</p>
+                <p className="text-[10px] text-rose-500 font-semibold mt-0.5">
+                  {reviewFilterRating === "BAD" ? "Showing bad comments (click to show all)" : "Click to filter negative comments"}
+                </p>
+              </div>
+
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider">Positive Sentiment</span>
+                  <CheckCircle className="h-4 w-4 text-emerald-500" />
+                </div>
+                <p className="text-2xl font-black text-emerald-600">
+                  {reviews.length > 0
+                    ? Math.round((((reviewStats.breakdown?.[4] || 0) + (reviewStats.breakdown?.[5] || 0)) / reviews.length) * 100)
+                    : 100}
+                  %
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">4 & 5-star customer satisfactions</p>
+              </div>
+            </div>
+
+            {/* Filter Controls & Search */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                {/* Search Bar */}
+                <div className="relative flex-1">
+                  <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={reviewSearchQuery}
+                    onChange={(e) => setReviewSearchQuery(e.target.value)}
+                    placeholder="Search by customer name, comment keywords (e.g. bad, broken, late), or product..."
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-indigo-500 focus:bg-white"
+                  />
+                  {reviewSearchQuery && (
+                    <button
+                      onClick={() => setReviewSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter by Product */}
+                <div className="shrink-0 w-full md:w-64">
+                  <select
+                    value={reviewProductFilter}
+                    onChange={(e) => setReviewProductFilter(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-indigo-500"
+                  >
+                    <option value="ALL">All Store Products & Designs</option>
+                    {products.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.title} ({p.ratingsCount || 0} reviews)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Rating Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <span className="text-[10px] font-black uppercase text-slate-400 mr-2 shrink-0">
+                  Rating Filter:
+                </span>
+                {[
+                  { key: "ALL", label: `All Reviews (${reviews.length})` },
+                  {
+                    key: "BAD",
+                    label: `🚨 Bad / Low (1-2★) (${reviewStats.badReviewsCount})`,
+                    alert: reviewStats.badReviewsCount > 0,
+                  },
+                  { key: "1", label: `1 Star (${reviewStats.breakdown?.[1] || 0})` },
+                  { key: "2", label: `2 Stars (${reviewStats.breakdown?.[2] || 0})` },
+                  { key: "3", label: `3 Stars (${reviewStats.breakdown?.[3] || 0})` },
+                  { key: "4", label: `4 Stars (${reviewStats.breakdown?.[4] || 0})` },
+                  { key: "5", label: `5 Stars (${reviewStats.breakdown?.[5] || 0})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setReviewFilterRating(tab.key)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
+                      reviewFilterRating === tab.key
+                        ? tab.key === "BAD"
+                          ? "bg-rose-600 text-white shadow-sm"
+                          : "bg-indigo-600 text-white shadow-sm"
+                        : tab.alert
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reviews List */}
+            {(() => {
+              const filteredReviews = reviews.filter((r) => {
+                if (reviewFilterRating === "BAD" && (Number(r.rating) || 0) > 2) return false;
+                if (["1", "2", "3", "4", "5"].includes(reviewFilterRating) && String(r.rating) !== reviewFilterRating) return false;
+
+                if (reviewSearchQuery.trim()) {
+                  const q = reviewSearchQuery.toLowerCase();
+                  const matchName = (r.userName || "").toLowerCase().includes(q);
+                  const matchComment = (r.comment || "").toLowerCase().includes(q);
+                  const matchProd = (r.productId?.title || r.designId?.tShirtType || "").toLowerCase().includes(q);
+                  if (!matchName && !matchComment && !matchProd) return false;
+                }
+
+                if (reviewProductFilter !== "ALL") {
+                  const pId = r.productId?._id || r.productId;
+                  if (pId !== reviewProductFilter) return false;
+                }
+
+                return true;
+              });
+
+              if (filteredReviews.length === 0) {
+                return (
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center shadow-xs">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+                      <MessageSquare className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900">No reviews found</h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {reviewSearchQuery || reviewFilterRating !== "ALL" || reviewProductFilter !== "ALL"
+                        ? "No reviews match your current filters. Try resetting the search or filter criteria."
+                        : "No customer reviews have been submitted yet."}
+                    </p>
+                    {(reviewSearchQuery || reviewFilterRating !== "ALL" || reviewProductFilter !== "ALL") && (
+                      <button
+                        onClick={() => {
+                          setReviewSearchQuery("");
+                          setReviewFilterRating("ALL");
+                          setReviewProductFilter("ALL");
+                        }}
+                        className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {filteredReviews.map((rev) => {
+                    const isBad = (Number(rev.rating) || 0) <= 2;
+                    const productName =
+                      rev.productId?.title ||
+                      rev.designId?.tShirtType ||
+                      (rev.orderId ? `Order #${String(rev.orderId._id || rev.orderId).slice(-6).toUpperCase()}` : "Custom Design");
+                    const productImage =
+                      rev.productId?.images?.[0] ||
+                      rev.designId?.thumbnailUrl ||
+                      null;
+
+                    return (
+                      <div
+                        key={rev._id}
+                        className={`bg-white border rounded-2xl p-5 shadow-xs transition hover:shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                          isBad ? "border-rose-200 bg-rose-50/10" : "border-slate-200/80"
+                        }`}
+                      >
+                        {/* Left: Customer info & review details */}
+                        <div className="flex-1 space-y-2.5">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            {/* User Avatar Initials */}
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-black text-xs flex items-center justify-center shadow-2xs">
+                              {(rev.userName || "C")[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <span className="text-xs font-black text-slate-900">
+                                {rev.userName || "Verified Buyer"}
+                              </span>
+                              <span className="text-[10px] text-slate-400 ml-2 font-medium">
+                                {new Date(rev.createdAt).toLocaleDateString("en-US", {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </span>
+                            </div>
+
+                            {/* Rating Stars */}
+                            <div className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
+                              <div className="flex text-amber-400">
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                  <Star
+                                    key={s}
+                                    className={`h-3 w-3 ${
+                                      s <= rev.rating
+                                        ? "fill-amber-400 text-amber-400"
+                                        : "text-slate-200"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-700">
+                                {rev.rating}.0
+                              </span>
+                            </div>
+
+                            {/* Bad Comment Badge */}
+                            {isBad && (
+                              <span className="px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 rounded-md text-[10px] font-black flex items-center gap-1">
+                                <ShieldAlert className="h-3 w-3" /> Bad / Low Feedback
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Comment Content */}
+                          <div
+                            className={`p-3 rounded-xl text-xs leading-relaxed ${
+                              isBad
+                                ? "bg-rose-50/50 border border-rose-100 text-rose-950 font-medium"
+                                : "bg-slate-50 border border-slate-100 text-slate-700"
+                            }`}
+                          >
+                            <p className="italic">
+                              "{rev.comment || "(No text comment provided, star rating only)"}"
+                            </p>
+                          </div>
+
+                          {/* Associated Product / Order info */}
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                            {productImage && (
+                              <img
+                                src={productImage}
+                                alt={productName}
+                                className="h-6 w-6 rounded object-cover border border-slate-200"
+                              />
+                            )}
+                            <span>
+                              Item: <strong className="text-slate-800 font-bold">{productName}</strong>
+                            </span>
+                            {rev.productId?.category && (
+                              <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-semibold text-slate-600">
+                                {rev.productId.category}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="shrink-0 flex items-center gap-2 self-end md:self-center">
+                          <button
+                            onClick={() => setReviewConfirmDelete(rev)}
+                            disabled={deletingReviewId === rev._id}
+                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 hover:border-rose-600 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                          >
+                            {deletingReviewId === rev._id ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Deleting...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>Delete Comment</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* Manager interactive 3D review modal */}
@@ -4606,6 +5120,84 @@ export default function ManagerPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Review / Bad Comment Confirmation Modal */}
+      {reviewConfirmDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-rose-100 flex flex-col">
+            <div className="bg-rose-50 border-b border-rose-100 p-6 flex items-start gap-4">
+              <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-black text-rose-950">
+                  Delete Bad Comment / Review?
+                </h3>
+                <p className="text-xs text-rose-700 mt-1">
+                  This action will permanently remove this customer comment from the store and recalculate product ratings.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span>{reviewConfirmDelete.userName || "Verified Buyer"}</span>
+                  <div className="flex text-amber-400">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`h-3 w-3 ${
+                          s <= reviewConfirmDelete.rating
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-slate-200"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-slate-600 italic">
+                  "{reviewConfirmDelete.comment || "(No comment text)"}"
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/80 text-[11px] text-amber-800 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>Removing abusive or inaccurate comments helps maintain customer trust.</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setReviewConfirmDelete(null)}
+                disabled={deletingReviewId !== null}
+                className="px-4 py-2.5 border border-slate-200 hover:bg-white text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteReview(reviewConfirmDelete._id)}
+                disabled={deletingReviewId !== null}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {deletingReviewId !== null ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Yes, Delete Comment</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

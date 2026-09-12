@@ -186,6 +186,7 @@ exports.getStoreProducts = async (req, res) => {
         productStats[pId].total += Number(r.rating) || 0;
         productStats[pId].count += 1;
         productStats[pId].reviews.push({
+          _id: r._id,
           userName: r.userName || "Verified Buyer",
           rating: r.rating,
           comment: r.comment,

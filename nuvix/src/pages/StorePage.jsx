@@ -114,6 +114,20 @@ export default function StorePage() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState("");
   const [reviewErrorMsg, setReviewErrorMsg] = useState("");
+  const [deletingReviewId, setDeletingReviewId] = useState(null);
+
+  // Check if current user is Manager or Admin
+  const storedCurrentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const isManagerOrAdmin =
+    storedCurrentUser?.role === "Manager" ||
+    storedCurrentUser?.role === "Admin" ||
+    isManagerPreview;
 
   useEffect(() => {
     if (selected3DProduct) {
@@ -221,6 +235,63 @@ export default function StorePage() {
       );
     } finally {
       setSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!reviewId) return;
+    if (!window.confirm("Are you sure you want to delete this comment? This will remove the bad review and update product ratings.")) {
+      return;
+    }
+    try {
+      setDeletingReviewId(reviewId);
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      await axios.delete(`${API_BASE_URL}/manager/reviews/${reviewId}`, { headers });
+
+      // Update selected3DProduct reviews list
+      setSelected3DProduct((prev) => {
+        if (!prev) return prev;
+        const updatedReviews = (prev.reviews || []).filter((r) => r._id !== reviewId);
+        const count = updatedReviews.length;
+        const total = updatedReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+        const averageRating = count > 0 ? parseFloat((total / count).toFixed(1)) : 0;
+        return {
+          ...prev,
+          reviews: updatedReviews,
+          ratingsCount: count,
+          averageRating,
+        };
+      });
+
+      // Update main products array as well
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p._id === selected3DProduct?._id) {
+            const updatedReviews = (p.reviews || []).filter((r) => r._id !== reviewId);
+            const count = updatedReviews.length;
+            const total = updatedReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+            const averageRating = count > 0 ? parseFloat((total / count).toFixed(1)) : 0;
+            return {
+              ...p,
+              reviews: updatedReviews,
+              ratingsCount: count,
+              averageRating,
+            };
+          }
+          return p;
+        })
+      );
+      setReviewSuccessMsg("Comment deleted successfully.");
+      setTimeout(() => setReviewSuccessMsg(""), 3000);
+    } catch (err) {
+      console.error("Failed to delete review:", err);
+      setReviewErrorMsg(
+        err.response?.data?.message || "Failed to delete comment. Manager access required."
+      );
+    } finally {
+      setDeletingReviewId(null);
     }
   };
 
@@ -1694,24 +1765,51 @@ export default function StorePage() {
                     <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                       {selected3DProduct.reviews.map((rev, rIdx) => (
                         <div
-                          key={rIdx}
-                          className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 space-y-1"
+                          key={rev._id || rIdx}
+                          className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 space-y-1 relative group"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-800">
-                              {rev.userName || "Verified Buyer"}
-                            </span>
-                            <div className="flex text-amber-400">
-                              {[1, 2, 3, 4, 5].map((s) => (
-                                <Star
-                                  key={s}
-                                  className={`h-3 w-3 ${
-                                    s <= rev.rating
-                                      ? "fill-amber-400 text-amber-400"
-                                      : "text-slate-200"
-                                  }`}
-                                />
-                              ))}
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-800">
+                                {rev.userName || "Verified Buyer"}
+                              </span>
+                              {rev.rating <= 2 && (
+                                <span className="text-[9px] bg-red-50 text-red-600 font-bold px-1.5 py-0.5 rounded border border-red-100">
+                                  Low Rating
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex text-amber-400">
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                  <Star
+                                    key={s}
+                                    className={`h-3 w-3 ${
+                                      s <= rev.rating
+                                        ? "fill-amber-400 text-amber-400"
+                                        : "text-slate-200"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              {isManagerOrAdmin && rev._id && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteReview(rev._id);
+                                  }}
+                                  disabled={deletingReviewId === rev._id}
+                                  title="Manager Action: Delete this comment"
+                                  className="p-1 rounded-md text-red-500 hover:text-white hover:bg-red-500 transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  {deletingReviewId === rev._id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3 w-3" />
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </div>
                           {rev.comment && (
