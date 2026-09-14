@@ -3,12 +3,16 @@ import RNavbar from "../components/Navbar/RNavbar";
 import GNavbar from "../components/Navbar/GNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
-import { Mail, Phone, MapPin, Clock, Send, CheckCircle } from "lucide-react";
+import { Mail, Phone, MapPin, Clock, Send, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import axios from "axios";
+import { API_BASE_URL } from "../config/api";
 
 export default function ContactUsPage() {
   const [token, setToken] = useState(null);
   const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [form, setForm] = useState({ name: "", email: "", subject: "General Inquiry", message: "" });
 
   useEffect(() => {
     setToken(localStorage.getItem("token"));
@@ -16,11 +20,31 @@ export default function ContactUsPage() {
 
   const Navbar = token ? RNavbar : GNavbar;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
-    setForm({ name: "", email: "", message: "" });
-    setTimeout(() => setSubmitted(false), 5000);
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      await axios.post(`${API_BASE_URL}/contact`, {
+        name: form.name,
+        email: form.email,
+        subject: form.subject || "General Inquiry",
+        message: form.message,
+        source: "Contact Us",
+      });
+
+      setSubmitted(true);
+      setForm({ name: "", email: "", subject: "General Inquiry", message: "" });
+      setTimeout(() => setSubmitted(false), 7000);
+    } catch (err) {
+      console.error("Error sending contact message:", err);
+      setErrorMessage(
+        err.response?.data?.message || "Failed to send message. Please try again or reach us by phone."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -96,7 +120,14 @@ export default function ContactUsPage() {
                   {submitted && (
                     <div className="mb-4 flex items-center gap-2 p-3 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 text-xs font-semibold">
                       <CheckCircle className="h-4 w-4 shrink-0" />
-                      <span>Message sent successfully! We'll reply soon.</span>
+                      <span>Message sent successfully! We'll reply to your email soon.</span>
+                    </div>
+                  )}
+
+                  {errorMessage && (
+                    <div className="mb-4 flex items-center gap-2 p-3 rounded-xl border border-rose-100 bg-rose-50 text-rose-600 text-xs font-semibold">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{errorMessage}</span>
                     </div>
                   )}
 
@@ -109,7 +140,7 @@ export default function ContactUsPage() {
                         value={form.name}
                         onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
                         placeholder="John Doe"
-                        className="w-full px-3 py-2.5 border rounded-xl text-xs"
+                        className="w-full px-3 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                     </div>
 
@@ -121,7 +152,18 @@ export default function ContactUsPage() {
                         value={form.email}
                         onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
                         placeholder="john@example.com"
-                        className="w-full px-3 py-2.5 border rounded-xl text-xs"
+                        className="w-full px-3 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Subject (Optional)</label>
+                      <input
+                        type="text"
+                        value={form.subject}
+                        onChange={(e) => setForm(p => ({ ...p, subject: e.target.value }))}
+                        placeholder="e.g. Bulk order inquiry / Print question"
+                        className="w-full px-3 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                     </div>
 
@@ -133,16 +175,26 @@ export default function ContactUsPage() {
                         value={form.message}
                         onChange={(e) => setForm(p => ({ ...p, message: e.target.value }))}
                         placeholder="Tell us what you'd like to ask..."
-                        className="w-full px-3 py-2.5 border rounded-xl text-xs resize-none"
+                        className="w-full px-3 py-2.5 border rounded-xl text-xs resize-none focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-4 flex items-center justify-center gap-1.5"
+                      disabled={loading}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition shadow-sm mt-4 flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
                     >
-                      <Send className="h-3.5 w-3.5" />
-                      Send Message
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Sending Message...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-3.5 w-3.5" />
+                          Send Message
+                        </>
+                      )}
                     </button>
                   </form>
                 </div>

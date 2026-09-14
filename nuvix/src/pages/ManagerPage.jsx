@@ -45,6 +45,7 @@ import {
   Star,
   MessageSquare,
   ThumbsDown,
+  Mail,
 } from "lucide-react";
 import axios from "axios";
 import Scene from "../three/Scene";
@@ -106,6 +107,15 @@ export default function ManagerPage() {
   const [deletingReviewId, setDeletingReviewId] = useState(null);
   const [reviewConfirmDelete, setReviewConfirmDelete] = useState(null);
   const [reviewNotification, setReviewNotification] = useState(null);
+
+  // Inquiries / Contact Messages states
+  const [inquiries, setInquiries] = useState([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [inquiryStatusFilter, setInquiryStatusFilter] = useState("ALL");
+  const [inquirySourceFilter, setInquirySourceFilter] = useState("ALL");
+  const [inquirySearchQuery, setInquirySearchQuery] = useState("");
+  const [inquiryStats, setInquiryStats] = useState({ total: 0, new: 0, resolved: 0 });
+  const [inquiryActionLoading, setInquiryActionLoading] = useState({});
 
   // Fetching loadings
   const [dataLoading, setDataLoading] = useState(false);
@@ -258,7 +268,12 @@ export default function ManagerPage() {
         axios
           .get(`${API_BASE_URL}/manager/reviews`, { headers })
           .catch(() => ({ data: { reviews: [], stats: {} } })),
+        axios
+          .get(`${API_BASE_URL}/contact/inquiries`)
+          .catch(() => ({ data: { data: [], stats: { total: 0, new: 0, resolved: 0 } } })),
       ]);
+
+      const inquiriesRes = argumentsList ? argumentsList[7] : null;
 
       setOrders(ordersRes.data);
       setProducts(productsRes.data);
@@ -270,6 +285,15 @@ export default function ManagerPage() {
         setReviews(reviewsRes.data.reviews || []);
         if (reviewsRes.data.stats) {
           setReviewStats(reviewsRes.data.stats);
+        }
+      }
+
+      // Inquiries data
+      const inqRes = await axios.get(`${API_BASE_URL}/contact/inquiries`).catch(() => null);
+      if (inqRes?.data?.success) {
+        setInquiries(inqRes.data.data || []);
+        if (inqRes.data.stats) {
+          setInquiryStats(inqRes.data.stats);
         }
       }
 
@@ -297,6 +321,55 @@ export default function ManagerPage() {
       console.error("Fetch dashboard data error:", err);
     } finally {
       setDataLoading(false);
+    }
+  };
+
+  const fetchInquiries = async () => {
+    setInquiriesLoading(true);
+    try {
+      const inqRes = await axios.get(`${API_BASE_URL}/contact/inquiries`);
+      if (inqRes.data?.success) {
+        setInquiries(inqRes.data.data || []);
+        if (inqRes.data.stats) {
+          setInquiryStats(inqRes.data.stats);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching inquiries:", err);
+    } finally {
+      setInquiriesLoading(false);
+    }
+  };
+
+  const handleUpdateInquiryStatus = async (id, newStatus) => {
+    setInquiryActionLoading((prev) => ({ ...prev, [id]: true }));
+    try {
+      await axios.patch(`${API_BASE_URL}/contact/inquiries/${id}/status`, { status: newStatus });
+      setInquiries((prev) =>
+        prev.map((inq) => (inq._id === id ? { ...inq, status: newStatus } : inq))
+      );
+      // Refresh stats
+      fetchInquiries();
+    } catch (err) {
+      console.error("Error updating inquiry status:", err);
+      alert(err.response?.data?.message || "Failed to update status");
+    } finally {
+      setInquiryActionLoading((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleDeleteInquiry = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this customer inquiry?")) return;
+    setInquiryActionLoading((prev) => ({ ...prev, [id]: true }));
+    try {
+      await axios.delete(`${API_BASE_URL}/contact/inquiries/${id}`);
+      setInquiries((prev) => prev.filter((inq) => inq._id !== id));
+      fetchInquiries();
+    } catch (err) {
+      console.error("Error deleting inquiry:", err);
+      alert(err.response?.data?.message || "Failed to delete inquiry");
+    } finally {
+      setInquiryActionLoading((prev) => ({ ...prev, [id]: false }));
     }
   };
 
@@ -1126,6 +1199,27 @@ export default function ManagerPage() {
               {reviewStats.badReviewsCount > 0 && (
                 <span className="px-2 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full animate-pulse">
                   {reviewStats.badReviewsCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("inquiries");
+                fetchInquiries();
+              }}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
+                activeTab === "inquiries"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "hover:bg-slate-800 hover:text-slate-200"
+              }`}
+            >
+              <span className="flex items-center gap-3.5">
+                <Mail className="h-4.5 w-4.5" />
+                Customer Inquiries
+              </span>
+              {inquiryStats.new > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-black bg-indigo-500 text-white rounded-full">
+                  {inquiryStats.new}
                 </span>
               )}
             </button>
@@ -3757,6 +3851,294 @@ export default function ManagerPage() {
                                 <span>Delete Comment</span>
                               </>
                             )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ================= TAB: CUSTOMER INQUIRIES & CONTACT MESSAGES ================= */}
+        {activeTab === "inquiries" && (
+          <div className="space-y-6">
+            {/* Header & Overview Stats */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2.5">
+                  <Mail className="h-5 w-5 text-indigo-600" />
+                  Customer Inquiries & Form Messages
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Incoming contact inquiries, support tickets, and questions submitted across the site.
+                </p>
+              </div>
+
+              <button
+                onClick={fetchInquiries}
+                disabled={inquiriesLoading}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs self-start sm:self-auto"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${inquiriesLoading ? "animate-spin" : ""}`} />
+                <span>Refresh Messages</span>
+              </button>
+            </div>
+
+            {/* Inquiries Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider">Total Received</span>
+                  <Inbox className="h-4 w-4 text-slate-400" />
+                </div>
+                <p className="text-2xl font-black text-slate-900">{inquiryStats.total || inquiries.length}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">All customer form submissions</p>
+              </div>
+
+              <div
+                onClick={() => setInquiryStatusFilter(inquiryStatusFilter === "New" ? "ALL" : "New")}
+                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${
+                  inquiryStatusFilter === "New"
+                    ? "bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400"
+                    : "bg-white border-slate-200/80 hover:bg-indigo-50/30"
+                }`}
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-indigo-600 flex items-center gap-1">
+                    <Sparkles className="h-3.5 w-3.5" /> New / Unresolved
+                  </span>
+                  {inquiryStats.new > 0 && (
+                    <span className="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded-full">
+                      ACTION
+                    </span>
+                  )}
+                </div>
+                <p className="text-2xl font-black text-indigo-600">{inquiryStats.new || 0}</p>
+                <p className="text-[10px] text-indigo-500 font-semibold mt-0.5">
+                  {inquiryStatusFilter === "New" ? "Filtered: New messages" : "Click to view unread messages"}
+                </p>
+              </div>
+
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-emerald-600">Resolved Inquiries</span>
+                  <CheckCircle className="h-4 w-4 text-emerald-500" />
+                </div>
+                <p className="text-2xl font-black text-emerald-600">{inquiryStats.resolved || 0}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Completed inquiries & answers</p>
+              </div>
+            </div>
+
+            {/* Filter Controls & Search */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                {/* Search Bar */}
+                <div className="relative flex-1">
+                  <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={inquirySearchQuery}
+                    onChange={(e) => setInquirySearchQuery(e.target.value)}
+                    placeholder="Search by name, email, subject, or message content..."
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-indigo-500 focus:bg-white"
+                  />
+                  {inquirySearchQuery && (
+                    <button
+                      onClick={() => setInquirySearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter by Form Source */}
+                <div className="shrink-0 w-full md:w-56">
+                  <select
+                    value={inquirySourceFilter}
+                    onChange={(e) => setInquirySourceFilter(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-indigo-500"
+                  >
+                    <option value="ALL">All Form Sources</option>
+                    <option value="Contact Us">Contact Us Page</option>
+                    <option value="Support Page">Support Page</option>
+                    <option value="How It Works">How It Works Page</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <span className="text-[10px] font-black uppercase text-slate-400 mr-2 shrink-0">
+                  Status:
+                </span>
+                {[
+                  { key: "ALL", label: `All Inquiries (${inquiries.length})` },
+                  { key: "New", label: `New (${inquiries.filter((i) => i.status === "New").length})` },
+                  { key: "In Progress", label: `In Progress (${inquiries.filter((i) => i.status === "In Progress").length})` },
+                  { key: "Resolved", label: `Resolved (${inquiries.filter((i) => i.status === "Resolved").length})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setInquiryStatusFilter(tab.key)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
+                      inquiryStatusFilter === tab.key
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Inquiries List */}
+            {(() => {
+              const filteredInquiries = inquiries.filter((inq) => {
+                if (inquiryStatusFilter !== "ALL" && inq.status !== inquiryStatusFilter) return false;
+                if (inquirySourceFilter !== "ALL" && inq.source !== inquirySourceFilter) return false;
+
+                if (inquirySearchQuery.trim()) {
+                  const q = inquirySearchQuery.toLowerCase();
+                  const matchName = (inq.name || "").toLowerCase().includes(q);
+                  const matchEmail = (inq.email || "").toLowerCase().includes(q);
+                  const matchSubject = (inq.subject || "").toLowerCase().includes(q);
+                  const matchMessage = (inq.message || "").toLowerCase().includes(q);
+                  if (!matchName && !matchEmail && !matchSubject && !matchMessage) return false;
+                }
+
+                return true;
+              });
+
+              if (filteredInquiries.length === 0) {
+                return (
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center shadow-xs">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+                      <Mail className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900">No inquiries found</h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {inquirySearchQuery || inquiryStatusFilter !== "ALL" || inquirySourceFilter !== "ALL"
+                        ? "No inquiries match your current filters. Try resetting your search."
+                        : "No customer contact messages have been received yet."}
+                    </p>
+                    {(inquirySearchQuery || inquiryStatusFilter !== "ALL" || inquirySourceFilter !== "ALL") && (
+                      <button
+                        onClick={() => {
+                          setInquirySearchQuery("");
+                          setInquiryStatusFilter("ALL");
+                          setInquirySourceFilter("ALL");
+                        }}
+                        className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-4">
+                  {filteredInquiries.map((inq) => {
+                    const isNew = inq.status === "New";
+                    const isResolved = inq.status === "Resolved";
+                    const isLoading = !!inquiryActionLoading[inq._id];
+
+                    return (
+                      <div
+                        key={inq._id}
+                        className={`bg-white border rounded-3xl p-5 md:p-6 transition shadow-xs flex flex-col md:flex-row md:items-start justify-between gap-5 ${
+                          isNew
+                            ? "border-indigo-200 bg-indigo-50/10"
+                            : isResolved
+                            ? "border-slate-200/80 opacity-90"
+                            : "border-slate-200/80"
+                        }`}
+                      >
+                        {/* Left Inquiry Info */}
+                        <div className="flex-1 space-y-3">
+                          {/* Sender & Badges Header */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-sm font-black text-slate-900">{inq.name}</h4>
+                            <span className="text-xs text-slate-400 font-semibold">&bull;</span>
+                            <a
+                              href={`mailto:${inq.email}?subject=Re: ${encodeURIComponent(inq.subject || 'PrintSphere Inquiry')}`}
+                              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1"
+                            >
+                              <Mail className="h-3 w-3" />
+                              {inq.email}
+                            </a>
+
+                            {/* Source Badge */}
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200">
+                              {inq.source || "Contact Us"}
+                            </span>
+
+                            {/* Status Badge */}
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                                isNew
+                                  ? "bg-indigo-100 text-indigo-700 border-indigo-200"
+                                  : isResolved
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}
+                            >
+                              {inq.status || "New"}
+                            </span>
+
+                            <span className="text-[10px] text-slate-400 font-medium ml-auto">
+                              {new Date(inq.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+
+                          {/* Subject */}
+                          <p className="text-xs font-bold text-slate-800">
+                            Subject: <span className="font-semibold text-slate-600">{inq.subject || "General Inquiry"}</span>
+                          </p>
+
+                          {/* Message Body */}
+                          <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs text-slate-700 leading-relaxed whitespace-pre-line">
+                            {inq.message}
+                          </div>
+                        </div>
+
+                        {/* Right Action Buttons */}
+                        <div className="shrink-0 flex flex-row md:flex-col items-center md:items-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                          {/* Direct Email Reply Button */}
+                          <a
+                            href={`mailto:${inq.email}?subject=Re: ${encodeURIComponent(inq.subject || 'PrintSphere Inquiry')}`}
+                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                            <span>Reply via Email</span>
+                          </a>
+
+                          {/* Status Toggle Dropdown */}
+                          <select
+                            value={inq.status || "New"}
+                            disabled={isLoading}
+                            onChange={(e) => handleUpdateInquiryStatus(inq._id, e.target.value)}
+                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/70 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 focus:outline-indigo-500 cursor-pointer"
+                          >
+                            <option value="New">Status: New</option>
+                            <option value="In Progress">Status: In Progress</option>
+                            <option value="Resolved">Status: Resolved</option>
+                          </select>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDeleteInquiry(inq._id)}
+                            disabled={isLoading}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                            title="Delete Inquiry"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
