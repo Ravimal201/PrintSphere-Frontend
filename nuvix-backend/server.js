@@ -36,6 +36,7 @@ require("./models/Notification");
 require("./models/Payment");
 require("./models/UserActivity");
 require("./models/Review");
+require("./models/ContactMessage");
 
 // Route Imports
 const authRoutes = require("./routes/authRoutes");
@@ -44,6 +45,7 @@ const managerRoutes = require("./routes/managerRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const contactRoutes = require("./routes/contactRoutes");
 
 // Mount API Endpoints
 app.use("/api/auth", authRoutes);
@@ -52,6 +54,7 @@ app.use("/api/manager", managerRoutes);
 app.use("/api/employee", employeeRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/contact", contactRoutes);
 
 // Test Connection Endpoint
 app.get("/api/health", (req, res) => {

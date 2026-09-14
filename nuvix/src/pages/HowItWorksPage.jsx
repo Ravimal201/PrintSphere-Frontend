@@ -13,13 +13,51 @@ import {
   ChevronDown,
   ChevronUp,
   Cpu,
-  Palette
+  Palette,
+  Send,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  HelpCircle
 } from "lucide-react";
+import axios from "axios";
+import { API_BASE_URL } from "../config/api";
 
 export default function HowItWorksPage() {
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState("customize");
   const [openFaq, setOpenFaq] = useState(null);
+
+  // Inquiry form states
+  const [inquiryForm, setInquiryForm] = useState({ name: "", email: "", subject: "How It Works Inquiry", message: "" });
+  const [submittingInquiry, setSubmittingInquiry] = useState(false);
+  const [inquirySuccess, setInquirySuccess] = useState(false);
+  const [inquiryError, setInquiryError] = useState("");
+
+  const handleInquirySubmit = async (e) => {
+    e.preventDefault();
+    setSubmittingInquiry(true);
+    setInquiryError("");
+
+    try {
+      await axios.post(`${API_BASE_URL}/contact`, {
+        name: inquiryForm.name,
+        email: inquiryForm.email,
+        subject: inquiryForm.subject || "How It Works Inquiry",
+        message: inquiryForm.message,
+        source: "How It Works",
+      });
+
+      setInquirySuccess(true);
+      setInquiryForm({ name: "", email: "", subject: "How It Works Inquiry", message: "" });
+      setTimeout(() => setInquirySuccess(false), 7000);
+    } catch (err) {
+      console.error("Error sending inquiry:", err);
+      setInquiryError(err.response?.data?.message || "Failed to send inquiry. Please try again.");
+    } finally {
+      setSubmittingInquiry(false);
+    }
+  };
 
   useEffect(() => {
     setToken(localStorage.getItem("token"));
@@ -276,6 +314,102 @@ export default function HowItWorksPage() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Production Question / Custom Order Inquiry Form */}
+            <div className="max-w-3xl mx-auto bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm">
+              <div className="flex items-center gap-3 pb-4 border-b mb-6">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+                  <HelpCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Have Questions About Production or Need a Custom Quote?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Send a direct message to our production managers and we'll get back to you swiftly.</p>
+                </div>
+              </div>
+
+              {inquirySuccess && (
+                <div className="mb-5 flex items-center gap-2.5 p-3.5 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 text-xs font-semibold">
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                  <span>Inquiry sent successfully! Our managers will review and respond to your email.</span>
+                </div>
+              )}
+
+              {inquiryError && (
+                <div className="mb-5 flex items-center gap-2.5 p-3.5 rounded-xl border border-rose-100 bg-rose-50 text-rose-600 text-xs font-semibold">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{inquiryError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleInquirySubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Your Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={inquiryForm.name}
+                      onChange={(e) => setInquiryForm((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="Jane Doe"
+                      className="w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Your Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={inquiryForm.email}
+                      onChange={(e) => setInquiryForm((p) => ({ ...p, email: e.target.value }))}
+                      placeholder="jane@example.com"
+                      className="w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Inquiry Topic</label>
+                  <input
+                    type="text"
+                    value={inquiryForm.subject}
+                    onChange={(e) => setInquiryForm((p) => ({ ...p, subject: e.target.value }))}
+                    placeholder="e.g. Bulk discount question / DTG print specs"
+                    className="w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Your Message / Question</label>
+                  <textarea
+                    required
+                    rows="3"
+                    value={inquiryForm.message}
+                    onChange={(e) => setInquiryForm((p) => ({ ...p, message: e.target.value }))}
+                    placeholder="Describe your inquiry or question here..."
+                    className="w-full px-3.5 py-2.5 border rounded-xl text-xs resize-none focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submittingInquiry}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {submittingInquiry ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" />
+                      Submit Production Inquiry
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
 
           </div>
