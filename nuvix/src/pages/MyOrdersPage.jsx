@@ -442,16 +442,6 @@ export default function MyOrdersPage() {
                                 <span>Pay PayHere</span>
                               </PaymentButton>
                             </div>
-                            <div className="w-24">
-                              <PaymentButton
-                                orderId={order._id}
-                                amount={order.totalCost}
-                                gateway="paymentaccount"
-                                className="w-full py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-lg font-bold text-[10px] shadow-sm transition-all flex items-center justify-center cursor-pointer"
-                              >
-                                <span>Pay Account</span>
-                              </PaymentButton>
-                            </div>
                           </div>
                         )}
                         {/* Shipped -> Order Collected Button */}
