@@ -3,26 +3,17 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2, Wallet, XCircle } from "lucide-react";
+import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2, XCircle } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
-import { processAccountPayment, processCardPayment, createCheckoutSession } from "../services/paymentService";
+import { processCardPayment, createCheckoutSession } from "../services/paymentService";
 
 export default function PaymentPage() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState("paymentaccount"); // 'paymentaccount', 'card', 'payhere', 'cod'
-
-  // Payment Account Form State
-  const [accountDetails, setAccountDetails] = useState({
-    provider: "",
-    accountType: "Bank Account",
-    accountNumber: "",
-    holderName: "",
-    pin: ""
-  });
+  const [selectedMethod, setSelectedMethod] = useState("card"); // 'card', 'payhere', 'cod'
 
   // Card Form State
   const [cardForm, setCardForm] = useState({
@@ -163,22 +154,7 @@ export default function PaymentPage() {
     setProcessingPayment(true);
 
     try {
-      if (selectedMethod === "paymentaccount") {
-        if (!accountDetails.provider || !accountDetails.accountNumber || !accountDetails.holderName) {
-          setErrorMessage("Please fill in all account payment details (Provider Name, Account Number, and Account Holder Name).");
-          setProcessingPayment(false);
-          return;
-        }
-
-        const data = await processAccountPayment(order._id, accountDetails);
-        if (data && data.success) {
-          localStorage.removeItem("printsphere_pending_order_id");
-          localStorage.setItem("printsphere_cart", JSON.stringify([]));
-          window.location.href = `/payment/success?order_id=${order._id}&gateway=paymentaccount`;
-        } else {
-          throw new Error(data?.message || "Account payment verification failed.");
-        }
-      } else if (selectedMethod === "card") {
+      if (selectedMethod === "card") {
         const cleanNum = cardForm.cardNumber.replace(/\s/g, "");
         if (cleanNum.length < 15) {
           setErrorMessage("Please enter a valid card number.");
@@ -393,21 +369,7 @@ export default function PaymentPage() {
                   <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
                     <h3 className="text-sm font-extrabold text-slate-900">Select Payment Method</h3>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMethod("paymentaccount")}
-                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
-                          selectedMethod === "paymentaccount"
-                            ? "border-indigo-650 bg-indigo-50/50 text-indigo-900 font-extrabold shadow-xs"
-                            : "border-slate-150 hover:border-slate-300 text-slate-500 hover:bg-slate-50"
-                        }`}
-                      >
-                        <Wallet className="h-5 w-5 mb-1 text-indigo-600" />
-                        <span className="text-xs font-bold">Payment Account</span>
-                        <span className="text-[9px] text-slate-400 font-semibold">Bank / Wallet</span>
-                      </button>
-
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <button
                         type="button"
                         onClick={() => setSelectedMethod("card")}
@@ -451,117 +413,6 @@ export default function PaymentPage() {
                       </button>
                     </div>
                   </div>
-
-                  {/* Payment Account Form */}
-                  {selectedMethod === "paymentaccount" && (
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
-                      <div className="flex items-center gap-3 pb-3 border-b">
-                        <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-2xl text-indigo-600">
-                          <Wallet className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <h4 className="font-extrabold text-slate-900 text-base">Payment Account Gateway</h4>
-                          <p className="text-xs text-slate-500">Enter bank, wallet, or payment account details to authorize payment</p>
-                        </div>
-                      </div>
-
-                      <form onSubmit={handleProcessPayment} className="space-y-4 text-xs font-semibold text-slate-700">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                              Provider Name *
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              placeholder="e.g. Commercial Bank, PayPal, Sampath"
-                              value={accountDetails.provider}
-                              onChange={(e) => setAccountDetails({ ...accountDetails, provider: e.target.value })}
-                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 transition"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                              Account Type *
-                            </label>
-                            <select
-                              value={accountDetails.accountType}
-                              onChange={(e) => setAccountDetails({ ...accountDetails, accountType: e.target.value })}
-                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 bg-white transition cursor-pointer"
-                            >
-                              <option value="Bank Account">Bank Account</option>
-                              <option value="Mobile Wallet">Mobile Wallet</option>
-                              <option value="Card">Card Account</option>
-                              <option value="Digital Account">Digital Account</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Account Number / ID *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. 100234598120"
-                            value={accountDetails.accountNumber}
-                            onChange={(e) => setAccountDetails({ ...accountDetails, accountNumber: e.target.value })}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Account Holder Name *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. Sachinthaka Ravimal"
-                            value={accountDetails.holderName}
-                            onChange={(e) => setAccountDetails({ ...accountDetails, holderName: e.target.value })}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 transition"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Security PIN / Password
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="password"
-                              placeholder="Enter security PIN or password"
-                              value={accountDetails.pin}
-                              onChange={(e) => setAccountDetails({ ...accountDetails, pin: e.target.value })}
-                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
-                            />
-                            <Lock className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={processingPayment}
-                          className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-99 text-white rounded-xl text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
-                        >
-                          {processingPayment ? (
-                            <>
-                              <Loader2 className="h-5 w-5 animate-spin text-white" />
-                              <span>Verifying Account & Processing Payment...</span>
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="h-5 w-5" />
-                              <span>Pay Rs. {order.totalCost?.toFixed(2)} Now</span>
-                            </>
-                          )}
-                        </button>
-                      </form>
-                    </div>
-                  )}
 
                   {/* Payment Card Form & Interactive Visual Graphic */}
                   {selectedMethod === "card" && (
