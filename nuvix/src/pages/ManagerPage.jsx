@@ -1560,154 +1560,99 @@ export default function ManagerPage() {
                   return (
                     <div
                       key={order._id}
-                      className="border border-slate-200/80 rounded-2xl p-5 hover:border-indigo-200 transition bg-slate-50/20"
+                      className="border border-slate-200/90 rounded-2xl p-4 hover:border-indigo-200 transition bg-white shadow-xs space-y-3"
                     >
-                      {/* Header */}
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-dashed">
-                        <div>
-                          <div className="flex items-center flex-wrap gap-2.5">
-                            <span className="text-xs font-bold text-slate-700">
-                              Order ID: <span className="font-mono text-indigo-600">#{order._id.slice(-8)}</span>
-                            </span>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                order.paymentStatus === "Paid"
-                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                  : "bg-amber-50 text-amber-600 border border-amber-200"
-                              }`}
-                            >
-                              Payment: {order.paymentStatus}
-                            </span>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                isCancelled
-                                  ? "bg-rose-50 text-rose-600 border border-rose-200"
-                                  : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
-                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                  : order.orderStatus === "Printing"
-                                  ? "bg-purple-50 text-purple-600 border border-purple-200"
-                                  : order.orderStatus === "Processing"
-                                  ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
-                                  : "bg-slate-100 text-slate-700 border border-slate-200"
-                              }`}
-                            >
-                              Status: {order.orderStatus}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1.5 flex items-center flex-wrap gap-1">
-                            <span className="font-medium text-slate-600">Customer:</span>{" "}
+                      {/* Compact Order Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+                        <div className="flex items-center flex-wrap gap-2">
+                          <span className="text-xs font-black text-slate-900">
+                            Order <span className="font-mono text-indigo-600 font-bold">#{order._id.slice(-8)}</span>
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                              order.paymentStatus === "Paid"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
+                            {order.paymentStatus}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                              isCancelled
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : order.orderStatus === "Printing"
+                                ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                : order.orderStatus === "Processing"
+                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                : "bg-slate-100 text-slate-700 border border-slate-200"
+                            }`}
+                          >
+                            {order.orderStatus}
+                          </span>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-xs text-slate-600 font-medium">
                             <span className="font-bold text-slate-900">
                               {order.customerId?.name ||
                                 (typeof order.customerId === "object" && order.customerId?.email) ||
                                 order.guestEmail ||
-                                "Unknown"}
+                                "Customer"}
                             </span>
                             {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
-                              <span className="text-slate-400 font-normal">
+                              <span className="text-slate-400 font-normal ml-1">
                                 ({order.customerId?.email || order.guestEmail})
                               </span>
                             ) : null}
-                          </p>
+                          </span>
                         </div>
-                        <div className="text-left md:text-right">
-                          <p className="text-lg font-black text-slate-900">
-                            Rs. {(order.totalCost || 0).toFixed(2)}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 md:justify-end">
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-slate-400 flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            Placed: {new Date(order.createdAt).toLocaleDateString()}
-                          </p>
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="text-base font-black text-slate-950">
+                            Rs. {(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Content Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
-                        {/* Items */}
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                              Order Items
-                            </h4>
-                            <div className="space-y-3">
-                              {order.items.map((item, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="bg-white p-3.5 border rounded-2xl shadow-xs text-xs space-y-3"
-                                  >
-                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-                                      <div>
-                                        <p className="font-extrabold text-slate-900 text-sm">
-                                          {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
-                                        </p>
-                                        <p className="text-slate-500 text-xs mt-0.5">
-                                          Style: <span className="font-semibold text-slate-700">{item.tShirtStyle || "Crew Neck"}</span> | 
-                                          Size: <span className="font-semibold text-slate-700">{item.selectedSize || item.size}</span> | 
-                                          Color: <span className="font-semibold text-slate-700">{resolveColorName(item.selectedColor || item.color)}</span> | 
-                                          GSM: <span className="font-semibold text-slate-700">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
-                                        </p>
-                                      </div>
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                        item.itemType === "Customized" || item.designId
-                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                          : "bg-blue-50 text-blue-700 border border-blue-200"
-                                      }`}>
-                                        {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog Product"}
-                                      </span>
-                                    </div>
-
-                                    {/* Multi-Angle Screenshots (Front, Back, Both Sides) & Downloads */}
-                                    <DesignScreenshotViewer
-                                      item={item}
-                                      orderId={order._id}
-                                      onOpen3DModal={(designToOpen) => {
-                                        setSelected3DDesign(designToOpen);
-                                        setIs3DModalOpen(true);
-                                      }}
-                                    />
-                                  </div>
-                              ))}
-                            </div>
+                      {/* Main Section: Compact Sidebar Meta Info + Wide 3D Views & Items */}
+                      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3 items-start">
+                        {/* Left Sidebar: Shipping & Assigned Employee */}
+                        <div className="space-y-2.5">
+                          {/* Shipping Destination */}
+                          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1">
+                            <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
+                              Shipping Destination
+                            </span>
+                            {order.shippingAddress ? (
+                              <p className="text-xs text-slate-700 font-medium leading-tight">
+                                {order.shippingAddress.street ? `${order.shippingAddress.street}, ` : ""}
+                                {order.shippingAddress.city ? `${order.shippingAddress.city}, ` : ""}
+                                {order.shippingAddress.country || "Sri Lanka"}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic">Address not specified</p>
+                            )}
                           </div>
-                        </div>
 
-                        {/* Ship Address */}
-                        <div>
-                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                            Shipping Destination
-                          </h4>
-                          {order.shippingAddress ? (
-                            <p className="text-xs text-slate-600 leading-relaxed bg-white p-3 border rounded-xl">
-                              {order.shippingAddress.street},{" "}
-                              {order.shippingAddress.city},{" "}
-                              {order.shippingAddress.country}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-slate-400 bg-white p-3 border rounded-xl">
-                              Address not specified
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Employee Assignment */}
-                        <div>
-                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                            Assigned Employee
-                          </h4>
-                          {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
-                            <div className="bg-white border rounded-xl p-3.5 space-y-2.5 shadow-xs">
+                          {/* Employee Assignment */}
+                          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5">
+                            <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
+                              Assigned Operator
+                            </span>
+                            {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
                               <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="h-6 w-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                                     {order.assignedEmployee.name ? order.assignedEmployee.name.charAt(0).toUpperCase() : "E"}
                                   </div>
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-bold text-slate-900 truncate">
-                                      {order.assignedEmployee.name}
-                                    </p>
-                                    <p className="text-[10px] text-indigo-600 font-semibold">
-                                      Assigned Operator
-                                    </p>
-                                  </div>
+                                  <span className="text-xs font-bold text-slate-900 truncate">
+                                    {order.assignedEmployee.name}
+                                  </span>
                                 </div>
 
                                 {!isCancelled && order.orderStatus !== "Shipped" && (
@@ -1719,124 +1664,148 @@ export default function ManagerPage() {
                                         [order._id]: order.assignedEmployee?._id || "",
                                       }));
                                     }}
-                                    className="px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
-                                    title="Edit / Change assigned employee"
+                                    className="px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition flex items-center gap-1 shrink-0 cursor-pointer bg-white"
+                                    title="Edit assigned employee"
                                   >
-                                    <Edit2 className="h-3 w-3 text-indigo-600" />
+                                    <Edit2 className="h-2.5 w-2.5 text-indigo-600" />
                                     <span>Edit</span>
                                   </button>
                                 )}
                               </div>
-                            </div>
-                          ) : (
-                            <div className="bg-white border rounded-xl p-3 space-y-2 shadow-xs">
-                              {editingEmployeeOrderId === order._id ? (
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] uppercase font-bold text-indigo-700">
-                                      Change Employee
-                                    </span>
-                                    <button
-                                      onClick={() => setEditingEmployeeOrderId(null)}
-                                      className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
-                                      title="Cancel"
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </button>
+                            ) : (
+                              <div>
+                                {editingEmployeeOrderId === order._id ? (
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1">
+                                      <select
+                                        value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
+                                        onChange={(e) =>
+                                          setSelectedEmployeeForOrder((prev) => ({
+                                            ...prev,
+                                            [order._id]: e.target.value,
+                                          }))
+                                        }
+                                        className="flex-1 text-[11px] border border-slate-300 rounded-lg px-2 py-1 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                      >
+                                        <option value="">-- Select Employee --</option>
+                                        {employees.map((emp) => (
+                                          <option key={emp._id} value={emp._id}>
+                                            {emp.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
+                                        onClick={() => {
+                                          const empId = selectedEmployeeForOrder[order._id];
+                                          if (empId) {
+                                            handleAssignEmployee(order._id, empId);
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      >
+                                        {assignLoading[order._id] ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Check className="h-3 w-3" />
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingEmployeeOrderId(null)}
+                                        className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5">
+                                ) : (
+                                  <div className="space-y-1">
                                     <select
-                                      value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
-                                      onChange={(e) =>
-                                        setSelectedEmployeeForOrder((prev) => ({
-                                          ...prev,
-                                          [order._id]: e.target.value,
-                                        }))
-                                      }
-                                      className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                      disabled={assignLoading[order._id] || isCancelled}
+                                      onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
+                                      defaultValue=""
+                                      className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white font-medium text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
                                     >
-                                      <option value="">-- Select Employee --</option>
+                                      <option value="" disabled>
+                                        -- Assign staff --
+                                      </option>
                                       {employees.map((emp) => (
                                         <option key={emp._id} value={emp._id}>
                                           {emp.name}
                                         </option>
                                       ))}
                                     </select>
-                                    <button
-                                      disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
-                                      onClick={() => {
-                                        const empId = selectedEmployeeForOrder[order._id];
-                                        if (empId) {
-                                          handleAssignEmployee(order._id, empId);
-                                        }
-                                      }}
-                                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
-                                      title="Save change"
-                                    >
-                                      {assignLoading[order._id] ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      ) : (
-                                        <Check className="h-3.5 w-3.5" />
-                                      )}
-                                      <span>Save</span>
-                                    </button>
+                                    <p className="text-[9px] text-amber-600 font-semibold flex items-center gap-1">
+                                      <AlertCircle className="h-2.5 w-2.5 shrink-0" />
+                                      No staff assigned
+                                    </p>
                                   </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right Area: Items List with Small 3D Views */}
+                        <div className="space-y-2">
+                          {order.items.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-white p-2.5 border border-slate-200/90 rounded-xl space-y-2"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-black text-slate-900 text-xs">
+                                    {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 font-medium">
+                                    Size: <span className="font-bold text-slate-800">{item.selectedSize || item.size}</span> | 
+                                    Color: <span className="font-bold text-slate-800">{resolveColorName(item.selectedColor || item.color)}</span> | 
+                                    GSM: <span className="font-bold text-slate-800">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
+                                  </span>
                                 </div>
-                              ) : (
-                                <div className="space-y-2">
-                                  <select
-                                    disabled={assignLoading[order._id] || isCancelled}
-                                    onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
-                                    defaultValue=""
-                                    className="w-full text-xs border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50/50 font-bold text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                                  >
-                                    <option value="" disabled>
-                                      -- Assign an employee --
-                                    </option>
-                                    {employees.map((emp) => (
-                                      <option key={emp._id} value={emp._id}>
-                                        {emp.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <p className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
-                                    <AlertCircle className="h-3 w-3 shrink-0" />
-                                    No employee assigned yet
-                                  </p>
-                                </div>
-                              )}
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                  item.itemType === "Customized" || item.designId
+                                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                }`}>
+                                  {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog"}
+                                </span>
+                              </div>
+
+                              {/* Multi-Angle 3D View Small Thumbnails */}
+                              <DesignScreenshotViewer
+                                item={item}
+                                orderId={order._id}
+                                onOpen3DModal={(designToOpen) => {
+                                  setSelected3DDesign(designToOpen);
+                                  setIs3DModalOpen(true);
+                                }}
+                              />
                             </div>
-                          )}
+                          ))}
                         </div>
                       </div>
 
-                      {/* Production Pipeline Status Viewer & Order Actions */}
-                      <div className="pt-4 border-t border-dashed flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        {/* Status / Pipeline Display (Read-Only) */}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                              Production Status:
-                            </span>
-                            {latestTimeline?.note && (
-                              <span className="text-[11px] text-slate-500 italic truncate max-w-md">
-                                ({latestTimeline.note})
-                              </span>
-                            )}
-                          </div>
+                      {/* Compact Bottom Footer: Status Stepper & Cancel Action */}
+                      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                            Status:
+                          </span>
 
                           {isCancelled ? (
-                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
-                              <Ban className="h-4 w-4 text-rose-500 shrink-0" />
-                              <span>Order has been Cancelled</span>
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-[11px] font-bold">
+                              <Ban className="h-3 w-3 text-rose-500 shrink-0" />
+                              Order Cancelled
+                            </span>
                           ) : isPendingPayment ? (
-                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-bold">
-                              <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-                              <span>Awaiting Customer Payment Before Processing</span>
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-[11px] font-bold">
+                              <Clock className="h-3 w-3 text-amber-500 shrink-0" />
+                              Awaiting Customer Payment
+                            </span>
                           ) : (
-                            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
+                            <div className="flex items-center gap-1 overflow-x-auto py-0.5">
                               {pipelineStages.map((stage, sIdx) => {
                                 const isPassed = currentStageIdx > sIdx;
                                 const isCurrent = currentStageIdx === sIdx;
@@ -1844,26 +1813,26 @@ export default function ManagerPage() {
                                 return (
                                   <div key={stage} className="flex items-center shrink-0">
                                     <div
-                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
                                         isCurrent
-                                          ? "bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200"
+                                          ? "bg-indigo-600 text-white shadow-2xs font-black"
                                           : isPassed
                                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                           : "bg-slate-100 text-slate-400 border border-slate-200"
                                       }`}
                                     >
                                       {isPassed ? (
-                                        <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                        <Check className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
                                       ) : isCurrent ? (
-                                        <div className="h-2 w-2 rounded-full bg-white animate-ping shrink-0" />
+                                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping shrink-0" />
                                       ) : (
-                                        <span className="h-2 w-2 rounded-full bg-slate-300 shrink-0" />
+                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-300 shrink-0" />
                                       )}
                                       <span>{stage}</span>
                                     </div>
                                     {sIdx < pipelineStages.length - 1 && (
                                       <div
-                                        className={`w-3 sm:w-6 h-0.5 mx-1 transition ${
+                                        className={`w-2 h-0.5 mx-0.5 transition ${
                                           isPassed ? "bg-emerald-400" : "bg-slate-200"
                                         }`}
                                       />
@@ -1873,33 +1842,31 @@ export default function ManagerPage() {
                               })}
                             </div>
                           )}
+
+                          {latestTimeline?.note && (
+                            <span className="text-[10px] text-slate-400 italic truncate max-w-xs">
+                              ({latestTimeline.note})
+                            </span>
+                          )}
                         </div>
 
-                        {/* Order Management Actions (Cancel Order) */}
-                        <div className="shrink-0 flex items-center gap-2">
+                        {/* Actions */}
+                        <div className="shrink-0">
                           {!isCancelled && order.orderStatus !== "Shipped" ? (
                             <button
                               disabled={assignLoading[order._id]}
                               onClick={() => handleCancelOrder(order._id)}
-                              className="px-3.5 py-2 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              title="Cancel this customer order"
+                              className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                              title="Cancel this order"
                             >
                               {assignLoading[order._id] ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
-                                <Ban className="h-3.5 w-3.5" />
+                                <Ban className="h-3 w-3" />
                               )}
-                              <span>Cancel Order</span>
+                              <span>Cancel</span>
                             </button>
-                          ) : isCancelled ? (
-                            <span className="text-xs font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 flex items-center gap-1.5">
-                              <Ban className="h-3.5 w-3.5" /> Order Cancelled
-                            </span>
-                          ) : (
-                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-1.5">
-                              <CheckCircle className="h-3.5 w-3.5" /> Order Fulfilled & Shipped
-                            </span>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>

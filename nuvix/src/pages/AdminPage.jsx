@@ -1070,45 +1070,45 @@ export default function AdminPage() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
-                  {/* Completed Orders */}
+                  {/* Active Orders in Production */}
+                  <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-amber-800 uppercase font-black tracking-wider">In Production</span>
+                      <Clock className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <p className="text-2xl font-black text-amber-950 mt-1">
+                      {analyticsLoading ? "..." : (analytics?.operationalStats?.activeOrders ?? 0)}
+                    </p>
+                    <span className="text-[10px] text-amber-700 font-semibold mt-0.5 block">
+                      Queue & Printing
+                    </span>
+                  </div>
+
+                  {/* Finished & Ready to Deliver */}
                   <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-emerald-800 uppercase font-black tracking-wider">Completed Orders</span>
+                      <span className="text-[10px] text-emerald-800 uppercase font-black tracking-wider">Ready to Deliver</span>
                       <CheckCheck className="h-4 w-4 text-emerald-600" />
                     </div>
                     <p className="text-2xl font-black text-emerald-950 mt-1">
                       {analyticsLoading ? "..." : (analytics?.operationalStats?.completedOrders ?? 0)}
                     </p>
                     <span className="text-[10px] text-emerald-700 font-semibold mt-0.5 block">
-                      Finished & Delivered
+                      Finished & Ready to Deliver
                     </span>
                   </div>
 
-                  {/* Shipped Orders */}
+                  {/* Delivered / Shipped */}
                   <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-blue-800 uppercase font-black tracking-wider">Shipped Orders</span>
+                      <span className="text-[10px] text-blue-800 uppercase font-black tracking-wider">Delivered / Shipped</span>
                       <Truck className="h-4 w-4 text-blue-600" />
                     </div>
                     <p className="text-2xl font-black text-blue-950 mt-1">
                       {analyticsLoading ? "..." : (analytics?.operationalStats?.shippedOrders ?? 0)}
                     </p>
                     <span className="text-[10px] text-blue-700 font-semibold mt-0.5 block">
-                      Dispatched & In Transit
-                    </span>
-                  </div>
-
-                  {/* Active Orders in Pipeline */}
-                  <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-indigo-800 uppercase font-black tracking-wider">Active in Pipeline</span>
-                      <Clock className="h-4 w-4 text-indigo-600" />
-                    </div>
-                    <p className="text-2xl font-black text-indigo-950 mt-1">
-                      {analyticsLoading ? "..." : (analytics?.operationalStats?.activeOrders ?? 0)}
-                    </p>
-                    <span className="text-[10px] text-indigo-700 font-semibold mt-0.5 block">
-                      In Queue & Printing
+                      Dispatched & Delivered
                     </span>
                   </div>
 
