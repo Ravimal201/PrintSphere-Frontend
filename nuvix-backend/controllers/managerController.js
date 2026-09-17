@@ -838,10 +838,10 @@ exports.createTShirtStyle = async (req, res) => {
     }
 
     const { name, path, type, price, gsms, gsmPrices, colors } = req.body;
-    const styleName = name || type;
-    const styleType = type || name || "Crew Neck";
+    const styleName = (name || type || "").trim();
+    const styleType = (name || type || "Crew Neck").trim();
     if (!styleName || !path) {
-      return res.status(400).json({ message: "Please provide T-Shirt type and model path" });
+      return res.status(400).json({ message: "Please provide T-Shirt style name and 3D model path" });
     }
 
     const cleanGsmPrices = (gsmPrices || []).map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) }));
@@ -871,8 +871,8 @@ exports.updateTShirtStyle = async (req, res) => {
     }
 
     const { name, path, type, price, gsms, gsmPrices, colors } = req.body;
-    const styleName = name || type;
-    const styleType = type || name || "Crew Neck";
+    const styleName = (name || type || "").trim();
+    const styleType = (name || type || "Crew Neck").trim();
     const cleanGsmPrices = (gsmPrices || []).map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) }));
     const updated = await TShirtStyle.findByIdAndUpdate(
       req.params.id,

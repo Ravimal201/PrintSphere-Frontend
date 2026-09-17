@@ -72,7 +72,6 @@ export default function ManagerPage() {
   const [styleForm, setStyleForm] = useState({
     name: "",
     path: "",
-    type: "Crew Neck",
     gsmPrices: [
       { gsm: "GSM 180", price: 1200 },
       { gsm: "GSM 220", price: 1500 },
@@ -782,7 +781,7 @@ export default function ManagerPage() {
     const payload = {
       name: styleForm.name,
       path: styleForm.path,
-      type: styleForm.type || "Crew Neck",
+      type: styleForm.name, // style name is used for type
       gsmPrices: styleForm.gsmPrices,
       colors: styleForm.colors,
     };
@@ -804,10 +803,9 @@ export default function ManagerPage() {
       setStyleForm({
         name: "",
         path: "",
-        type: "Crew Neck",
         gsmPrices: [
-          { gsm: "180GSM", price: 1200 },
-          { gsm: "220GSM", price: 1500 },
+          { gsm: "GSM 180", price: 1200 },
+          { gsm: "GSM 220", price: 1500 },
         ],
         colors: [
           { name: "White", value: "#ffffff" },
@@ -3294,7 +3292,6 @@ export default function ManagerPage() {
                   setStyleForm({
                     name: "",
                     path: "",
-                    type: "Crew Neck",
                     gsmPrices: [
                       { gsm: "GSM 180", price: 1200 },
                       { gsm: "GSM 220", price: 1500 },
@@ -3331,7 +3328,6 @@ export default function ManagerPage() {
                     setStyleForm({
                       name: "",
                       path: "/images/models/male normal t-shirt1.glb",
-                      type: "Crew Neck",
                       gsmPrices: [
                         { gsm: "GSM 180", price: 1200 },
                         { gsm: "GSM 220", price: 1500 },
@@ -3358,9 +3354,8 @@ export default function ManagerPage() {
                     onEdit={(styleToEdit) => {
                       setEditingStyle(styleToEdit);
                       setStyleForm({
-                        name: styleToEdit.name,
-                        path: styleToEdit.path,
-                        type: styleToEdit.type || "Crew Neck",
+                        name: styleToEdit.name || styleToEdit.type || "",
+                        path: styleToEdit.path || "",
                         gsmPrices:
                           styleToEdit.gsmPrices && styleToEdit.gsmPrices.length > 0
                             ? styleToEdit.gsmPrices
@@ -4330,352 +4325,7 @@ export default function ManagerPage() {
         </div>
       )}
 
-      {showStyleModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-sm uppercase tracking-wider">
-                {editingStyle
-                  ? `Edit Style: ${editingStyle.name}`
-                  : "Add New T-Shirt Style"}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowStyleModal(false);
-                  setEditingStyle(null);
-                }}
-                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            <form
-              onSubmit={handleSaveStyle}
-              className="p-6 space-y-4 overflow-y-auto flex-1"
-            >
-              {stylesError && (
-                <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl text-xs font-semibold">
-                  {stylesError}
-                </div>
-              )}
-
-              {/* Live Frozen 3D Preview */}
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-1.5">
-                  3D Model Preview (Frozen)
-                </label>
-                <Store3DCardPreview
-                  product={{
-                    title: styleForm.name || "Style Preview",
-                    tShirtType: styleForm.name || styleForm.type || "Crew Neck",
-                    path:
-                      styleForm.path ||
-                      "/images/models/male normal t-shirt1.glb",
-                    modelPath:
-                      styleForm.path ||
-                      "/images/models/male normal t-shirt1.glb",
-                    colors: (styleForm.colors || []).map((c) =>
-                      typeof c === "string" ? c : c.value,
-                    ),
-                  }}
-                  activeColor={
-                    styleForm.colors?.[0]
-                      ? typeof styleForm.colors[0] === "string"
-                        ? styleForm.colors[0]
-                        : styleForm.colors[0].value
-                      : "#ffffff"
-                  }
-                  showControls={true}
-                  hideBadge={false}
-                  className="h-44 w-full rounded-2xl bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-100 border border-slate-200/80 shadow-inner"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                  T-Shirt Type
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={styleForm.name}
-                  onChange={(e) =>
-                    setStyleForm((prev) => ({
-                      ...prev,
-                      name: e.target.value,
-                      type: e.target.value,
-                    }))
-                  }
-                  placeholder="e.g. Crew Neck, V-Neck, Polo, Oversized, Hoodie"
-                  className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold"
-                />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <span className="text-[9px] font-bold text-slate-400 self-center">Quick Select:</span>
-                  {["Crew Neck", "V-Neck", "Polo", "Oversized", "Hoodie", "Long Sleeve", "Tank Top"].map((tType) => (
-                    <button
-                      key={tType}
-                      type="button"
-                      onClick={() =>
-                        setStyleForm((prev) => ({
-                          ...prev,
-                          name: tType,
-                          type: tType,
-                        }))
-                      }
-                      className={`px-2.5 py-1 border rounded-lg text-[9px] font-bold transition cursor-pointer ${
-                        styleForm.name === tType
-                          ? "bg-indigo-600 border-indigo-600 text-white"
-                          : "bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {tType}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                    3D GLTF Model File Path
-                  </label>
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={styleForm.path}
-                  onChange={(e) =>
-                    setStyleForm((prev) => ({ ...prev, path: e.target.value }))
-                  }
-                  placeholder="e.g. /images/models/male normal t-shirt1.glb"
-                  className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 font-mono"
-                />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <span className="text-[9px] font-bold text-slate-400 self-center">Presets:</span>
-                  {[
-                    { label: "Male Normal", path: "/images/models/male normal t-shirt1.glb", defaultType: "Crew Neck" },
-                    { label: "Female Normal", path: "/images/models/female normal t-shirt.glb", defaultType: "Crew Neck" },
-                    { label: "Long Sleeve", path: "/images/models/long_sleeve_t-_shirt.glb", defaultType: "Long Sleeve" },
-                    { label: "Oversized", path: "/images/models/oversized t-sdirt1.glb", defaultType: "Oversized" },
-                    { label: "Hoodie", path: "/images/models/t_shirt_hoodie.glb", defaultType: "Hoodie" },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() =>
-                        setStyleForm((prev) => ({
-                          ...prev,
-                          path: preset.path,
-                          type: prev.type || preset.defaultType,
-                        }))
-                      }
-                      className="px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border rounded-lg text-[9px] font-bold transition cursor-pointer"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">
-                  Configure GSM Weights & Prices
-                </label>
-
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    placeholder="GSM name (e.g. 220GSM)"
-                    value={newGsmName}
-                    onChange={(e) => setNewGsmName(e.target.value)}
-                    className="flex-1 px-3 py-2 border rounded-xl text-xs font-semibold"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Price (Rs.)"
-                    value={newGsmPrice}
-                    onChange={(e) => setNewGsmPrice(e.target.value)}
-                    className="w-28 px-3 py-2 border rounded-xl text-xs font-semibold"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newGsmName.trim())
-                        return alert("Please type a GSM name.");
-                      if (!newGsmPrice) return alert("Please type a price.");
-                      setStyleForm((prev) => ({
-                        ...prev,
-                        gsmPrices: [
-                          ...prev.gsmPrices.filter(
-                            (gp) =>
-                              gp.gsm.toLowerCase() !==
-                              formatGsm(newGsmName).toLowerCase(),
-                          ),
-                          {
-                            gsm: formatGsm(newGsmName),
-                            price: Number(newGsmPrice),
-                          },
-                        ],
-                      }));
-                      setNewGsmName("");
-                      setNewGsmPrice("");
-                    }}
-                    className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    Add GSM
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
-                  {styleForm.gsmPrices.length === 0 ? (
-                    <p className="text-[10px] text-slate-400 font-semibold p-2">
-                      No GSM prices added yet.
-                    </p>
-                  ) : (
-                    styleForm.gsmPrices.map((gp, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between bg-white border rounded-xl px-3 py-1.5 text-xs shadow-2xs"
-                      >
-                        <span className="font-semibold text-slate-700">
-                          {gp.gsm}
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <span className="font-black text-slate-900">
-                            Rs. {gp.price.toFixed(2)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStyleForm((prev) => ({
-                                ...prev,
-                                gsmPrices: prev.gsmPrices.filter(
-                                  (_, idx) => idx !== i,
-                                ),
-                              }));
-                            }}
-                            className="text-rose-500 hover:text-rose-700 transition"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">
-                  Configure Allowed Brand Colors
-                </label>
-
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    placeholder="Color name (e.g. Royal Blue)"
-                    value={newColor.name}
-                    onChange={(e) =>
-                      setNewColor((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    className="flex-1 px-3 py-2 border rounded-xl text-xs font-semibold"
-                  />
-                  <input
-                    type="color"
-                    value={newColor.value}
-                    onChange={(e) =>
-                      setNewColor((prev) => ({
-                        ...prev,
-                        value: e.target.value,
-                      }))
-                    }
-                    className="h-8 w-12 p-0.5 border rounded-xl cursor-pointer bg-white shrink-0"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newColor.name.trim())
-                        return alert("Please type a color name.");
-                      setStyleForm((prev) => ({
-                        ...prev,
-                        colors: [
-                          ...prev.colors,
-                          { name: newColor.name.trim(), value: newColor.value },
-                        ],
-                      }));
-                      setNewColor({ name: "", value: "#ffffff" });
-                    }}
-                    className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    Add
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
-                  {styleForm.colors.length === 0 ? (
-                    <p className="text-[10px] text-slate-400 font-semibold p-2">
-                      No colors added yet.
-                    </p>
-                  ) : (
-                    styleForm.colors.map((color, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-1.5 bg-white border rounded-full px-2.5 py-1 text-xs shadow-2xs"
-                      >
-                        <span
-                          className="h-3.5 w-3.5 rounded-full border border-slate-200"
-                          style={{ backgroundColor: color.value }}
-                        />
-                        <span className="font-semibold text-slate-700">
-                          {color.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStyleForm((prev) => ({
-                              ...prev,
-                              colors: prev.colors.filter((_, idx) => idx !== i),
-                            }));
-                          }}
-                          className="text-slate-400 hover:text-rose-500 font-bold ml-1 text-[10px] shrink-0"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="border-t pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowStyleModal(false);
-                    setEditingStyle(null);
-                  }}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={stylesLoading}
-                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {stylesLoading && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  )}
-                  {editingStyle ? "Save Changes" : "Create Style"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Add New Inventory Modal */}
       {showInventoryModal && (
@@ -5227,6 +4877,34 @@ export default function ManagerPage() {
                 </div>
               )}
 
+              {/* Live 3D Model Preview */}
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1.5">
+                  3D Model Preview (Live)
+                </label>
+                <Store3DCardPreview
+                  product={{
+                    title: styleForm.name || "T-Shirt Style Preview",
+                    tShirtType: styleForm.name || "Crew Neck",
+                    path: styleForm.path || "/images/models/male normal t-shirt1.glb",
+                    modelPath: styleForm.path || "/images/models/male normal t-shirt1.glb",
+                    colors: (styleForm.colors || []).map((c) =>
+                      typeof c === "string" ? c : c.value
+                    ),
+                  }}
+                  activeColor={
+                    styleForm.colors?.[0]
+                      ? typeof styleForm.colors[0] === "string"
+                        ? styleForm.colors[0]
+                        : styleForm.colors[0].value
+                      : "#ffffff"
+                  }
+                  showControls={true}
+                  hideBadge={false}
+                  className="h-48 w-full rounded-2xl bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-100 border border-slate-200/80 shadow-inner"
+                />
+              </div>
+
               {/* Style Name */}
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
@@ -5235,7 +4913,7 @@ export default function ManagerPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Women's V-Neck, Long Sleeve Shirt, Oversized Tee"
+                  placeholder="e.g. Crew Neck, Women's V-Neck, Long Sleeve Shirt, Oversized Tee, Hoodie"
                   value={styleForm.name}
                   onChange={(e) =>
                     setStyleForm((prev) => ({ ...prev, name: e.target.value }))
@@ -5292,27 +4970,6 @@ export default function ManagerPage() {
                   }
                   className="w-full px-3.5 py-2 border rounded-xl text-xs font-mono text-slate-700 focus:outline-indigo-500 mt-1"
                 />
-              </div>
-
-              {/* Collar / Garment Type */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                  Collar / Garment Category
-                </label>
-                <select
-                  value={styleForm.type}
-                  onChange={(e) =>
-                    setStyleForm((prev) => ({ ...prev, type: e.target.value }))
-                  }
-                  className="w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 bg-white"
-                >
-                  <option value="Crew Neck">Crew Neck</option>
-                  <option value="V-Neck">V-Neck</option>
-                  <option value="Polo">Polo</option>
-                  <option value="Hoodie">Hoodie</option>
-                  <option value="Oversized">Oversized</option>
-                  <option value="Long Sleeve">Long Sleeve</option>
-                </select>
               </div>
 
               {/* GSM Weights & Prices Section */}
