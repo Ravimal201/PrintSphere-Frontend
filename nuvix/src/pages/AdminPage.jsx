@@ -4,7 +4,7 @@ import {
   Loader2, AlertCircle, CheckCircle, BarChart3, TrendingUp, Inbox, 
   Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check, Bell, Download, FileText,
   Droplets, Package, Box, Filter, Search, Tag, Plus, X,
-  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye, AlertTriangle, CreditCard, Printer, CheckCheck, Clock
+  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye, AlertTriangle, CreditCard, Printer, CheckCheck, Clock, Activity, Truck
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -1060,36 +1060,98 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Conversion Statistics */}
+              {/* Operational Performance & Live Metrics */}
               <div className="bg-white border rounded-3xl p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-950 mb-6 flex items-center gap-2">
-                  <Info className="h-5 w-5 text-indigo-600" />
-                  Operational Performance
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-2xl bg-slate-50">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Active Orders in Pipeline</span>
-                    <p className="text-xl font-bold text-slate-800 mt-1">
-                      {analyticsLoading ? "..." : (analytics?.operationalStats?.activeOrders ?? 0)}
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-slate-50">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Fulfilled Orders</span>
-                    <p className="text-xl font-bold text-slate-800 mt-1">
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-indigo-600" />
+                    Operational Performance & Real-Time Tracking
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                  {/* Completed Orders */}
+                  <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-emerald-800 uppercase font-black tracking-wider">Completed Orders</span>
+                      <CheckCheck className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <p className="text-2xl font-black text-emerald-950 mt-1">
                       {analyticsLoading ? "..." : (analytics?.operationalStats?.completedOrders ?? 0)}
                     </p>
+                    <span className="text-[10px] text-emerald-700 font-semibold mt-0.5 block">
+                      Finished & Delivered
+                    </span>
                   </div>
-                  <div className="p-4 rounded-2xl bg-slate-50">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Avg Order Value</span>
-                    <p className="text-xl font-bold text-slate-800 mt-1">
+
+                  {/* Shipped Orders */}
+                  <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-blue-800 uppercase font-black tracking-wider">Shipped Orders</span>
+                      <Truck className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <p className="text-2xl font-black text-blue-950 mt-1">
+                      {analyticsLoading ? "..." : (analytics?.operationalStats?.shippedOrders ?? 0)}
+                    </p>
+                    <span className="text-[10px] text-blue-700 font-semibold mt-0.5 block">
+                      Dispatched & In Transit
+                    </span>
+                  </div>
+
+                  {/* Active Orders in Pipeline */}
+                  <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-indigo-800 uppercase font-black tracking-wider">Active in Pipeline</span>
+                      <Clock className="h-4 w-4 text-indigo-600" />
+                    </div>
+                    <p className="text-2xl font-black text-indigo-950 mt-1">
+                      {analyticsLoading ? "..." : (analytics?.operationalStats?.activeOrders ?? 0)}
+                    </p>
+                    <span className="text-[10px] text-indigo-700 font-semibold mt-0.5 block">
+                      In Queue & Printing
+                    </span>
+                  </div>
+
+                  {/* Avg Order Value */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider">Avg Order Value</span>
+                      <CreditCard className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-800 mt-1">
                       {analyticsLoading ? "..." : `Rs. ${(analytics?.operationalStats?.avgOrderValue || 0).toLocaleString()}`}
                     </p>
+                    <span className="text-[10px] text-slate-400 font-semibold mt-0.5 block">
+                      Revenue per paid order
+                    </span>
                   </div>
-                  <div className="p-4 rounded-2xl bg-slate-50">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Custom Designs</span>
-                    <p className="text-xl font-bold text-slate-800 mt-1">
+
+                  {/* Units Sold */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider">Total Units Sold</span>
+                      <Package className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-800 mt-1">
+                      {analyticsLoading ? "..." : (analytics?.operationalStats?.totalUnitsSold || 0).toLocaleString()}
+                    </p>
+                    <span className="text-[10px] text-slate-400 font-semibold mt-0.5 block">
+                      Garments customized & bought
+                    </span>
+                  </div>
+
+                  {/* Custom Designs */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider">Custom Designs</span>
+                      <Layers className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-800 mt-1">
                       {analyticsLoading ? "..." : (analytics?.customDesigns || 0).toLocaleString()}
                     </p>
+                    <span className="text-[10px] text-slate-400 font-semibold mt-0.5 block">
+                      Saved 3D artwork models
+                    </span>
                   </div>
                 </div>
               </div>
