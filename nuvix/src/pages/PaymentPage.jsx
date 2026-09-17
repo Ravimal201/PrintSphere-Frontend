@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2, XCircle } from "lucide-react";
+import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2, XCircle, Info } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { processCardPayment, createCheckoutSession } from "../services/paymentService";
@@ -365,6 +365,26 @@ export default function PaymentPage() {
                 {/* Left Panel: Payment Method & Details Form */}
                 <div className="lg:col-span-7 space-y-6">
                   
+                  {/* Delivery Fee Advisory Notice Banner */}
+                  <div className="bg-gradient-to-r from-amber-50 via-amber-50/70 to-orange-50 border border-amber-200/90 rounded-3xl p-4.5 shadow-xs flex items-start gap-3.5">
+                    <div className="p-2.5 bg-amber-100/90 text-amber-800 rounded-2xl shrink-0 mt-0.5 shadow-2xs">
+                      <Truck className="h-5 w-5 text-amber-700" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                          Important Delivery Fee Notice
+                        </h4>
+                        <span className="px-2 py-0.5 bg-amber-200/60 border border-amber-300 text-amber-900 rounded-full text-[9px] font-extrabold uppercase">
+                          Pay Upon Receipt
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                        Please note that the <strong>delivery fee is to be paid upon receipt of the product</strong> directly in cash to the courier. This payment covers only your items and custom printing costs.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Select Payment Method Tabs */}
                   <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
                     <h3 className="text-sm font-extrabold text-slate-900">Select Payment Method</h3>
@@ -530,10 +550,16 @@ export default function PaymentPage() {
                           </label>
                         </div>
 
+                        {/* Delivery Notice Reminder above button */}
+                        <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl flex items-center gap-2 text-[11px] text-amber-900 font-medium">
+                          <Info className="h-4 w-4 text-amber-600 shrink-0" />
+                          <span>Delivery fee is excluded from card charge and must be paid upon receipt.</span>
+                        </div>
+
                         <button
                           type="submit"
                           disabled={processingPayment}
-                          className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-99 text-white rounded-xl text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
+                          className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-99 text-white rounded-xl text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
                         >
                           {processingPayment ? (
                             <>
@@ -571,6 +597,12 @@ export default function PaymentPage() {
                         </ul>
                       </div>
 
+                      {/* Delivery Notice Reminder */}
+                      <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl flex items-center gap-2 text-[11px] text-amber-900 font-medium">
+                        <Info className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span>Delivery fee is excluded and to be paid directly upon receipt of the package.</span>
+                      </div>
+
                       <button
                         onClick={handleProcessPayment}
                         disabled={processingPayment}
@@ -603,8 +635,13 @@ export default function PaymentPage() {
                       </div>
 
                       <p className="text-xs text-slate-600 leading-relaxed">
-                        Our courier will collect the exact payment of <strong className="text-slate-900">Rs. {order.totalCost?.toFixed(2)}</strong> when delivering your custom products to your address.
+                        Our courier will collect the items payment of <strong className="text-slate-900">Rs. {order.totalCost?.toFixed(2)}</strong> plus the standard courier delivery fee when delivering your custom products to your address.
                       </p>
+
+                      <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl flex items-center gap-2 text-[11px] text-amber-900 font-medium">
+                        <Info className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span>Please prepare the product cost and courier delivery fee upon receiving the package.</span>
+                      </div>
 
                       <button
                         onClick={handleProcessPayment}
@@ -687,19 +724,27 @@ export default function PaymentPage() {
                     </div>
 
                     {/* Cost Breakdown */}
-                    <div className="pt-4 border-t border-slate-100 space-y-2 text-xs font-semibold text-slate-600">
+                    <div className="pt-4 border-t border-slate-100 space-y-2.5 text-xs font-semibold text-slate-600">
                       <div className="flex justify-between">
                         <span>Items Subtotal</span>
                         <span className="text-slate-800">Rs. {order.subtotal?.toFixed(2) || order.totalCost?.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Shipping / Delivery</span>
-                        <span className="text-emerald-600 font-bold">FREE</span>
+                      <div className="flex justify-between items-center py-1">
+                        <span className="flex items-center gap-1 text-slate-700">
+                          <Truck className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Delivery Fee</span>
+                        </span>
+                        <span className="text-amber-700 font-extrabold bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-lg text-[10px]">
+                          Pay upon receipt
+                        </span>
                       </div>
                       <div className="flex justify-between text-base font-black text-slate-950 pt-2 border-t">
-                        <span>Total Payable</span>
+                        <span>Total Payable Now</span>
                         <span className="text-indigo-600">Rs. {order.totalCost?.toFixed(2)}</span>
                       </div>
+                      <p className="text-[10px] text-slate-400 italic pt-1 leading-snug">
+                        * Courier delivery fee will be collected in cash upon arrival of your package.
+                      </p>
                     </div>
                   </div>
                 </div>

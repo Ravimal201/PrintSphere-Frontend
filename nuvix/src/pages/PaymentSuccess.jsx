@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { verifyPaymentSuccess } from "../services/paymentService";
-import { CheckCircle2, ShoppingBag, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle2, ShoppingBag, ArrowRight, Loader2, Truck } from "lucide-react";
 
 /**
  * PaymentSuccess Page
@@ -117,6 +117,14 @@ export default function PaymentSuccess() {
               Rs. {Number(paymentData?.amount || orderData?.totalCost || 0).toFixed(2)}
             </span>
           </div>
+        </div>
+
+        {/* Delivery Fee Notice Reminder */}
+        <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5 flex items-start gap-2.5 text-left text-xs text-amber-900">
+          <Truck className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="leading-snug text-[11px] font-medium">
+            <strong>Delivery Reminder:</strong> The courier delivery fee is to be paid in cash upon receipt of your package at your doorstep.
+          </p>
         </div>
 
         {/* Continue Shopping Button */}
