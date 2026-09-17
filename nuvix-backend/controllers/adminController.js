@@ -334,10 +334,34 @@ exports.getAnalytics = async (req, res) => {
     const inkInventory = formattedAllInventory.filter(i => i.category === "ink");
     const packagingInventory = formattedAllInventory.filter(i => i.category === "packaging");
 
-    // 7. Operational Statistics
-    const activeOrdersCount = allOrders.filter(o => ["Processing", "Printing", "Shipped"].includes(o.orderStatus)).length;
+    // 7. Operational Statistics from real-time database data
+    const activeOrdersCount = allOrders.filter(o => ["Processing", "Printing"].includes(o.orderStatus)).length;
     const completedOrdersCount = allOrders.filter(o => ["Completed", "Delivered", "Collected"].includes(o.orderStatus)).length;
-    const avgOrderValue = validRevenueOrders.length > 0 ? (grossRevenue / validRevenueOrders.length) : 0;
+    const shippedOrdersCount = allOrders.filter(o => o.orderStatus === "Shipped").length;
+    const pendingPaymentCount = allOrders.filter(o => o.orderStatus === "Pending Payment" || o.paymentStatus === "Pending").length;
+    const cancelledOrdersCount = allOrders.filter(o => o.orderStatus === "Cancelled").length;
+    const fulfillmentRate = totalOrdersCount > 0 ? Math.round((completedOrdersCount / totalOrdersCount) * 100) : 0;
+    const avgOrderValue = validRevenueOrders.length > 0 ? Math.round(grossRevenue / validRevenueOrders.length) : 0;
+
+    const totalUnitsSold = validRevenueOrders.reduce((sum, order) => {
+      if (order.items && order.items.length > 0) {
+        return sum + order.items.reduce((iSum, item) => iSum + (Number(item.quantity) || 1), 0);
+      }
+      return sum + (Number(order.quantity) || 1);
+    }, 0);
+
+    const lowStockCount = allInventoryDocs.filter(i => i.quantity <= (i.minThreshold || 10)).length;
+    const totalCustomersCount = await User.countDocuments({ role: "Customer" });
+    const totalStaffCount = await User.countDocuments({ role: { $in: ["Manager", "Employee"] } });
+
+    const reviews = await Review.find();
+    const totalReviews = reviews.length;
+    const avgRating = totalReviews > 0 
+      ? Number((reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / totalReviews).toFixed(1))
+      : 5.0;
+
+    const printingNowCount = allOrders.filter(o => o.orderStatus === "Printing").length;
+    const processingNowCount = allOrders.filter(o => o.orderStatus === "Processing").length;
 
     res.json({
       grossRevenue,
@@ -353,7 +377,19 @@ exports.getAnalytics = async (req, res) => {
       operationalStats: {
         activeOrders: activeOrdersCount,
         completedOrders: completedOrdersCount,
-        avgOrderValue: Math.round(avgOrderValue)
+        shippedOrders: shippedOrdersCount,
+        pendingPaymentOrders: pendingPaymentCount,
+        cancelledOrders: cancelledOrdersCount,
+        fulfillmentRate,
+        avgOrderValue,
+        totalUnitsSold,
+        totalCustomers: totalCustomersCount,
+        activeStaff: totalStaffCount,
+        lowStockItems: lowStockCount,
+        avgRating,
+        totalReviews,
+        printingNow: printingNowCount,
+        processingNow: processingNowCount
       }
     });
   } catch (error) {
