@@ -336,11 +336,11 @@ exports.getAnalytics = async (req, res) => {
 
     // 7. Operational Statistics from real-time database data
     const activeOrdersCount = allOrders.filter(o => ["Processing", "Printing"].includes(o.orderStatus)).length;
-    const completedOrdersCount = allOrders.filter(o => ["Completed", "Delivered", "Collected"].includes(o.orderStatus)).length;
-    const shippedOrdersCount = allOrders.filter(o => o.orderStatus === "Shipped").length;
+    const completedOrdersCount = allOrders.filter(o => o.orderStatus === "Completed").length;
+    const shippedOrdersCount = allOrders.filter(o => ["Shipped", "Delivered", "Collected"].includes(o.orderStatus)).length;
     const pendingPaymentCount = allOrders.filter(o => o.orderStatus === "Pending Payment" || o.paymentStatus === "Pending").length;
     const cancelledOrdersCount = allOrders.filter(o => o.orderStatus === "Cancelled").length;
-    const fulfillmentRate = totalOrdersCount > 0 ? Math.round((completedOrdersCount / totalOrdersCount) * 100) : 0;
+    const fulfillmentRate = totalOrdersCount > 0 ? Math.round(((completedOrdersCount + shippedOrdersCount) / totalOrdersCount) * 100) : 0;
     const avgOrderValue = validRevenueOrders.length > 0 ? Math.round(grossRevenue / validRevenueOrders.length) : 0;
 
     const totalUnitsSold = validRevenueOrders.reduce((sum, order) => {
