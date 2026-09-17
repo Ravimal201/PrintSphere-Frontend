@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { createCheckoutSession, processCardPayment } from "../services/paymentService";
-import { CreditCard, Loader2, X } from "lucide-react";
+import { CreditCard, Loader2, X, Truck, Info } from "lucide-react";
 
 /**
  * Reusable PaymentButton Component
@@ -242,6 +242,11 @@ export default function PaymentButton({
                     required
                   />
                 </div>
+              </div>
+
+              <div className="p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl flex items-center gap-2 text-[10px] text-amber-900 font-medium">
+                <Truck className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                <span>Delivery fee is to be paid upon receipt of the product.</span>
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex gap-3 select-none">

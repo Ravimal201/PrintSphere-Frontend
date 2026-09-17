@@ -4,7 +4,10 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle, Loader2, Wallet } from "lucide-react";
+import { 
+  ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle, 
+  Loader2, Wallet, CreditCard, X, MapPin, ShieldCheck, Edit3, Truck, Info 
+} from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { processAccountPayment, processCardPayment } from "../services/paymentService";
@@ -467,15 +470,36 @@ export default function CartPage() {
                         </div>
                       )}
 
-                      <div className="flex justify-between text-sm font-black text-slate-950 pt-3 border-t">
-                        <span>Total Cost</span>
+                      <div className="flex justify-between items-center py-1 border-t border-slate-100">
+                        <span className="flex items-center gap-1 text-slate-600">
+                          <Truck className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Delivery Fee</span>
+                        </span>
+                        <span className="text-amber-700 font-extrabold bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-lg text-[10px]">
+                          Pay upon receipt
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm font-black text-slate-950 pt-2 border-t">
+                        <span>Items Total</span>
                         <span className="text-indigo-650 font-black">Rs. {cartTotal.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    {/* Delivery Fee Notice Box */}
+                    <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900">
+                      <Truck className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-extrabold text-[11px] text-amber-950">Delivery Fee Information</p>
+                        <p className="text-[10px] text-amber-800 leading-snug mt-0.5 font-medium">
+                          The delivery fee is <strong>to be paid upon receipt of the product</strong> directly to the courier service.
+                        </p>
                       </div>
                     </div>
 
                     <button
                       onClick={handleOpenCheckoutModal}
-                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-4 flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-2 flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <CreditCard className="h-4 w-4" />
                       <span>Proceed to Checkout</span>
@@ -622,14 +646,30 @@ export default function CartPage() {
               )}
             </div>
 
-            {/* Section 3: Next Step Notice */}
+            {/* Section 3: Delivery Fee Advisory Notice */}
+            <div className="p-4 bg-amber-50/80 border border-amber-200/90 rounded-2xl flex items-start gap-3 text-xs text-amber-950">
+              <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0 mt-0.5">
+                <Truck className="h-4 w-4" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-amber-950 text-xs">Delivery Fee to be Paid Upon Receipt</span>
+                  <span className="px-2 py-0.2 bg-amber-200/70 border border-amber-300 text-amber-900 rounded-full text-[9px] font-extrabold uppercase">Notice</span>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
+                  The delivery fee is <strong>to be paid upon receipt of the product</strong> directly in cash to the courier person. The amount paid in the next step covers your item fabrication and custom printing only.
+                </p>
+              </div>
+            </div>
+
+            {/* Section 4: Next Step Notice */}
             <div className="p-4 bg-indigo-50/70 border border-indigo-150 rounded-2xl space-y-1.5 text-xs text-indigo-950">
               <div className="flex items-center gap-2 font-extrabold text-indigo-900">
                 <ShieldCheck className="h-4 w-4 text-indigo-600" />
                 <span>Next Step: Secure Payment Interface</span>
               </div>
               <p className="text-[11px] text-slate-600 leading-snug">
-                When you click <strong>Proceed to Payment Interface</strong> below, your order will be created and you will land on our payment gateway page to enter your Payment Account or Card credentials and click Pay.
+                When you click <strong>Proceed to Payment Interface</strong> below, your order will be created and you will land on our payment gateway page to enter your Payment credentials and finalize your order.
               </p>
             </div>
 
@@ -637,8 +677,9 @@ export default function CartPage() {
             <div className="pt-4 border-t border-slate-100 space-y-4">
               <div className="flex justify-between items-center bg-slate-900 text-white rounded-2xl p-4">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Amount Payable</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Items Amount Payable Now</span>
                   <span className="text-xl font-black">Rs. {cartTotal.toFixed(2)}</span>
+                  <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">+ Courier delivery fee payable upon package receipt</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold">
                   <ShieldCheck className="h-4 w-4" />
