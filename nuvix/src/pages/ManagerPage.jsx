@@ -258,6 +258,7 @@ export default function ManagerPage() {
         employeesRes,
         stylesRes,
         reviewsRes,
+        inquiriesRes,
       ] = await Promise.all([
         axios.get(`${API_BASE_URL}/manager/orders`, { headers }),
         axios.get(`${API_BASE_URL}/manager/products`, { headers }),
@@ -273,14 +274,12 @@ export default function ManagerPage() {
           .catch(() => ({ data: { data: [], stats: { total: 0, new: 0, resolved: 0 } } })),
       ]);
 
-      const inquiriesRes = argumentsList ? argumentsList[7] : null;
-
-      setOrders(ordersRes.data);
-      setProducts(productsRes.data);
-      setInventory(inventoryRes.data);
-      setPricingRules(pricingRes.data);
-      setEmployees(employeesRes.data);
-      setStyles(stylesRes.data);
+      setOrders(ordersRes.data || []);
+      setProducts(productsRes.data || []);
+      setInventory(inventoryRes.data || []);
+      setPricingRules(pricingRes.data || null);
+      setEmployees(employeesRes.data || []);
+      setStyles(stylesRes.data || []);
       if (reviewsRes.data) {
         setReviews(reviewsRes.data.reviews || []);
         if (reviewsRes.data.stats) {
@@ -289,11 +288,10 @@ export default function ManagerPage() {
       }
 
       // Inquiries data
-      const inqRes = await axios.get(`${API_BASE_URL}/contact/inquiries`).catch(() => null);
-      if (inqRes?.data?.success) {
-        setInquiries(inqRes.data.data || []);
-        if (inqRes.data.stats) {
-          setInquiryStats(inqRes.data.stats);
+      if (inquiriesRes?.data?.success) {
+        setInquiries(inquiriesRes.data.data || []);
+        if (inquiriesRes.data.stats) {
+          setInquiryStats(inquiriesRes.data.stats);
         }
       }
 
