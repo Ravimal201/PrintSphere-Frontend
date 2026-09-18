@@ -245,10 +245,9 @@ export default function ManagerPage() {
   const fetchAllData = async () => {
     setDataLoading(true);
     const token = localStorage.getItem("token");
-    const headers = { Authorization: `Bearer ${token}` };
-
     try {
-      // Fetch concurrently
+      const headers = { Authorization: `Bearer ${token}` };
+      // Fetch concurrently with resilient fallbacks
       const [
         ordersRes,
         productsRes,
@@ -259,12 +258,24 @@ export default function ManagerPage() {
         reviewsRes,
         inquiriesRes,
       ] = await Promise.all([
-        axios.get(`${API_BASE_URL}/manager/orders`, { headers }),
-        axios.get(`${API_BASE_URL}/manager/products`, { headers }),
-        axios.get(`${API_BASE_URL}/manager/inventory`, { headers }),
-        axios.get(`${API_BASE_URL}/manager/pricing-rules`, { headers }),
-        axios.get(`${API_BASE_URL}/manager/employees`, { headers }),
-        axios.get(`${API_BASE_URL}/manager/tshirt-styles`, { headers }),
+        axios
+          .get(`${API_BASE_URL}/manager/orders`, { headers })
+          .catch((e) => { console.warn("Failed to fetch orders:", e); return { data: [] }; }),
+        axios
+          .get(`${API_BASE_URL}/manager/products`, { headers })
+          .catch((e) => { console.warn("Failed to fetch products:", e); return { data: [] }; }),
+        axios
+          .get(`${API_BASE_URL}/manager/inventory`, { headers })
+          .catch((e) => { console.warn("Failed to fetch inventory:", e); return { data: [] }; }),
+        axios
+          .get(`${API_BASE_URL}/manager/pricing-rules`, { headers })
+          .catch((e) => { console.warn("Failed to fetch pricing rules:", e); return { data: null }; }),
+        axios
+          .get(`${API_BASE_URL}/manager/employees`, { headers })
+          .catch((e) => { console.warn("Failed to fetch employees:", e); return { data: [] }; }),
+        axios
+          .get(`${API_BASE_URL}/manager/tshirt-styles`, { headers })
+          .catch((e) => { console.warn("Failed to fetch tshirt styles:", e); return { data: [] }; }),
         axios
           .get(`${API_BASE_URL}/manager/reviews`, { headers })
           .catch(() => ({ data: { reviews: [], stats: {} } })),

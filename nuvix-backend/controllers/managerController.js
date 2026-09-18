@@ -89,18 +89,6 @@ exports.getInventory = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    // Auto-seed default inventory if empty
-    const count = await Inventory.countDocuments();
-    if (count === 0) {
-      await Inventory.insertMany([
-        { itemType: "Plain T-Shirt", tShirtType: "Crew Neck", color: "White", size: "M", gsm: "GSM 180", material: "Cotton", quantity: 120, minThreshold: 15 },
-        { itemType: "Plain T-Shirt", tShirtType: "V-Neck", color: "Navy Blue", size: "L", gsm: "GSM 220", material: "Cotton", quantity: 8, minThreshold: 15 },
-        { itemType: "Plain T-Shirt", tShirtType: "Polo", color: "Black", size: "XL", gsm: "GSM 240", material: "Organic Cotton", quantity: 45, minThreshold: 10 },
-        { itemType: "Printing Ink", color: "Cyan", quantity: 3, minThreshold: 5 },
-        { itemType: "Transfer Paper", quantity: 150, minThreshold: 50 }
-      ]);
-    }
-
     const inventory = await Inventory.find().sort({ itemType: 1 });
     res.json(inventory);
   } catch (error) {
@@ -282,15 +270,6 @@ exports.getProducts = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    // Auto-seed default store products if empty
-    const count = await Product.countDocuments();
-    if (count === 0) {
-      await Product.insertMany([
-        { title: "Retro Mountain Adventure", description: "Vibrant retro mountains printed on soft crew neck cotton T-shirt.", category: "Nature Collection", basePrice: 21.05, sizes: ["S", "M", "L"], gsms: ["180GSM", "220GSM"], colors: ["White"], images: ["/images/dumyImage.png"], status: "Active", isApproved: true },
-        { title: "Minimalist Pine Silhouette", description: "Monochrome forest trees custom layout.", category: "Nature Collection", basePrice: 19.50, sizes: ["M", "L", "XL"], gsms: ["180GSM", "200GSM"], colors: ["Black"], images: ["/images/dumyImage.png"], status: "Draft", isApproved: false } // Employee Draft
-      ]);
-    }
-
     const products = await Product.find().populate("createdBy", "name").sort({ createdAt: -1 });
     res.json(products);
   } catch (error) {
@@ -339,29 +318,6 @@ exports.getOrders = async (req, res) => {
   try {
     if (!verifyManager(req)) {
       return res.status(403).json({ message: "Access denied. Manager role required." });
-    }
-
-    // Auto-seed dummy orders if empty
-    const count = await Order.countDocuments();
-    if (count === 0) {
-      await Order.create({
-        guestEmail: "customer1@example.com",
-        items: [
-          { itemType: "Customized", quantity: 2, size: "M", color: "White", material: "Cotton", unitPrice: 21.05 }
-        ],
-        subtotal: 38.00,
-        printCost: 7.05,
-        complexityFee: 2.00,
-        discount: 0,
-        totalCost: 42.10,
-        paymentStatus: "Paid",
-        orderStatus: "Processing",
-        shippingAddress: { street: "12 Gully Rd", city: "Colombo", country: "Sri Lanka" },
-        timeline: [
-          { status: "Pending Payment", note: "Order placed by customer" },
-          { status: "Processing", note: "Manager approved order. Sent to printing queue." }
-        ]
-      });
     }
 
     const orders = await Order.find()
