@@ -85,66 +85,37 @@ const presetLogos = [
   { name: "Logo 3", url: "/logos/logo3.jpeg" }
 ];
 
-const tShirtModels = [
-  {
-    name: "Men's T-Shirt",
-    path: "/images/models/male normal t-shirt1.glb",
-    type: "Crew Neck",
-    gsmPrices: [
-      { gsm: "GSM 180", price: 1200.00 },
-      { gsm: "GSM 220", price: 1500.00 },
-      { gsm: "GSM 280", price: 1800.00 },
-      { gsm: "GSM 320", price: 2000.00 }
-    ]
-  },
-  {
-    name: "Women's T-Shirt",
-    path: "/images/models/female normal t-shirt.glb",
-    type: "V-Neck",
-    gsmPrices: [
-      { gsm: "GSM 180", price: 1400.00 },
-      { gsm: "GSM 220", price: 1700.00 },
-      { gsm: "GSM 280", price: 1900.00 },
-      { gsm: "GSM 320", price: 2200.00 }
-    ]
-  },
-  {
-    name: "Long Sleeve Shirt",
-    path: "/images/models/long_sleeve_t-_shirt.glb",
-    type: "Crew Neck",
-    gsmPrices: [
-      { gsm: "GSM 180", price: 1800.00 },
-      { gsm: "GSM 220", price: 2100.00 }
-    ]
-  },
-  {
-    name: "Oversized T-Shirt",
-    path: "/images/models/oversized t-sdirt1.glb",
-    type: "Crew Neck",
-    gsmPrices: [
-      { gsm: "GSM 180", price: 1500.00 },
-      { gsm: "GSM 220", price: 1800.00 }
-    ]
-  },
-  {
-    name: "Hoodie",
-    path: "/images/models/t_shirt_hoodie.glb",
-    type: "Polo",
-    gsmPrices: [
-      { gsm: "GSM 180", price: 2500.00 },
-      { gsm: "GSM 220", price: 2800.00 }
-    ]
-  },
-  {
-    name: "Classic FBX T-Shirt",
-    path: "/images/models/T SHIRT.fbx",
-    type: "Crew Neck",
-    gsmPrices: [
-      { gsm: "GSM 180", price: 1300.00 },
-      { gsm: "GSM 220", price: 1600.00 }
-    ]
+const findMatchingModel = (design, styles = []) => {
+  if (!styles || styles.length === 0) return null;
+  if (!design) return styles[0] || null;
+  if (design.modelPath) {
+    const match = styles.find(m => m.path === design.modelPath);
+    if (match) return match;
   }
-];
+  const typeStr = (design.tShirtType || design.shirtType || design.name || "").toLowerCase();
+  if (typeStr) {
+    const match = styles.find(m => m.name?.toLowerCase() === typeStr) ||
+                  styles.find(m => m.name?.toLowerCase().includes(typeStr) || typeStr.includes(m.name?.toLowerCase()));
+    if (match) return match;
+
+    if (typeStr.includes("female") || typeStr.includes("women") || typeStr.includes("woman") || typeStr.includes("v-neck")) {
+      return styles.find(m => m.path?.includes("female")) || styles[0] || null;
+    }
+    if (typeStr.includes("long sleeve") || typeStr.includes("long-sleeve")) {
+      return styles.find(m => m.path?.includes("long_sleeve")) || styles[0] || null;
+    }
+    if (typeStr.includes("oversized")) {
+      return styles.find(m => m.path?.includes("oversized")) || styles[0] || null;
+    }
+    if (typeStr.includes("hoodie") || typeStr.includes("polo")) {
+      return styles.find(m => m.path?.includes("hoodie")) || styles[0] || null;
+    }
+    if (typeStr.includes("fbx") || typeStr.includes("classic")) {
+      return styles.find(m => m.path?.includes("fbx") || m.path?.includes("T SHIRT")) || styles[0] || null;
+    }
+  }
+  return styles[0] || null;
+};
 
 // Helper to read cached custom design synchronously on component mount
 const getInitialCustomDesign = () => {
@@ -158,42 +129,8 @@ const getInitialCustomDesign = () => {
   }
 };
 
-const findMatchingModel = (design, styles = tShirtModels) => {
-  if (!design) return styles[0] || tShirtModels[0];
-  if (design.modelPath) {
-    const match = styles.find(m => m.path === design.modelPath) || tShirtModels.find(m => m.path === design.modelPath);
-    if (match) return match;
-  }
-  const typeStr = (design.tShirtType || design.shirtType || design.name || "").toLowerCase();
-  if (typeStr) {
-    const match = styles.find(m => m.name.toLowerCase() === typeStr) ||
-                  tShirtModels.find(m => m.name.toLowerCase() === typeStr) ||
-                  styles.find(m => m.name.toLowerCase().includes(typeStr) || typeStr.includes(m.name.toLowerCase())) ||
-                  tShirtModels.find(m => m.name.toLowerCase().includes(typeStr) || typeStr.includes(m.name.toLowerCase()));
-    if (match) return match;
-
-    if (typeStr.includes("female") || typeStr.includes("women") || typeStr.includes("woman") || typeStr.includes("v-neck")) {
-      return styles.find(m => m.path.includes("female")) || tShirtModels[1];
-    }
-    if (typeStr.includes("long sleeve") || typeStr.includes("long-sleeve")) {
-      return styles.find(m => m.path.includes("long_sleeve")) || tShirtModels[2];
-    }
-    if (typeStr.includes("oversized")) {
-      return styles.find(m => m.path.includes("oversized")) || tShirtModels[3];
-    }
-    if (typeStr.includes("hoodie") || typeStr.includes("polo")) {
-      return styles.find(m => m.path.includes("hoodie")) || tShirtModels[4];
-    }
-    if (typeStr.includes("fbx") || typeStr.includes("classic")) {
-      return styles.find(m => m.path.includes("fbx") || m.path.includes("T SHIRT")) || tShirtModels[5];
-    }
-  }
-  return styles[0] || tShirtModels[0];
-};
-
 export default function DesignerPage() {
   const initialDraft = useRef(getInitialCustomDesign()).current;
-  const initialModel = findMatchingModel(initialDraft, tShirtModels);
 
   const [activeMenu, setActiveMenu] = useState("3d-designer");
   const [loadedDesignId, setLoadedDesignId] = useState(() => initialDraft?._id || initialDraft?.id || sessionStorage.getItem("active_editing_design_id") || null);
@@ -221,7 +158,7 @@ export default function DesignerPage() {
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
 
-  const [availableStyles, setAvailableStyles] = useState(tShirtModels);
+  const [availableStyles, setAvailableStyles] = useState([]);
   const [showCartRedirectModal, setShowCartRedirectModal] = useState(false);
   const [addedItemDetails, setAddedItemDetails] = useState({ name: "", size: "" });
 
@@ -262,15 +199,32 @@ export default function DesignerPage() {
     }
 
     const loadAndFetch = async () => {
-      let stylesList = tShirtModels;
+      let stylesList = [];
       try {
         const [stylesRes, pricingRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/auth/tshirt-styles`),
           axios.get(`${API_BASE_URL}/auth/pricing-rules`)
         ]);
-        if (stylesRes.data && Array.isArray(stylesRes.data) && stylesRes.data.length > 0) {
+        if (stylesRes.data && Array.isArray(stylesRes.data)) {
           setAvailableStyles(stylesRes.data);
           stylesList = stylesRes.data;
+          if (stylesRes.data.length > 0) {
+            const matched = findMatchingModel(initialDraft, stylesRes.data);
+            const chosen = matched || stylesRes.data[0];
+            setSelectedModel(chosen);
+            if (chosen?.type) setShirtType(chosen.type);
+            if (chosen?.colors && chosen.colors.length > 0 && !initialDraft?.fabricColor) {
+              setShirtColor(chosen.colors[0].value);
+            }
+            const modelGSMs = chosen?.gsmPrices && chosen.gsmPrices.length > 0
+              ? chosen.gsmPrices.map(gp => gp.gsm)
+              : (chosen?.gsms || []);
+            if (modelGSMs.length > 0 && !initialDraft?.material) {
+              setShirtMaterial(modelGSMs[0]);
+            }
+          } else {
+            setSelectedModel(null);
+          }
         }
         if (pricingRes.data) {
           setPricingRules({
@@ -536,9 +490,9 @@ export default function DesignerPage() {
   const [activeLeftPanel, setActiveLeftPanel] = useState("style");
   const [rightTab, setRightTab] = useState("layers");
   const [shirtColor, setShirtColor] = useState(() => initialDraft?.fabricColor || initialDraft?.color || "#ffffff");
-  const [selectedModel, setSelectedModel] = useState(() => initialModel);
+  const [selectedModel, setSelectedModel] = useState(null);
   const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
-  const [shirtType, setShirtType] = useState(() => initialModel?.type || "Crew Neck");
+  const [shirtType, setShirtType] = useState("Crew Neck");
   const [shirtMaterial, setShirtMaterial] = useState(() => initialDraft?.material || "GSM 180");
   const [isGsmSelectorOpen, setIsGsmSelectorOpen] = useState(false);
   const [activeView, setActiveView] = useState("front");
@@ -1401,29 +1355,16 @@ export default function DesignerPage() {
     designComplexity = "Medium";
   }
 
-  const getGSMDetails = (gsmName) => {
-    if (!gsmName) return { premium: 0.00, label: "Base" };
-    const cleanGsm = formatGsm(gsmName);
-    if (cleanGsm.includes("180")) return { premium: 0.00, label: "Base" };
-    if (cleanGsm.includes("220")) return { premium: 3.00, label: "+Rs. 3.00" };
-    if (cleanGsm.includes("280")) return { premium: 6.00, label: "+Rs. 6.00" };
-    if (cleanGsm.includes("320")) return { premium: 10.00, label: "+Rs. 10.00" };
-    return { premium: 0.00, label: "Base" };
-  };
-
   const getBasePrice = () => {
-    if (selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0) {
+    if (!selectedModel) return 0;
+    if (selectedModel.gsmPrices && selectedModel.gsmPrices.length > 0) {
       const match = selectedModel.gsmPrices.find(
-        (gp) => gp.gsm.replace(/\s+/g, "").toUpperCase() === shirtMaterial.replace(/\s+/g, "").toUpperCase()
+        (gp) => gp.gsm.replace(/\s+/g, "").toUpperCase() === (shirtMaterial || "").replace(/\s+/g, "").toUpperCase()
       );
       if (match) return match.price;
       return selectedModel.gsmPrices[0].price;
     }
-
-    let price = selectedModel?.price || 1200.00;
-    const gsmDetails = getGSMDetails(shirtMaterial);
-    price += gsmDetails.premium;
-    return price;
+    return selectedModel.price || 0;
   };
 
   const getPrintAreaCost = () => {
@@ -1435,28 +1376,28 @@ export default function DesignerPage() {
   };
 
   const getGsmPriceLabel = (gsmName) => {
-    if (selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0) {
+    if (!selectedModel) return "Rs. 0.00";
+    if (selectedModel.gsmPrices && selectedModel.gsmPrices.length > 0) {
       const match = selectedModel.gsmPrices.find(
-        (gp) => gp.gsm.replace(/\s+/g, "").toUpperCase() === gsmName.replace(/\s+/g, "").toUpperCase()
+        (gp) => gp.gsm.replace(/\s+/g, "").toUpperCase() === (gsmName || "").replace(/\s+/g, "").toUpperCase()
       );
       if (match) return `Rs. ${match.price.toFixed(2)}`;
     }
-    const details = getGSMDetails(gsmName);
-    const basePrice = selectedModel?.price || 1200.00;
-    return `Rs. ${(basePrice + details.premium).toFixed(2)}`;
+    return `Rs. ${(selectedModel.price || 0).toFixed(2)}`;
   };
 
   const getModelGsmOptions = () => {
-    if (selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0) {
+    if (!selectedModel) return [];
+    if (selectedModel.gsmPrices && selectedModel.gsmPrices.length > 0) {
       return selectedModel.gsmPrices.map((gp) => gp.gsm);
     }
-    if (selectedModel?.gsms && selectedModel.gsms.length > 0) {
+    if (selectedModel.gsms && selectedModel.gsms.length > 0) {
       return selectedModel.gsms.map((g) => formatGsm(g));
     }
-    if (selectedModel?.gsm) {
+    if (selectedModel.gsm) {
       return [formatGsm(selectedModel.gsm)];
     }
-    return ["GSM 180", "GSM 220", "GSM 280", "GSM 320"];
+    return [];
   };
 
   const unitPrice = getBasePrice() + getPrintAreaCost();
@@ -1745,97 +1686,116 @@ export default function DesignerPage() {
                 {/* 1. T-Shirt Style */}
                 {activeLeftPanel === "style" && (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {availableStyles.map((model) => {
-                        const isSelected = selectedModel?.path === model.path;
-                        return (
-                          <button
-                            key={model.name}
-                            onClick={() => {
-                              setSelectedModel(model);
-                              setShirtType(model.type);
-                              if (model.colors && model.colors.length > 0) {
-                                setShirtColor(model.colors[0].value);
-                              }
-                              const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
-                                ? model.gsmPrices.map(gp => gp.gsm)
-                                : (model.gsms || []);
-                              if (modelGSMs.length > 0) {
-                                setShirtMaterial(modelGSMs[0]);
-                              }
-                            }}
-                            className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                              isSelected
-                                ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
-                                : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
-                            }`}
-                          >
-                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center text-2xl mb-2 transition ${
-                              isSelected ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-500"
-                            }`}>
-                              👕
-                            </div>
-                            <span className={`text-[11px] font-bold text-center leading-tight truncate w-full ${
-                              isSelected ? "text-indigo-950" : "text-slate-800"
-                            }`}>
-                              {model.name}
-                            </span>
-                            <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">
-                              {model.type}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    {availableStyles.length === 0 ? (
+                      <div className="p-6 text-center text-slate-400 text-xs border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                        <Shirt className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                        <p className="font-bold text-slate-700 dark:text-slate-300">No Styles in Database</p>
+                        <p className="mt-1 text-[11px] text-slate-400">Add new styles from the Manager Dashboard.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {availableStyles.map((model) => {
+                          const isSelected = selectedModel?.path === model.path;
+                          return (
+                            <button
+                              key={model.name}
+                              onClick={() => {
+                                setSelectedModel(model);
+                                setShirtType(model.type);
+                                if (model.colors && model.colors.length > 0) {
+                                  setShirtColor(model.colors[0].value);
+                                }
+                                const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
+                                  ? model.gsmPrices.map(gp => gp.gsm)
+                                  : (model.gsms || []);
+                                if (modelGSMs.length > 0) {
+                                  const exists = modelGSMs.some(
+                                    g => g.replace(/\s+/g, "").toUpperCase() === (shirtMaterial || "").replace(/\s+/g, "").toUpperCase()
+                                  );
+                                  if (!exists) {
+                                    setShirtMaterial(modelGSMs[0]);
+                                  }
+                                }
+                              }}
+                              className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
+                                isSelected
+                                  ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
+                                  : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
+                              }`}
+                            >
+                              <div className={`h-11 w-11 rounded-xl flex items-center justify-center text-2xl mb-2 transition ${
+                                isSelected ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-500"
+                              }`}>
+                                👕
+                              </div>
+                              <span className={`text-[11px] font-bold text-center leading-tight truncate w-full ${
+                                isSelected ? "text-indigo-950" : "text-slate-800"
+                              }`}>
+                                {model.name}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">
+                                {model.type}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* 2. Fabric GSM */}
                 {activeLeftPanel === "gsm" && (
                   <div className="space-y-3">
-                    {(selectedModel?.gsmPrices && selectedModel.gsmPrices.length > 0
-                      ? selectedModel.gsmPrices.map(gp => gp.gsm)
-                      : (selectedModel?.gsms || ["180GSM", "220 GSM", "280GSM", "320GSM"])
-                    ).map((gsm) => {
-                      const isSelected = shirtMaterial === gsm;
-                      const priceLabel = getGsmPriceLabel(gsm);
-                      const clean = formatGsm(gsm);
-                      let gsmDesc = "Lightweight & soft breathable cotton";
-                      if (clean.includes("220")) gsmDesc = "Midweight premium structured fabric";
-                      if (clean.includes("280")) gsmDesc = "Heavyweight durable cotton blend";
-                      if (clean.includes("320")) gsmDesc = "Ultra heavyweight luxury streetwear";
+                    {getModelGsmOptions().length === 0 ? (
+                      <div className="p-6 text-center text-slate-400 text-xs border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                        <Scale className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                        <p className="font-bold text-slate-700 dark:text-slate-300">No GSM Weights Configured</p>
+                        <p className="mt-1 text-[11px] text-slate-400">This style has no custom GSM weights set.</p>
+                      </div>
+                    ) : (
+                      getModelGsmOptions().map((gsm) => {
+                        const isSelected = (shirtMaterial || "").replace(/\s+/g, "").toUpperCase() === gsm.replace(/\s+/g, "").toUpperCase();
+                        const priceLabel = getGsmPriceLabel(gsm);
+                        const clean = formatGsm(gsm);
+                        let gsmDesc = "Standard breathable fabric";
+                        if (clean.includes("180")) gsmDesc = "Lightweight & soft breathable cotton";
+                        if (clean.includes("220")) gsmDesc = "Midweight premium structured fabric";
+                        if (clean.includes("280")) gsmDesc = "Heavyweight durable cotton blend";
+                        if (clean.includes("320")) gsmDesc = "Ultra heavyweight luxury streetwear";
 
-                      return (
-                        <button
-                          key={gsm}
-                          onClick={() => setShirtMaterial(gsm)}
-                          className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                            isSelected
-                              ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
-                              : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
-                          }`}
-                        >
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-extrabold ${isSelected ? "text-indigo-950" : "text-slate-900"}`}>
-                                {gsm}
-                              </span>
-                              {isSelected && (
-                                <span className="h-4 w-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
-                                  ✓
+                        return (
+                          <button
+                            key={gsm}
+                            onClick={() => setShirtMaterial(gsm)}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
+                              isSelected
+                                ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
+                                : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-extrabold ${isSelected ? "text-indigo-950" : "text-slate-900"}`}>
+                                  {gsm}
                                 </span>
-                              )}
+                                {isSelected && (
+                                  <span className="h-4 w-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
+                                    ✓
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-slate-500 font-medium leading-tight">
+                                {gsmDesc}
+                              </p>
                             </div>
-                            <p className="text-[10px] text-slate-500 font-medium leading-tight">
-                              {gsmDesc}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0 pl-2">
-                            <span className="text-xs font-black text-indigo-600">{priceLabel}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                            <div className="text-right shrink-0 pl-2">
+                              <span className="text-xs font-black text-indigo-600">{priceLabel}</span>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 )}
 
@@ -2585,19 +2545,31 @@ export default function DesignerPage() {
                   <span>{bgStatusMessage}</span>
                 </div>
               )}
-              <Scene
-                modelPath={selectedModel?.path || "/images/models/male normal t-shirt1.glb"}
-                shirtColor={shirtColor}
-                activeSide={activeView}
-                zoomLevel={zoomLevel}
-                layers={layers}
-                selectedLayerId={selectedLayerId}
-                onSelectLayer={selectLayer}
-                onUpdateLayers={setLayers}
-                onDeleteLayer={deleteLayer}
-                modelRotation={modelRotation}
-                onContextMenuLayer={handleOpenContextMenu}
-              />
+              {!selectedModel || availableStyles.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400 select-none max-w-sm">
+                  <div className="h-16 w-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                    <Shirt className="h-8 w-8 text-slate-400 dark:text-slate-500" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200">No 3D Models in Database</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                    The database has no T-Shirt styles. Add new styles in the Manager Dashboard to enable 3D customization.
+                  </p>
+                </div>
+              ) : (
+                <Scene
+                  modelPath={selectedModel.path}
+                  shirtColor={shirtColor}
+                  activeSide={activeView}
+                  zoomLevel={zoomLevel}
+                  layers={layers}
+                  selectedLayerId={selectedLayerId}
+                  onSelectLayer={selectLayer}
+                  onUpdateLayers={setLayers}
+                  onDeleteLayer={deleteLayer}
+                  modelRotation={modelRotation}
+                  onContextMenuLayer={handleOpenContextMenu}
+                />
+              )}
             </div>
 
             <div className={`flex flex-col gap-3 max-w-sm mx-auto w-full border p-4 rounded-2xl shadow-sm select-none z-10 transition-colors duration-200 ${
