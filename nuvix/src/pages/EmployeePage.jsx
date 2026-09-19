@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   ShoppingCart, Layers, Settings, LogOut, Loader2, AlertCircle,
   CheckCircle, Plus, Edit2, Check, X, FileText, Download, User, Sparkles,
-  Clock, Ban
+  Clock, Ban, Play, Printer, Truck, ArrowRight
 } from "lucide-react";
 import axios from "axios";
 import TShirt3DModal from "../components/TShirt3DModal";
@@ -10,6 +10,49 @@ import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
 
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+
+// Helper to determine the single next actionable status in the pipeline
+const getNextPipelineAction = (currentStatus) => {
+  switch (currentStatus) {
+    case "Processing":
+      return {
+        nextStatus: "Printing",
+        label: "Start Printing",
+        icon: Printer,
+        btnClass: "bg-purple-600 hover:bg-purple-700 text-white shadow-xs",
+        desc: "Advance order to printing stage"
+      };
+    case "Printing":
+      return {
+        nextStatus: "Completed",
+        label: "Complete Printing",
+        icon: CheckCircle,
+        btnClass: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs",
+        desc: "Mark printing as completed"
+      };
+    case "Completed":
+      return {
+        nextStatus: "Shipped",
+        label: "Ship Order",
+        icon: Truck,
+        btnClass: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs",
+        desc: "Dispatch and mark as shipped"
+      };
+    case "Shipped":
+    case "Delivered":
+    case "Collected":
+      return null;
+    default:
+      // When order is Pending / Paid / Assigned / not yet started in processing
+      return {
+        nextStatus: "Processing",
+        label: "Start Processing",
+        icon: Play,
+        btnClass: "bg-blue-600 hover:bg-blue-700 text-white shadow-xs",
+        desc: "Add order to processing"
+      };
+  }
+};
 
 export default function EmployeePage() {
   const [isEmployee, setIsEmployee] = useState(false);
@@ -424,6 +467,7 @@ export default function EmployeePage() {
                   {filteredOrders.map((order) => {
                     const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
                     const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
+                    const nextAction = getNextPipelineAction(order.orderStatus);
                     const isCancelled = order.orderStatus === "Cancelled";
                     const isCollected = order.orderStatus === "Collected" || order.orderStatus === "Delivered";
                     const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
@@ -648,37 +692,48 @@ export default function EmployeePage() {
                             </div>
                           )}
 
-                          {/* Interactive Flow Updates (Processing -> Printing -> Completed -> Shipped) */}
+                          {/* Interactive Flow Updates (Sequential next step button) */}
                           {!isCancelled ? (
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                              <div className="flex-1">
-                                <input
-                                  type="text"
-                                  placeholder="Optional work log / operator note..."
-                                  value={orderNotes[order._id] || ""}
-                                  onChange={(e) => setOrderNotes(prev => ({ ...prev, [order._id]: e.target.value }))}
-                                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-indigo-500"
-                                />
-                              </div>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-[10px] uppercase font-bold text-slate-400 mr-1">
-                                  Update to:
-                                </span>
-                                {pipelineStages.map((st) => (
-                                  <button
-                                    key={st}
-                                    disabled={actionLoading[order._id]}
-                                    onClick={() => handleUpdateStatus(order._id, st)}
-                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition cursor-pointer disabled:opacity-50 ${
-                                      order.orderStatus === st
-                                        ? "bg-indigo-600 text-white shadow-xs"
-                                        : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
-                                    }`}
-                                  >
-                                    {st}
-                                  </button>
-                                ))}
-                              </div>
+                              {nextAction ? (
+                                <>
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      placeholder="Optional work log / operator note..."
+                                      value={orderNotes[order._id] || ""}
+                                      onChange={(e) => setOrderNotes(prev => ({ ...prev, [order._id]: e.target.value }))}
+                                      className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      disabled={actionLoading[order._id]}
+                                      onClick={() => handleUpdateStatus(order._id, nextAction.nextStatus)}
+                                      className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 ${nextAction.btnClass}`}
+                                      title={nextAction.desc}
+                                    >
+                                      {actionLoading[order._id] ? (
+                                        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                                      ) : (
+                                        <nextAction.icon className="h-4 w-4 shrink-0" />
+                                      )}
+                                      <span>{nextAction.label}</span>
+                                      <ArrowRight className="h-3.5 w-3.5 opacity-80 shrink-0" />
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="w-full flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl">
+                                    <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                                    <span>Production & Dispatch Completed ({order.orderStatus})</span>
+                                  </div>
+                                  <span className="text-[11px] text-slate-400 font-medium">
+                                    No further pipeline updates needed
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="p-3 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-xs font-semibold flex items-center gap-2">
