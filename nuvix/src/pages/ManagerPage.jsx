@@ -76,6 +76,7 @@ export default function ManagerPage() {
   const [styleForm, setStyleForm] = useState({
     name: "",
     path: "",
+    sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
     gsmPrices: [
       { gsm: "GSM 180", price: 1200 },
       { gsm: "GSM 220", price: 1500 },
@@ -88,6 +89,7 @@ export default function ManagerPage() {
   const [newGsmName, setNewGsmName] = useState("");
   const [newGsmPrice, setNewGsmPrice] = useState("");
   const [newColor, setNewColor] = useState({ name: "", value: "#ffffff" });
+  const [newCustomSize, setNewCustomSize] = useState("");
 
   // Data states
   const [orders, setOrders] = useState([]);
@@ -830,6 +832,7 @@ export default function ManagerPage() {
       name: styleForm.name,
       path: styleForm.path,
       type: styleForm.name, // style name is used for type
+      sizes: styleForm.sizes && styleForm.sizes.length > 0 ? styleForm.sizes : ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
       gsmPrices: styleForm.gsmPrices,
       colors: styleForm.colors,
     };
@@ -851,6 +854,7 @@ export default function ManagerPage() {
       setStyleForm({
         name: "",
         path: "",
+        sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
         gsmPrices: [
           { gsm: "GSM 180", price: 1200 },
           { gsm: "GSM 220", price: 1500 },
@@ -1144,8 +1148,8 @@ export default function ManagerPage() {
             <button
               onClick={() => setActiveTab("overview")}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "overview"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <BarChart3 className="h-4.5 w-4.5" />
@@ -1154,8 +1158,8 @@ export default function ManagerPage() {
             <button
               onClick={() => setActiveTab("orders")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "orders"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <span className="flex items-center gap-3.5">
@@ -1171,8 +1175,8 @@ export default function ManagerPage() {
             <button
               onClick={() => setActiveTab("products")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "products"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <span className="flex items-center gap-3.5">
@@ -1188,8 +1192,8 @@ export default function ManagerPage() {
             <button
               onClick={() => setActiveTab("pricing")}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "pricing"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <Sparkles className="h-4.5 w-4.5" />
@@ -1198,8 +1202,8 @@ export default function ManagerPage() {
             <button
               onClick={() => setActiveTab("inventory")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inventory"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <span className="flex items-center gap-3.5">
@@ -1215,8 +1219,8 @@ export default function ManagerPage() {
             <button
               onClick={() => setActiveTab("styles")}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "styles"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <Layers className="h-4.5 w-4.5" />
@@ -1225,8 +1229,8 @@ export default function ManagerPage() {
             <button
               onClick={() => setActiveTab("reviews")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "reviews"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <span className="flex items-center gap-3.5">
@@ -1245,8 +1249,8 @@ export default function ManagerPage() {
                 fetchInquiries();
               }}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inquiries"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <span className="flex items-center gap-3.5">
@@ -1262,8 +1266,8 @@ export default function ManagerPage() {
             <button
               onClick={() => setActiveTab("settings")}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "settings"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <Settings className="h-4.5 w-4.5" />
@@ -1277,8 +1281,8 @@ export default function ManagerPage() {
                   setShowStorePreview(true);
                 }}
                 className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "store-preview"
-                    ? "bg-indigo-600 text-white shadow-lg"
-                    : "hover:bg-slate-800 hover:text-slate-200"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "hover:bg-slate-800 hover:text-slate-200"
                   }`}
               >
                 <Award className="h-4.5 w-4.5" />
@@ -1646,22 +1650,22 @@ export default function ManagerPage() {
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${order.paymentStatus === "Paid"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
                               }`}
                           >
                             {order.paymentStatus}
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${isCancelled
-                                ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : order.orderStatus === "Printing"
-                                    ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                    : order.orderStatus === "Processing"
-                                      ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                      : "bg-slate-100 text-slate-700 border border-slate-200"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : order.orderStatus === "Printing"
+                                  ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                  : order.orderStatus === "Processing"
+                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                    : "bg-slate-100 text-slate-700 border border-slate-200"
                               }`}
                           >
                             {order.orderStatus}
@@ -1839,8 +1843,8 @@ export default function ManagerPage() {
                                   </span>
                                 </div>
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${item.itemType === "Customized" || item.designId
-                                    ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                  ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                  : "bg-blue-50 text-blue-700 border border-blue-200"
                                   }`}>
                                   {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog"}
                                 </span>
@@ -1887,10 +1891,10 @@ export default function ManagerPage() {
                                   <div key={stage} className="flex items-center shrink-0">
                                     <div
                                       className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${isCurrent
-                                          ? "bg-indigo-600 text-white shadow-2xs font-black"
-                                          : isPassed
-                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                            : "bg-slate-100 text-slate-400 border border-slate-200"
+                                        ? "bg-indigo-600 text-white shadow-2xs font-black"
+                                        : isPassed
+                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                          : "bg-slate-100 text-slate-400 border border-slate-200"
                                         }`}
                                     >
                                       {isPassed ? (
@@ -2119,8 +2123,8 @@ export default function ManagerPage() {
                   <button
                     onClick={() => setProductTabFilter("all")}
                     className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "all"
-                        ? "bg-white text-slate-900 shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                       }`}
                   >
                     All ({products.length})
@@ -2128,8 +2132,8 @@ export default function ManagerPage() {
                   <button
                     onClick={() => setProductTabFilter("pending")}
                     className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${productTabFilter === "pending"
-                        ? "bg-purple-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
+                      ? "bg-purple-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                       }`}
                   >
                     <span>Pending</span>
@@ -2142,8 +2146,8 @@ export default function ManagerPage() {
                   <button
                     onClick={() => setProductTabFilter("approved")}
                     className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "approved"
-                        ? "bg-emerald-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                       }`}
                   >
                     Approved ({products.filter((p) => p.isApproved).length})
@@ -2151,8 +2155,8 @@ export default function ManagerPage() {
                   <button
                     onClick={() => setProductTabFilter("archived")}
                     className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "archived"
-                        ? "bg-rose-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
+                      ? "bg-rose-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                       }`}
                   >
                     Disapproved ({products.filter((p) => p.status === "Archived" || (!p.isApproved && p.status !== "Draft")).length})
@@ -2627,8 +2631,8 @@ export default function ManagerPage() {
                             <label
                               key={size}
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
-                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
-                                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
+                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                 }`}
                             >
                               <input
@@ -2682,8 +2686,8 @@ export default function ManagerPage() {
                               <label
                                 key={gsm}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
-                                    ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
-                                    : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
+                                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                   }`}
                               >
                                 <input
@@ -2761,8 +2765,8 @@ export default function ManagerPage() {
                                   });
                                 }}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
-                                    ? "bg-slate-900 border-slate-900 text-white shadow-xs"
-                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                  ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                                   }`}
                               >
                                 <span
@@ -3231,15 +3235,15 @@ export default function ManagerPage() {
                       setInventoryColorFilter("ALL");
                     }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${isActive
-                        ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/10"
-                        : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
+                      ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/10"
+                      : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
                       }`}
                   >
                     <span>{cat.label}</span>
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-black ${isActive
-                          ? "bg-indigo-500 text-white"
-                          : "bg-slate-200 text-slate-700"
+                        ? "bg-indigo-500 text-white"
+                        : "bg-slate-200 text-slate-700"
                         }`}
                     >
                       {count}
@@ -3568,8 +3572,8 @@ export default function ManagerPage() {
                             <td className="py-4 text-xs">
                               <span
                                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isLow
-                                    ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
-                                    : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                                  ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
+                                  : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
                                   }`}
                               >
                                 {isLow ? "Low stock" : "In Stock"}
@@ -3645,6 +3649,7 @@ export default function ManagerPage() {
                       { name: "White", value: "#ffffff" },
                       { name: "Black", value: "#111827" },
                     ],
+                    sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
                   });
                   setShowStyleModal(true);
                 }}
@@ -3681,6 +3686,7 @@ export default function ManagerPage() {
                         { name: "White", value: "#ffffff" },
                         { name: "Black", value: "#111827" },
                       ],
+                      sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
                     });
                     setShowStyleModal(true);
                   }}
@@ -3709,6 +3715,10 @@ export default function ManagerPage() {
                               price: styleToEdit.price || 1200,
                             })),
                         colors: styleToEdit.colors || [],
+                        sizes:
+                          styleToEdit.sizes && styleToEdit.sizes.length > 0
+                            ? styleToEdit.sizes
+                            : ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
                       });
                       setShowStyleModal(true);
                     }}
@@ -3847,8 +3857,8 @@ export default function ManagerPage() {
             {reviewNotification && (
               <div
                 className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-150 ${reviewNotification.type === "success"
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                    : "bg-rose-50 text-rose-800 border border-rose-200"
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  : "bg-rose-50 text-rose-800 border border-rose-200"
                   }`}
               >
                 <div className="flex items-center gap-2">
@@ -3895,8 +3905,8 @@ export default function ManagerPage() {
                     <Star
                       key={s}
                       className={`h-2.5 w-2.5 ${s <= Math.round(reviewStats.averageRating || 0)
-                          ? "fill-amber-400 text-amber-400"
-                          : "text-slate-200"
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-slate-200"
                         }`}
                     />
                   ))}
@@ -3906,8 +3916,8 @@ export default function ManagerPage() {
               <div
                 onClick={() => setReviewFilterRating(reviewFilterRating === "BAD" ? "ALL" : "BAD")}
                 className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${reviewFilterRating === "BAD"
-                    ? "bg-rose-50 border-rose-300 ring-2 ring-rose-400"
-                    : "bg-white border-slate-200/80 hover:border-rose-200 hover:bg-rose-50/20"
+                  ? "bg-rose-50 border-rose-300 ring-2 ring-rose-400"
+                  : "bg-white border-slate-200/80 hover:border-rose-200 hover:bg-rose-50/20"
                   }`}
               >
                 <div className="flex items-center justify-between text-slate-400 mb-1">
@@ -4003,12 +4013,12 @@ export default function ManagerPage() {
                     key={tab.key}
                     onClick={() => setReviewFilterRating(tab.key)}
                     className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${reviewFilterRating === tab.key
-                        ? tab.key === "BAD"
-                          ? "bg-rose-600 text-white shadow-sm"
-                          : "bg-indigo-600 text-white shadow-sm"
-                        : tab.alert
-                          ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                      ? tab.key === "BAD"
+                        ? "bg-rose-600 text-white shadow-sm"
+                        : "bg-indigo-600 text-white shadow-sm"
+                      : tab.alert
+                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
                       }`}
                   >
                     {tab.label}
@@ -4113,8 +4123,8 @@ export default function ManagerPage() {
                                   <Star
                                     key={s}
                                     className={`h-3 w-3 ${s <= rev.rating
-                                        ? "fill-amber-400 text-amber-400"
-                                        : "text-slate-200"
+                                      ? "fill-amber-400 text-amber-400"
+                                      : "text-slate-200"
                                       }`}
                                   />
                                 ))}
@@ -4135,8 +4145,8 @@ export default function ManagerPage() {
                           {/* Comment Content */}
                           <div
                             className={`p-3 rounded-xl text-xs leading-relaxed ${isBad
-                                ? "bg-rose-50/50 border border-rose-100 text-rose-950 font-medium"
-                                : "bg-slate-50 border border-slate-100 text-slate-700"
+                              ? "bg-rose-50/50 border border-rose-100 text-rose-950 font-medium"
+                              : "bg-slate-50 border border-slate-100 text-slate-700"
                               }`}
                           >
                             <p className="italic">
@@ -4232,8 +4242,8 @@ export default function ManagerPage() {
               <div
                 onClick={() => setInquiryStatusFilter(inquiryStatusFilter === "New" ? "ALL" : "New")}
                 className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${inquiryStatusFilter === "New"
-                    ? "bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400"
-                    : "bg-white border-slate-200/80 hover:bg-indigo-50/30"
+                  ? "bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400"
+                  : "bg-white border-slate-200/80 hover:bg-indigo-50/30"
                   }`}
               >
                 <div className="flex items-center justify-between text-slate-400 mb-1">
@@ -4315,8 +4325,8 @@ export default function ManagerPage() {
                     key={tab.key}
                     onClick={() => setInquiryStatusFilter(tab.key)}
                     className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${inquiryStatusFilter === tab.key
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
                       }`}
                   >
                     {tab.label}
@@ -4382,10 +4392,10 @@ export default function ManagerPage() {
                       <div
                         key={inq._id}
                         className={`bg-white border rounded-3xl p-5 md:p-6 transition shadow-xs flex flex-col md:flex-row md:items-start justify-between gap-5 ${isNew
-                            ? "border-indigo-200 bg-indigo-50/10"
-                            : isResolved
-                              ? "border-slate-200/80 opacity-90"
-                              : "border-slate-200/80"
+                          ? "border-indigo-200 bg-indigo-50/10"
+                          : isResolved
+                            ? "border-slate-200/80 opacity-90"
+                            : "border-slate-200/80"
                           }`}
                       >
                         {/* Left Inquiry Info */}
@@ -4410,10 +4420,10 @@ export default function ManagerPage() {
                             {/* Status Badge */}
                             <span
                               className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${isNew
-                                  ? "bg-indigo-100 text-indigo-700 border-indigo-200"
-                                  : isResolved
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                ? "bg-indigo-100 text-indigo-700 border-indigo-200"
+                                : isResolved
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
                                 }`}
                             >
                               {inq.status || "New"}
@@ -4497,8 +4507,8 @@ export default function ManagerPage() {
                     key={side}
                     onClick={() => setSubmissionSide(side)}
                     className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${submissionSide === side
-                        ? "bg-purple-600 border-purple-600 text-white"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      ? "bg-purple-600 border-purple-600 text-white"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                       }`}
                   >
                     {side}
@@ -4826,8 +4836,8 @@ export default function ManagerPage() {
                             }));
                           }}
                           className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition cursor-pointer ${isSelected
-                              ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50/80 shadow-xs"
-                              : "border-slate-200 bg-white hover:bg-slate-100/70"
+                            ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50/80 shadow-xs"
+                            : "border-slate-200 bg-white hover:bg-slate-100/70"
                             }`}
                         >
                           <div className="flex items-center gap-2.5">
@@ -4939,8 +4949,8 @@ export default function ManagerPage() {
                                 }))
                               }
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer ${inventoryForm.colorName === c.name
-                                  ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50 text-indigo-950 font-bold"
-                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50 text-indigo-950 font-bold"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                                 }`}
                             >
                               <span
@@ -5472,6 +5482,149 @@ export default function ManagerPage() {
                 </div>
               </div>
 
+              {/* Available Sizes Section */}
+              <div className="space-y-2.5 border rounded-2xl p-4 bg-slate-50/70">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                      Available Sizes for Designing
+                    </label>
+                    <span className="text-[10px] text-slate-400">
+                      Users & employees can only choose from these sizes in 3D designer
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-2xs">
+                    {styleForm.sizes?.length || 0} of 7 Selected
+                  </span>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStyleForm((prev) => ({
+                        ...prev,
+                        sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
+                      }))
+                    }
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStyleForm((prev) => ({
+                        ...prev,
+                        sizes: ["S", "M", "L", "XL", "XXL"],
+                      }))
+                    }
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                  >
+                    Standard (S-XXL)
+                  </button>
+                </div>
+
+                {/* Sizes grid toggle buttons */}
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 pt-1">
+                  {["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((sz) => {
+                    const isSelected = (styleForm.sizes || []).includes(sz);
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => {
+                          setStyleForm((prev) => {
+                            const current = prev.sizes || [];
+                            if (current.includes(sz)) {
+                              if (current.length === 1) return prev; // Keep at least one size
+                              return {
+                                ...prev,
+                                sizes: current.filter((s) => s !== sz),
+                              };
+                            } else {
+                              return {
+                                ...prev,
+                                sizes: [...current, sz],
+                              };
+                            }
+                          });
+                        }}
+                        className={`py-2 px-2 rounded-xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                          isSelected
+                            ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
+                            : "border-slate-200 bg-white hover:bg-slate-100 text-slate-700 opacity-60"
+                        }`}
+                      >
+                        <span className="text-xs font-extrabold">{sz}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Additional Custom Sizes (if any) */}
+                {(styleForm.sizes || []).some(
+                  (s) => !["XS", "S", "M", "L", "XL", "XXL", "3XL"].includes(s)
+                ) && (
+                  <div className="pt-2 flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] font-bold text-slate-400">Custom Sizes:</span>
+                    {(styleForm.sizes || [])
+                      .filter((s) => !["XS", "S", "M", "L", "XL", "XXL", "3XL"].includes(s))
+                      .map((customSz, cIdx) => (
+                        <span
+                          key={cIdx}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-xs font-black"
+                        >
+                          {customSz}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStyleForm((prev) => ({
+                                ...prev,
+                                sizes: prev.sizes.filter((s) => s !== customSz),
+                              }));
+                            }}
+                            className="hover:text-rose-200 cursor-pointer"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                )}
+
+                {/* Add Custom Size Input */}
+                <div className="flex items-center gap-2 pt-1.5">
+                  <input
+                    type="text"
+                    placeholder="Add custom size (e.g. 4XL, Youth M)"
+                    value={newCustomSize}
+                    onChange={(e) => setNewCustomSize(e.target.value)}
+                    className="flex-1 px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = newCustomSize.trim().toUpperCase();
+                      if (!trimmed) return;
+                      setStyleForm((prev) => {
+                        const current = prev.sizes || [];
+                        if (current.includes(trimmed)) return prev;
+                        return {
+                          ...prev,
+                          sizes: [...current, trimmed],
+                        };
+                      });
+                      setNewCustomSize("");
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Size
+                  </button>
+                </div>
+              </div>
+
               {/* Actions */}
               <div className="pt-3 border-t flex items-center gap-3">
                 <button
@@ -5527,8 +5680,8 @@ export default function ManagerPage() {
                       <Star
                         key={s}
                         className={`h-3 w-3 ${s <= reviewConfirmDelete.rating
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-slate-200"
+                          ? "fill-amber-400 text-amber-400"
+                          : "text-slate-200"
                           }`}
                       />
                     ))}
@@ -5620,7 +5773,7 @@ export default function ManagerPage() {
                   {[
                     "Fabric or color out of stock",
                     "Print artwork resolution too low",
-                    "Customer requested cancellation",
+                    "Your Design cannot approve",
                     "Delivery address unreachable",
                     "Payment verification issue",
                   ].map((quickReason) => (
@@ -5628,11 +5781,10 @@ export default function ManagerPage() {
                       key={quickReason}
                       type="button"
                       onClick={() => setCancelReasonInput(quickReason)}
-                      className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition cursor-pointer ${
-                        cancelReasonInput === quickReason
-                          ? "bg-rose-50 border-rose-200 text-rose-700 font-bold"
-                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                      }`}
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition cursor-pointer ${cancelReasonInput === quickReason
+                        ? "bg-rose-50 border-rose-200 text-rose-700 font-bold"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
                     >
                       {quickReason}
                     </button>

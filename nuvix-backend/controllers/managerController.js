@@ -793,7 +793,7 @@ exports.createTShirtStyle = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { name, path, type, price, gsms, gsmPrices, colors } = req.body;
+    const { name, path, type, price, sizes, gsms, gsmPrices, colors } = req.body;
     const styleName = (name || type || "").trim();
     const styleType = (name || type || "Crew Neck").trim();
     if (!styleName || !path) {
@@ -801,11 +801,13 @@ exports.createTShirtStyle = async (req, res) => {
     }
 
     const cleanGsmPrices = (gsmPrices || []).map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) }));
+    const cleanSizes = Array.isArray(sizes) && sizes.length > 0 ? sizes : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
     const style = await TShirtStyle.create({
       name: styleName,
       path,
       type: styleType,
       price: Number(price) || 0,
+      sizes: cleanSizes,
       gsms: cleanGsmPrices.length > 0 ? cleanGsmPrices.map(gp => gp.gsm) : (gsms || ["GSM 180"]).map(formatGsm),
       gsmPrices: cleanGsmPrices,
       colors: colors || [{ name: "White", value: "#ffffff" }]
@@ -826,10 +828,11 @@ exports.updateTShirtStyle = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { name, path, type, price, gsms, gsmPrices, colors } = req.body;
+    const { name, path, type, price, sizes, gsms, gsmPrices, colors } = req.body;
     const styleName = (name || type || "").trim();
     const styleType = (name || type || "Crew Neck").trim();
     const cleanGsmPrices = (gsmPrices || []).map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) }));
+    const cleanSizes = Array.isArray(sizes) && sizes.length > 0 ? sizes : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
     const updated = await TShirtStyle.findByIdAndUpdate(
       req.params.id,
       {
@@ -837,6 +840,7 @@ exports.updateTShirtStyle = async (req, res) => {
         path,
         type: styleType,
         price: Number(price) || 0,
+        sizes: cleanSizes,
         gsms: cleanGsmPrices.length > 0 ? cleanGsmPrices.map(gp => gp.gsm) : (gsms || ["GSM 180"]).map(formatGsm),
         gsmPrices: cleanGsmPrices,
         colors
