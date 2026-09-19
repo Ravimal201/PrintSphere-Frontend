@@ -149,6 +149,41 @@ export default function ManagerPage() {
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [approvingProductId, setApprovingProductId] = useState(null);
 
+  // Orders tab states & filters
+  const [orderTabFilter, setOrderTabFilter] = useState("all"); // "all" | "active" | "pending_payment" | "delivered" | "cancelled"
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+
+  // Order status classification helpers
+  const isDeliveredOrder = (order) => {
+    return (
+      order.orderStatus === "Collected" ||
+      order.orderStatus === "Delivered" ||
+      Boolean(order.isCollected)
+    );
+  };
+
+  const isCancelledOrder = (order) => {
+    return (
+      order.orderStatus === "Cancelled" ||
+      order.orderStatus === "Canceled"
+    );
+  };
+
+  const isPendingPaymentOrder = (order) => {
+    if (isCancelledOrder(order) || isDeliveredOrder(order)) return false;
+    return (
+      order.orderStatus === "Pending Payment" ||
+      order.paymentStatus === "Pending"
+    );
+  };
+
+  const isActiveOrder = (order) => {
+    if (isCancelledOrder(order) || isDeliveredOrder(order) || isPendingPaymentOrder(order)) {
+      return false;
+    }
+    return true; // Processing, Printing, Completed, Shipped
+  };
+
   // Order cancellation state
   const [cancellingOrder, setCancellingOrder] = useState(null); // { orderId, orderNumber, customerName }
   const [cancelReasonInput, setCancelReasonInput] = useState("");
@@ -1410,25 +1445,24 @@ export default function ManagerPage() {
                 <TrendingUp className="h-5 w-5 text-indigo-600" />
                 Live Shop Operations & Active Pipeline
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 py-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 py-2">
                 {[
-                  "Pending Payment",
-                  "Processing",
-                  "Printing",
-                  "Completed",
-                  "Shipped",
-                  "Cancelled",
-                ].map((status, index) => {
-                  const count = orders.filter(
-                    (o) => o.orderStatus === status,
-                  ).length;
+                  { label: "Pending Payment", filter: (o) => isPendingPaymentOrder(o) },
+                  { label: "Processing", filter: (o) => o.orderStatus === "Processing" && !isDeliveredOrder(o) },
+                  { label: "Printing", filter: (o) => o.orderStatus === "Printing" && !isDeliveredOrder(o) },
+                  { label: "Completed", filter: (o) => o.orderStatus === "Completed" && !isDeliveredOrder(o) },
+                  { label: "Shipped", filter: (o) => o.orderStatus === "Shipped" && !isDeliveredOrder(o) },
+                  { label: "Delivered", filter: (o) => isDeliveredOrder(o) },
+                  { label: "Cancelled", filter: (o) => isCancelledOrder(o) },
+                ].map((item, index) => {
+                  const count = orders.filter(item.filter).length;
                   return (
                     <div
-                      key={status}
-                      className="border border-slate-100 rounded-2xl p-4 text-center bg-slate-50/50"
+                      key={item.label}
+                      className="border border-slate-100 rounded-2xl p-3 text-center bg-slate-50/50"
                     >
                       <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                        {status}
+                        {item.label}
                       </span>
                       <p className="text-xl font-black text-slate-900 mt-1">
                         {count}
@@ -1605,352 +1639,495 @@ export default function ManagerPage() {
         )}
 
         {/* ================= TAB 2: ORDERS fulfillment ================= */}
-        {activeTab === "orders" && (
-          <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5 text-indigo-600" />
-                  Customer Orders & Production Pipeline
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Assign staff to orders, monitor production pipeline status, or manage order cancellations.
-                </p>
-              </div>
-              <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold">
-                {orders.length} Total Orders
-              </span>
-            </div>
+        {activeTab === "orders" && (() => {
+          const orderCounts = {
+            all: orders.length,
+            active: orders.filter(isActiveOrder).length,
+            pending_payment: orders.filter(isPendingPaymentOrder).length,
+            delivered: orders.filter(isDeliveredOrder).length,
+            cancelled: orders.filter(isCancelledOrder).length,
+          };
 
-            {orders.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-sm text-slate-500 font-semibold">
-                  No customer orders found in the database.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {orders.map((order) => {
-                  const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
-                  const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
-                  const isCancelled = order.orderStatus === "Cancelled";
-                  const isPendingPayment = order.orderStatus === "Pending Payment";
-                  const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
+          const filteredOrders = orders.filter((order) => {
+            if (orderTabFilter === "active" && !isActiveOrder(order)) return false;
+            if (orderTabFilter === "pending_payment" && !isPendingPaymentOrder(order)) return false;
+            if (orderTabFilter === "delivered" && !isDeliveredOrder(order)) return false;
+            if (orderTabFilter === "cancelled" && !isCancelledOrder(order)) return false;
 
-                  return (
-                    <div
-                      key={order._id}
-                      className="border border-slate-200/90 rounded-2xl p-4 hover:border-indigo-200 transition bg-white shadow-xs space-y-3"
+            if (orderSearchQuery.trim()) {
+              const q = orderSearchQuery.toLowerCase().trim();
+              const orderIdMatch = (order._id || "").toLowerCase().includes(q) || (order._id || "").slice(-8).toLowerCase().includes(q);
+              const custName = (order.customerId?.name || "").toLowerCase();
+              const custEmail = ((typeof order.customerId === "object" ? order.customerId?.email : "") || order.guestEmail || "").toLowerCase();
+              const custPhone = (order.shippingAddress?.phone || order.customerId?.phone || "").toLowerCase();
+              const city = (order.shippingAddress?.city || order.shippingAddress?.street || "").toLowerCase();
+              const itemsMatch = (order.items || []).some((it) =>
+                (it.tShirtStyle || "").toLowerCase().includes(q) ||
+                (it.itemType || "").toLowerCase().includes(q) ||
+                (it.selectedColor || it.color || "").toLowerCase().includes(q) ||
+                (it.selectedSize || it.size || "").toLowerCase().includes(q)
+              );
+              return orderIdMatch || custName.includes(q) || custEmail.includes(q) || custPhone.includes(q) || city.includes(q) || itemsMatch;
+            }
+
+            return true;
+          });
+
+          return (
+            <div className="bg-white border rounded-3xl p-6 shadow-sm space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-indigo-600" />
+                    Customer Orders & Production Pipeline
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Filter by active, payment pending, delivered, or canceled orders. Assign staff and manage production workflow.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5" />
+                    {orders.length} Total Orders
+                  </span>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search Bar */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                {/* Status Filter Tabs */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                  {[
+                    { id: "all", label: "All Orders", count: orderCounts.all },
+                    { id: "active", label: "Active Orders", count: orderCounts.active },
+                    { id: "pending_payment", label: "Payment Pending", count: orderCounts.pending_payment },
+                    { id: "delivered", label: "Delivered Orders", count: orderCounts.delivered },
+                    { id: "cancelled", label: "Canceled Orders", count: orderCounts.cancelled },
+                  ].map((tab) => {
+                    const isActive = orderTabFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setOrderTabFilter(tab.id)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
+                          isActive
+                            ? "bg-slate-950 text-white shadow-xs"
+                            : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70"
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span
+                          className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                            isActive
+                              ? "bg-white/20 text-white"
+                              : "bg-white text-slate-700 border border-slate-200"
+                          }`}
+                        >
+                          {tab.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Search Box */}
+                <div className="relative min-w-[240px] md:w-72">
+                  <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search order #, customer, item..."
+                    value={orderSearchQuery}
+                    onChange={(e) => setOrderSearchQuery(e.target.value)}
+                    className="w-full text-xs pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
+                  />
+                  {orderSearchQuery && (
+                    <button
+                      onClick={() => setOrderSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                      title="Clear search"
                     >
-                      {/* Compact Order Header */}
-                      <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
-                        <div className="flex items-center flex-wrap gap-2">
-                          <span className="text-xs font-black text-slate-900">
-                            Order <span className="font-mono text-indigo-600 font-bold">#{order._id.slice(-8)}</span>
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${order.paymentStatus === "Paid"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-amber-50 text-amber-700 border border-amber-200"
-                              }`}
-                          >
-                            {order.paymentStatus}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${isCancelled
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
-                              : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : order.orderStatus === "Printing"
-                                  ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                  : order.orderStatus === "Processing"
-                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                    : "bg-slate-100 text-slate-700 border border-slate-200"
-                              }`}
-                          >
-                            {order.orderStatus}
-                          </span>
-                          <span className="text-slate-300">|</span>
-                          <span className="text-xs text-slate-600 font-medium">
-                            <span className="font-bold text-slate-900">
-                              {order.customerId?.name ||
-                                (typeof order.customerId === "object" && order.customerId?.email) ||
-                                order.guestEmail ||
-                                "Customer"}
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Order List / Empty States */}
+              {orders.length === 0 ? (
+                <div className="text-center py-16 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                  <Package className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600 font-bold">No customer orders found in the database.</p>
+                </div>
+              ) : filteredOrders.length === 0 ? (
+                <div className="text-center py-14 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                  <Filter className="h-9 w-9 text-slate-300 mx-auto" />
+                  <div>
+                    <p className="text-sm text-slate-700 font-bold">No orders match the selected filter.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Try switching filter tabs or clearing your search query.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setOrderTabFilter("all");
+                      setOrderSearchQuery("");
+                    }}
+                    className="px-3.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredOrders.map((order) => {
+                    const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
+                    const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
+                    const isCancelled = isCancelledOrder(order);
+                    const isPendingPayment = isPendingPaymentOrder(order);
+                    const isDelivered = isDeliveredOrder(order);
+                    const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
+
+                    return (
+                      <div
+                        key={order._id}
+                        className="border border-slate-200/90 rounded-2xl p-4 hover:border-indigo-200 transition bg-white shadow-xs space-y-3"
+                      >
+                        {/* Compact Order Header */}
+                        <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <span className="text-xs font-black text-slate-900">
+                              Order <span className="font-mono text-indigo-600 font-bold">#{order._id.slice(-8)}</span>
                             </span>
-                            {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
-                              <span className="text-slate-400 font-normal ml-1">
-                                ({order.customerId?.email || order.guestEmail})
+
+                            {/* Payment Status Badge */}
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                order.paymentStatus === "Paid"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                              }`}
+                            >
+                              {order.paymentStatus || "Pending"}
+                            </span>
+
+                            {/* Order Status Badge */}
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1 ${
+                                isCancelled
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : isDelivered
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : isPendingPayment
+                                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                      : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
+                                        ? "bg-sky-50 text-sky-700 border border-sky-200"
+                                        : order.orderStatus === "Printing"
+                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                          : order.orderStatus === "Processing"
+                                            ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                            : "bg-slate-100 text-slate-700 border border-slate-200"
+                              }`}
+                            >
+                              {isDelivered && <CheckCircle2 className="h-3 w-3 text-emerald-600" />}
+                              {isCancelled && <Ban className="h-3 w-3 text-rose-500" />}
+                              <span>{isDelivered ? "Delivered (Collected)" : order.orderStatus}</span>
+                            </span>
+
+                            <span className="text-slate-300">|</span>
+                            <span className="text-xs text-slate-600 font-medium">
+                              <span className="font-bold text-slate-900">
+                                {order.customerId?.name ||
+                                  (typeof order.customerId === "object" && order.customerId?.email) ||
+                                  order.guestEmail ||
+                                  "Customer"}
                               </span>
-                            ) : null}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-slate-400 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {new Date(order.createdAt).toLocaleDateString()}
-                          </span>
-                          <span className="text-base font-black text-slate-950">
-                            Rs. {(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Main Section: Compact Sidebar Meta Info + Wide 3D Views & Items */}
-                      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3 items-start">
-                        {/* Left Sidebar: Shipping & Assigned Employee */}
-                        <div className="space-y-2.5">
-                          {/* Shipping Destination */}
-                          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1">
-                            <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
-                              Shipping Destination
+                              {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
+                                <span className="text-slate-400 font-normal ml-1">
+                                  ({order.customerId?.email || order.guestEmail})
+                                </span>
+                              ) : null}
                             </span>
-                            {order.shippingAddress ? (
-                              <p className="text-xs text-slate-700 font-medium leading-tight">
-                                {order.shippingAddress.street ? `${order.shippingAddress.street}, ` : ""}
-                                {order.shippingAddress.city ? `${order.shippingAddress.city}, ` : ""}
-                                {order.shippingAddress.country || "Sri Lanka"}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-slate-400 italic">Address not specified</p>
-                            )}
                           </div>
 
-                          {/* Employee Assignment */}
-                          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5">
-                            <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
-                              Assigned Operator
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(order.createdAt).toLocaleDateString()}
                             </span>
-                            {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="h-6 w-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
-                                    {order.assignedEmployee.name ? order.assignedEmployee.name.charAt(0).toUpperCase() : "E"}
-                                  </div>
-                                  <span className="text-xs font-bold text-slate-900 truncate">
-                                    {order.assignedEmployee.name}
-                                  </span>
-                                </div>
+                            <span className="text-base font-black text-slate-950">
+                              Rs. {(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
 
-                                {!isCancelled && order.orderStatus !== "Shipped" && (
-                                  <button
-                                    onClick={() => {
-                                      setEditingEmployeeOrderId(order._id);
-                                      setSelectedEmployeeForOrder((prev) => ({
-                                        ...prev,
-                                        [order._id]: order.assignedEmployee?._id || "",
-                                      }));
-                                    }}
-                                    className="px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition flex items-center gap-1 shrink-0 cursor-pointer bg-white"
-                                    title="Edit assigned employee"
-                                  >
-                                    <Edit2 className="h-2.5 w-2.5 text-indigo-600" />
-                                    <span>Edit</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <div>
-                                {editingEmployeeOrderId === order._id ? (
-                                  <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1">
+                        {/* Main Section: Compact Sidebar Meta Info + Wide 3D Views & Items */}
+                        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3 items-start">
+                          {/* Left Sidebar: Shipping & Assigned Employee */}
+                          <div className="space-y-2.5">
+                            {/* Shipping Destination */}
+                            <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1">
+                              <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
+                                Shipping Destination
+                              </span>
+                              {order.shippingAddress ? (
+                                <p className="text-xs text-slate-700 font-medium leading-tight">
+                                  {order.shippingAddress.street ? `${order.shippingAddress.street}, ` : ""}
+                                  {order.shippingAddress.city ? `${order.shippingAddress.city}, ` : ""}
+                                  {order.shippingAddress.country || "Sri Lanka"}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-slate-400 italic">Address not specified</p>
+                              )}
+                            </div>
+
+                            {/* Employee Assignment */}
+                            <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5">
+                              <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
+                                Assigned Operator
+                              </span>
+                              {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="h-6 w-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                                      {order.assignedEmployee.name ? order.assignedEmployee.name.charAt(0).toUpperCase() : "E"}
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-900 truncate">
+                                      {order.assignedEmployee.name}
+                                    </span>
+                                  </div>
+
+                                  {!isCancelled && !isDelivered && order.orderStatus !== "Shipped" && (
+                                    <button
+                                      onClick={() => {
+                                        setEditingEmployeeOrderId(order._id);
+                                        setSelectedEmployeeForOrder((prev) => ({
+                                          ...prev,
+                                          [order._id]: order.assignedEmployee?._id || "",
+                                        }));
+                                      }}
+                                      className="px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition flex items-center gap-1 shrink-0 cursor-pointer bg-white"
+                                      title="Edit assigned employee"
+                                    >
+                                      <Edit2 className="h-2.5 w-2.5 text-indigo-600" />
+                                      <span>Edit</span>
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div>
+                                  {editingEmployeeOrderId === order._id ? (
+                                    <div className="space-y-1.5">
+                                      <div className="flex items-center gap-1">
+                                        <select
+                                          value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
+                                          onChange={(e) =>
+                                            setSelectedEmployeeForOrder((prev) => ({
+                                              ...prev,
+                                              [order._id]: e.target.value,
+                                            }))
+                                          }
+                                          className="flex-1 text-[11px] border border-slate-300 rounded-lg px-2 py-1 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                        >
+                                          <option value="">-- Select Employee --</option>
+                                          {employees.map((emp) => (
+                                            <option key={emp._id} value={emp._id}>
+                                              {emp.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
+                                          onClick={() => {
+                                            const empId = selectedEmployeeForOrder[order._id];
+                                            if (empId) {
+                                              handleAssignEmployee(order._id, empId);
+                                            }
+                                          }}
+                                          className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                        >
+                                          {assignLoading[order._id] ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Check className="h-3 w-3" />
+                                          )}
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingEmployeeOrderId(null)}
+                                          className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1">
                                       <select
-                                        value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
-                                        onChange={(e) =>
-                                          setSelectedEmployeeForOrder((prev) => ({
-                                            ...prev,
-                                            [order._id]: e.target.value,
-                                          }))
-                                        }
-                                        className="flex-1 text-[11px] border border-slate-300 rounded-lg px-2 py-1 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                        disabled={assignLoading[order._id] || isCancelled || isDelivered}
+                                        onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
+                                        defaultValue=""
+                                        className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white font-medium text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-50"
                                       >
-                                        <option value="">-- Select Employee --</option>
+                                        <option value="" disabled>
+                                          -- Assign staff --
+                                        </option>
                                         {employees.map((emp) => (
                                           <option key={emp._id} value={emp._id}>
                                             {emp.name}
                                           </option>
                                         ))}
                                       </select>
-                                      <button
-                                        disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
-                                        onClick={() => {
-                                          const empId = selectedEmployeeForOrder[order._id];
-                                          if (empId) {
-                                            handleAssignEmployee(order._id, empId);
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                      >
-                                        {assignLoading[order._id] ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                          <Check className="h-3 w-3" />
-                                        )}
-                                      </button>
-                                      <button
-                                        onClick={() => setEditingEmployeeOrderId(null)}
-                                        className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
+                                      {!order.assignedEmployee && !isCancelled && !isDelivered && (
+                                        <p className="text-[9px] text-amber-600 font-semibold flex items-center gap-1">
+                                          <AlertCircle className="h-2.5 w-2.5 shrink-0" />
+                                          No staff assigned
+                                        </p>
+                                      )}
                                     </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right Area: Items List with Small 3D Views */}
+                          <div className="space-y-2">
+                            {order.items.map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-white p-2.5 border border-slate-200/90 rounded-xl space-y-2"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-black text-slate-900 text-xs">
+                                      {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                      Size: <span className="font-bold text-slate-800">{item.selectedSize || item.size}</span> |
+                                      Color: <span className="font-bold text-slate-800">{resolveColorName(item.selectedColor || item.color)}</span> |
+                                      GSM: <span className="font-bold text-slate-800">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
+                                    </span>
                                   </div>
-                                ) : (
-                                  <div className="space-y-1">
-                                    <select
-                                      disabled={assignLoading[order._id] || isCancelled}
-                                      onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
-                                      defaultValue=""
-                                      className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white font-medium text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                                    >
-                                      <option value="" disabled>
-                                        -- Assign staff --
-                                      </option>
-                                      {employees.map((emp) => (
-                                        <option key={emp._id} value={emp._id}>
-                                          {emp.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <p className="text-[9px] text-amber-600 font-semibold flex items-center gap-1">
-                                      <AlertCircle className="h-2.5 w-2.5 shrink-0" />
-                                      No staff assigned
-                                    </p>
-                                  </div>
-                                )}
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${item.itemType === "Customized" || item.designId
+                                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                    }`}>
+                                    {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog"}
+                                  </span>
+                                </div>
+
+                                {/* Multi-Angle 3D View Small Thumbnails */}
+                                <DesignScreenshotViewer
+                                  item={item}
+                                  orderId={order._id}
+                                  onOpen3DModal={(designToOpen) => {
+                                    setSelected3DDesign(designToOpen);
+                                    setIs3DModalOpen(true);
+                                  }}
+                                />
                               </div>
-                            )}
+                            ))}
                           </div>
                         </div>
 
-                        {/* Right Area: Items List with Small 3D Views */}
-                        <div className="space-y-2">
-                          {order.items.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-white p-2.5 border border-slate-200/90 rounded-xl space-y-2"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-black text-slate-900 text-xs">
-                                    {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
-                                  </span>
-                                  <span className="text-[10px] text-slate-500 font-medium">
-                                    Size: <span className="font-bold text-slate-800">{item.selectedSize || item.size}</span> |
-                                    Color: <span className="font-bold text-slate-800">{resolveColorName(item.selectedColor || item.color)}</span> |
-                                    GSM: <span className="font-bold text-slate-800">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
-                                  </span>
-                                </div>
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${item.itemType === "Customized" || item.designId
-                                  ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                  : "bg-blue-50 text-blue-700 border border-blue-200"
-                                  }`}>
-                                  {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog"}
-                                </span>
-                              </div>
-
-                              {/* Multi-Angle 3D View Small Thumbnails */}
-                              <DesignScreenshotViewer
-                                item={item}
-                                orderId={order._id}
-                                onOpen3DModal={(designToOpen) => {
-                                  setSelected3DDesign(designToOpen);
-                                  setIs3DModalOpen(true);
-                                }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Compact Bottom Footer: Status Stepper & Cancel Action */}
-                      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                            Status:
-                          </span>
-
-                          {isCancelled ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-[11px] font-bold">
-                              <Ban className="h-3 w-3 text-rose-500 shrink-0" />
-                              Order Cancelled
+                        {/* Compact Bottom Footer: Status Stepper & Cancel Action */}
+                        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                              Status:
                             </span>
-                          ) : isPendingPayment ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-[11px] font-bold">
-                              <Clock className="h-3 w-3 text-amber-500 shrink-0" />
-                              Awaiting Customer Payment
-                            </span>
-                          ) : (
-                            <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-                              {pipelineStages.map((stage, sIdx) => {
-                                const isPassed = currentStageIdx > sIdx;
-                                const isCurrent = currentStageIdx === sIdx;
 
-                                return (
-                                  <div key={stage} className="flex items-center shrink-0">
-                                    <div
-                                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${isCurrent
-                                        ? "bg-indigo-600 text-white shadow-2xs font-black"
-                                        : isPassed
-                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                          : "bg-slate-100 text-slate-400 border border-slate-200"
-                                        }`}
-                                    >
-                                      {isPassed ? (
-                                        <Check className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
-                                      ) : isCurrent ? (
-                                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping shrink-0" />
-                                      ) : (
-                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-300 shrink-0" />
-                                      )}
-                                      <span>{stage}</span>
-                                    </div>
-                                    {sIdx < pipelineStages.length - 1 && (
+                            {isCancelled ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-[11px] font-bold">
+                                <Ban className="h-3 w-3 text-rose-500 shrink-0" />
+                                Order Cancelled
+                              </span>
+                            ) : isDelivered ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-[11px] font-bold">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                <span>Order Delivered & Collected by Customer</span>
+                                {order.collectedAt && (
+                                  <span className="text-[10px] font-normal text-emerald-600 ml-1">
+                                    ({new Date(order.collectedAt).toLocaleDateString()})
+                                  </span>
+                                )}
+                              </span>
+                            ) : isPendingPayment ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-[11px] font-bold">
+                                <Clock className="h-3 w-3 text-amber-500 shrink-0" />
+                                Awaiting Customer Payment
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+                                {pipelineStages.map((stage, sIdx) => {
+                                  const isPassed = currentStageIdx > sIdx;
+                                  const isCurrent = currentStageIdx === sIdx;
+
+                                  return (
+                                    <div key={stage} className="flex items-center shrink-0">
                                       <div
-                                        className={`w-2 h-0.5 mx-0.5 transition ${isPassed ? "bg-emerald-400" : "bg-slate-200"
+                                        className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${isCurrent
+                                          ? "bg-indigo-600 text-white shadow-2xs font-black"
+                                          : isPassed
+                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                            : "bg-slate-100 text-slate-400 border border-slate-200"
                                           }`}
-                                      />
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                                      >
+                                        {isPassed ? (
+                                          <Check className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                        ) : isCurrent ? (
+                                          <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping shrink-0" />
+                                        ) : (
+                                          <span className="h-1.5 w-1.5 rounded-full bg-slate-300 shrink-0" />
+                                        )}
+                                        <span>{stage}</span>
+                                      </div>
+                                      {sIdx < pipelineStages.length - 1 && (
+                                        <div
+                                          className={`w-2 h-0.5 mx-0.5 transition ${isPassed ? "bg-emerald-400" : "bg-slate-200"
+                                            }`}
+                                        />
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
 
-                          {latestTimeline?.note && (
-                            <span className="text-[10px] text-slate-400 italic truncate max-w-xs">
-                              ({latestTimeline.note})
-                            </span>
-                          )}
-                        </div>
+                            {latestTimeline?.note && (
+                              <span className="text-[10px] text-slate-400 italic truncate max-w-xs">
+                                ({latestTimeline.note})
+                              </span>
+                            )}
+                          </div>
 
-                        {/* Actions */}
-                        <div className="shrink-0">
-                          {!isCancelled && order.orderStatus !== "Shipped" ? (
-                            <button
-                              disabled={assignLoading[order._id]}
-                              onClick={() => openCancelOrderModal(order)}
-                              className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                              title="Cancel this order"
-                            >
-                              {assignLoading[order._id] ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Ban className="h-3 w-3" />
-                              )}
-                              <span>Cancel</span>
-                            </button>
-                          ) : null}
+                          {/* Actions */}
+                          <div className="shrink-0">
+                            {!isCancelled && !isDelivered && order.orderStatus !== "Shipped" ? (
+                              <button
+                                disabled={assignLoading[order._id]}
+                                onClick={() => openCancelOrderModal(order)}
+                                className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                title="Cancel this order"
+                              >
+                                {assignLoading[order._id] ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Ban className="h-3 w-3" />
+                                )}
+                                <span>Cancel</span>
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ================= TAB 3: PRODUCT CATALOG & SUBMISSIONS ================= */}
         {activeTab === "products" && (

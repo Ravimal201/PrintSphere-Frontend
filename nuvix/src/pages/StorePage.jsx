@@ -1650,7 +1650,7 @@ export default function StorePage() {
                   </div>
                 </div>
 
-                {/* Customer Reviews List & Interactive Rating Form */}
+                {/* Customer Reviews List */}
                 <div className="space-y-3 pt-4 border-t">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1674,140 +1674,7 @@ export default function StorePage() {
                         </span>
                       </div>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isManagerPreview || isManagerOrAdmin) {
-                          setPreviewNotice({
-                            type: "review",
-                            title: "Manager Store Preview",
-                            message: "Review submission is disabled in Store Preview. This view is for previewing the storefront design. You can moderate live customer reviews from the Manager Dashboard.",
-                            productTitle: selected3DProduct?.title || "T-Shirt Design",
-                          });
-                          return;
-                        }
-                        setIsWritingReview(!isWritingReview);
-                        setReviewErrorMsg("");
-                        setReviewSuccessMsg("");
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition cursor-pointer border border-indigo-100"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      <span>{isWritingReview ? "Close Review Form" : "Write a Review"}</span>
-                    </button>
                   </div>
-
-                  {/* Review Submission Form */}
-                  {isWritingReview && (
-                    <form
-                      onSubmit={handleProductReviewSubmit}
-                      className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3.5 space-y-3 animate-fade-in"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-amber-900 flex items-center gap-1">
-                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                          Rate & Review this Product
-                        </span>
-                        <span className="text-[11px] font-extrabold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full">
-                          {(reviewHover || reviewRating) === 1 && "😞 Poor"}
-                          {(reviewHover || reviewRating) === 2 && "😐 Fair"}
-                          {(reviewHover || reviewRating) === 3 && "🙂 Good"}
-                          {(reviewHover || reviewRating) === 4 && "😊 Very Good"}
-                          {(reviewHover || reviewRating) === 5 && "🤩 Excellent"}
-                        </span>
-                      </div>
-
-                      {/* Interactive Stars */}
-                      <div className="flex items-center gap-1.5">
-                        {[1, 2, 3, 4, 5].map((star) => {
-                          const active = (reviewHover || reviewRating) >= star;
-                          return (
-                            <button
-                              key={star}
-                              type="button"
-                              onClick={() => setReviewRating(star)}
-                              onMouseEnter={() => setReviewHover(star)}
-                              onMouseLeave={() => setReviewHover(0)}
-                              className="p-1 rounded-lg transition hover:scale-110 cursor-pointer"
-                            >
-                              <Star
-                                className={`h-6 w-6 transition-colors ${
-                                  active
-                                    ? "fill-amber-400 text-amber-400 drop-shadow-xs"
-                                    : "text-slate-300 hover:text-slate-400"
-                                }`}
-                              />
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Name input */}
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="Your Name (e.g. Alex M.)"
-                          value={reviewerName}
-                          onChange={(e) => setReviewerName(e.target.value)}
-                          className="w-full text-xs font-medium px-3 py-2 bg-white rounded-xl border border-amber-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                        />
-                      </div>
-
-                      {/* Comment textarea */}
-                      <div>
-                        <textarea
-                          rows={2}
-                          maxLength={300}
-                          placeholder="What did you think of the design, fabric quality, or style? (Optional)"
-                          value={reviewComment}
-                          onChange={(e) => setReviewComment(e.target.value)}
-                          className="w-full text-xs font-medium px-3 py-2 bg-white rounded-xl border border-amber-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 resize-none leading-relaxed"
-                        />
-                      </div>
-
-                      {reviewErrorMsg && (
-                        <div className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 p-2 rounded-xl flex items-center gap-1.5">
-                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                          <span>{reviewErrorMsg}</span>
-                        </div>
-                      )}
-
-                      {reviewSuccessMsg && (
-                        <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded-xl flex items-center gap-1.5">
-                          <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-                          <span>{reviewSuccessMsg}</span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-end gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setIsWritingReview(false)}
-                          className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-amber-100/50 rounded-xl transition cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={submittingReview}
-                          className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition shadow-xs cursor-pointer disabled:opacity-50"
-                        >
-                          {submittingReview ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              <span>Submitting...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Send className="h-3.5 w-3.5" />
-                              <span>Submit Review</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </form>
-                  )}
 
                   {/* Existing Reviews List */}
                   {selected3DProduct.reviews && selected3DProduct.reviews.length > 0 ? (
