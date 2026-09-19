@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { useGLTF, useFBX, Html } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
+import { useThree, createPortal } from "@react-three/fiber";
 import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
 import ThreeErrorBoundary from "../components/ThreeErrorBoundary";
@@ -596,17 +596,13 @@ function DecalItem({
     return null;
   }
 
-  // Calculate world coordinates for the helper controls outline
-  rootScene.updateMatrixWorld(true);
-  scene.updateMatrixWorld(true);
+  const helperRot = useMemo(() => {
+    return new THREE.Euler(Number(rawRot[0]) || 0, Number(rawRot[1]) || 0, Number(rawRot[2]) || 0, "YXZ");
+  }, [rawRot[0], rawRot[1], rawRot[2]]);
 
-  const worldPos = groupPos.clone().applyMatrix4(scene.matrixWorld);
-  const sceneQuaternion = new THREE.Quaternion().setFromRotationMatrix(scene.matrixWorld);
-  const layerQuaternion = new THREE.Quaternion().setFromEuler(
-    new THREE.Euler(Number(rawRot[0]) || 0, Number(rawRot[1]) || 0, Number(rawRot[2]) || 0, "YXZ")
-  );
-  const worldQuaternion = sceneQuaternion.clone().multiply(layerQuaternion);
-  const worldEuler = new THREE.Euler().setFromQuaternion(worldQuaternion, "YXZ");
+  const helperPos = useMemo(() => {
+    return [groupPos.x, groupPos.y, groupPos.z];
+  }, [groupPos.x, groupPos.y, groupPos.z]);
 
   const helperScale = [
     groupScale.x,
@@ -615,11 +611,13 @@ function DecalItem({
   ];
 
   const meshWorldScale = new THREE.Vector3(1, 1, 1);
-  mesh.getWorldScale(meshWorldScale);
+  if (mesh?.getWorldScale) {
+    mesh.getWorldScale(meshWorldScale);
+  }
 
   if (!isSelected) {
-    return (
-      <group position={[worldPos.x, worldPos.y, worldPos.z]} rotation={worldEuler}>
+    return createPortal(
+      <group position={helperPos} rotation={helperRot}>
         <mesh
           userData={{ isDecal: true }}
           position={[0, 0, -0.005]}
@@ -658,7 +656,8 @@ function DecalItem({
           <planeGeometry args={[helperScale[0] || 0.3, helperScale[1] || 0.3]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
-      </group>
+      </group>,
+      scene
     );
   }
 
@@ -750,11 +749,11 @@ function DecalItem({
     }
   };
 
-  return (
+  return createPortal(
     <DecalHelperControls
       groupRef={groupRef}
-      position={[worldPos.x, worldPos.y, worldPos.z]}
-      rotation={worldEuler}
+      position={helperPos}
+      rotation={helperRot}
       scale={helperScale}
       meshWorldScale={meshWorldScale}
       isLocked={Boolean(layer.locked)}
@@ -763,7 +762,8 @@ function DecalItem({
       onDeleteClick={handleDeleteClick}
       onDecalPointerDown={handleDecalPointerDown}
       onContextMenu={handleContextMenu}
-    />
+    />,
+    scene
   );
 }
 
@@ -1021,10 +1021,10 @@ export default function ShirtModel({
           return true;
         });
 
-        // Fallback raycast straight at chest center if initial ray missed
+        // Fallback raycast straight at chest center or back center if initial ray missed
         if (!validHit) {
-          const fallbackOrigin = new THREE.Vector3(center.x, chestY, center.z + 2.5).applyMatrix4(scene.matrixWorld);
-          const fallbackDir = new THREE.Vector3(0, 0, -1).transformDirection(scene.matrixWorld).normalize();
+          const fallbackOrigin = new THREE.Vector3(center.x, chestY, center.z + zSign * 2.5).applyMatrix4(scene.matrixWorld);
+          const fallbackDir = new THREE.Vector3(0, 0, -zSign).transformDirection(scene.matrixWorld).normalize();
           raycaster.set(fallbackOrigin, fallbackDir);
           intersects = raycaster.intersectObjects(scene.children, true);
           validHit = intersects.find((hit) => {

@@ -416,6 +416,14 @@ export const renderTShirtCompositeToCanvas = async ({
         if (!text) continue;
 
         ctx.save();
+        ctx.translate(centerX, centerY);
+        if (layer.rotation && Array.isArray(layer.rotation) && layer.rotation[2]) {
+          ctx.rotate(layer.rotation[2]);
+        }
+        if (layer.flipX || layer.flipY) {
+          ctx.scale(layer.flipX ? -1 : 1, layer.flipY ? -1 : 1);
+        }
+
         const fontSize = Math.round(areaW * 0.14);
         const fontStyle = [
           layer.italic ? "italic" : "normal",
@@ -435,7 +443,7 @@ export const renderTShirtCompositeToCanvas = async ({
         ctx.shadowOffsetX = 1;
         ctx.shadowOffsetY = 1;
 
-        ctx.fillText(text, centerX, centerY);
+        ctx.fillText(text, 0, 0);
         ctx.restore();
 
       } else {
@@ -459,14 +467,12 @@ export const renderTShirtCompositeToCanvas = async ({
             drawW = drawH * imgAspect;
           }
 
-          const dx = centerX - drawW / 2;
-          const dy = centerY - drawH / 2;
-
-          // Apply layer rotation or flips if specified
+          ctx.translate(centerX, centerY);
+          if (layer.rotation && Array.isArray(layer.rotation) && layer.rotation[2]) {
+            ctx.rotate(layer.rotation[2]);
+          }
           if (layer.flipX || layer.flipY) {
-            ctx.translate(centerX, centerY);
             ctx.scale(layer.flipX ? -1 : 1, layer.flipY ? -1 : 1);
-            ctx.translate(-centerX, -centerY);
           }
 
           // Subtle shadow under decal
@@ -475,7 +481,7 @@ export const renderTShirtCompositeToCanvas = async ({
           ctx.shadowOffsetX = 1;
           ctx.shadowOffsetY = 2;
 
-          ctx.drawImage(img, dx, dy, drawW, drawH);
+          ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
           ctx.restore();
         }
       }

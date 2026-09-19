@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import * as THREE from "three";
 import Scene from "../three/Scene";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -963,9 +964,12 @@ export default function DesignerPage() {
     const theta = -modelRotation;
     const x = 0.16 * Math.sin(theta);
     const z = 0.16 * Math.cos(theta);
+    const normal = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta)).normalize();
+    const matrix = new THREE.Matrix4().lookAt(new THREE.Vector3(0, 0, 0), normal, new THREE.Vector3(0, 1, 0));
+    const euler = new THREE.Euler().setFromRotationMatrix(matrix, "YXZ");
     return {
       position: [x, 0, z],
-      rotation: [0, theta, 0]
+      rotation: [euler.x, euler.y, 0]
     };
   };
 
