@@ -9,6 +9,8 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
+  CheckCircle2,
+  XCircle,
   TrendingUp,
   Sparkles,
   Plus,
@@ -45,6 +47,8 @@ import {
   Star,
   MessageSquare,
   ThumbsDown,
+  ThumbsUp,
+  Eye,
   Mail,
 } from "lucide-react";
 import axios from "axios";
@@ -139,6 +143,9 @@ export default function ManagerPage() {
   const [productError, setProductError] = useState("");
   const [productSuccess, setProductSuccess] = useState("");
   const [productActionLoading, setProductActionLoading] = useState(false);
+  const [productTabFilter, setProductTabFilter] = useState("all"); // "all" | "pending" | "approved" | "archived"
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [approvingProductId, setApprovingProductId] = useState(null);
 
   // Pricing rules inputs
   const [pricingForm, setPricingForm] = useState({
@@ -477,20 +484,25 @@ export default function ManagerPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
+      setApprovingProductId(id);
       const res = await axios.put(
         `${API_BASE_URL}/manager/products/${id}/approve`,
         { action },
         { headers },
       );
-      alert(res.data.message);
       // reload products
       const productsRes = await axios.get(`${API_BASE_URL}/manager/products`, {
         headers,
       });
       setProducts(productsRes.data);
+      if (selectedSubmissionProduct && selectedSubmissionProduct._id === id) {
+        setSelectedSubmissionProduct(null);
+      }
     } catch (err) {
       console.error("Draft action error:", err);
-      alert("Failed to process draft design");
+      alert(err.response?.data?.message || "Failed to process draft design");
+    } finally {
+      setApprovingProductId(null);
     }
   };
 
@@ -939,7 +951,7 @@ export default function ManagerPage() {
 
   // Helper selectors / values
   const pendingDrafts = products.filter(
-    (p) => !p.isApproved && p.status === "Draft",
+    (p) => !p.isApproved && p.status !== "Archived",
   );
   const lowStockItems = inventory.filter(
     (item) => item.quantity <= item.minThreshold,
@@ -1457,45 +1469,71 @@ export default function ManagerPage() {
 
               {/* Pending Employee Designs */}
               <div className="bg-white border rounded-3xl p-6 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-950 mb-4 flex items-center gap-2">
-                  <Award className="h-4.5 w-4.5 text-purple-500" />
-                  Designs Awaiting Approval ({pendingDrafts.length})
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
+                    <Award className="h-4.5 w-4.5 text-purple-500" />
+                    Designs Awaiting Approval ({pendingDrafts.length})
+                  </h3>
+                  {pendingDrafts.length > 0 && (
+                    <button
+                      onClick={() => setActiveTab("products")}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition"
+                    >
+                      <span>Manage All in Products</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
                 {pendingDrafts.length === 0 ? (
                   <div className="text-center py-10">
-                    <p className="text-sm text-slate-500 font-semibold">
-                      All employee submissions approved & active.
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm text-slate-700 font-bold">
+                      All Submissions Reviewed
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      All employee design submissions are approved & active.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                     {pendingDrafts.map((draft) => (
                       <div
                         key={draft._id}
-                        className="flex items-center justify-between border rounded-2xl p-4 hover:bg-slate-50 transition"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between border border-slate-200/90 rounded-2xl p-4 hover:border-purple-200 hover:bg-purple-50/20 transition gap-3"
                       >
                         <div className="flex items-center gap-4">
-                          <TShirt2D
-                            color={draft.colors?.[0]}
-                            designUrl={draft.images?.[0]}
-                            className="h-16 w-16 bg-slate-50 border rounded-xl shrink-0"
-                          />
+                          <div className="w-16 h-16 shrink-0 relative rounded-xl overflow-hidden shadow-2xs border border-slate-200 bg-slate-50">
+                            <Store3DCardPreview
+                              product={draft}
+                              activeColor={draft.colors?.[0] || "#ffffff"}
+                              showControls={false}
+                              hideBadge={true}
+                              className="!h-16 !w-16 !rounded-xl !p-0"
+                              onClick={() => {
+                                setSelectedSubmissionProduct(draft);
+                                setSubmissionSide("front");
+                                setSubmissionZoom(0.85);
+                              }}
+                            />
+                          </div>
                           <div>
                             <p className="text-sm font-bold text-slate-900">
                               {draft.title}
                             </p>
                             <p className="text-[11px] text-slate-500">
                               {draft.category} — Rs.{" "}
-                              {draft.basePrice.toFixed(2)}
+                              {(draft.basePrice || 0).toFixed(2)}
                             </p>
                             {draft.createdBy && (
-                              <span className="text-[9px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-block">
-                                By {draft.createdBy.name || "Employee"}
+                              <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-flex items-center gap-1">
+                                <User className="h-3 w-3 text-purple-500" /> By {draft.createdBy.name || "Employee"}
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
                           <button
                             onClick={() => {
                               setSelectedSubmissionProduct(draft);
@@ -1508,22 +1546,34 @@ export default function ManagerPage() {
                             <span>View 3D</span>
                           </button>
                           <button
+                            disabled={approvingProductId === draft._id}
                             onClick={() =>
                               handleApproveProductDraft(draft._id, "approve")
                             }
-                            className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                             title="Approve & Publish"
                           >
-                            <Check className="h-4 w-4" />
+                            {approvingProductId === draft._id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                            )}
+                            <span>Approve</span>
                           </button>
                           <button
+                            disabled={approvingProductId === draft._id}
                             onClick={() =>
                               handleApproveProductDraft(draft._id, "reject")
                             }
-                            className="p-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                            title="Reject"
+                            className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                            title="Disapprove / Reject"
                           >
-                            <X className="h-4 w-4" />
+                            {approvingProductId === draft._id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                            )}
+                            <span>Disapprove</span>
                           </button>
                         </div>
                       </div>
@@ -1888,141 +1938,458 @@ export default function ManagerPage() {
           </div>
         )}
 
-        {/* ================= TAB 3: PRODUCT CATALOG ================= */}
+        {/* ================= TAB 3: PRODUCT CATALOG & SUBMISSIONS ================= */}
         {activeTab === "products" && (
           <div className="space-y-8">
-            {/* Catalog Grid */}
+            {/* Header */}
             <div className="bg-white border rounded-3xl p-6 shadow-sm">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                    <Layers className="h-5 w-5 text-indigo-600" />
-                    Product Catalog & Categories
-                  </h3>
+              <div>
+                <h3 className="text-xl font-black text-slate-950 flex items-center gap-2.5">
+                  <Layers className="h-6 w-6 text-indigo-600" />
+                  Products & Design Submissions
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Review employee design submissions, approve or disapprove designs, and manage the live product catalog.
+                </p>
+              </div>
+            </div>
+
+            {/* SECTION 1: EMPLOYEE SUBMISSIONS & PENDING APPROVALS SHOWCASE */}
+            <div className="bg-white border rounded-3xl p-6 sm:p-7 shadow-sm space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
+                    <Award className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-base font-black text-slate-900">
+                        Employee Design Submissions
+                      </h4>
+                      {pendingDrafts.length > 0 ? (
+                        <span className="px-2.5 py-0.5 bg-purple-100 text-purple-700 font-black text-xs rounded-full animate-pulse">
+                          {pendingDrafts.length} Pending Review
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> All Reviewed
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Designs created by staff members that require manager approval before being published to the store.
+                    </p>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setEditingProduct(null);
-                    resetProductForm();
-                    setShowProductModal(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Product
-                </button>
               </div>
 
-              {products.length === 0 ? (
-                <div className="text-center py-16">
-                  <p className="text-sm text-slate-500 font-semibold">
-                    No catalog products loaded.
+              {pendingDrafts.length === 0 ? (
+                <div className="text-center py-10 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 p-8">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 border border-emerald-100">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800">
+                    All Employee Submissions Reviewed
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    There are currently no staff design concepts waiting for your approval. New submissions will appear here automatically.
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                        <th className="pb-3">Title</th>
-                        <th className="pb-3">Category</th>
-                        <th className="pb-3">Price</th>
-                        <th className="pb-3">Discount</th>
-                        <th className="pb-3">Sizes</th>
-                        <th className="pb-3">GSMs</th>
-                        <th className="pb-3">Status</th>
-                        <th className="pb-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((p) => (
-                        <tr
-                          key={p._id}
-                          className="border-b last:border-b-0 hover:bg-slate-50/50 transition"
-                        >
-                          <td className="py-4 font-bold text-slate-900">
-                            <div className="flex items-center gap-3">
-                              <TShirt2D
-                                color={p.colors?.[0]}
-                                designUrl={p.images?.[0]}
-                                className="h-10 w-10 bg-slate-50 border rounded-lg shrink-0"
-                              />
-                              <div>
-                                <p>{p.title}</p>
-                                {!p.isApproved && (
-                                  <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[8px] font-black rounded-full uppercase mt-1 inline-block">
-                                    Awaiting Approval
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 text-xs text-slate-600">
-                            {p.category}
-                          </td>
-                          <td className="py-4 text-xs font-bold text-slate-900">
-                            Rs. {(p.basePrice || 0).toFixed(2)}
-                          </td>
-                          <td className="py-4 text-xs">
-                            {p.discount > 0 ? (
-                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-bold">
-                                {p.discount}% Off
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                  {pendingDrafts.map((draft) => (
+                    <div
+                      key={draft._id}
+                      className="border border-slate-200/90 hover:border-purple-300 rounded-2xl p-5 bg-white shadow-xs hover:shadow-md transition flex flex-col justify-between space-y-4 group"
+                    >
+                      {/* Top info */}
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                            {draft.category || "T-Shirts"}
+                          </span>
+                          <span className="text-xs font-black text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
+                            Rs. {(draft.basePrice || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        {/* 3D Frozen T-Shirt Card Preview like in Store */}
+                        <div className="relative rounded-2xl overflow-hidden shadow-xs border border-slate-100">
+                          <Store3DCardPreview
+                            product={draft}
+                            activeColor={draft.colors?.[0] || "#ffffff"}
+                            onClick={() => {
+                              setSelectedSubmissionProduct(draft);
+                              setSubmissionSide("front");
+                              setSubmissionZoom(0.85);
+                            }}
+                          />
+                        </div>
+
+                        {/* Details */}
+                        <div>
+                          <h5 className="font-bold text-slate-900 text-sm line-clamp-1">
+                            {draft.title}
+                          </h5>
+                          {draft.description && (
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                              {draft.description}
+                            </p>
+                          )}
+                          <div className="flex items-center flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100">
+                            {draft.createdBy && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md">
+                                <User className="h-3 w-3" />
+                                {draft.createdBy.name || "Employee"}
                               </span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
                             )}
-                          </td>
-                          <td className="py-4 text-xs text-slate-500">
-                            {(p.sizes || []).join(", ")}
-                          </td>
-                          <td className="py-4 text-xs font-medium text-slate-700">
-                            {(() => {
-                              if (p.gsms && p.gsms.length > 0) {
-                                return p.gsms.join(", ");
-                              }
-                              const matchedStyle = styles.find((s) => s.path === p.modelPath);
-                              if (matchedStyle) {
-                                if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
-                                  return matchedStyle.gsmPrices.map((gp) => gp.gsm).join(", ");
-                                }
-                                if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
-                                  return matchedStyle.gsms.join(", ");
-                                }
-                              }
-                              return "GSM 180";
-                            })()}
-                          </td>
-                          <td className="py-4 text-xs">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                                p.status === "Active"
-                                  ? "bg-emerald-50 text-emerald-600"
-                                  : "bg-slate-100 text-slate-600"
-                              }`}
-                            >
-                              {p.status}
-                            </span>
-                          </td>
-                          <td className="py-4 text-right space-x-2">
-                            <button
-                              onClick={() => openEditProduct(p)}
-                              className="inline-flex items-center p-1.5 rounded-lg border hover:bg-slate-50 transition"
-                            >
-                              <Edit2 className="h-3.5 w-3.5 text-slate-500" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteProduct(p._id)}
-                              className="inline-flex items-center p-1.5 rounded-lg border border-red-50 text-red-500 hover:bg-red-50 transition"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            {draft.sizes && draft.sizes.length > 0 && (
+                              <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">
+                                Sizes: {draft.sizes.join(", ")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CLEAR APPROVE & DISAPPROVE BUTTONS */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <button
+                          disabled={approvingProductId === draft._id}
+                          onClick={() =>
+                            handleApproveProductDraft(draft._id, "approve")
+                          }
+                          className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-sm hover:shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          title="Approve submission and publish to live store"
+                        >
+                          {approvingProductId === draft._id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4 stroke-[2.5]" />
+                          )}
+                          <span>Approve & Publish</span>
+                        </button>
+                        <button
+                          disabled={approvingProductId === draft._id}
+                          onClick={() =>
+                            handleApproveProductDraft(draft._id, "reject")
+                          }
+                          className="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition shadow-sm hover:shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          title="Disapprove / Reject submission"
+                        >
+                          {approvingProductId === draft._id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <X className="h-4 w-4 stroke-[2.5]" />
+                          )}
+                          <span>Disapprove</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
+            </div>
+
+            {/* SECTION 2: COMPLETE CATALOG & SUBMISSIONS TABLE */}
+            <div className="bg-white border rounded-3xl p-6 sm:p-7 shadow-sm space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                    <Package className="h-5 w-5 text-indigo-600" />
+                    Live Products & Submissions Directory
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Filter by status, search items, and perform instant approvals or edits.
+                  </p>
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs">
+                  <button
+                    onClick={() => setProductTabFilter("all")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${
+                      productTabFilter === "all"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    All ({products.length})
+                  </button>
+                  <button
+                    onClick={() => setProductTabFilter("pending")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                      productTabFilter === "pending"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>Pending</span>
+                    {pendingDrafts.length > 0 && (
+                      <span className="px-1.5 py-0.2 bg-purple-200 text-purple-900 rounded-full text-[10px] font-black">
+                        {pendingDrafts.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setProductTabFilter("approved")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${
+                      productTabFilter === "approved"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Approved ({products.filter((p) => p.isApproved).length})
+                  </button>
+                  <button
+                    onClick={() => setProductTabFilter("archived")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${
+                      productTabFilter === "archived"
+                        ? "bg-rose-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Disapproved ({products.filter((p) => p.status === "Archived" || (!p.isApproved && p.status !== "Draft")).length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search products by title, category, or creator name..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+              </div>
+
+              {/* Filtered Products Table */}
+              {(() => {
+                const filteredProducts = products.filter((p) => {
+                  if (productTabFilter === "pending") {
+                    if (p.isApproved || p.status === "Archived") return false;
+                  } else if (productTabFilter === "approved") {
+                    if (!p.isApproved) return false;
+                  } else if (productTabFilter === "archived") {
+                    if (p.status !== "Archived" && (p.isApproved || p.status === "Draft")) return false;
+                  }
+
+                  if (productSearchQuery.trim()) {
+                    const q = productSearchQuery.toLowerCase();
+                    const matchTitle = (p.title || "").toLowerCase().includes(q);
+                    const matchCat = (p.category || "").toLowerCase().includes(q);
+                    const matchCreator = (p.createdBy?.name || "").toLowerCase().includes(q);
+                    if (!matchTitle && !matchCat && !matchCreator) return false;
+                  }
+
+                  return true;
+                });
+
+                if (filteredProducts.length === 0) {
+                  return (
+                    <div className="text-center py-16">
+                      <p className="text-sm text-slate-500 font-semibold">
+                        No products match the selected criteria.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                          <th className="pb-3">Product / Design</th>
+                          <th className="pb-3">Category</th>
+                          <th className="pb-3">Price</th>
+                          <th className="pb-3">Discount</th>
+                          <th className="pb-3">Sizes & GSM</th>
+                          <th className="pb-3">Approval Status</th>
+                          <th className="pb-3 text-right">Review & Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredProducts.map((p) => {
+                          const isPending = !p.isApproved && p.status !== "Archived";
+                          const isDisapproved = p.status === "Archived";
+                          const isApproved = p.isApproved;
+
+                          return (
+                            <tr
+                              key={p._id}
+                              className="border-b last:border-b-0 hover:bg-slate-50/70 transition"
+                            >
+                              <td className="py-4 font-bold text-slate-900">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-12 h-12 shrink-0 relative rounded-xl overflow-hidden shadow-2xs border border-slate-200 bg-slate-50">
+                                    <Store3DCardPreview
+                                      product={p}
+                                      activeColor={p.colors?.[0] || "#ffffff"}
+                                      showControls={false}
+                                      hideBadge={true}
+                                      className="!h-12 !w-12 !rounded-xl !p-0"
+                                      onClick={() => {
+                                        setSelectedSubmissionProduct(p);
+                                        setSubmissionSide("front");
+                                        setSubmissionZoom(0.85);
+                                      }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm">{p.title}</p>
+                                    {p.createdBy && (
+                                      <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full mt-0.5 inline-flex items-center gap-1">
+                                        <User className="h-3 w-3" /> By {p.createdBy.name || "Employee"}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-4 text-xs text-slate-600 font-medium">
+                                {p.category}
+                              </td>
+                              <td className="py-4 text-xs font-black text-slate-900">
+                                Rs. {(p.basePrice || 0).toFixed(2)}
+                              </td>
+                              <td className="py-4 text-xs">
+                                {p.discount > 0 ? (
+                                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-bold">
+                                    {p.discount}% Off
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
+                              </td>
+                              <td className="py-4 text-xs text-slate-500">
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold text-slate-700">{(p.sizes || []).join(", ") || "All Sizes"}</p>
+                                  <p className="text-[11px] text-slate-400">
+                                    {(() => {
+                                      if (p.gsms && p.gsms.length > 0) {
+                                        return p.gsms.join(", ");
+                                      }
+                                      const matchedStyle = styles.find((s) => s.path === p.modelPath);
+                                      if (matchedStyle) {
+                                        if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+                                          return matchedStyle.gsmPrices.map((gp) => gp.gsm).join(", ");
+                                        }
+                                        if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+                                          return matchedStyle.gsms.join(", ");
+                                        }
+                                      }
+                                      return "GSM 180";
+                                    })()}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="py-4 text-xs">
+                                {isApproved ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-bold">
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Approved & Live
+                                  </span>
+                                ) : isPending ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[11px] font-bold animate-pulse">
+                                    <Clock className="h-3.5 w-3.5" /> Pending Review
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[11px] font-bold">
+                                    <Ban className="h-3.5 w-3.5" /> Disapproved
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* CLEAR APPROVE & DISAPPROVE BUTTONS IN TABLE */}
+                                  {!isApproved && (
+                                    <button
+                                      disabled={approvingProductId === p._id}
+                                      onClick={() => handleApproveProductDraft(p._id, "approve")}
+                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      title="Approve & Publish to Store"
+                                    >
+                                      {approvingProductId === p._id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                                      )}
+                                      <span>Approve</span>
+                                    </button>
+                                  )}
+
+                                  {isApproved ? (
+                                    <button
+                                      disabled={approvingProductId === p._id}
+                                      onClick={() => handleApproveProductDraft(p._id, "reject")}
+                                      className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      title="Revoke Approval / Disapprove"
+                                    >
+                                      {approvingProductId === p._id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <X className="h-3.5 w-3.5 stroke-[2]" />
+                                      )}
+                                      <span>Disapprove</span>
+                                    </button>
+                                  ) : !isDisapproved ? (
+                                    <button
+                                      disabled={approvingProductId === p._id}
+                                      onClick={() => handleApproveProductDraft(p._id, "reject")}
+                                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      title="Disapprove / Reject"
+                                    >
+                                      {approvingProductId === p._id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                                      )}
+                                      <span>Disapprove</span>
+                                    </button>
+                                  ) : null}
+
+                                  {/* 3D Preview */}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedSubmissionProduct(p);
+                                      setSubmissionSide("front");
+                                      setSubmissionZoom(0.85);
+                                    }}
+                                    className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition"
+                                    title="Inspect in 3D"
+                                  >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                  </button>
+
+                                  {/* Edit */}
+                                  <button
+                                    onClick={() => openEditProduct(p)}
+                                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600"
+                                    title="Edit Product Details"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </button>
+
+                                  {/* Delete */}
+                                  <button
+                                    onClick={() => handleDeleteProduct(p._id)}
+                                    className="p-1.5 border border-rose-100 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                    title="Delete Product"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Product Create/Edit Modal */}
@@ -4270,32 +4637,40 @@ export default function ManagerPage() {
               </div>
 
               {/* Action buttons */}
-              <div className="mt-8 pt-4 border-t flex flex-col gap-2">
+              <div className="mt-8 pt-4 border-t flex flex-col gap-2.5">
                 <button
+                  disabled={approvingProductId === selectedSubmissionProduct._id}
                   onClick={() => {
                     handleApproveProductDraft(
                       selectedSubmissionProduct._id,
                       "approve",
                     );
-                    setSelectedSubmissionProduct(null);
                   }}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <Check className="h-4 w-4" />
+                  {approvingProductId === selectedSubmissionProduct._id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4.5 w-4.5 stroke-[2.5]" />
+                  )}
                   <span>Approve & Publish to Store</span>
                 </button>
                 <button
+                  disabled={approvingProductId === selectedSubmissionProduct._id}
                   onClick={() => {
                     handleApproveProductDraft(
                       selectedSubmissionProduct._id,
                       "reject",
                     );
-                    setSelectedSubmissionProduct(null);
                   }}
-                  className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <X className="h-4 w-4" />
-                  <span>Reject Submission</span>
+                  {approvingProductId === selectedSubmissionProduct._id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <X className="h-4.5 w-4.5 stroke-[2.5]" />
+                  )}
+                  <span>Disapprove / Reject Submission</span>
                 </button>
               </div>
             </div>
