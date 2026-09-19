@@ -343,7 +343,7 @@ export default function DesignerPage() {
       description: submitForm.description,
       category: submitForm.category,
       basePrice: submitForm.basePrice,
-      sizes: [selectedSize],
+      sizes: (isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize],
       colors: [shirtColor],
       images: [thumb],
       modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
@@ -494,6 +494,30 @@ export default function DesignerPage() {
   const [shirtColor, setShirtColor] = useState(() => initialDraft?.fabricColor || initialDraft?.color || "#ffffff");
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
+  const ALL_SHIRT_SIZES = [
+    { code: "S", label: "Small", desc: "Chest: 36-38\"" },
+    { code: "M", label: "Medium", desc: "Chest: 38-40\"" },
+    { code: "L", label: "Large", desc: "Chest: 40-42\"" },
+    { code: "XL", label: "Extra Large", desc: "Chest: 42-44\"" },
+    { code: "XXL", label: "Double Extra Large", desc: "Chest: 44-46\"" }
+  ];
+  const [selectedStoreSizes, setSelectedStoreSizes] = useState(() => {
+    if (initialDraft?.sizes && Array.isArray(initialDraft.sizes) && initialDraft.sizes.length > 0) {
+      return initialDraft.sizes;
+    }
+    return ["S", "M", "L", "XL", "XXL"];
+  });
+
+  const toggleStoreSize = (sizeCode) => {
+    setSelectedStoreSizes((prev) => {
+      if (prev.includes(sizeCode)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((s) => s !== sizeCode);
+      } else {
+        return [...prev, sizeCode];
+      }
+    });
+  };
   const [shirtType, setShirtType] = useState("Crew Neck");
   const [shirtMaterial, setShirtMaterial] = useState(() => initialDraft?.material || "GSM 180");
   const [isGsmSelectorOpen, setIsGsmSelectorOpen] = useState(false);
@@ -1936,41 +1960,140 @@ export default function DesignerPage() {
                 {/* 4. Sizes */}
                 {activeLeftPanel === "sizes" && (
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Available Sizes</span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((size) => {
-                          const isSelected = selectedSize === size;
-                          return (
-                            <button
-                              key={size}
-                              onClick={() => setSelectedSize(size)}
-                              className={`py-3 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
-                                ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                                : "border-slate-200 hover:bg-slate-50 text-slate-700 bg-white"
-                                }`}
-                            >
-                              <span className="text-sm leading-none">{size}</span>
-                              <span className={`text-[9px] uppercase font-semibold ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
-                                Regular
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    {isEmployee || isManager ? (
+                      <div className="space-y-3.5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                              Available Sizes
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Select sizes available for this design
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-2xs">
+                            {selectedStoreSizes.length} of {ALL_SHIRT_SIZES.length} Active
+                          </span>
+                        </div>
 
-                    <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-2">
-                      <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
-                        <Ruler className="h-4 w-4 text-indigo-600" />
-                        <span>Sizing Guide Overview</span>
+                        {/* Quick Presets */}
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStoreSizes(ALL_SHIRT_SIZES.map((s) => s.code))}
+                            className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStoreSizes(["S", "M", "L", "XL", "XXL"])}
+                            className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                          >
+                            Standard (S-XXL)
+                          </button>
+                        </div>
+
+                        {/* Checkbox List of Sizes */}
+                        <div className="space-y-2 pt-1">
+                          {ALL_SHIRT_SIZES.map((sizeObj) => {
+                            const isChecked = selectedStoreSizes.includes(sizeObj.code);
+                            return (
+                              <label
+                                key={sizeObj.code}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  toggleStoreSize(sizeObj.code);
+                                }}
+                                className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none ${isChecked
+                                    ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500/20"
+                                    : "border-slate-200/80 bg-white hover:bg-slate-50 opacity-60"
+                                  }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${isChecked
+                                        ? "bg-indigo-600 border-indigo-600 text-white shadow-2xs"
+                                        : "border-slate-300 bg-white"
+                                      }`}
+                                  >
+                                    {isChecked && (
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-black text-slate-900">{sizeObj.code}</span>
+                                      <span className="text-[11px] font-semibold text-slate-500">({sizeObj.label})</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 block">{sizeObj.desc}</span>
+                                  </div>
+                                </div>
+
+                                <span
+                                  className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isChecked
+                                      ? "bg-indigo-100 text-indigo-700"
+                                      : "bg-slate-100 text-slate-400"
+                                    }`}
+                                >
+                                  {isChecked ? "Available" : "Disabled"}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-indigo-50/40 border border-indigo-100 space-y-1 mt-2">
+                          <div className="flex items-center gap-1.5 text-indigo-950 font-bold text-xs">
+                            <Ruler className="h-3.5 w-3.5 text-indigo-600" />
+                            <span>Catalog Availability</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 leading-relaxed">
+                            Checked sizes will be published to the customer store catalog as purchasing options.
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-slate-600 space-y-1">
-                        <p><strong>Chest:</strong> 38-40" for Size M | 42-44" for Size L</p>
-                        <p><strong>Length:</strong> 28" for Standard fit</p>
-                        <p className="text-[10px] text-slate-400 pt-1">Pre-shrunk 100% combed cotton jersey.</p>
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Available Sizes</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((size) => {
+                              const isSelected = selectedSize === size;
+                              return (
+                                <button
+                                  key={size}
+                                  onClick={() => setSelectedSize(size)}
+                                  className={`py-3 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
+                                    ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                                    : "border-slate-200 hover:bg-slate-50 text-slate-700 bg-white"
+                                    }`}
+                                >
+                                  <span className="text-sm leading-none">{size}</span>
+                                  <span className={`text-[9px] uppercase font-semibold ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
+                                    Regular
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-2">
+                          <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                            <Ruler className="h-4 w-4 text-indigo-600" />
+                            <span>Sizing Guide Overview</span>
+                          </div>
+                          <div className="text-[11px] text-slate-600 space-y-1">
+                            <p><strong>Chest:</strong> 38-40" for Size M | 42-44" for Size L</p>
+                            <p><strong>Length:</strong> 28" for Standard fit</p>
+                            <p className="text-[10px] text-slate-400 pt-1">Pre-shrunk 100% combed cotton jersey.</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
