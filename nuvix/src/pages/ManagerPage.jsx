@@ -147,6 +147,10 @@ export default function ManagerPage() {
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [approvingProductId, setApprovingProductId] = useState(null);
 
+  // Order cancellation state
+  const [cancellingOrder, setCancellingOrder] = useState(null); // { orderId, orderNumber, customerName }
+  const [cancelReasonInput, setCancelReasonInput] = useState("");
+
   // Pricing rules inputs
   const [pricingForm, setPricingForm] = useState({
     baseRates: { crewNeck: 12.0, vNeck: 14.0, polo: 18.0 },
@@ -395,10 +399,24 @@ export default function ManagerPage() {
 
   // ================= ORDERS OPERATIONS =================
 
-  const handleCancelOrder = async (orderId) => {
-    if (!window.confirm("Are you sure you want to cancel this order? This action will mark the order as Cancelled.")) {
-      return;
-    }
+  const openCancelOrderModal = (order) => {
+    setCancellingOrder({
+      orderId: order._id,
+      orderNumber: order._id.slice(-8).toUpperCase(),
+      customerName:
+        order.customerId?.name ||
+        (typeof order.customerId === "object" && order.customerId?.email) ||
+        order.guestEmail ||
+        "Customer",
+    });
+    setCancelReasonInput("");
+  };
+
+  const handleConfirmCancelOrder = async () => {
+    if (!cancellingOrder) return;
+    const orderId = cancellingOrder.orderId;
+    const finalReason = cancelReasonInput.trim() || "Order cancelled by store manager.";
+
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -406,13 +424,20 @@ export default function ManagerPage() {
       setAssignLoading((prev) => ({ ...prev, [orderId]: true }));
       const response = await axios.put(
         `${API_BASE_URL}/manager/orders/${orderId}/status`,
-        { status: "Cancelled", note: "Order cancelled by manager." },
+        {
+          status: "Cancelled",
+          note: finalReason,
+          cancellationReason: finalReason,
+          cancelReason: finalReason,
+        },
         { headers },
       );
 
       setOrders((prev) =>
         prev.map((o) => (o._id === orderId ? response.data.order : o)),
       );
+      setCancellingOrder(null);
+      setCancelReasonInput("");
     } catch (err) {
       console.error("Cancel order error:", err);
       alert(err.response?.data?.message || "Failed to cancel order");
@@ -1118,22 +1143,20 @@ export default function ManagerPage() {
           <nav className="p-4 space-y-1">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "overview"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "overview"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <BarChart3 className="h-4.5 w-4.5" />
               Dashboard Overview
             </button>
             <button
               onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "orders"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "orders"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <ShoppingCart className="h-4.5 w-4.5" />
@@ -1147,11 +1170,10 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("products")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "products"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "products"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Layers className="h-4.5 w-4.5" />
@@ -1165,22 +1187,20 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("pricing")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "pricing"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "pricing"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <Sparkles className="h-4.5 w-4.5" />
               Pricing Rules
             </button>
             <button
               onClick={() => setActiveTab("inventory")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "inventory"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inventory"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Inbox className="h-4.5 w-4.5" />
@@ -1194,22 +1214,20 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("styles")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "styles"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "styles"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <Layers className="h-4.5 w-4.5" />
               T-Shirt Styles
             </button>
             <button
               onClick={() => setActiveTab("reviews")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "reviews"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "reviews"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <MessageSquare className="h-4.5 w-4.5" />
@@ -1226,11 +1244,10 @@ export default function ManagerPage() {
                 setActiveTab("inquiries");
                 fetchInquiries();
               }}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "inquiries"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inquiries"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Mail className="h-4.5 w-4.5" />
@@ -1244,11 +1261,10 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "settings"
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "settings"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+                }`}
             >
               <Settings className="h-4.5 w-4.5" />
               Settings & Security
@@ -1260,11 +1276,10 @@ export default function ManagerPage() {
                   setActiveTab("store-preview");
                   setShowStorePreview(true);
                 }}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                  activeTab === "store-preview"
+                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "store-preview"
                     ? "bg-indigo-600 text-white shadow-lg"
                     : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+                  }`}
               >
                 <Award className="h-4.5 w-4.5" />
                 Store Preview
@@ -1630,26 +1645,24 @@ export default function ManagerPage() {
                             Order <span className="font-mono text-indigo-600 font-bold">#{order._id.slice(-8)}</span>
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                              order.paymentStatus === "Paid"
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${order.paymentStatus === "Paid"
                                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                 : "bg-amber-50 text-amber-700 border border-amber-200"
-                            }`}
+                              }`}
                           >
                             {order.paymentStatus}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                              isCancelled
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${isCancelled
                                 ? "bg-rose-50 text-rose-700 border border-rose-200"
                                 : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : order.orderStatus === "Printing"
-                                ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                : order.orderStatus === "Processing"
-                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                : "bg-slate-100 text-slate-700 border border-slate-200"
-                            }`}
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : order.orderStatus === "Printing"
+                                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                    : order.orderStatus === "Processing"
+                                      ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                      : "bg-slate-100 text-slate-700 border border-slate-200"
+                              }`}
                           >
                             {order.orderStatus}
                           </span>
@@ -1820,16 +1833,15 @@ export default function ManagerPage() {
                                     {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
                                   </span>
                                   <span className="text-[10px] text-slate-500 font-medium">
-                                    Size: <span className="font-bold text-slate-800">{item.selectedSize || item.size}</span> | 
-                                    Color: <span className="font-bold text-slate-800">{resolveColorName(item.selectedColor || item.color)}</span> | 
+                                    Size: <span className="font-bold text-slate-800">{item.selectedSize || item.size}</span> |
+                                    Color: <span className="font-bold text-slate-800">{resolveColorName(item.selectedColor || item.color)}</span> |
                                     GSM: <span className="font-bold text-slate-800">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
                                   </span>
                                 </div>
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                  item.itemType === "Customized" || item.designId
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${item.itemType === "Customized" || item.designId
                                     ? "bg-purple-50 text-purple-700 border border-purple-200"
                                     : "bg-blue-50 text-blue-700 border border-blue-200"
-                                }`}>
+                                  }`}>
                                   {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog"}
                                 </span>
                               </div>
@@ -1874,13 +1886,12 @@ export default function ManagerPage() {
                                 return (
                                   <div key={stage} className="flex items-center shrink-0">
                                     <div
-                                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
-                                        isCurrent
+                                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${isCurrent
                                           ? "bg-indigo-600 text-white shadow-2xs font-black"
                                           : isPassed
-                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                          : "bg-slate-100 text-slate-400 border border-slate-200"
-                                      }`}
+                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                            : "bg-slate-100 text-slate-400 border border-slate-200"
+                                        }`}
                                     >
                                       {isPassed ? (
                                         <Check className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
@@ -1893,9 +1904,8 @@ export default function ManagerPage() {
                                     </div>
                                     {sIdx < pipelineStages.length - 1 && (
                                       <div
-                                        className={`w-2 h-0.5 mx-0.5 transition ${
-                                          isPassed ? "bg-emerald-400" : "bg-slate-200"
-                                        }`}
+                                        className={`w-2 h-0.5 mx-0.5 transition ${isPassed ? "bg-emerald-400" : "bg-slate-200"
+                                          }`}
                                       />
                                     )}
                                   </div>
@@ -1916,7 +1926,7 @@ export default function ManagerPage() {
                           {!isCancelled && order.orderStatus !== "Shipped" ? (
                             <button
                               disabled={assignLoading[order._id]}
-                              onClick={() => handleCancelOrder(order._id)}
+                              onClick={() => openCancelOrderModal(order)}
                               className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
                               title="Cancel this order"
                             >
@@ -2082,7 +2092,7 @@ export default function ManagerPage() {
                           ) : (
                             <X className="h-4 w-4 stroke-[2.5]" />
                           )}
-                          <span>Disapprove</span>
+                          <span>Reject</span>
                         </button>
                       </div>
                     </div>
@@ -2108,21 +2118,19 @@ export default function ManagerPage() {
                 <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs">
                   <button
                     onClick={() => setProductTabFilter("all")}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition ${
-                      productTabFilter === "all"
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "all"
                         ? "bg-white text-slate-900 shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     All ({products.length})
                   </button>
                   <button
                     onClick={() => setProductTabFilter("pending")}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
-                      productTabFilter === "pending"
+                    className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${productTabFilter === "pending"
                         ? "bg-purple-600 text-white shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     <span>Pending</span>
                     {pendingDrafts.length > 0 && (
@@ -2133,21 +2141,19 @@ export default function ManagerPage() {
                   </button>
                   <button
                     onClick={() => setProductTabFilter("approved")}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition ${
-                      productTabFilter === "approved"
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "approved"
                         ? "bg-emerald-600 text-white shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     Approved ({products.filter((p) => p.isApproved).length})
                   </button>
                   <button
                     onClick={() => setProductTabFilter("archived")}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition ${
-                      productTabFilter === "archived"
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "archived"
                         ? "bg-rose-600 text-white shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     Disapproved ({products.filter((p) => p.status === "Archived" || (!p.isApproved && p.status !== "Draft")).length})
                   </button>
@@ -2620,11 +2626,10 @@ export default function ManagerPage() {
                           return (
                             <label
                               key={size}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
-                                isSelected
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
                                   ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
                                   : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                              }`}
+                                }`}
                             >
                               <input
                                 type="checkbox"
@@ -2676,11 +2681,10 @@ export default function ManagerPage() {
                             return (
                               <label
                                 key={gsm}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
-                                  isSelected
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
                                     ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
                                     : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                                }`}
+                                  }`}
                               >
                                 <input
                                   type="checkbox"
@@ -2720,11 +2724,11 @@ export default function ManagerPage() {
                           let availableStyleColors = matchedStyle && matchedStyle.colors && matchedStyle.colors.length > 0
                             ? matchedStyle.colors
                             : [
-                                { name: "White", value: "#ffffff" },
-                                { name: "Black", value: "#111827" },
-                                { name: "Navy Blue", value: "#1e3a8a" },
-                                { name: "Red", value: "#dc2626" },
-                              ];
+                              { name: "White", value: "#ffffff" },
+                              { name: "Black", value: "#111827" },
+                              { name: "Navy Blue", value: "#1e3a8a" },
+                              { name: "Red", value: "#dc2626" },
+                            ];
 
                           return availableStyleColors.map((cObj) => {
                             const hexVal = typeof cObj === "string" ? cObj : cObj.value;
@@ -2756,11 +2760,10 @@ export default function ManagerPage() {
                                     };
                                   });
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
-                                  isSelected
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
                                     ? "bg-slate-900 border-slate-900 text-white shadow-xs"
                                     : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                                }`}
+                                  }`}
                               >
                                 <span
                                   className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
@@ -3164,8 +3167,8 @@ export default function ManagerPage() {
                     itemType: inventoryCategoryFilter === "INK"
                       ? "Printing Ink"
                       : inventoryCategoryFilter === "PAPERS_PACKAGING"
-                      ? "Transfer Paper"
-                      : "Plain T-Shirt",
+                        ? "Transfer Paper"
+                        : "Plain T-Shirt",
                     tShirtType: defaultStyleName,
                     color: defaultStyle?.colors?.[0]?.value || "#ffffff",
                     colorName: defaultStyle?.colors?.[0]?.name || "White",
@@ -3227,19 +3230,17 @@ export default function ManagerPage() {
                       setInventorySizeFilter("ALL");
                       setInventoryColorFilter("ALL");
                     }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                      isActive
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${isActive
                         ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/10"
                         : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
-                    }`}
+                      }`}
                   >
                     <span>{cat.label}</span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        isActive
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${isActive
                           ? "bg-indigo-500 text-white"
                           : "bg-slate-200 text-slate-700"
-                      }`}
+                        }`}
                     >
                       {count}
                     </span>
@@ -3566,11 +3567,10 @@ export default function ManagerPage() {
                             </td>
                             <td className="py-4 text-xs">
                               <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                                  isLow
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isLow
                                     ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
                                     : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                                }`}
+                                  }`}
                               >
                                 {isLow ? "Low stock" : "In Stock"}
                               </span>
@@ -3705,9 +3705,9 @@ export default function ManagerPage() {
                           styleToEdit.gsmPrices && styleToEdit.gsmPrices.length > 0
                             ? styleToEdit.gsmPrices
                             : (styleToEdit.gsms || []).map((g) => ({
-                                gsm: g,
-                                price: styleToEdit.price || 1200,
-                              })),
+                              gsm: g,
+                              price: styleToEdit.price || 1200,
+                            })),
                         colors: styleToEdit.colors || [],
                       });
                       setShowStyleModal(true);
@@ -3846,11 +3846,10 @@ export default function ManagerPage() {
             {/* Notification alert banner */}
             {reviewNotification && (
               <div
-                className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-150 ${
-                  reviewNotification.type === "success"
+                className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-150 ${reviewNotification.type === "success"
                     ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                     : "bg-rose-50 text-rose-800 border border-rose-200"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   {reviewNotification.type === "success" ? (
@@ -3895,11 +3894,10 @@ export default function ManagerPage() {
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star
                       key={s}
-                      className={`h-2.5 w-2.5 ${
-                        s <= Math.round(reviewStats.averageRating || 0)
+                      className={`h-2.5 w-2.5 ${s <= Math.round(reviewStats.averageRating || 0)
                           ? "fill-amber-400 text-amber-400"
                           : "text-slate-200"
-                      }`}
+                        }`}
                     />
                   ))}
                 </div>
@@ -3907,11 +3905,10 @@ export default function ManagerPage() {
 
               <div
                 onClick={() => setReviewFilterRating(reviewFilterRating === "BAD" ? "ALL" : "BAD")}
-                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${
-                  reviewFilterRating === "BAD"
+                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${reviewFilterRating === "BAD"
                     ? "bg-rose-50 border-rose-300 ring-2 ring-rose-400"
                     : "bg-white border-slate-200/80 hover:border-rose-200 hover:bg-rose-50/20"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between text-slate-400 mb-1">
                   <span className="text-[10px] uppercase font-black tracking-wider text-rose-600 flex items-center gap-1">
@@ -4005,15 +4002,14 @@ export default function ManagerPage() {
                   <button
                     key={tab.key}
                     onClick={() => setReviewFilterRating(tab.key)}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
-                      reviewFilterRating === tab.key
+                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${reviewFilterRating === tab.key
                         ? tab.key === "BAD"
                           ? "bg-rose-600 text-white shadow-sm"
                           : "bg-indigo-600 text-white shadow-sm"
                         : tab.alert
-                        ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                    }`}
+                          ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -4087,9 +4083,8 @@ export default function ManagerPage() {
                     return (
                       <div
                         key={rev._id}
-                        className={`bg-white border rounded-2xl p-5 shadow-xs transition hover:shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                          isBad ? "border-rose-200 bg-rose-50/10" : "border-slate-200/80"
-                        }`}
+                        className={`bg-white border rounded-2xl p-5 shadow-xs transition hover:shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isBad ? "border-rose-200 bg-rose-50/10" : "border-slate-200/80"
+                          }`}
                       >
                         {/* Left: Customer info & review details */}
                         <div className="flex-1 space-y-2.5">
@@ -4117,11 +4112,10 @@ export default function ManagerPage() {
                                 {[1, 2, 3, 4, 5].map((s) => (
                                   <Star
                                     key={s}
-                                    className={`h-3 w-3 ${
-                                      s <= rev.rating
+                                    className={`h-3 w-3 ${s <= rev.rating
                                         ? "fill-amber-400 text-amber-400"
                                         : "text-slate-200"
-                                    }`}
+                                      }`}
                                   />
                                 ))}
                               </div>
@@ -4140,11 +4134,10 @@ export default function ManagerPage() {
 
                           {/* Comment Content */}
                           <div
-                            className={`p-3 rounded-xl text-xs leading-relaxed ${
-                              isBad
+                            className={`p-3 rounded-xl text-xs leading-relaxed ${isBad
                                 ? "bg-rose-50/50 border border-rose-100 text-rose-950 font-medium"
                                 : "bg-slate-50 border border-slate-100 text-slate-700"
-                            }`}
+                              }`}
                           >
                             <p className="italic">
                               "{rev.comment || "(No text comment provided, star rating only)"}"
@@ -4238,11 +4231,10 @@ export default function ManagerPage() {
 
               <div
                 onClick={() => setInquiryStatusFilter(inquiryStatusFilter === "New" ? "ALL" : "New")}
-                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${
-                  inquiryStatusFilter === "New"
+                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${inquiryStatusFilter === "New"
                     ? "bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400"
                     : "bg-white border-slate-200/80 hover:bg-indigo-50/30"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between text-slate-400 mb-1">
                   <span className="text-[10px] uppercase font-black tracking-wider text-indigo-600 flex items-center gap-1">
@@ -4322,11 +4314,10 @@ export default function ManagerPage() {
                   <button
                     key={tab.key}
                     onClick={() => setInquiryStatusFilter(tab.key)}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
-                      inquiryStatusFilter === tab.key
+                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${inquiryStatusFilter === tab.key
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -4390,13 +4381,12 @@ export default function ManagerPage() {
                     return (
                       <div
                         key={inq._id}
-                        className={`bg-white border rounded-3xl p-5 md:p-6 transition shadow-xs flex flex-col md:flex-row md:items-start justify-between gap-5 ${
-                          isNew
+                        className={`bg-white border rounded-3xl p-5 md:p-6 transition shadow-xs flex flex-col md:flex-row md:items-start justify-between gap-5 ${isNew
                             ? "border-indigo-200 bg-indigo-50/10"
                             : isResolved
-                            ? "border-slate-200/80 opacity-90"
-                            : "border-slate-200/80"
-                        }`}
+                              ? "border-slate-200/80 opacity-90"
+                              : "border-slate-200/80"
+                          }`}
                       >
                         {/* Left Inquiry Info */}
                         <div className="flex-1 space-y-3">
@@ -4419,13 +4409,12 @@ export default function ManagerPage() {
 
                             {/* Status Badge */}
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
-                                isNew
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${isNew
                                   ? "bg-indigo-100 text-indigo-700 border-indigo-200"
                                   : isResolved
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : "bg-amber-50 text-amber-700 border-amber-200"
-                              }`}
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                }`}
                             >
                               {inq.status || "New"}
                             </span>
@@ -4507,11 +4496,10 @@ export default function ManagerPage() {
                   <button
                     key={side}
                     onClick={() => setSubmissionSide(side)}
-                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${
-                      submissionSide === side
+                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${submissionSide === side
                         ? "bg-purple-600 border-purple-600 text-white"
                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     {side}
                   </button>
@@ -4529,8 +4517,8 @@ export default function ManagerPage() {
                   zoomLevel={submissionZoom}
                   layers={getSubmissionLayers()}
                   selectedLayerId={null}
-                  onSelectLayer={() => {}}
-                  onUpdateLayers={() => {}}
+                  onSelectLayer={() => { }}
+                  onUpdateLayers={() => { }}
                 />
               </div>
 
@@ -4837,11 +4825,10 @@ export default function ManagerPage() {
                               color: ink.name,
                             }));
                           }}
-                          className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition cursor-pointer ${
-                            isSelected
+                          className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition cursor-pointer ${isSelected
                               ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50/80 shadow-xs"
                               : "border-slate-200 bg-white hover:bg-slate-100/70"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-2.5">
                             <span
@@ -4951,11 +4938,10 @@ export default function ManagerPage() {
                                   color: c.value,
                                 }))
                               }
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer ${
-                                inventoryForm.colorName === c.name
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer ${inventoryForm.colorName === c.name
                                   ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50 text-indigo-950 font-bold"
                                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                              }`}
+                                }`}
                             >
                               <span
                                 className="h-3.5 w-3.5 rounded-full border border-slate-300 shrink-0"
@@ -5540,11 +5526,10 @@ export default function ManagerPage() {
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
-                        className={`h-3 w-3 ${
-                          s <= reviewConfirmDelete.rating
+                        className={`h-3 w-3 ${s <= reviewConfirmDelete.rating
                             ? "fill-amber-400 text-amber-400"
                             : "text-slate-200"
-                        }`}
+                          }`}
                       />
                     ))}
                   </div>
@@ -5587,6 +5572,108 @@ export default function ManagerPage() {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Order Reason Modal */}
+      {cancellingOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
+          <div className="bg-white rounded-3xl max-w-md w-full border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-slate-950 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-rose-500/20 border border-rose-500/30 rounded-xl text-rose-400">
+                  <Ban className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Cancel Order #{cancellingOrder.orderNumber}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Customer: {cancellingOrder.customerName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setCancellingOrder(null);
+                  setCancelReasonInput("");
+                }}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-800 block mb-1">
+                  Reason for Cancellation
+                </label>
+                <p className="text-[11px] text-slate-500 mb-2.5 leading-relaxed">
+                  Please provide a clear reason for cancelling this order. This message will be displayed directly to the customer on their order details page.
+                </p>
+
+                {/* Quick reason suggestions */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {[
+                    "Fabric or color out of stock",
+                    "Print artwork resolution too low",
+                    "Customer requested cancellation",
+                    "Delivery address unreachable",
+                    "Payment verification issue",
+                  ].map((quickReason) => (
+                    <button
+                      key={quickReason}
+                      type="button"
+                      onClick={() => setCancelReasonInput(quickReason)}
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition cursor-pointer ${
+                        cancelReasonInput === quickReason
+                          ? "bg-rose-50 border-rose-200 text-rose-700 font-bold"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {quickReason}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={cancelReasonInput}
+                  onChange={(e) => setCancelReasonInput(e.target.value)}
+                  placeholder="e.g. Due to fabric inventory shortage for XL Navy Blue, we cannot fulfill this order..."
+                  className="w-full p-3 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 focus:outline-none transition resize-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCancellingOrder(null);
+                    setCancelReasonInput("");
+                  }}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="button"
+                  disabled={assignLoading[cancellingOrder.orderId]}
+                  onClick={handleConfirmCancelOrder}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {assignLoading[cancellingOrder.orderId] ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Ban className="h-3.5 w-3.5" />
+                  )}
+                  <span>Confirm Cancellation</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

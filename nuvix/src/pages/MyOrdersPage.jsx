@@ -8,7 +8,7 @@ import TShirt3DModal from "../components/TShirt3DModal";
 import PaymentButton from "../components/PaymentButton";
 import { 
   ShoppingBag, Calendar, MapPin, ShieldCheck, AlertCircle, Edit3, Plus, 
-  CheckCircle, X, Phone, Star, PackageCheck, Sparkles, CheckCircle2, MessageSquare
+  CheckCircle, X, Phone, Star, PackageCheck, Sparkles, CheckCircle2, MessageSquare, Ban
 } from "lucide-react";
 import axios from "axios";
 
@@ -494,6 +494,42 @@ export default function MyOrdersPage() {
                     </div>
 
                     <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                      {/* Cancellation Reason Notice Box */}
+                      {order.orderStatus === "Cancelled" && (() => {
+                        const cancelStep = order.timeline?.filter((t) => t.status === "Cancelled").pop();
+                        const cancelReason =
+                          order.cancellationReason ||
+                          order.cancelReason ||
+                          cancelStep?.note ||
+                          order.note ||
+                          "This order has been cancelled by the store manager.";
+
+                        return (
+                          <div className="lg:col-span-3 p-4 sm:p-5 bg-gradient-to-r from-rose-50 to-red-50/50 border border-rose-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+                            <div className="flex items-start gap-3.5">
+                              <div className="p-2.5 bg-rose-100 text-rose-700 rounded-xl shrink-0 mt-0.5 sm:mt-0 border border-rose-200 shadow-2xs">
+                                <Ban className="h-5 w-5" />
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-black text-rose-950 text-sm">Order Cancelled</span>
+                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-200/80 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                    Manager Notice
+                                  </span>
+                                </div>
+                                <p className="text-xs text-rose-800 font-medium leading-relaxed">
+                                  <strong className="font-bold text-rose-950">Reason for Cancellation: </strong>
+                                  <span className="italic font-semibold">"{cancelReason}"</span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-[11px] text-rose-600 font-semibold self-end sm:self-center shrink-0 bg-white/70 px-3 py-1.5 rounded-xl border border-rose-100">
+                              Questions? Contact our support team.
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* Items Info */}
                       <div className="lg:col-span-2 space-y-4">
                         <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Items Summary</h4>
@@ -676,21 +712,34 @@ export default function MyOrdersPage() {
                         <div className="space-y-3.5">
                           <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Order Timeline</h4>
                           <div className="relative pl-5 border-l-2 border-slate-150 space-y-4">
-                            {order.timeline?.map((step, sIdx) => (
-                              <div key={sIdx} className="relative">
-                                {/* Dot indicator */}
-                                <span className="absolute -left-[27px] top-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-indigo-600 ring-4 ring-white"></span>
-                                <div className="space-y-0.5">
-                                  <span className="font-extrabold text-slate-800 text-xs block capitalize">{step.status}</span>
-                                  <span className="text-[10px] text-slate-400 font-semibold block">{step.note}</span>
-                                  {step.date && (
-                                    <span className="text-[9px] text-indigo-500 font-semibold block mt-0.5">
-                                      {new Date(step.date).toLocaleString()}
+                            {order.timeline?.map((step, sIdx) => {
+                              const isStepCancelled = step.status === "Cancelled";
+                              return (
+                                <div key={sIdx} className="relative">
+                                  {/* Dot indicator */}
+                                  <span
+                                    className={`absolute -left-[27px] top-0.5 flex h-3 w-3 items-center justify-center rounded-full ring-4 ring-white ${
+                                      isStepCancelled ? "bg-rose-600 ring-rose-100" : "bg-indigo-600"
+                                    }`}
+                                  ></span>
+                                  <div className="space-y-0.5">
+                                    <span
+                                      className={`font-extrabold text-xs block capitalize ${
+                                        isStepCancelled ? "text-rose-700" : "text-slate-800"
+                                      }`}
+                                    >
+                                      {step.status}
                                     </span>
-                                  )}
+                                    <span className="text-[10px] text-slate-400 font-semibold block">{step.note}</span>
+                                    {step.date && (
+                                      <span className="text-[9px] text-indigo-500 font-semibold block mt-0.5">
+                                        {new Date(step.date).toLocaleString()}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
