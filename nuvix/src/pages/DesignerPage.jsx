@@ -49,7 +49,9 @@ import {
   Ruler,
   Minus,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ShoppingCart,
+  Settings
 } from "lucide-react";
 
 const shirtColors = [
@@ -95,7 +97,7 @@ const findMatchingModel = (design, styles = []) => {
   const typeStr = (design.tShirtType || design.shirtType || design.name || "").toLowerCase();
   if (typeStr) {
     const match = styles.find(m => m.name?.toLowerCase() === typeStr) ||
-                  styles.find(m => m.name?.toLowerCase().includes(typeStr) || typeStr.includes(m.name?.toLowerCase()));
+      styles.find(m => m.name?.toLowerCase().includes(typeStr) || typeStr.includes(m.name?.toLowerCase()));
     if (match) return match;
 
     if (typeStr.includes("female") || typeStr.includes("women") || typeStr.includes("woman") || typeStr.includes("v-neck")) {
@@ -267,7 +269,7 @@ export default function DesignerPage() {
             autoSaveImagesFromLayers(normalizedLayers);
           }
           if (design.fabricColor) setShirtColor(design.fabricColor);
-          
+
           const model = findMatchingModel(design, stylesList);
           if (model) {
             setSelectedModel(model);
@@ -624,13 +626,13 @@ export default function DesignerPage() {
     const userId = currentUser?.id || currentUser?._id || "guest";
     const storageKey = `printsphere_user_images_${userId}`;
     const guestKey = "printsphere_user_images_guest";
-    
+
     try {
       const userSaved = localStorage.getItem(storageKey);
       const guestSaved = localStorage.getItem(guestKey);
       const userList = userSaved ? JSON.parse(userSaved) : [];
       const guestList = guestSaved ? JSON.parse(guestSaved) : [];
-      
+
       // Merge guest images into user images without duplicates
       const merged = [...userList];
       guestList.forEach((gImg) => {
@@ -638,7 +640,7 @@ export default function DesignerPage() {
           merged.push(gImg);
         }
       });
-      
+
       if (merged.length > 0) {
         setUserImages(merged);
         saveUserImagesToStorage(merged, currentUser);
@@ -1461,109 +1463,193 @@ export default function DesignerPage() {
   return (
     <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
 
+      {/* Leftmost Sidebar */}
       <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
-        <div>
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
-              P
-            </div>
+        {isEmployee ? (
+          <>
             <div>
-              <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">3D Customizer</span>
-            </div>
-          </div>
-
-          <nav className="p-4 space-y-1">
-            {[
-              { id: "dashboard", label: "Dashboard", icon: Sparkles, path: "/customer-home" },
-              { id: "store", label: "Store", icon: ShoppingBag, path: "/store" },
-              { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
-              { id: "my-orders", label: "My Orders", icon: FolderHeart, path: "/my-orders" },
-              { id: "my-designs", label: "My Designs", icon: Palette, path: "/my-designs" }
-            ].map((item) => {
-              const Icon = item.icon;
-              const isActive = item.id === "3d-designer";
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (item.path) {
-                      window.location.href = item.path;
-                    }
-                  }}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
-                      ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.25)]"
-                      : "hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  <Icon className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="p-4 border-t border-slate-800 space-y-3">
-          {currentUser ? (
-            <div className="space-y-3">
-              <div
-                onClick={() => window.location.href = "/account"}
-                className="flex items-center gap-3 px-2 py-1.5 cursor-pointer rounded-xl hover:bg-slate-800/40 transition group select-none"
-              >
-                <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
-                  alt="Avatar"
-                  className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover group-hover:ring-indigo-500 transition duration-200"
-                />
-                <div className="leading-tight">
-                  <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition duration-200">{currentUser.name}</p>
-                  <span className="text-xs text-slate-500">{currentUser.role || "Customer"}</span>
+              <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
+                  E
+                </div>
+                <div>
+                  <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
+                  <span className="text-[10px] text-teal-400 uppercase tracking-widest font-bold">Operator Desk</span>
                 </div>
               </div>
-              <div className="px-1.5">
+
+              <nav className="p-4 space-y-1">
                 <button
-                  onClick={() => {
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("printsphere_cart");
-                    window.location.href = "/login";
-                  }}
-                  className="w-full py-2 px-4 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/20 hover:border-transparent rounded-xl font-bold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                  onClick={() => window.location.href = "/employee"}
+                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
-                  Logout
+                  <ShoppingCart className="h-4.5 w-4.5" />
+                  <span>Assigned Print Tasks</span>
                 </button>
-              </div>
+                <button
+                  onClick={() => window.location.href = "/employee"}
+                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
+                >
+                  <Layers className="h-4.5 w-4.5" />
+                  <span>My Concept Designs</span>
+                </button>
+                <button
+                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition bg-indigo-600 text-white shadow-lg cursor-pointer"
+                >
+                  <Palette className="h-4.5 w-4.5 text-white" />
+                  <span>3D Designer</span>
+                </button>
+                <button
+                  onClick={() => window.location.href = "/employee"}
+                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
+                >
+                  <Settings className="h-4.5 w-4.5" />
+                  <span>Settings & Security</span>
+                </button>
+              </nav>
             </div>
-          ) : (
-            <div className="px-1.5 pb-1">
+
+            <div className="p-4 border-t border-slate-800">
+              <div className="flex items-center gap-2 mb-3 px-2">
+                <div className="h-2.5 w-2.5 rounded-full bg-teal-400 animate-pulse" />
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Operator Session</span>
+              </div>
               <button
-                onClick={() => window.location.href = "/login?redirect=/designer"}
-                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.href = "/login";
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/30 hover:border-red-500 text-xs text-red-400 font-semibold hover:bg-red-500/10 transition cursor-pointer"
               >
-                <LogIn className="h-4 w-4" />
-                Login / Sign Up
+                <LogOut className="h-4 w-4" />
+                Log Out
               </button>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
+                  P
+                </div>
+                <div>
+                  <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">3D Customizer</span>
+                </div>
+              </div>
+
+              <nav className="p-4 space-y-1">
+                {(isManager
+                  ? [
+                    { id: "dashboard", label: "Manager Dashboard", icon: Sparkles, path: "/manager" },
+                    { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
+                    { id: "store", label: "Store Catalog", icon: ShoppingBag, path: "/store" },
+                  ]
+                  : [
+                    { id: "dashboard", label: "Dashboard", icon: Sparkles, path: "/customer-home" },
+                    { id: "store", label: "Store", icon: ShoppingBag, path: "/store" },
+                    { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
+                    { id: "my-orders", label: "My Orders", icon: FolderHeart, path: "/my-orders" },
+                    { id: "my-designs", label: "My Designs", icon: Palette, path: "/my-designs" }
+                  ]
+                ).map((item) => {
+                  const Icon = item.icon;
+                  const isActive = item.id === "3d-designer";
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        if (item.path) {
+                          window.location.href = item.path;
+                        }
+                      }}
+                      className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
+                        ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.25)]"
+                        : "hover:bg-slate-800 hover:text-slate-200"
+                        }`}
+                    >
+                      <Icon className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            <div className="p-4 border-t border-slate-800 space-y-3">
+              {currentUser ? (
+                <div className="space-y-3">
+                  <div
+                    onClick={() => {
+                      if (isManager) window.location.href = "/manager";
+                      else window.location.href = "/account";
+                    }}
+                    className="flex items-center gap-3 px-2 py-1.5 cursor-pointer rounded-xl hover:bg-slate-800/40 transition group select-none"
+                  >
+                    <img
+                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
+                      alt="Avatar"
+                      className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover group-hover:ring-indigo-500 transition duration-200"
+                    />
+                    <div className="leading-tight">
+                      <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition duration-200">{currentUser.name}</p>
+                      <span className="text-xs text-slate-500">{currentUser.role || "Customer"}</span>
+                    </div>
+                  </div>
+                  <div className="px-1.5">
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem("token");
+                        localStorage.removeItem("printsphere_cart");
+                        window.location.href = "/login";
+                      }}
+                      className="w-full py-2 px-4 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/20 hover:border-transparent rounded-xl font-bold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="px-1.5 pb-1">
+                  <button
+                    onClick={() => window.location.href = "/login?redirect=/designer"}
+                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Login / Sign Up
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         <header className="h-16 border-b bg-white flex items-center justify-between px-8 select-none shrink-0 z-10">
           <div className="flex items-center gap-2 text-sm text-slate-400">
-            <span className="hover:text-indigo-600 cursor-pointer transition">Store</span>
+            <span
+              onClick={() => window.location.href = isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home"}
+              className="hover:text-indigo-600 cursor-pointer transition font-medium"
+            >
+              {isEmployee ? "Employee Dashboard" : isManager ? "Manager Dashboard" : "Store"}
+            </span>
             <span>/</span>
-            <span className="text-slate-600 font-medium">3D Customizer</span>
+            <span className="text-slate-600 font-semibold">
+              {isEmployee ? "3D Concept Designer" : isManager ? "Store Concept Creator" : "3D Customizer"}
+            </span>
           </div>
 
-          <div className="flex items-center gap-6">
-
-            <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-700 font-bold text-xs">
-              <ShoppingBag className="h-3.5 w-3.5" />
-              <span>Cart ({quantity})</span>
-            </div>
+          <div className="flex items-center gap-4">
+            {!isEmployee && !isManager && (
+              <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-700 font-bold text-xs">
+                <ShoppingBag className="h-3.5 w-3.5" />
+                <span>Cart ({quantity})</span>
+              </div>
+            )}
 
             <button
               onClick={() => {
@@ -1581,7 +1667,7 @@ export default function DesignerPage() {
                   handleSaveBtnClick();
                 }
               }}
-              className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition cursor-pointer"
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition cursor-pointer"
             >
               <Save className="h-4 w-4" />
               {isManager ? "Publish to Store" : isEmployee ? "Submit to Manager" : "Save Design"}
@@ -1609,19 +1695,17 @@ export default function DesignerPage() {
                   <button
                     key={item.id}
                     onClick={() => setActiveLeftPanel(prev => prev === item.id ? null : item.id)}
-                    className={`w-[68px] py-2.5 px-1 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer relative group ${
-                      isActive
-                        ? "bg-indigo-50/90 text-indigo-600 font-bold shadow-xs ring-1 ring-indigo-200"
-                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 font-medium"
-                    }`}
+                    className={`w-[68px] py-2.5 px-1 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer relative group ${isActive
+                      ? "bg-indigo-50/90 text-indigo-600 font-bold shadow-xs ring-1 ring-indigo-200"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 font-medium"
+                      }`}
                     title={item.subtitle}
                   >
                     {isActive && (
                       <div className="absolute -left-1 top-2.5 bottom-2.5 w-1 bg-indigo-600 rounded-r-full shadow-sm" />
                     )}
-                    <div className={`p-1.5 rounded-xl transition-transform duration-200 relative ${
-                      isActive ? "bg-indigo-600 text-white shadow-xs" : "group-hover:scale-110"
-                    }`}>
+                    <div className={`p-1.5 rounded-xl transition-transform duration-200 relative ${isActive ? "bg-indigo-600 text-white shadow-xs" : "group-hover:scale-110"
+                      }`}>
                       <Icon className="h-4.5 w-4.5" />
                       {Boolean(item.count) && !isActive && (
                         <span className="absolute -top-1 -right-1 h-3.5 min-w-[14px] px-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center ring-1 ring-white shadow-xs">
@@ -1717,20 +1801,17 @@ export default function DesignerPage() {
                                   }
                                 }
                               }}
-                              className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                                isSelected
-                                  ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
-                                  : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
-                              }`}
+                              className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${isSelected
+                                ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
+                                : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
+                                }`}
                             >
-                              <div className={`h-11 w-11 rounded-xl flex items-center justify-center text-2xl mb-2 transition ${
-                                isSelected ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-500"
-                              }`}>
+                              <div className={`h-11 w-11 rounded-xl flex items-center justify-center text-2xl mb-2 transition ${isSelected ? "bg-indigo-600 text-white shadow-xs" : "bg-slate-100 text-slate-500"
+                                }`}>
                                 👕
                               </div>
-                              <span className={`text-[11px] font-bold text-center leading-tight truncate w-full ${
-                                isSelected ? "text-indigo-950" : "text-slate-800"
-                              }`}>
+                              <span className={`text-[11px] font-bold text-center leading-tight truncate w-full ${isSelected ? "text-indigo-950" : "text-slate-800"
+                                }`}>
                                 {model.name}
                               </span>
                               <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">
@@ -1768,11 +1849,10 @@ export default function DesignerPage() {
                           <button
                             key={gsm}
                             onClick={() => setShirtMaterial(gsm)}
-                            className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                              isSelected
-                                ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
-                                : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
-                            }`}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${isSelected
+                              ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
+                              : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
+                              }`}
                           >
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-2">
@@ -1830,11 +1910,10 @@ export default function DesignerPage() {
                             <button
                               key={color.name}
                               onClick={() => setShirtColor(color.value)}
-                              className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer ${
-                                isSelected
-                                  ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500"
-                                  : "border-slate-200/70 hover:bg-slate-50 hover:border-slate-300"
-                              }`}
+                              className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer ${isSelected
+                                ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500"
+                                : "border-slate-200/70 hover:bg-slate-50 hover:border-slate-300"
+                                }`}
                               title={color.name}
                             >
                               <div
@@ -1864,11 +1943,10 @@ export default function DesignerPage() {
                             <button
                               key={size}
                               onClick={() => setSelectedSize(size)}
-                              className={`py-3 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                                isSelected
-                                  ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                                  : "border-slate-200 hover:bg-slate-50 text-slate-700 bg-white"
-                              }`}
+                              className={`py-3 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
+                                ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                                : "border-slate-200 hover:bg-slate-50 text-slate-700 bg-white"
+                                }`}
                             >
                               <span className="text-sm leading-none">{size}</span>
                               <span className={`text-[9px] uppercase font-semibold ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
@@ -1899,7 +1977,7 @@ export default function DesignerPage() {
                   <div className="space-y-5">
                     {/* Upload button & options */}
                     <div className="space-y-3">
-                      <label 
+                      <label
                         onDragOver={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -2144,19 +2222,17 @@ export default function DesignerPage() {
                 processAndImportFile(file, autoRemoveBgOnUpload);
               }
             }}
-            className={`flex-1 flex flex-col relative overflow-hidden transition-colors duration-300 ${
-              isDarkStudio
-                ? "bg-gradient-to-tr from-slate-950 via-slate-900 to-slate-950"
-                : "bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20"
-            }`}
+            className={`flex-1 flex flex-col relative overflow-hidden transition-colors duration-300 ${isDarkStudio
+              ? "bg-gradient-to-tr from-slate-950 via-slate-900 to-slate-950"
+              : "bg-gradient-to-tr from-slate-100 via-slate-50/30 to-indigo-50/20"
+              }`}
           >
             {/* Top Properties Panel Toolbar */}
             <div
-              className={`w-full px-5 py-2.5 border-b backdrop-blur-md z-20 flex items-center justify-between gap-3 select-none shrink-0 transition-colors duration-200 overflow-x-auto ${
-                isDarkStudio
-                  ? "bg-slate-900/90 border-slate-800 text-slate-200"
-                  : "bg-white/90 border-slate-200/80 text-slate-800 shadow-2xs"
-              }`}
+              className={`w-full px-5 py-2.5 border-b backdrop-blur-md z-20 flex items-center justify-between gap-3 select-none shrink-0 transition-colors duration-200 overflow-x-auto ${isDarkStudio
+                ? "bg-slate-900/90 border-slate-800 text-slate-200"
+                : "bg-white/90 border-slate-200/80 text-slate-800 shadow-2xs"
+                }`}
             >
               {activeLayer ? (
                 <div className="flex items-center gap-2.5 w-full min-w-max">
@@ -2183,11 +2259,10 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => moveLayerToSide(activeLayer.id, (activeLayer.position?.[2] || 0) < 0 ? "front" : "back")}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                        (activeLayer.position?.[2] || 0) < 0
-                          ? "bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 hover:bg-purple-200"
-                          : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-                      }`}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${(activeLayer.position?.[2] || 0) < 0
+                        ? "bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 hover:bg-purple-200"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                        }`}
                       title="Toggle between Front and Back placement on the shirt"
                     >
                       <Shirt className="h-3.5 w-3.5" />
@@ -2229,11 +2304,10 @@ export default function DesignerPage() {
                       <button
                         type="button"
                         onClick={() => updateActiveLayer("bold", !activeLayer.bold)}
-                        className={`w-7 h-7 rounded-lg border text-xs font-black flex items-center justify-center transition cursor-pointer ${
-                          activeLayer.bold
-                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-                            : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                        }`}
+                        className={`w-7 h-7 rounded-lg border text-xs font-black flex items-center justify-center transition cursor-pointer ${activeLayer.bold
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                          }`}
                         title="Bold"
                       >
                         B
@@ -2241,11 +2315,10 @@ export default function DesignerPage() {
                       <button
                         type="button"
                         onClick={() => updateActiveLayer("italic", !activeLayer.italic)}
-                        className={`w-7 h-7 rounded-lg border text-xs font-black italic flex items-center justify-center transition cursor-pointer ${
-                          activeLayer.italic
-                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-                            : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                        }`}
+                        className={`w-7 h-7 rounded-lg border text-xs font-black italic flex items-center justify-center transition cursor-pointer ${activeLayer.italic
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                          }`}
                         title="Italic"
                       >
                         I
@@ -2349,11 +2422,10 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => updateActiveLayer("flipX", !activeLayer.flipX)}
-                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                        activeLayer.flipX
-                          ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-600 dark:text-indigo-400 font-bold"
-                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
-                      }`}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${activeLayer.flipX
+                        ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-600 dark:text-indigo-400 font-bold"
+                        : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                        }`}
                       title="Flip Horizontally"
                     >
                       <FlipHorizontal className="h-3.5 w-3.5" />
@@ -2361,11 +2433,10 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => updateActiveLayer("flipY", !activeLayer.flipY)}
-                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                        activeLayer.flipY
-                          ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-600 dark:text-indigo-400 font-bold"
-                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
-                      }`}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${activeLayer.flipY
+                        ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 text-indigo-600 dark:text-indigo-400 font-bold"
+                        : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                        }`}
                       title="Flip Vertically"
                     >
                       <FlipVertical className="h-3.5 w-3.5" />
@@ -2413,11 +2484,10 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => toggleLayerLock(activeLayer.id)}
-                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                        activeLayer.locked
-                          ? "bg-amber-50 dark:bg-amber-950/60 border-amber-300 text-amber-600 dark:text-amber-400"
-                          : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
-                      }`}
+                      className={`p-1.5 rounded-lg border transition cursor-pointer ${activeLayer.locked
+                        ? "bg-amber-50 dark:bg-amber-950/60 border-amber-300 text-amber-600 dark:text-amber-400"
+                        : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                        }`}
                       title={activeLayer.locked ? "Unlock Layer" : "Lock Layer"}
                     >
                       {activeLayer.locked ? <Lock className="h-3.5 w-3.5 text-amber-500" /> : <Unlock className="h-3.5 w-3.5" />}
@@ -2467,9 +2537,8 @@ export default function DesignerPage() {
             </div>
 
             {/* Canvas Angle View Controls */}
-            <div className={`absolute top-16 left-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${
-              isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
-            }`}>
+            <div className={`absolute top-16 left-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
+              }`}>
               {["front", "back", "left", "right"].map((view) => (
                 <button
                   key={view}
@@ -2480,13 +2549,12 @@ export default function DesignerPage() {
                     else if (view === "left") setModelRotation(Math.PI / 2);
                     else if (view === "right") setModelRotation(-Math.PI / 2);
                   }}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
-                    activeView === view
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : isDarkStudio
-                        ? "text-slate-400 hover:text-slate-200"
-                        : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${activeView === view
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : isDarkStudio
+                      ? "text-slate-400 hover:text-slate-200"
+                      : "text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   {view}
                 </button>
@@ -2494,15 +2562,13 @@ export default function DesignerPage() {
             </div>
 
             {/* Canvas Quick Undo / Redo & Studio Theme Controls */}
-            <div className={`absolute top-16 right-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${
-              isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
-            }`}>
+            <div className={`absolute top-16 right-6 flex items-center gap-1.5 backdrop-blur border p-1 rounded-xl shadow-xs z-10 select-none transition-colors duration-200 ${isDarkStudio ? "bg-slate-900/80 border-slate-700/60" : "bg-white/80 border-slate-200"
+              }`}>
               <button
                 onClick={handleUndo}
                 disabled={!canUndo}
-                className={`p-2 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed ${
-                  isDarkStudio ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
-                }`}
+                className={`p-2 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed ${isDarkStudio ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                  }`}
                 title="Undo (Ctrl+Z)"
               >
                 <Undo2 className="h-4 w-4" />
@@ -2510,9 +2576,8 @@ export default function DesignerPage() {
               <button
                 onClick={handleRedo}
                 disabled={!canRedo}
-                className={`p-2 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed ${
-                  isDarkStudio ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
-                }`}
+                className={`p-2 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer disabled:cursor-not-allowed ${isDarkStudio ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                  }`}
                 title="Redo (Ctrl+Y)"
               >
                 <Redo2 className="h-4 w-4" />
@@ -2520,9 +2585,8 @@ export default function DesignerPage() {
               <div className={`w-px h-5 mx-0.5 ${isDarkStudio ? "bg-slate-700" : "bg-slate-200"}`} />
               <button
                 onClick={toggleStudioTheme}
-                className={`p-2 rounded-lg transition cursor-pointer ${
-                  isDarkStudio ? "text-amber-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
-                }`}
+                className={`p-2 rounded-lg transition cursor-pointer ${isDarkStudio ? "text-amber-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                  }`}
                 title={isDarkStudio ? "Switch to Light Studio" : "Switch to Dark Studio"}
               >
                 {isDarkStudio ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-indigo-600" />}
@@ -2572,9 +2636,8 @@ export default function DesignerPage() {
               )}
             </div>
 
-            <div className={`flex flex-col gap-3 max-w-sm mx-auto w-full border p-4 rounded-2xl shadow-sm select-none z-10 transition-colors duration-200 ${
-              isDarkStudio ? "bg-slate-900/90 border-slate-700/80 text-slate-200" : "bg-white border-slate-200 text-slate-800"
-            }`}>
+            <div className={`flex flex-col gap-3 max-w-sm mx-auto w-full border p-4 rounded-2xl shadow-sm select-none z-10 transition-colors duration-200 ${isDarkStudio ? "bg-slate-900/90 border-slate-700/80 text-slate-200" : "bg-white border-slate-200 text-slate-800"
+              }`}>
               {/* View Zoom Control */}
               <div className={`flex items-center justify-between text-xs font-bold ${isDarkStudio ? "text-slate-400" : "text-slate-500"}`}>
                 <span className="flex items-center gap-1">
@@ -2585,9 +2648,8 @@ export default function DesignerPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.15))}
-                  className={`p-1 rounded-lg border font-bold ${
-                    isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
-                  }`}
+                  className={`p-1 rounded-lg border font-bold ${isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                    }`}
                 >
                   -
                 </button>
@@ -2598,15 +2660,13 @@ export default function DesignerPage() {
                   step="0.05"
                   value={zoomLevel}
                   onChange={(e) => setZoomLevel(Number(e.target.value))}
-                  className={`flex-1 accent-indigo-600 h-1 rounded-lg appearance-none cursor-pointer ${
-                    isDarkStudio ? "bg-slate-700" : "bg-slate-100"
-                  }`}
+                  className={`flex-1 accent-indigo-600 h-1 rounded-lg appearance-none cursor-pointer ${isDarkStudio ? "bg-slate-700" : "bg-slate-100"
+                    }`}
                 />
                 <button
                   onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.15))}
-                  className={`p-1 rounded-lg border font-bold ${
-                    isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
-                  }`}
+                  className={`p-1 rounded-lg border font-bold ${isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                    }`}
                 >
                   +
                 </button>
@@ -2616,9 +2676,8 @@ export default function DesignerPage() {
                     setActiveView("front");
                     setModelRotation(0);
                   }}
-                  className={`p-1 rounded-lg border ${
-                    isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-400" : "border-slate-200 hover:bg-slate-50 text-slate-500"
-                  }`}
+                  className={`p-1 rounded-lg border ${isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-400" : "border-slate-200 hover:bg-slate-50 text-slate-500"
+                    }`}
                   title="Reset View"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
@@ -2640,9 +2699,8 @@ export default function DesignerPage() {
                       setModelRotation(newRot);
                       updateActiveViewFromAngle(newRot);
                     }}
-                    className={`p-1 rounded-lg border font-bold ${
-                      isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
-                    }`}
+                    className={`p-1 rounded-lg border font-bold ${isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                      }`}
                   >
                     -
                   </button>
@@ -2658,9 +2716,8 @@ export default function DesignerPage() {
                       setModelRotation(rad);
                       updateActiveViewFromAngle(rad);
                     }}
-                    className={`flex-1 accent-indigo-600 h-1 rounded-lg appearance-none cursor-pointer ${
-                      isDarkStudio ? "bg-slate-700" : "bg-slate-100"
-                    }`}
+                    className={`flex-1 accent-indigo-600 h-1 rounded-lg appearance-none cursor-pointer ${isDarkStudio ? "bg-slate-700" : "bg-slate-100"
+                      }`}
                   />
                   <button
                     onClick={() => {
@@ -2668,9 +2725,8 @@ export default function DesignerPage() {
                       setModelRotation(newRot);
                       updateActiveViewFromAngle(newRot);
                     }}
-                    className={`p-1 rounded-lg border font-bold ${
-                      isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
-                    }`}
+                    className={`p-1 rounded-lg border font-bold ${isDarkStudio ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                      }`}
                   >
                     +
                   </button>
@@ -2684,8 +2740,8 @@ export default function DesignerPage() {
               <button
                 onClick={() => setRightTab("layers")}
                 className={`flex-1 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${rightTab === "layers"
-                    ? "border-indigo-600 text-indigo-600 bg-indigo-50/30"
-                    : "border-transparent text-slate-400 hover:text-slate-600"
+                  ? "border-indigo-600 text-indigo-600 bg-indigo-50/30"
+                  : "border-transparent text-slate-400 hover:text-slate-600"
                   }`}
               >
                 <Layers className="h-3.5 w-3.5" />
@@ -2694,8 +2750,8 @@ export default function DesignerPage() {
               <button
                 onClick={() => setRightTab("properties")}
                 className={`flex-1 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center justify-center gap-1.5 ${rightTab === "properties"
-                    ? "border-indigo-600 text-indigo-600 bg-indigo-50/30"
-                    : "border-transparent text-slate-400 hover:text-slate-600"
+                  ? "border-indigo-600 text-indigo-600 bg-indigo-50/30"
+                  : "border-transparent text-slate-400 hover:text-slate-600"
                   }`}
                 disabled={!selectedLayerId}
               >
@@ -2734,8 +2790,8 @@ export default function DesignerPage() {
                             });
                           }}
                           className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isSelected
-                              ? "border-indigo-500 bg-indigo-50/20 ring-1 ring-indigo-500/30 shadow-xs"
-                              : "border-slate-100 hover:border-slate-200 hover:bg-slate-50/70"
+                            ? "border-indigo-500 bg-indigo-50/20 ring-1 ring-indigo-500/30 shadow-xs"
+                            : "border-slate-100 hover:border-slate-200 hover:bg-slate-50/70"
                             }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -2929,11 +2985,10 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => updateActiveLayer("flipX", !activeLayer.flipX)}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
-                        activeLayer.flipX
-                          ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
-                          : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
-                      }`}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${activeLayer.flipX
+                        ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
+                        : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
+                        }`}
                     >
                       <FlipHorizontal className="h-4 w-4" />
                       Flip Horizontal
@@ -2941,11 +2996,10 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => updateActiveLayer("flipY", !activeLayer.flipY)}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${
-                        activeLayer.flipY
-                          ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
-                          : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
-                      }`}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition duration-200 cursor-pointer ${activeLayer.flipY
+                        ? "bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm font-extrabold"
+                        : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
+                        }`}
                     >
                       <FlipVertical className="h-4 w-4" />
                       Flip Vertical
@@ -2997,22 +3051,20 @@ export default function DesignerPage() {
                     <button
                       type="button"
                       onClick={() => moveLayerToSide(activeLayer.id, "front")}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition duration-200 cursor-pointer ${
-                        (activeLayer.position?.[2] || 0) >= 0
-                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                          : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
-                      }`}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition duration-200 cursor-pointer ${(activeLayer.position?.[2] || 0) >= 0
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                        : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
+                        }`}
                     >
                       <span>Move to Front</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => moveLayerToSide(activeLayer.id, "back")}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition duration-200 cursor-pointer ${
-                        (activeLayer.position?.[2] || 0) < 0
-                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                          : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
-                      }`}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition duration-200 cursor-pointer ${(activeLayer.position?.[2] || 0) < 0
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                        : "hover:bg-slate-50 border-slate-200 text-slate-600 bg-white"
+                        }`}
                     >
                       <span>Move to Back</span>
                     </button>
@@ -3187,11 +3239,10 @@ export default function DesignerPage() {
                                 key={preset}
                                 type="button"
                                 onClick={() => setAngleDeg(preset)}
-                                className={`py-1 text-[10px] font-semibold rounded-md border transition-colors cursor-pointer ${
-                                  currentDeg === preset
-                                    ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-bold"
-                                    : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                                }`}
+                                className={`py-1 text-[10px] font-semibold rounded-md border transition-colors cursor-pointer ${currentDeg === preset
+                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-bold"
+                                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                                  }`}
                               >
                                 {preset > 0 ? `+${preset}°` : `${preset}°`}
                               </button>
@@ -3210,10 +3261,10 @@ export default function DesignerPage() {
               <div className="flex items-center justify-between text-xs font-bold text-slate-500">
                 <span>Print Area: {totalPrintArea.toFixed(1)} in²</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${designComplexity === "High"
-                    ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
-                    : designComplexity === "Medium"
-                      ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
-                      : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                  ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
+                  : designComplexity === "Medium"
+                    ? "bg-amber-50 text-amber-600 ring-1 ring-amber-100"
+                    : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
                   }`}>
                   {designComplexity}
                 </span>
@@ -3265,11 +3316,10 @@ export default function DesignerPage() {
                           key={gsmOption}
                           type="button"
                           onClick={() => setShirtMaterial(gsmOption)}
-                          className={`flex flex-col p-1.5 rounded-lg text-left transition-all border cursor-pointer ${
-                            isSelected
-                              ? "border-indigo-600 bg-white ring-2 ring-indigo-500/20 shadow-xs"
-                              : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300 text-slate-600"
-                          }`}
+                          className={`flex flex-col p-1.5 rounded-lg text-left transition-all border cursor-pointer ${isSelected
+                            ? "border-indigo-600 bg-white ring-2 ring-indigo-500/20 shadow-xs"
+                            : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300 text-slate-600"
+                            }`}
                           title={`Select ${gsmOption} (${priceFormatted})`}
                         >
                           <div className="flex items-center justify-between w-full">
@@ -3305,26 +3355,28 @@ export default function DesignerPage() {
                   <span>Rs. {getPrintAreaCost().toFixed(2)}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-0.5">
-                  <span>Quantity</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="h-6 w-6 rounded border flex items-center justify-center font-bold text-slate-600 hover:bg-slate-50"
-                    >
-                      -
-                    </button>
-                    <span className="font-bold text-slate-700 w-4 text-center text-xs">{quantity}</span>
-                    <button
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="h-6 w-6 rounded border flex items-center justify-center font-bold text-slate-600 hover:bg-slate-50"
-                    >
-                      +
-                    </button>
+                {!isEmployee && !isManager && (
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-0.5">
+                    <span>Quantity</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="h-6 w-6 rounded border flex items-center justify-center font-bold text-slate-600 hover:bg-slate-50"
+                      >
+                        -
+                      </button>
+                      <span className="font-bold text-slate-700 w-4 text-center text-xs">{quantity}</span>
+                      <button
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="h-6 w-6 rounded border flex items-center justify-center font-bold text-slate-600 hover:bg-slate-50"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {quantity >= pricingRules.volumeDiscountThreshold && (
+                {!isEmployee && !isManager && quantity >= pricingRules.volumeDiscountThreshold && (
                   <div className="flex items-center justify-between text-xs font-semibold text-emerald-600">
                     <span>Volume Discount ({pricingRules.volumeDiscountPercentage}%)</span>
                     <span>-Rs. {(unitPrice * quantity * (pricingRules.volumeDiscountPercentage / 100)).toFixed(2)}</span>
@@ -3332,10 +3384,16 @@ export default function DesignerPage() {
                 )}
 
                 <div className="border-t pt-2.5 flex items-baseline justify-between select-none">
-                  <span className="text-sm font-extrabold text-slate-900">Total Price</span>
+                  <span className="text-sm font-extrabold text-slate-900">
+                    {isEmployee ? "Proposed Unit Price" : isManager ? "Estimated Unit Cost" : "Total Price"}
+                  </span>
                   <div className="text-right">
-                    <p className="text-xl font-black text-slate-900 leading-none">Rs. {totalCost.toFixed(2)}</p>
-                    <span className="text-[10px] text-slate-400 font-medium">Rs. {unitPrice.toFixed(2)} each</span>
+                    <p className="text-xl font-black text-slate-900 leading-none">
+                      Rs. {isEmployee || isManager ? unitPrice.toFixed(2) : totalCost.toFixed(2)}
+                    </p>
+                    {!isEmployee && !isManager && (
+                      <span className="text-[10px] text-slate-400 font-medium">Rs. {unitPrice.toFixed(2)} each</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -3347,16 +3405,54 @@ export default function DesignerPage() {
                   className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 border border-slate-200 transition cursor-pointer shadow-2xs active:scale-[0.99]"
                 >
                   <Eye className="h-4 w-4 text-indigo-600" />
-                  <span>Preview Final Design</span>
+                  <span>Preview 3D Design</span>
                 </button>
 
-                <button
-                  onClick={handleAddToCartAndCheckout}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight cursor-pointer active:scale-[0.99]"
-                >
-                  <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Continue to Checkout</span>
-                  <span className="text-sm mt-0.5">Total: Rs. {totalCost.toFixed(2)}</span>
-                </button>
+                {isEmployee ? (
+                  <button
+                    onClick={() => {
+                      setSubmitError("");
+                      setSubmitSuccess("");
+                      setSubmitForm({
+                        title: "",
+                        description: "",
+                        category: selectedModel?.name || "",
+                        basePrice: Math.round(unitPrice)
+                      });
+                      setShowSubmitModal(true);
+                    }}
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight cursor-pointer active:scale-[0.99]"
+                  >
+                    <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Submit Concept to Manager</span>
+                    <span className="text-xs mt-0.5 opacity-90">Send for review & catalog listing</span>
+                  </button>
+                ) : isManager ? (
+                  <button
+                    onClick={() => {
+                      setSubmitError("");
+                      setSubmitSuccess("");
+                      setSubmitForm({
+                        title: "",
+                        description: "",
+                        category: selectedModel?.name || "",
+                        basePrice: Math.round(unitPrice)
+                      });
+                      setShowSubmitModal(true);
+                    }}
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight cursor-pointer active:scale-[0.99]"
+                  >
+                    <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Publish to Store</span>
+                    <span className="text-xs mt-0.5 opacity-90">Add to catalog</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleAddToCartAndCheckout}
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight cursor-pointer active:scale-[0.99]"
+                  >
+                    <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Continue to Checkout</span>
+                    <span className="text-sm mt-0.5">Total: Rs. {totalCost.toFixed(2)}</span>
+                  </button>
+                )}
               </div>
             </div>
           </aside>
@@ -3548,12 +3644,12 @@ export default function DesignerPage() {
             <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-4 border border-emerald-100">
               <CheckCircle className="h-9 w-9" />
             </div>
-            
+
             <h3 className="text-lg font-bold text-slate-950 mb-1">Added to Cart!</h3>
             <p className="text-sm text-slate-500 mb-6">
               <strong className="text-slate-800 font-semibold">{addedItemDetails.name} ({addedItemDetails.size})</strong> has been successfully added to your cart.
             </p>
-            
+
             <p className="text-xs text-slate-500 mb-6 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100 font-medium">
               Would you like to redirect to checkout now?
             </p>
@@ -3777,11 +3873,10 @@ export default function DesignerPage() {
                   toggleLayerLock(targetLayer.id);
                   handleCloseContextMenu();
                 }}
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition cursor-pointer text-left font-bold group ${
-                  targetLayer.locked
-                    ? "hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300"
-                    : "hover:bg-amber-500/20 text-amber-400 hover:text-amber-300"
-                }`}
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition cursor-pointer text-left font-bold group ${targetLayer.locked
+                  ? "hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300"
+                  : "hover:bg-amber-500/20 text-amber-400 hover:text-amber-300"
+                  }`}
               >
                 <span className="flex items-center gap-2.5">
                   {targetLayer.locked ? (
@@ -3891,7 +3986,7 @@ export default function DesignerPage() {
           thumbnailUrl: generateDesignThumbnail(layers)
         }}
         onCustomize={() => setIsPreviewModalOpen(false)}
-        onCheckout={handleAddToCartAndCheckout}
+        onCheckout={isEmployee || isManager ? undefined : handleAddToCartAndCheckout}
       />
     </div>
   );
