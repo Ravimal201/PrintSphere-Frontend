@@ -390,7 +390,8 @@ function DecalItem({
         const localPoint = groupRef.current.worldToLocal(intersectionPoint.clone());
 
         if (isScaling) {
-          const newScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2);
+          const currentMeshScaleX = meshWorldScale.x || 1;
+          const newScaleX = Math.max(0.05, Math.abs(localPoint.x) * 2 * currentMeshScaleX);
           const aspect = layer.aspectRatio || (layer.scale[0] / layer.scale[1]) || 1;
           const newScaleY = newScaleX / aspect;
 
@@ -604,16 +605,16 @@ function DecalItem({
     return [groupPos.x, groupPos.y, groupPos.z];
   }, [groupPos.x, groupPos.y, groupPos.z]);
 
-  const helperScale = [
-    groupScale.x,
-    groupScale.y,
-    1
-  ];
-
   const meshWorldScale = new THREE.Vector3(1, 1, 1);
   if (mesh?.getWorldScale) {
     mesh.getWorldScale(meshWorldScale);
   }
+
+  const helperScale = [
+    Math.max(0.01, groupScale.x / (meshWorldScale.x || 1)),
+    Math.max(0.01, groupScale.y / (meshWorldScale.y || 1)),
+    1
+  ];
 
   if (!isSelected) {
     return createPortal(
