@@ -50,6 +50,7 @@ import {
   ThumbsUp,
   Eye,
   Mail,
+  Phone,
   Menu,
 } from "lucide-react";
 import axios from "axios";
@@ -1096,14 +1097,14 @@ export default function ManagerPage() {
       {isMobileSidebarOpen && (
         <div
           onClick={() => setIsMobileSidebarOpen(false)}
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
           aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 md:w-72 lg:w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 sm:w-72 lg:w-64 xl:w-72 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 h-full max-h-screen ${
           isMobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
@@ -1117,7 +1118,7 @@ export default function ManagerPage() {
               <h1 className="font-extrabold text-white text-base tracking-wide leading-none truncate">
                 PrintSphere
               </h1>
-              <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold block mt-0.5">
+              <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold block mt-1">
                 Manager Desk
               </span>
             </div>
@@ -4662,28 +4663,69 @@ export default function ManagerPage() {
                           </div>
                         </div>
 
-                        {/* Right Action Buttons */}
-                        <div className="shrink-0 flex flex-row md:flex-col items-center md:items-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
-                          {/* Direct Email Reply Button */}
-                          <a
-                            href={`mailto:${inq.email}?subject=Re: ${encodeURIComponent(inq.subject || 'PrintSphere Inquiry')}`}
-                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
-                          >
-                            <Mail className="h-3.5 w-3.5" />
-                            <span>Reply via Email</span>
-                          </a>
+                        {/* Right Action Buttons & User Contact Info */}
+                        <div className="shrink-0 flex flex-row md:flex-col items-center md:items-end gap-2.5 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                          {/* User Contact Info: Email */}
+                          <div className="flex flex-col items-start md:items-end w-full">
+                            <a
+                              href={`mailto:${inq.email}?subject=Re: ${encodeURIComponent(inq.subject || 'PrintSphere Inquiry')}`}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline bg-indigo-50/70 hover:bg-indigo-100/70 px-3 py-1.5 rounded-xl border border-indigo-100 transition max-w-full"
+                              title="Customer Email"
+                            >
+                              <Mail className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
+                              <span className="truncate">{inq.email}</span>
+                            </a>
+                          </div>
 
-                          {/* Status Toggle Dropdown */}
-                          <select
-                            value={inq.status || "New"}
-                            disabled={isLoading}
-                            onChange={(e) => handleUpdateInquiryStatus(inq._id, e.target.value)}
-                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/70 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 focus:outline-indigo-500 cursor-pointer"
-                          >
-                            <option value="New">Status: New</option>
-                            <option value="In Progress">Status: In Progress</option>
-                            <option value="Resolved">Status: Resolved</option>
-                          </select>
+                          {/* Dynamic Sequential Status Action Buttons */}
+                          {inq.status === "New" && (
+                            <button
+                              disabled={isLoading}
+                              onClick={() => handleUpdateInquiryStatus(inq._id, "In Progress")}
+                              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                              title="Mark inquiry as In Progress"
+                            >
+                              {isLoading ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Clock className="h-3.5 w-3.5" />
+                              )}
+                              <span>In Progress</span>
+                            </button>
+                          )}
+
+                          {inq.status === "In Progress" && (
+                            <button
+                              disabled={isLoading}
+                              onClick={() => handleUpdateInquiryStatus(inq._id, "Resolved")}
+                              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                              title="Mark inquiry as Resolved"
+                            >
+                              {isLoading ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-3.5 w-3.5" />
+                              )}
+                              <span>Resolved</span>
+                            </button>
+                          )}
+
+                          {inq.status === "Resolved" && (
+                            <div className="flex items-center gap-2">
+                              <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 select-none">
+                                <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Resolved</span>
+                              </span>
+                              <button
+                                disabled={isLoading}
+                                onClick={() => handleUpdateInquiryStatus(inq._id, "In Progress")}
+                                className="text-[11px] text-slate-400 hover:text-indigo-600 font-semibold underline px-1 cursor-pointer disabled:opacity-50"
+                                title="Reopen inquiry as In Progress"
+                              >
+                                Reopen
+                              </button>
+                            </div>
+                          )}
 
                           {/* Delete Button */}
                           <button
