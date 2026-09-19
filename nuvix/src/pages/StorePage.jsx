@@ -25,6 +25,7 @@ import {
   Edit3,
   MessageSquare,
   Send,
+  Eye,
 } from "lucide-react";
 import axios from "axios";
 import Navbar from "../components/Navbar/RNavbar";
@@ -115,6 +116,7 @@ export default function StorePage() {
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState("");
   const [reviewErrorMsg, setReviewErrorMsg] = useState("");
   const [deletingReviewId, setDeletingReviewId] = useState(null);
+  const [previewNotice, setPreviewNotice] = useState(null);
 
   // Check if current user is Manager or Admin
   const storedCurrentUser = (() => {
@@ -169,6 +171,15 @@ export default function StorePage() {
   const handleProductReviewSubmit = async (e) => {
     e.preventDefault();
     if (!selected3DProduct) return;
+    if (isManagerPreview || isManagerOrAdmin) {
+      setPreviewNotice({
+        type: "review",
+        title: "Manager Store Preview",
+        message: "Review submission is disabled in Manager Store Preview. This view is for demonstrating the customer storefront. Live reviews can be managed and moderated in the Manager Dashboard.",
+        productTitle: selected3DProduct?.title || "T-Shirt Design",
+      });
+      return;
+    }
     setSubmittingReview(true);
     setReviewErrorMsg("");
     setReviewSuccessMsg("");
@@ -478,6 +489,16 @@ export default function StorePage() {
 
   // Add to cart
   const handleAddToCart = (product, selectedOptions = {}) => {
+    if (isManagerPreview || isManagerOrAdmin) {
+      setPreviewNotice({
+        type: "cart",
+        title: "Store Preview Mode",
+        message: "Adding products to cart is disabled in Store Preview. This view allows managers to preview and inspect 3D garments, sizing configurations, and store presentation without creating real customer cart sessions.",
+        productTitle: product?.title || "T-Shirt Design",
+      });
+      return;
+    }
+
     const defaultSize = selectedOptions.size || product.sizes?.[0] || "M";
     const defaultColor = resolveColorName(
       selectedOptions.color || product.colors?.[0] || "White"
@@ -734,6 +755,25 @@ export default function StorePage() {
           className={`${isManagerPreview ? "flex-1 overflow-y-auto" : "flex-1 overflow-y-auto p-8 lg:ml-72"}`}
         >
           <div className="max-w-7xl mx-auto space-y-8">
+            {isManagerPreview && (
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-5 py-3 rounded-2xl border border-indigo-500/30 flex items-center justify-between shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl">
+                    <Eye className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">Manager Storefront Preview Mode</p>
+                    <p className="text-[11px] text-indigo-200">
+                      You are viewing the live storefront as customers see it. Add to cart and review submission actions are in preview mode.
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 bg-indigo-600/40 text-indigo-200 border border-indigo-400/30 rounded-xl text-[10px] font-black uppercase tracking-wider">
+                  Preview Active
+                </span>
+              </div>
+            )}
+
             {/* Header section with Cart status */}
             <div className="flex justify-between items-center select-none border-b pb-4">
               <div>
@@ -1638,6 +1678,15 @@ export default function StorePage() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (isManagerPreview || isManagerOrAdmin) {
+                          setPreviewNotice({
+                            type: "review",
+                            title: "Manager Store Preview",
+                            message: "Review submission is disabled in Store Preview. This view is for previewing the storefront design. You can moderate live customer reviews from the Manager Dashboard.",
+                            productTitle: selected3DProduct?.title || "T-Shirt Design",
+                          });
+                          return;
+                        }
                         setIsWritingReview(!isWritingReview);
                         setReviewErrorMsg("");
                         setReviewSuccessMsg("");
@@ -1838,11 +1887,13 @@ export default function StorePage() {
                       gsm: modalGsm,
                       quantity: modalQty,
                     });
-                    setSelected3DProduct(null);
+                    if (!isManagerPreview && !isManagerOrAdmin) {
+                      setSelected3DProduct(null);
+                    }
                   }}
                   className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition cursor-pointer"
                 >
-                  Add to Cart — Rs.{" "}
+                  {isManagerPreview || isManagerOrAdmin ? "Add to Cart (Preview)" : "Add to Cart"} — Rs.{" "}
                   {(
                     selected3DProduct.basePrice *
                     (1 - selected3DProduct.discount / 100) *
@@ -1850,6 +1901,70 @@ export default function StorePage() {
                   ).toFixed(2)}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manager Store Preview Mode Notice Modal */}
+      {previewNotice && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 select-none">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-indigo-100 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white p-6 flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl text-indigo-200 shadow-inner">
+                  {previewNotice.type === "cart" ? (
+                    <ShoppingCart className="h-6 w-6 text-indigo-200" />
+                  ) : (
+                    <MessageSquare className="h-6 w-6 text-indigo-200" />
+                  )}
+                </div>
+                <div>
+                  <span className="px-2.5 py-0.5 bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-[10px] font-black uppercase tracking-wider rounded-full">
+                    Manager Preview
+                  </span>
+                  <h3 className="text-base font-black text-white mt-1">
+                    {previewNotice.title}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewNotice(null)}
+                className="p-1 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100/80 space-y-1.5">
+                <p className="text-xs font-bold text-slate-800 leading-relaxed">
+                  {previewNotice.message}
+                </p>
+                {previewNotice.productTitle && (
+                  <p className="text-[11px] text-indigo-600 font-semibold pt-1">
+                    Design: <strong>{previewNotice.productTitle}</strong>
+                  </p>
+                )}
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-center gap-2 font-medium">
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>This storefront is currently in preview mode for manager demonstration and visual inspection.</span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setPreviewNotice(null)}
+                className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+              >
+                Got It, Continue Preview
+              </button>
             </div>
           </div>
         </div>
