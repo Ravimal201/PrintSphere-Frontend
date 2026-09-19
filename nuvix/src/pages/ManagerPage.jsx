@@ -111,9 +111,6 @@ export default function ManagerPage() {
   const [reviewFilterRating, setReviewFilterRating] = useState("ALL"); // ALL | BAD | 1 | 2 | 3 | 4 | 5
   const [reviewSearchQuery, setReviewSearchQuery] = useState("");
   const [reviewProductFilter, setReviewProductFilter] = useState("ALL");
-  const [deletingReviewId, setDeletingReviewId] = useState(null);
-  const [reviewConfirmDelete, setReviewConfirmDelete] = useState(null);
-  const [reviewNotification, setReviewNotification] = useState(null);
 
   // Inquiries / Contact Messages states
   const [inquiries, setInquiries] = useState([]);
@@ -1081,75 +1078,6 @@ export default function ManagerPage() {
       return "/images/models/t_shirt_hoodie.glb";
     }
     return "/images/models/male normal t-shirt1.glb";
-  };
-
-  const handleDeleteReview = async (reviewId) => {
-    if (!reviewId) return;
-    try {
-      setDeletingReviewId(reviewId);
-      const token = localStorage.getItem("token");
-      const headers = { Authorization: `Bearer ${token}` };
-
-      await axios.delete(`${API_BASE_URL}/manager/reviews/${reviewId}`, { headers });
-
-      const updatedReviews = reviews.filter((r) => r._id !== reviewId);
-      setReviews(updatedReviews);
-
-      const total = updatedReviews.length;
-      const totalRating = updatedReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
-      const averageRating = total > 0 ? parseFloat((totalRating / total).toFixed(1)) : 0;
-      const badReviewsCount = updatedReviews.filter((r) => (Number(r.rating) || 0) <= 2).length;
-
-      setReviewStats({
-        totalReviews: total,
-        averageRating,
-        badReviewsCount,
-        breakdown: {
-          1: updatedReviews.filter((r) => r.rating === 1).length,
-          2: updatedReviews.filter((r) => r.rating === 2).length,
-          3: updatedReviews.filter((r) => r.rating === 3).length,
-          4: updatedReviews.filter((r) => r.rating === 4).length,
-          5: updatedReviews.filter((r) => r.rating === 5).length,
-        },
-      });
-
-      const reviewObj = reviews.find((r) => r._id === reviewId);
-      if (reviewObj && reviewObj.productId) {
-        const prodId = reviewObj.productId._id || reviewObj.productId;
-        setProducts((prev) =>
-          prev.map((p) => {
-            if (p._id === prodId) {
-              const pRevs = (p.reviews || []).filter((r) => r._id !== reviewId);
-              const pCount = pRevs.length;
-              const pTot = pRevs.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
-              return {
-                ...p,
-                reviews: pRevs,
-                ratingsCount: pCount,
-                averageRating: pCount > 0 ? parseFloat((pTot / pCount).toFixed(1)) : 0,
-              };
-            }
-            return p;
-          })
-        );
-      }
-
-      setReviewConfirmDelete(null);
-      setReviewNotification({
-        type: "success",
-        message: "Bad comment/review deleted successfully.",
-      });
-      setTimeout(() => setReviewNotification(null), 4000);
-    } catch (err) {
-      console.error("Delete review error:", err);
-      setReviewNotification({
-        type: "error",
-        message: err.response?.data?.message || "Failed to delete review.",
-      });
-      setTimeout(() => setReviewNotification(null), 4000);
-    } finally {
-      setDeletingReviewId(null);
-    }
   };
 
   if (loading) {
@@ -4181,31 +4109,6 @@ export default function ManagerPage() {
               </div>
             </div>
 
-            {/* Notification alert banner */}
-            {reviewNotification && (
-              <div
-                className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-150 ${reviewNotification.type === "success"
-                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                  : "bg-rose-50 text-rose-800 border border-rose-200"
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  {reviewNotification.type === "success" ? (
-                    <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                  )}
-                  <span>{reviewNotification.message}</span>
-                </div>
-                <button
-                  onClick={() => setReviewNotification(null)}
-                  className="text-slate-400 hover:text-slate-600 text-xs p-1"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-
             {/* Metric KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
@@ -4502,25 +4405,11 @@ export default function ManagerPage() {
                           </div>
                         </div>
 
-                        {/* Right: Actions */}
-                        <div className="shrink-0 flex items-center gap-2 self-end md:self-center">
-                          <button
-                            onClick={() => setReviewConfirmDelete(rev)}
-                            disabled={deletingReviewId === rev._id}
-                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 hover:border-rose-600 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-                          >
-                            {deletingReviewId === rev._id ? (
-                              <>
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                <span>Deleting...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span>Delete Comment</span>
-                              </>
-                            )}
-                          </button>
+                        {/* Right: Read-only badge */}
+                        <div className="shrink-0 self-end md:self-center">
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200/80">
+                            Read-Only
+                          </span>
                         </div>
                       </div>
                     );
@@ -5977,83 +5866,6 @@ export default function ManagerPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Review / Bad Comment Confirmation Modal */}
-      {reviewConfirmDelete && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-rose-100 flex flex-col">
-            <div className="bg-rose-50 border-b border-rose-100 p-6 flex items-start gap-4">
-              <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0">
-                <Trash2 className="h-6 w-6" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-base font-black text-rose-950">
-                  Delete Bad Comment / Review?
-                </h3>
-                <p className="text-xs text-rose-700 mt-1">
-                  This action will permanently remove this customer comment from the store and recalculate product ratings.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                  <span>{reviewConfirmDelete.userName || "Verified Buyer"}</span>
-                  <div className="flex text-amber-400">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star
-                        key={s}
-                        className={`h-3 w-3 ${s <= reviewConfirmDelete.rating
-                          ? "fill-amber-400 text-amber-400"
-                          : "text-slate-200"
-                          }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs text-slate-600 italic">
-                  "{reviewConfirmDelete.comment || "(No comment text)"}"
-                </p>
-              </div>
-
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/80 text-[11px] text-amber-800 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                <span>Removing abusive or inaccurate comments helps maintain customer trust.</span>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border-t flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setReviewConfirmDelete(null)}
-                disabled={deletingReviewId !== null}
-                className="px-4 py-2.5 border border-slate-200 hover:bg-white text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteReview(reviewConfirmDelete._id)}
-                disabled={deletingReviewId !== null}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {deletingReviewId !== null ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Yes, Delete Comment</span>
-                  </>
-                )}
-              </button>
-            </div>
           </div>
         </div>
       )}

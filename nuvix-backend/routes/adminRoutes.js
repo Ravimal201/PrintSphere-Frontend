@@ -6,7 +6,8 @@ const {
   deleteStaffAccount,
   getAnalytics,
   updateStaffPassword,
-  getCustomerSatisfactionReviews
+  getCustomerSatisfactionReviews,
+  deleteReview
 } = require("../controllers/adminController");
 
 router.get("/staff", getStaffList);
@@ -15,5 +16,6 @@ router.delete("/delete-staff/:id", deleteStaffAccount);
 router.get("/analytics", getAnalytics);
 router.put("/update-staff-password", updateStaffPassword);
 router.get("/reviews", getCustomerSatisfactionReviews);
+router.delete("/reviews/:id", deleteReview);
 
 module.exports = router;
