@@ -224,6 +224,15 @@ export default function DesignerPage() {
             if (modelGSMs.length > 0 && !initialDraft?.material) {
               setShirtMaterial(modelGSMs[0]);
             }
+            const modelSizes = chosen?.sizes && Array.isArray(chosen.sizes) && chosen.sizes.length > 0
+              ? chosen.sizes
+              : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+            if (!initialDraft?.size) {
+              setSelectedSize(modelSizes[0] || "M");
+            }
+            if (!initialDraft?.sizes) {
+              setSelectedStoreSizes(modelSizes);
+            }
           } else {
             setSelectedModel(null);
           }
@@ -493,20 +502,58 @@ export default function DesignerPage() {
   const [rightTab, setRightTab] = useState("layers");
   const [shirtColor, setShirtColor] = useState(() => initialDraft?.fabricColor || initialDraft?.color || "#ffffff");
   const [selectedModel, setSelectedModel] = useState(null);
-  const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
   const ALL_SHIRT_SIZES = [
+    { code: "XS", label: "Extra Small", desc: "Chest: 34-36\"" },
     { code: "S", label: "Small", desc: "Chest: 36-38\"" },
     { code: "M", label: "Medium", desc: "Chest: 38-40\"" },
     { code: "L", label: "Large", desc: "Chest: 40-42\"" },
     { code: "XL", label: "Extra Large", desc: "Chest: 42-44\"" },
-    { code: "XXL", label: "Double Extra Large", desc: "Chest: 44-46\"" }
+    { code: "XXL", label: "Double Extra Large", desc: "Chest: 44-46\"" },
+    { code: "3XL", label: "Triple Extra Large", desc: "Chest: 46-48\"" }
   ];
+
+  const activeModelSizes =
+    selectedModel?.sizes && Array.isArray(selectedModel.sizes) && selectedModel.sizes.length > 0
+      ? selectedModel.sizes
+      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+
+  const getActiveSizeList = () => {
+    return activeModelSizes.map((code) => {
+      const found = ALL_SHIRT_SIZES.find((s) => s.code.toUpperCase() === code.toUpperCase());
+      return (
+        found || {
+          code: code,
+          label: code,
+          desc: "Custom Sizing",
+        }
+      );
+    });
+  };
+
+  const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
   const [selectedStoreSizes, setSelectedStoreSizes] = useState(() => {
     if (initialDraft?.sizes && Array.isArray(initialDraft.sizes) && initialDraft.sizes.length > 0) {
       return initialDraft.sizes;
     }
     return ["S", "M", "L", "XL", "XXL"];
   });
+
+  useEffect(() => {
+    if (!selectedModel) return;
+    const modelSizes =
+      selectedModel.sizes && Array.isArray(selectedModel.sizes) && selectedModel.sizes.length > 0
+        ? selectedModel.sizes
+        : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+
+    if (!modelSizes.includes(selectedSize)) {
+      setSelectedSize(modelSizes[0] || "M");
+    }
+
+    setSelectedStoreSizes((prev) => {
+      const valid = prev.filter((s) => modelSizes.includes(s));
+      return valid.length > 0 ? valid : modelSizes;
+    });
+  }, [selectedModel]);
 
   const toggleStoreSize = (sizeCode) => {
     setSelectedStoreSizes((prev) => {
@@ -1826,6 +1873,16 @@ export default function DesignerPage() {
                                     setShirtMaterial(modelGSMs[0]);
                                   }
                                 }
+                                const modelSizes = model.sizes && Array.isArray(model.sizes) && model.sizes.length > 0
+                                  ? model.sizes
+                                  : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+                                if (!modelSizes.includes(selectedSize)) {
+                                  setSelectedSize(modelSizes[0] || "M");
+                                }
+                                setSelectedStoreSizes((prev) => {
+                                  const valid = prev.filter(s => modelSizes.includes(s));
+                                  return valid.length > 0 ? valid : modelSizes;
+                                });
                               }}
                               className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${isSelected
                                 ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
@@ -1972,7 +2029,7 @@ export default function DesignerPage() {
                             </span>
                           </div>
                           <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-2xs">
-                            {selectedStoreSizes.length} of {ALL_SHIRT_SIZES.length} Active
+                            {selectedStoreSizes.length} of {getActiveSizeList().length} Active
                           </span>
                         </div>
 
@@ -1980,14 +2037,14 @@ export default function DesignerPage() {
                         <div className="flex items-center gap-1.5 pt-0.5">
                           <button
                             type="button"
-                            onClick={() => setSelectedStoreSizes(ALL_SHIRT_SIZES.map((s) => s.code))}
+                            onClick={() => setSelectedStoreSizes([...activeModelSizes])}
                             className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
                           >
                             Select All
                           </button>
                           <button
                             type="button"
-                            onClick={() => setSelectedStoreSizes(["S", "M", "L", "XL", "XXL"])}
+                            onClick={() => setSelectedStoreSizes(["S", "M", "L", "XL", "XXL"].filter((s) => activeModelSizes.includes(s)))}
                             className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
                           >
                             Standard (S-XXL)
@@ -1996,7 +2053,7 @@ export default function DesignerPage() {
 
                         {/* Checkbox List of Sizes */}
                         <div className="space-y-2 pt-1">
-                          {ALL_SHIRT_SIZES.map((sizeObj) => {
+                          {getActiveSizeList().map((sizeObj) => {
                             const isChecked = selectedStoreSizes.includes(sizeObj.code);
                             return (
                               <label
@@ -2060,7 +2117,7 @@ export default function DesignerPage() {
                         <div className="space-y-2">
                           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Available Sizes</span>
                           <div className="grid grid-cols-3 gap-2">
-                            {["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((size) => {
+                            {activeModelSizes.map((size) => {
                               const isSelected = selectedSize === size;
                               return (
                                 <button
