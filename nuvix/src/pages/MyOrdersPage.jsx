@@ -421,27 +421,15 @@ export default function MyOrdersPage() {
 
                       <div className="flex items-center gap-2">
                         {order.paymentStatus === "Pending" && (
-                          <div className="flex gap-2 items-center">
-                            <div className="w-24">
-                              <PaymentButton
-                                orderId={order._id}
-                                amount={order.totalCost}
-                                gateway="stripe"
-                                className="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-lg font-bold text-[10px] shadow-sm transition-all flex items-center justify-center cursor-pointer"
-                              >
-                                <span>Pay Stripe</span>
-                              </PaymentButton>
-                            </div>
-                            <div className="w-24">
-                              <PaymentButton
-                                orderId={order._id}
-                                amount={order.totalCost}
-                                gateway="payhere"
-                                className="w-full py-1.5 px-3 bg-amber-500 hover:bg-amber-600 active:scale-98 text-white rounded-lg font-bold text-[10px] shadow-sm transition-all flex items-center justify-center cursor-pointer"
-                              >
-                                <span>Pay PayHere</span>
-                              </PaymentButton>
-                            </div>
+                          <div className="w-28">
+                            <PaymentButton
+                              orderId={order._id}
+                              amount={order.totalCost}
+                              gateway="card"
+                              className="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-lg font-bold text-[10px] shadow-sm transition-all flex items-center justify-center cursor-pointer"
+                            >
+                              <span>Pay with Card</span>
+                            </PaymentButton>
                           </div>
                         )}
                         {/* Shipped -> Order Collected Button */}

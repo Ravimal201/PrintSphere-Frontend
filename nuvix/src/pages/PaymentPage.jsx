@@ -3,17 +3,16 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt3DModal from "../components/TShirt3DModal";
-import { CreditCard, ShieldCheck, Lock, CheckCircle, AlertCircle, MapPin, ChevronRight, Building, Smartphone, Truck, ArrowLeft, Loader2, XCircle, Info } from "lucide-react";
+import { CreditCard, ShieldCheck, Lock, AlertCircle, MapPin, Truck, ArrowLeft, Loader2, XCircle, Info } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
-import { processCardPayment, createCheckoutSession } from "../services/paymentService";
+import { processCardPayment } from "../services/paymentService";
 
 export default function PaymentPage() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState("card"); // 'card', 'payhere', 'cod'
 
   // Card Form State
   const [cardForm, setCardForm] = useState({
@@ -114,28 +113,7 @@ export default function PaymentPage() {
     return "CARD";
   };
 
-  const loadPayHereScript = () => {
-    return new Promise((resolve, reject) => {
-      if (window.payhere) {
-        resolve(true);
-        return;
-      }
-      const existingScript = document.querySelector('script[src="https://www.payhere.lk/lib/payhere.js"]');
-      if (existingScript) {
-        existingScript.onload = () => resolve(true);
-        existingScript.onerror = () => reject(new Error("Failed to load PayHere SDK"));
-        return;
-      }
-      const script = document.createElement("script");
-      script.type = "text/javascript";
-      script.src = "https://www.payhere.lk/lib/payhere.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => reject(new Error("Failed to load PayHere SDK"));
-      document.body.appendChild(script);
-    });
-  };
-
-  // Process Interactive Payment Submission via Gateway Verification
+  // Process Interactive Payment Submission via Card Payment
   const handleProcessPayment = async (e) => {
     if (e) e.preventDefault();
     setErrorMessage("");
@@ -154,88 +132,43 @@ export default function PaymentPage() {
     setProcessingPayment(true);
 
     try {
-      if (selectedMethod === "card") {
-        const cleanNum = cardForm.cardNumber.replace(/\s/g, "");
-        if (cleanNum.length < 15) {
-          setErrorMessage("Please enter a valid card number.");
-          setProcessingPayment(false);
-          return;
-        }
-        if (!cardForm.expiryDate || cardForm.expiryDate.length < 5) {
-          setErrorMessage("Please enter a valid expiry date (MM/YY).");
-          setProcessingPayment(false);
-          return;
-        }
-        if (!cardForm.cvv || cardForm.cvv.length < 3) {
-          setErrorMessage("Please enter a valid 3-digit CVV code.");
-          setProcessingPayment(false);
-          return;
-        }
+      const cleanNum = cardForm.cardNumber.replace(/\s/g, "");
+      if (cleanNum.length < 15) {
+        setErrorMessage("Please enter a valid card number.");
+        setProcessingPayment(false);
+        return;
+      }
+      if (!cardForm.expiryDate || cardForm.expiryDate.length < 5) {
+        setErrorMessage("Please enter a valid expiry date (MM/YY).");
+        setProcessingPayment(false);
+        return;
+      }
+      if (!cardForm.cvv || cardForm.cvv.length < 3) {
+        setErrorMessage("Please enter a valid 3-digit CVV code.");
+        setProcessingPayment(false);
+        return;
+      }
 
-        const data = await processCardPayment(order._id, {
-          cardNumber: cardForm.cardNumber,
-          cardholderName: cardForm.cardholderName,
-          expiryDate: cardForm.expiryDate,
-          cvv: cardForm.cvv,
-          brand: getCardBrand()
-        });
+      const data = await processCardPayment(order._id, {
+        cardNumber: cardForm.cardNumber,
+        cardholderName: cardForm.cardholderName,
+        expiryDate: cardForm.expiryDate,
+        cvv: cardForm.cvv,
+        brand: getCardBrand()
+      });
 
-        if (data && data.success) {
-          localStorage.removeItem("printsphere_pending_order_id");
-          localStorage.setItem("printsphere_cart", JSON.stringify([]));
-          window.location.href = `/payment/success?order_id=${order._id}&gateway=card`;
-        } else {
-          throw new Error(data?.message || "Card payment authorization failed.");
-        }
-      } else if (selectedMethod === "payhere") {
-        await loadPayHereScript();
-        const headers = { Authorization: `Bearer ${token}` };
-        const sessionRes = await axios.post(
-          `${API_BASE_URL}/payment/create-checkout-session`,
-          { orderId: order._id, gateway: "payhere" },
-          { headers }
-        );
-
-        if (sessionRes.data && sessionRes.data.payhereParams) {
-          localStorage.removeItem("printsphere_pending_order_id");
-          localStorage.setItem("printsphere_cart", JSON.stringify([]));
-
-          window.payhere.onCompleted = function (completedOrderId) {
-            window.location.href = `/payment/success?order_id=${completedOrderId}&gateway=payhere`;
-          };
-
-          window.payhere.onDismissed = function () {
-            window.location.href = `/payment/cancel?order_id=${order._id}&gateway=payhere`;
-          };
-
-          window.payhere.onError = function (error) {
-            console.error("PayHere Checkout Error: ", error);
-            setErrorMessage("PayHere Checkout Error: " + error);
-            setProcessingPayment(false);
-          };
-
-          window.payhere.startPayment(sessionRes.data.payhereParams);
-        } else {
-          throw new Error("PayHere payment parameters were not returned by backend");
-        }
+      if (data && data.success) {
+        localStorage.removeItem("printsphere_pending_order_id");
+        localStorage.setItem("printsphere_cart", JSON.stringify([]));
+        window.location.href = `/payment/success?order_id=${order._id}&gateway=card`;
       } else {
-        // Cash on Delivery (COD)
-        const headers = { Authorization: `Bearer ${token}` };
-        const res = await axios.get(
-          `${API_BASE_URL}/payment/success?session_id=direct_cod_${order._id}&order_id=${order._id}`,
-          { headers }
-        );
-        if (res.data && res.data.success) {
-          localStorage.removeItem("printsphere_pending_order_id");
-          localStorage.setItem("printsphere_cart", JSON.stringify([]));
-          window.location.href = `/payment/success?order_id=${order._id}&gateway=cod`;
-        } else {
-          throw new Error("Order confirmation failed.");
-        }
+        throw new Error(data?.message || "Card payment authorization failed.");
       }
     } catch (err) {
       console.error("Payment submission error:", err);
       setErrorMessage(err.response?.data?.message || err.message || "Payment processing error. Please verify payment details.");
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -326,9 +259,9 @@ export default function PaymentPage() {
                 </button>
                 <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
                   <CreditCard className="h-6 w-6 text-indigo-600" />
-                  Secure Payment Gateway
+                  Card Payment Gateway
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">Enter your payment credentials to finalize your order</p>
+                <p className="text-xs text-slate-500 mt-0.5">Enter your credit or debit card details to finalize your order</p>
               </div>
 
               <div className="flex items-center gap-2 px-3.5 py-2 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-700 text-xs font-extrabold shadow-2xs">
@@ -336,13 +269,6 @@ export default function PaymentPage() {
                 <span>256-bit SSL Encrypted</span>
               </div>
             </div>
-
-            {errorMessage && (
-              <div className="flex items-center gap-2 p-4 rounded-2xl border border-rose-200 bg-rose-50 text-rose-600 text-xs font-bold animate-fade-in">
-                <AlertCircle className="h-5 w-5 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
 
             {loading ? (
               <div className="flex justify-center items-center h-64">
@@ -362,7 +288,7 @@ export default function PaymentPage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 
-                {/* Left Panel: Payment Method & Details Form */}
+                {/* Left Panel: Payment Card Form & Details */}
                 <div className="lg:col-span-7 space-y-6">
                   
                   {/* Delivery Fee Advisory Notice Banner */}
@@ -380,288 +306,173 @@ export default function PaymentPage() {
                         </span>
                       </div>
                       <p className="text-xs text-amber-900 leading-relaxed font-medium">
-                        Please note that the <strong>delivery fee is to be paid upon receipt of the product</strong> directly in cash to the courier. This payment covers only your items and custom printing costs.
+                        Please note that the <strong>delivery fee is to be paid upon receipt of the product</strong> directly in cash to the courier. This card payment covers only your items and custom printing costs.
                       </p>
-                    </div>
-                  </div>
-
-                  {/* Select Payment Method Tabs */}
-                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-                    <h3 className="text-sm font-extrabold text-slate-900">Select Payment Method</h3>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMethod("card")}
-                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
-                          selectedMethod === "card"
-                            ? "border-indigo-650 bg-indigo-50/50 text-indigo-900 font-extrabold shadow-xs"
-                            : "border-slate-150 hover:border-slate-300 text-slate-500 hover:bg-slate-50"
-                        }`}
-                      >
-                        <CreditCard className="h-5 w-5 mb-1 text-indigo-600" />
-                        <span className="text-xs font-bold">Credit / Debit</span>
-                        <span className="text-[9px] text-slate-400 font-semibold">Instant Card</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMethod("payhere")}
-                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
-                          selectedMethod === "payhere"
-                            ? "border-indigo-650 bg-indigo-50/50 text-indigo-900 font-extrabold shadow-xs"
-                            : "border-slate-150 hover:border-slate-300 text-slate-500 hover:bg-slate-50"
-                        }`}
-                      >
-                        <Building className="h-5 w-5 mb-1 text-indigo-600" />
-                        <span className="text-xs font-bold">PayHere</span>
-                        <span className="text-[9px] text-emerald-600 font-extrabold">Online Banking</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMethod("cod")}
-                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer ${
-                          selectedMethod === "cod"
-                            ? "border-indigo-650 bg-indigo-50/50 text-indigo-900 font-extrabold shadow-xs"
-                            : "border-slate-150 hover:border-slate-300 text-slate-500 hover:bg-slate-50"
-                        }`}
-                      >
-                        <Truck className="h-5 w-5 mb-1 text-slate-600" />
-                        <span className="text-xs font-bold">Pay on Delivery</span>
-                        <span className="text-[9px] text-slate-400 font-semibold">Cash</span>
-                      </button>
                     </div>
                   </div>
 
                   {/* Payment Card Form & Interactive Visual Graphic */}
-                  {selectedMethod === "card" && (
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
-                      
-                      {/* Live Credit Card Graphic */}
-                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xl space-y-6">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-extrabold tracking-widest text-indigo-400 uppercase">PrintSphere Pay</span>
-                          <span className="px-2.5 py-0.5 rounded-md bg-white/10 border border-white/20 text-[10px] font-black tracking-widest uppercase">
-                            {getCardBrand()}
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-600">
+                          <CreditCard className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-extrabold text-slate-900">Credit / Debit Card</h3>
+                          <p className="text-[10px] text-slate-400 font-semibold">Visa, MasterCard, American Express accepted</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-150 rounded-xl text-[10px] font-black uppercase tracking-wider">
+                        Instant Card Checkout
+                      </span>
+                    </div>
+
+                    {/* Live Credit Card Graphic */}
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xl space-y-6">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-extrabold tracking-widest text-indigo-400 uppercase">PrintSphere Pay</span>
+                        <span className="px-2.5 py-0.5 rounded-md bg-white/10 border border-white/20 text-[10px] font-black tracking-widest uppercase">
+                          {getCardBrand()}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="w-10 h-7 bg-amber-400/90 rounded-md border border-amber-200/50 mb-2"></div>
+                        <p className="font-mono text-lg font-bold tracking-widest select-none">
+                          {cardForm.cardNumber || "•••• •••• •••• ••••"}
+                        </p>
+                      </div>
+
+                      <div className="flex justify-between items-end text-xs">
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Card Holder</span>
+                          <span className="font-bold tracking-wide uppercase truncate block max-w-[180px]">
+                            {cardForm.cardholderName || "VALUED CUSTOMER"}
                           </span>
                         </div>
-
-                        <div className="space-y-1">
-                          <div className="w-10 h-7 bg-amber-400/90 rounded-md border border-amber-200/50 mb-2"></div>
-                          <p className="font-mono text-lg font-bold tracking-widest select-none">
-                            {cardForm.cardNumber || "•••• •••• •••• ••••"}
-                          </p>
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Expires</span>
+                          <span className="font-mono font-bold">{cardForm.expiryDate || "MM/YY"}</span>
                         </div>
+                      </div>
+                    </div>
 
-                        <div className="flex justify-between items-end text-xs">
-                          <div>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Card Holder</span>
-                            <span className="font-bold tracking-wide uppercase truncate block max-w-[180px]">
-                              {cardForm.cardholderName || "VALUED CUSTOMER"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Expires</span>
-                            <span className="font-mono font-bold">{cardForm.expiryDate || "MM/YY"}</span>
-                          </div>
+                    {/* Card Input Form */}
+                    <form onSubmit={handleProcessPayment} className="space-y-4 text-xs font-semibold text-slate-700">
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Cardholder Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Sachinthaka Ravimal"
+                          value={cardForm.cardholderName}
+                          onChange={(e) => setCardForm({ ...cardForm, cardholderName: e.target.value })}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Card Number *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            required
+                            placeholder="4111 2222 3333 4444"
+                            maxLength={19}
+                            value={cardForm.cardNumber}
+                            onChange={handleCardNumberChange}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
+                          />
+                          <CreditCard className="absolute right-3 top-2.5 h-5 w-5 text-slate-400" />
                         </div>
                       </div>
 
-                      {/* Card Input Form */}
-                      <form onSubmit={handleProcessPayment} className="space-y-4 text-xs font-semibold text-slate-700">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Cardholder Name *
+                            Expiry Date (MM/YY) *
                           </label>
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Sachinthaka Ravimal"
-                            value={cardForm.cardholderName}
-                            onChange={(e) => setCardForm({ ...cardForm, cardholderName: e.target.value })}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 transition"
+                            placeholder="MM/YY"
+                            maxLength={5}
+                            value={cardForm.expiryDate}
+                            onChange={handleExpiryChange}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
                           />
                         </div>
 
                         <div>
                           <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Card Number *
+                            CVC / CVV *
                           </label>
                           <div className="relative">
                             <input
-                              type="text"
+                              type="password"
                               required
-                              placeholder="4111 2222 3333 4444"
-                              maxLength={19}
-                              value={cardForm.cardNumber}
-                              onChange={handleCardNumberChange}
+                              placeholder="123"
+                              maxLength={4}
+                              value={cardForm.cvv}
+                              onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "") })}
                               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
                             />
-                            <CreditCard className="absolute right-3 top-2.5 h-5 w-5 text-slate-400" />
+                            <Lock className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                              Expiry Date (MM/YY) *
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              placeholder="MM/YY"
-                              maxLength={5}
-                              value={cardForm.expiryDate}
-                              onChange={handleExpiryChange}
-                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                              CVC / CVV *
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="password"
-                                required
-                                placeholder="123"
-                                maxLength={4}
-                                value={cardForm.cvv}
-                                onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "") })}
-                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition"
-                              />
-                              <Lock className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-2">
-                          <input
-                            type="checkbox"
-                            id="saveCard"
-                            checked={cardForm.saveCard}
-                            onChange={(e) => setCardForm({ ...cardForm, saveCard: e.target.checked })}
-                            className="rounded text-indigo-600 focus:ring-indigo-500"
-                          />
-                          <label htmlFor="saveCard" className="text-xs font-semibold text-slate-600">
-                            Save card details securely for future custom 3D orders
-                          </label>
-                        </div>
-
-                        {/* Delivery Notice Reminder above button */}
-                        <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl flex items-center gap-2 text-[11px] text-amber-900 font-medium">
-                          <Info className="h-4 w-4 text-amber-600 shrink-0" />
-                          <span>Delivery fee is excluded from card charge and must be paid upon receipt.</span>
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={processingPayment}
-                          className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-99 text-white rounded-xl text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
-                        >
-                          {processingPayment ? (
-                            <>
-                              <Loader2 className="h-5 w-5 animate-spin text-white" />
-                              <span>Authorizing & Encrypting Payment...</span>
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="h-5 w-5" />
-                              <span>Pay Rs. {order.totalCost?.toFixed(2)} Now</span>
-                            </>
-                          )}
-                        </button>
-                      </form>
-                    </div>
-                  )}
-
-                  {/* PayHere Gateway Details */}
-                  {selectedMethod === "payhere" && (
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-                      <div className="flex items-center gap-3 pb-3 border-b">
-                        <Building className="h-6 w-6 text-indigo-600" />
-                        <div>
-                          <h4 className="font-extrabold text-slate-900 text-sm">PayHere Online Payment Gateway</h4>
-                          <p className="text-xs text-slate-500">Pay using Sri Lankan Internet Banking, eZ Cash or Genie</p>
                         </div>
                       </div>
 
-                      <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl text-xs text-indigo-900 leading-relaxed space-y-2">
-                        <p className="font-bold">Instructions:</p>
-                        <ul className="list-disc list-inside space-y-1 text-[11px] font-semibold text-slate-600">
-                          <li>Click below to open PayHere secure checkout modal.</li>
-                          <li>Select Sampath Vishwa, Commercial Bank, HNB, or eZ Cash.</li>
-                          <li>Your order payment will automatically update once verified.</li>
-                        </ul>
+                      <div className="flex items-center gap-2 pt-2">
+                        <input
+                          type="checkbox"
+                          id="saveCard"
+                          checked={cardForm.saveCard}
+                          onChange={(e) => setCardForm({ ...cardForm, saveCard: e.target.checked })}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <label htmlFor="saveCard" className="text-xs font-semibold text-slate-600">
+                          Save card details securely for future custom 3D orders
+                        </label>
                       </div>
 
-                      {/* Delivery Notice Reminder */}
+                      {/* Delivery Notice Reminder above button */}
                       <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl flex items-center gap-2 text-[11px] text-amber-900 font-medium">
                         <Info className="h-4 w-4 text-amber-600 shrink-0" />
-                        <span>Delivery fee is excluded and to be paid directly upon receipt of the package.</span>
+                        <span>Delivery fee is excluded from card charge and must be paid upon receipt.</span>
                       </div>
 
                       <button
-                        onClick={handleProcessPayment}
+                        type="submit"
                         disabled={processingPayment}
-                        className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-99 text-white rounded-xl text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
                       >
                         {processingPayment ? (
                           <>
                             <Loader2 className="h-5 w-5 animate-spin text-white" />
-                            <span>Connecting to PayHere Gateway...</span>
+                            <span>Authorizing & Encrypting Payment...</span>
                           </>
                         ) : (
                           <>
-                            <CheckCircle className="h-5 w-5" />
-                            <span>Proceed with PayHere Portal (Rs. {order.totalCost?.toFixed(2)})</span>
+                            <ShieldCheck className="h-5 w-5" />
+                            <span>Pay Rs. {order.totalCost?.toFixed(2)} with Card</span>
                           </>
                         )}
                       </button>
-                    </div>
-                  )}
 
-                  {/* Cash on Delivery Details */}
-                  {selectedMethod === "cod" && (
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-                      <div className="flex items-center gap-3 pb-3 border-b">
-                        <Truck className="h-6 w-6 text-slate-700" />
-                        <div>
-                          <h4 className="font-extrabold text-slate-900 text-sm">Pay on Delivery (Cash/COD)</h4>
-                          <p className="text-xs text-slate-500">Pay cash upon delivery at your doorstep</p>
+                      {/* Payment Error Displayed Below Pay Button */}
+                      {errorMessage && (
+                        <div className="flex items-center gap-2.5 p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-xs font-bold animate-fade-in shadow-2xs">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                          <span>{errorMessage}</span>
                         </div>
-                      </div>
-
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        Our courier will collect the items payment of <strong className="text-slate-900">Rs. {order.totalCost?.toFixed(2)}</strong> plus the standard courier delivery fee when delivering your custom products to your address.
-                      </p>
-
-                      <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl flex items-center gap-2 text-[11px] text-amber-900 font-medium">
-                        <Info className="h-4 w-4 text-amber-600 shrink-0" />
-                        <span>Please prepare the product cost and courier delivery fee upon receiving the package.</span>
-                      </div>
-
-                      <button
-                        onClick={handleProcessPayment}
-                        disabled={processingPayment}
-                        className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                      >
-                        {processingPayment ? (
-                          <>
-                            <Loader2 className="h-5 w-5 animate-spin text-white" />
-                            <span>Confirming Order...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-5 w-5" />
-                            <span>Confirm Pay on Delivery</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
+                      )}
+                    </form>
+                  </div>
 
                   {/* Cancel Option */}
                   <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-3">

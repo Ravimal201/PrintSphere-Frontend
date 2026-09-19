@@ -52,7 +52,7 @@ export default function PaymentSuccess() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 select-none">
         <div className="bg-white border border-slate-100 rounded-3xl p-8 max-w-md w-full text-center shadow-xl space-y-4">
           <Loader2 className="h-12 w-12 text-indigo-600 animate-spin mx-auto" />
-          <h2 className="text-lg font-bold text-slate-800">Verifying {gateway.toLowerCase() === "payhere" ? "PayHere" : "Stripe"} Payment...</h2>
+          <h2 className="text-lg font-bold text-slate-800">Verifying Card Payment...</h2>
           <p className="text-xs text-slate-400 font-medium">
             Please wait while we confirm your transaction and update your order status.
           </p>
@@ -72,7 +72,7 @@ export default function PaymentSuccess() {
  
         <div>
           <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-black uppercase tracking-wider">
-            {gateway.toLowerCase() === "payhere" ? "PayHere" : "Stripe"} Payment Verified
+            Card Payment Verified
           </span>
           <h1 className="text-2xl font-black text-slate-900 mt-2">Payment Successful!</h1>
           <p className="text-xs text-slate-500 font-semibold mt-1">
@@ -105,9 +105,7 @@ export default function PaymentSuccess() {
           <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200/60">
             <span className="font-bold text-slate-400 uppercase tracking-wider">Payment Method</span>
             <span className="font-extrabold text-slate-800 capitalize">
-              {paymentData?.paymentMethod === "PaymentAccount"
-                ? "Payment Account"
-                : (paymentData?.paymentMethod || (gateway.toLowerCase() === "payhere" ? "PayHere Checkout" : gateway.toLowerCase() === "paymentaccount" ? "Payment Account" : "Stripe Sandbox Card"))}
+              {paymentData?.paymentMethod || "Credit / Debit Card"}
             </span>
           </div>
 

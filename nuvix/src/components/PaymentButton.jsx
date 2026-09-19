@@ -26,27 +26,6 @@ export default function PaymentButton({
     brand: "CARD"
   });
 
-  const loadPayHereScript = () => {
-    return new Promise((resolve, reject) => {
-      if (window.payhere) {
-        resolve(true);
-        return;
-      }
-      const existingScript = document.querySelector('script[src="https://www.payhere.lk/lib/payhere.js"]');
-      if (existingScript) {
-        existingScript.onload = () => resolve(true);
-        existingScript.onerror = () => reject(new Error("Failed to load PayHere SDK"));
-        return;
-      }
-      const script = document.createElement("script");
-      script.type = "text/javascript";
-      script.src = "https://www.payhere.lk/lib/payhere.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => reject(new Error("Failed to load PayHere SDK"));
-      document.body.appendChild(script);
-    });
-  };
-
   const handlePayment = async () => {
     if (!orderId) {
       const err = "Order ID is missing. Please create an order first.";
@@ -71,9 +50,6 @@ export default function PaymentButton({
   };
 
   const getLoadingText = () => {
-    if (gateway.toLowerCase() === "payhere") {
-      return "Opening PayHere...";
-    }
     return "Redirecting to Payment...";
   };
 
@@ -153,7 +129,7 @@ export default function PaymentButton({
           children || (
             <>
               <CreditCard className="h-4 w-4 text-white" />
-              <span>Pay with {gateway.toLowerCase() === "payhere" ? "PayHere" : "Card"} {amount ? `(Rs. ${Number(amount).toFixed(2)})` : ""}</span>
+              <span>Pay with Card {amount ? `(Rs. ${Number(amount).toFixed(2)})` : ""}</span>
             </>
           )
         )}

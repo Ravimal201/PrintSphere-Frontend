@@ -45,11 +45,11 @@ export default function PaymentCancel() {
           {orderId ? (
             <PaymentButton
               orderId={orderId}
-              gateway={gateway}
+              gateway="card"
               className="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
             >
               <RotateCcw className="h-4 w-4" />
-              <span>Retry Payment ({gateway.toLowerCase() === "payhere" ? "PayHere" : "Stripe"})</span>
+              <span>Retry Card Payment</span>
             </PaymentButton>
           ) : (
             <button
