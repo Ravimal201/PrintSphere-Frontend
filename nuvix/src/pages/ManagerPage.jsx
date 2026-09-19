@@ -150,7 +150,7 @@ export default function ManagerPage() {
   const [approvingProductId, setApprovingProductId] = useState(null);
 
   // Orders tab states & filters
-  const [orderTabFilter, setOrderTabFilter] = useState("all"); // "all" | "active" | "pending_payment" | "delivered" | "cancelled"
+  const [orderTabFilter, setOrderTabFilter] = useState("all"); // "all" | "active" | "delivered" | "cancelled"
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
 
   // Order status classification helpers
@@ -1445,9 +1445,8 @@ export default function ManagerPage() {
                 <TrendingUp className="h-5 w-5 text-indigo-600" />
                 Live Shop Operations & Active Pipeline
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 py-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 py-2">
                 {[
-                  { label: "Pending Payment", filter: (o) => isPendingPaymentOrder(o) },
                   { label: "Processing", filter: (o) => o.orderStatus === "Processing" && !isDeliveredOrder(o) },
                   { label: "Printing", filter: (o) => o.orderStatus === "Printing" && !isDeliveredOrder(o) },
                   { label: "Completed", filter: (o) => o.orderStatus === "Completed" && !isDeliveredOrder(o) },
@@ -1643,14 +1642,12 @@ export default function ManagerPage() {
           const orderCounts = {
             all: orders.length,
             active: orders.filter(isActiveOrder).length,
-            pending_payment: orders.filter(isPendingPaymentOrder).length,
             delivered: orders.filter(isDeliveredOrder).length,
             cancelled: orders.filter(isCancelledOrder).length,
           };
 
           const filteredOrders = orders.filter((order) => {
             if (orderTabFilter === "active" && !isActiveOrder(order)) return false;
-            if (orderTabFilter === "pending_payment" && !isPendingPaymentOrder(order)) return false;
             if (orderTabFilter === "delivered" && !isDeliveredOrder(order)) return false;
             if (orderTabFilter === "cancelled" && !isCancelledOrder(order)) return false;
 
@@ -1683,7 +1680,7 @@ export default function ManagerPage() {
                     Customer Orders & Production Pipeline
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Filter by active, payment pending, delivered, or canceled orders. Assign staff and manage production workflow.
+                    Filter by active, delivered, or canceled orders. Assign staff and manage production workflow.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1701,7 +1698,6 @@ export default function ManagerPage() {
                   {[
                     { id: "all", label: "All Orders", count: orderCounts.all },
                     { id: "active", label: "Active Orders", count: orderCounts.active },
-                    { id: "pending_payment", label: "Payment Pending", count: orderCounts.pending_payment },
                     { id: "delivered", label: "Delivered Orders", count: orderCounts.delivered },
                     { id: "cancelled", label: "Canceled Orders", count: orderCounts.cancelled },
                   ].map((tab) => {

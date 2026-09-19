@@ -2697,27 +2697,22 @@ export default function DesignerPage() {
                   </div>
                 </div>
               ) : !isEmployee ? (
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                      <Shirt className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                      <span>{selectedModel?.name || shirtType}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                      <div
-                        className="h-3.5 w-3.5 rounded-full border border-slate-300 shadow-2xs"
-                        style={{ backgroundColor: shirtColor }}
-                      />
-                      <span>{resolveColorName(shirtColor)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
-                      <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                      <span>{formatGsm(shirtMaterial)}</span>
-                    </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                    <Shirt className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>{selectedModel?.name || shirtType}</span>
                   </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden md:block">
-                    💡 Select any layer on the 3D model or layers tab to edit properties
-                  </p>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                    <div
+                      className="h-3.5 w-3.5 rounded-full border border-slate-300 shadow-2xs"
+                      style={{ backgroundColor: shirtColor }}
+                    />
+                    <span>{resolveColorName(shirtColor)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
+                    <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>{formatGsm(shirtMaterial)}</span>
+                  </div>
                 </div>
               ) : null}
             </div>

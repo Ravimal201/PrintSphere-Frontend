@@ -320,7 +320,10 @@ exports.getOrders = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const orders = await Order.find()
+    const orders = await Order.find({
+      paymentStatus: "Paid",
+      orderStatus: { $ne: "Pending Payment" }
+    })
       .populate("customerId", "name email phone")
       .populate("assignedEmployee", "name")
       .populate("items.productId")

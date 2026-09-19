@@ -44,6 +44,59 @@ export default function MyDesignsPage() {
     window.location.href = "/designer";
   };
 
+  const handleCheckoutDesign = (design) => {
+    if (!design) return;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/login?redirect=/cart";
+      return;
+    }
+
+    const savedCart = localStorage.getItem("printsphere_cart");
+    let currentCart = [];
+    if (savedCart) {
+      try {
+        currentCart = JSON.parse(savedCart);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const designId = design._id || `custom-${Date.now()}`;
+    const selectedSize = design.size || "M";
+    const color = design.fabricColor || design.color || "White";
+    const cartKey = `${designId}-${selectedSize}-${color}`;
+
+    const existingIndex = currentCart.findIndex(item => item.cartKey === cartKey);
+    if (existingIndex > -1) {
+      currentCart[existingIndex].quantity = (currentCart[existingIndex].quantity || 1) + 1;
+    } else {
+      const cartItem = {
+        cartKey,
+        designId: design._id,
+        productId: null,
+        title: design.tShirtType || "Custom T-Shirt",
+        basePrice: design.estimatedCost || 0,
+        discount: 0,
+        category: "Customized",
+        size: selectedSize,
+        color: color,
+        material: design.material || "GSM 180",
+        gsm: design.material || "GSM 180",
+        tShirtType: design.tShirtType || "Crew Neck",
+        tShirtStyle: design.tShirtType || "Crew Neck",
+        quantity: 1,
+        image: design.thumbnailUrl || "/images/dumyImage.png",
+        isCustom: true,
+        layers: design.layers || []
+      };
+      currentCart.push(cartItem);
+    }
+
+    localStorage.setItem("printsphere_cart", JSON.stringify(currentCart));
+    window.location.href = "/cart";
+  };
+
   const handleDeleteDesign = async (id) => {
     if (!window.confirm("Are you sure you want to delete this design?")) {
       return;
@@ -188,6 +241,7 @@ export default function MyDesignsPage() {
           setSelected3DDesign(null);
         }}
         design={selected3DDesign}
+        onCheckout={handleCheckoutDesign}
       />
     </div>
   );

@@ -39,7 +39,11 @@ exports.getAssignedOrders = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Employee role required." });
     }
 
-    const orders = await Order.find({ assignedEmployee: decoded.id })
+    const orders = await Order.find({
+      assignedEmployee: decoded.id,
+      paymentStatus: "Paid",
+      orderStatus: { $ne: "Pending Payment" }
+    })
       .populate("customerId", "name email phone")
       .populate("assignedEmployee", "name")
       .populate("items.productId")
