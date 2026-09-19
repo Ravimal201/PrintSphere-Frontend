@@ -66,8 +66,11 @@ const logUserActivity = async (actionData, onLogged) => {
 };
 
 export default function StorePage() {
-  const isManagerPreview =
-    new URLSearchParams(window.location.search).get("preview") === "manager";
+  const previewParam =
+    new URLSearchParams(window.location.search).get("preview");
+  const isPreviewMode = Boolean(previewParam);
+  const isManagerPreview = previewParam === "manager";
+  const isAdminPreview = previewParam === "admin";
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -129,7 +132,7 @@ export default function StorePage() {
   const isManagerOrAdmin =
     storedCurrentUser?.role === "Manager" ||
     storedCurrentUser?.role === "Admin" ||
-    isManagerPreview;
+    isPreviewMode;
 
   useEffect(() => {
     if (selected3DProduct) {
@@ -489,11 +492,11 @@ export default function StorePage() {
 
   // Add to cart
   const handleAddToCart = (product, selectedOptions = {}) => {
-    if (isManagerPreview || isManagerOrAdmin) {
+    if (isPreviewMode || isManagerOrAdmin) {
       setPreviewNotice({
         type: "cart",
         title: "Store Preview Mode",
-        message: "Adding products to cart is disabled in Store Preview. This view allows managers to preview and inspect 3D garments, sizing configurations, and store presentation without creating real customer cart sessions.",
+        message: "Adding products to cart is disabled in Store Preview. This view allows administrators and managers to preview and inspect 3D garments, sizing configurations, and store presentation without creating real customer cart sessions.",
         productTitle: product?.title || "T-Shirt Design",
       });
       return;
@@ -742,29 +745,33 @@ export default function StorePage() {
 
   return (
     <div
-      className={`min-h-screen bg-[#f8fafc] flex flex-col text-slate-800 font-sans ${isManagerPreview ? "p-4" : ""}`}
+      className={`min-h-screen bg-[#f8fafc] flex flex-col text-slate-800 font-sans ${isPreviewMode ? "p-4" : ""}`}
     >
-      {!isManagerPreview && <Navbar />}
+      {!isPreviewMode && <Navbar />}
 
       <div
-        className={`flex flex-1 overflow-hidden ${isManagerPreview ? "flex-col" : ""}`}
+        className={`flex flex-1 overflow-hidden ${isPreviewMode ? "flex-col" : ""}`}
       >
-        {!isManagerPreview && <Sidebar />}
+        {!isPreviewMode && <Sidebar />}
 
         <main
-          className={`${isManagerPreview ? "flex-1 overflow-y-auto" : "flex-1 overflow-y-auto p-8 lg:ml-72"}`}
+          className={`${isPreviewMode ? "flex-1 overflow-y-auto" : "flex-1 overflow-y-auto p-8 lg:ml-72"}`}
         >
           <div className="max-w-7xl mx-auto space-y-8">
-            {isManagerPreview && (
+            {isPreviewMode && (
               <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-5 py-3 rounded-2xl border border-indigo-500/30 flex items-center justify-between shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl">
                     <Eye className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-white">Manager Storefront Preview Mode</p>
+                    <p className="text-xs font-bold text-white">
+                      {isAdminPreview
+                        ? "Admin Storefront Preview Mode"
+                        : "Manager Storefront Preview Mode"}
+                    </p>
                     <p className="text-[11px] text-indigo-200">
-                      You are viewing the live storefront as customers see it. Add to cart and review submission actions are in preview mode.
+                      You are viewing the store catalog only without sidebar, navbar, or footer.
                     </p>
                   </div>
                 </div>
@@ -1837,7 +1844,7 @@ export default function StorePage() {
         </div>
       )}
 
-      {!isManagerPreview && <Footer withSidebarOffset />}
+      {!isPreviewMode && <Footer withSidebarOffset />}
     </div>
   );
 }

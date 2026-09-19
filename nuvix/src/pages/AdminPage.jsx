@@ -4,7 +4,7 @@ import {
   Loader2, AlertCircle, CheckCircle, BarChart3, TrendingUp, Inbox, 
   Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check, Bell, Download, FileText,
   Droplets, Package, Box, Filter, Search, Tag, Plus, X, Menu,
-  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye, AlertTriangle, CreditCard, Printer, CheckCheck, Clock, Activity, Truck, Sparkles
+  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye, AlertTriangle, CreditCard, Printer, CheckCheck, Clock, Activity, Truck, Sparkles, Award
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -14,7 +14,7 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("analytics"); // "analytics" | "staff" | "inventory" | "satisfaction" | "inquiries" | "notifications" | "settings"
+  const [activeTab, setActiveTab] = useState("analytics"); // "analytics" | "staff" | "inventory" | "satisfaction" | "inquiries" | "notifications" | "settings" | "store-preview"
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState("ALL"); // "ALL" | "TSHIRTS" | "INK" | "PAPERS_PACKAGING"
   const [inventorySizeFilter, setInventorySizeFilter] = useState("ALL");
   const [inventoryColorFilter, setInventoryColorFilter] = useState("ALL");
@@ -1078,13 +1078,18 @@ export default function AdminPage() {
             <div className="pt-2 border-t border-slate-800">
               <button
                 onClick={() => {
-                  window.location.href = "/customer-home";
+                  setActiveTab("store-preview");
+                  setIsMobileSidebarOpen(false);
                 }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+                  activeTab === "store-preview"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+                }`}
               >
                 <span className="flex items-center gap-3 min-w-0">
-                  <Shield className="h-4.5 w-4.5 shrink-0" />
-                  <span className="truncate">View Store Front</span>
+                  <Award className="h-4.5 w-4.5 shrink-0" />
+                  <span className="truncate">Store Preview</span>
                 </span>
               </button>
             </div>
@@ -1137,6 +1142,7 @@ export default function AdminPage() {
                   {activeTab === "inquiries" && "Customer Inquiries"}
                   {activeTab === "notifications" && "Live Notifications"}
                   {activeTab === "settings" && "System Settings"}
+                  {activeTab === "store-preview" && "Store Preview"}
                 </span>
               </div>
             </div>
@@ -1205,6 +1211,30 @@ export default function AdminPage() {
           </div>
         </div>
 
+
+        {/* ================= TAB: STORE PREVIEW ================= */}
+        {activeTab === "store-preview" && (
+          <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950">
+                  Store Preview
+                </h3>
+                <p className="text-sm text-slate-500">
+                  This preview shows the live store page while the administrator
+                  dashboard stays accessible.
+                </p>
+              </div>
+            </div>
+            <div className="h-[75vh] min-h-[600px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+              <iframe
+                src={`${window.location.origin}/store?preview=admin`}
+                title="Store Preview"
+                className="h-full w-full border-0"
+              />
+            </div>
+          </div>
+        )}
 
         {/* ================= TAB 1: ANALYTICS & REPORTS ================= */}
         {activeTab === "analytics" && (
