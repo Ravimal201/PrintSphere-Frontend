@@ -240,11 +240,16 @@ export const render3DDesignToDataUrl = async ({
         const invMeshMatrix = new THREE.Matrix4().copy(bodyMesh.matrixWorld).invert();
         const localHitPos = hitPos.clone().applyMatrix4(invMeshMatrix);
 
-        // Calculate local rotation euler
-        const rotEuler = new THREE.Euler(0, 0, 0, "XYZ");
-        if (Array.isArray(layer.rotation)) {
-          rotEuler.set(layer.rotation[0] || 0, layer.rotation[1] || 0, layer.rotation[2] || 0);
-        }
+        // Calculate local rotation euler matching ShirtModel transformation
+        const rotArr = Array.isArray(layer.rotation) ? layer.rotation : [0, 0, 0];
+        const sceneQuaternion = new THREE.Quaternion().setFromRotationMatrix(sceneClone.matrixWorld);
+        const layerQuaternion = new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(Number(rotArr[0]) || 0, Number(rotArr[1]) || 0, Number(rotArr[2]) || 0, "YXZ")
+        );
+        const worldQuaternion = sceneQuaternion.clone().multiply(layerQuaternion);
+        const meshQuaternion = new THREE.Quaternion().setFromRotationMatrix(bodyMesh.matrixWorld);
+        const localQuaternion = meshQuaternion.clone().invert().multiply(worldQuaternion);
+        const rotEuler = new THREE.Euler().setFromQuaternion(localQuaternion, "YXZ");
 
         const scaleArr = Array.isArray(layer.scale) ? layer.scale : [0.3, 0.3, 0.25];
         const decalScaleVec = new THREE.Vector3(
