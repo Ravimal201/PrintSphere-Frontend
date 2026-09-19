@@ -50,6 +50,7 @@ import {
   ThumbsUp,
   Eye,
   Mail,
+  Menu,
 } from "lucide-react";
 import axios from "axios";
 import Scene from "../three/Scene";
@@ -66,6 +67,7 @@ export default function ManagerPage() {
   const [isManager, setIsManager] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview"); // "overview" | "orders" | "products" | "pricing" | "inventory" | "styles" | "settings"
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Styles tab states
   const [styles, setStyles] = useState([]);
@@ -109,9 +111,6 @@ export default function ManagerPage() {
   const [reviewFilterRating, setReviewFilterRating] = useState("ALL"); // ALL | BAD | 1 | 2 | 3 | 4 | 5
   const [reviewSearchQuery, setReviewSearchQuery] = useState("");
   const [reviewProductFilter, setReviewProductFilter] = useState("ALL");
-  const [deletingReviewId, setDeletingReviewId] = useState(null);
-  const [reviewConfirmDelete, setReviewConfirmDelete] = useState(null);
-  const [reviewNotification, setReviewNotification] = useState(null);
 
   // Inquiries / Contact Messages states
   const [inquiries, setInquiries] = useState([]);
@@ -1081,75 +1080,6 @@ export default function ManagerPage() {
     return "/images/models/male normal t-shirt1.glb";
   };
 
-  const handleDeleteReview = async (reviewId) => {
-    if (!reviewId) return;
-    try {
-      setDeletingReviewId(reviewId);
-      const token = localStorage.getItem("token");
-      const headers = { Authorization: `Bearer ${token}` };
-
-      await axios.delete(`${API_BASE_URL}/manager/reviews/${reviewId}`, { headers });
-
-      const updatedReviews = reviews.filter((r) => r._id !== reviewId);
-      setReviews(updatedReviews);
-
-      const total = updatedReviews.length;
-      const totalRating = updatedReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
-      const averageRating = total > 0 ? parseFloat((totalRating / total).toFixed(1)) : 0;
-      const badReviewsCount = updatedReviews.filter((r) => (Number(r.rating) || 0) <= 2).length;
-
-      setReviewStats({
-        totalReviews: total,
-        averageRating,
-        badReviewsCount,
-        breakdown: {
-          1: updatedReviews.filter((r) => r.rating === 1).length,
-          2: updatedReviews.filter((r) => r.rating === 2).length,
-          3: updatedReviews.filter((r) => r.rating === 3).length,
-          4: updatedReviews.filter((r) => r.rating === 4).length,
-          5: updatedReviews.filter((r) => r.rating === 5).length,
-        },
-      });
-
-      const reviewObj = reviews.find((r) => r._id === reviewId);
-      if (reviewObj && reviewObj.productId) {
-        const prodId = reviewObj.productId._id || reviewObj.productId;
-        setProducts((prev) =>
-          prev.map((p) => {
-            if (p._id === prodId) {
-              const pRevs = (p.reviews || []).filter((r) => r._id !== reviewId);
-              const pCount = pRevs.length;
-              const pTot = pRevs.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
-              return {
-                ...p,
-                reviews: pRevs,
-                ratingsCount: pCount,
-                averageRating: pCount > 0 ? parseFloat((pTot / pCount).toFixed(1)) : 0,
-              };
-            }
-            return p;
-          })
-        );
-      }
-
-      setReviewConfirmDelete(null);
-      setReviewNotification({
-        type: "success",
-        message: "Bad comment/review deleted successfully.",
-      });
-      setTimeout(() => setReviewNotification(null), 4000);
-    } catch (err) {
-      console.error("Delete review error:", err);
-      setReviewNotification({
-        type: "error",
-        message: err.response?.data?.message || "Failed to delete review.",
-      });
-      setTimeout(() => setReviewNotification(null), 4000);
-    } finally {
-      setDeletingReviewId(null);
-    }
-  };
-
   if (loading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-slate-50">
@@ -1161,191 +1091,340 @@ export default function ManagerPage() {
   if (!isManager) return null;
 
   return (
-    <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
+    <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800 relative">
+      {/* Mobile Sidebar Backdrop Overlay */}
+      {isMobileSidebarOpen && (
+        <div
+          onClick={() => setIsMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
-        <div>
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 md:w-72 lg:w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+          isMobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+        }`}
+      >
+        {/* Top Header Branding */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-base shadow-[0_4px_12px_rgba(99,102,241,0.3)] shrink-0">
               M
             </div>
-            <div>
-              <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">
+            <div className="min-w-0">
+              <h1 className="font-extrabold text-white text-base tracking-wide leading-none truncate">
                 PrintSphere
               </h1>
-              <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold">
+              <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold block mt-0.5">
                 Manager Desk
               </span>
             </div>
           </div>
-
-          <nav className="p-4 space-y-1">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "overview"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <BarChart3 className="h-4.5 w-4.5" />
-              Dashboard Overview
-            </button>
-            <button
-              onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "orders"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <span className="flex items-center gap-3.5">
-                <ShoppingCart className="h-4.5 w-4.5" />
-                Orders Fulfillment
-              </span>
-              {activeOrdersCount > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-black bg-indigo-800 text-indigo-100 rounded-full">
-                  {activeOrdersCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("products")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "products"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <span className="flex items-center gap-3.5">
-                <Layers className="h-4.5 w-4.5" />
-                Products & Submissions
-              </span>
-              {pendingDrafts.length > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-black bg-purple-500 text-white rounded-full">
-                  {pendingDrafts.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("pricing")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "pricing"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <Sparkles className="h-4.5 w-4.5" />
-              Pricing Rules
-            </button>
-            <button
-              onClick={() => setActiveTab("inventory")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inventory"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <span className="flex items-center gap-3.5">
-                <Inbox className="h-4.5 w-4.5" />
-                Inventory stock
-              </span>
-              {lowStockItems.length > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-black bg-amber-500 text-slate-900 rounded-full">
-                  {lowStockItems.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("styles")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "styles"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <Layers className="h-4.5 w-4.5" />
-              T-Shirt Styles
-            </button>
-            <button
-              onClick={() => setActiveTab("reviews")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "reviews"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <span className="flex items-center gap-3.5">
-                <MessageSquare className="h-4.5 w-4.5" />
-                Reviews & Moderation
-              </span>
-              {reviewStats.badReviewsCount > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full animate-pulse">
-                  {reviewStats.badReviewsCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("inquiries");
-                fetchInquiries();
-              }}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inquiries"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <span className="flex items-center gap-3.5">
-                <Mail className="h-4.5 w-4.5" />
-                Customer Inquiries
-              </span>
-              {inquiryStats.new > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-black bg-indigo-500 text-white rounded-full">
-                  {inquiryStats.new}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "settings"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
-            >
-              <Settings className="h-4.5 w-4.5" />
-              Settings & Security
-            </button>
-
-            <div className="pt-4 border-t border-slate-800">
-              <button
-                onClick={() => {
-                  setActiveTab("store-preview");
-                  setShowStorePreview(true);
-                }}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "store-preview"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-                  }`}
-              >
-                <Award className="h-4.5 w-4.5" />
-                Store Preview
-              </button>
-            </div>
-          </nav>
+          <button
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            aria-label="Close sidebar"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <div className="p-4 border-t border-slate-800">
-          <div className="flex items-center gap-2 mb-3 px-2">
-            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              Logged as Manager
+        {/* Scrollable Navigation List */}
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 min-h-0 [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
+          <button
+            onClick={() => {
+              setActiveTab("overview");
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "overview"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <BarChart3 className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">Dashboard Overview</span>
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("orders");
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "orders"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <ShoppingCart className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">Orders Fulfillment</span>
+            </span>
+            {activeOrdersCount > 0 && (
+              <span
+                className={`ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full shrink-0 ${
+                  activeTab === "orders"
+                    ? "bg-indigo-800 text-white"
+                    : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                }`}
+              >
+                {activeOrdersCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("products");
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "products"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Layers className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">Products & Submissions</span>
+            </span>
+            {pendingDrafts.length > 0 && (
+              <span
+                className={`ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full shrink-0 ${
+                  activeTab === "products"
+                    ? "bg-purple-800 text-white"
+                    : "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                }`}
+              >
+                {pendingDrafts.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("pricing");
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "pricing"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Sparkles className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">Pricing Rules</span>
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("inventory");
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "inventory"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Inbox className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">Inventory Stock</span>
+            </span>
+            {lowStockItems.length > 0 && (
+              <span
+                className={`ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full shrink-0 ${
+                  activeTab === "inventory"
+                    ? "bg-amber-400 text-slate-950 font-black"
+                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                }`}
+              >
+                {lowStockItems.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("styles");
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "styles"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Sliders className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">T-Shirt Styles</span>
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("reviews");
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "reviews"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <MessageSquare className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">Reviews & Moderation</span>
+            </span>
+            {reviewStats.badReviewsCount > 0 && (
+              <span
+                className={`ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full shrink-0 animate-pulse ${
+                  activeTab === "reviews"
+                    ? "bg-rose-800 text-white"
+                    : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                }`}
+              >
+                {reviewStats.badReviewsCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("inquiries");
+              fetchInquiries();
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "inquiries"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Mail className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">Customer Inquiries</span>
+            </span>
+            {inquiryStats.new > 0 && (
+              <span
+                className={`ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full shrink-0 ${
+                  activeTab === "inquiries"
+                    ? "bg-indigo-800 text-white"
+                    : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                }`}
+              >
+                {inquiryStats.new}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("settings");
+              setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+              activeTab === "settings"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Settings className="h-4.5 w-4.5 shrink-0" />
+              <span className="truncate">Settings & Security</span>
+            </span>
+          </button>
+
+          <div className="pt-2 border-t border-slate-800">
+            <button
+              onClick={() => {
+                setActiveTab("store-preview");
+                setShowStorePreview(true);
+                setIsMobileSidebarOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer text-left ${
+                activeTab === "store-preview"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-100"
+              }`}
+            >
+              <span className="flex items-center gap-3 min-w-0">
+                <Award className="h-4.5 w-4.5 shrink-0" />
+                <span className="truncate">Store Preview</span>
+              </span>
+            </button>
+          </div>
+        </nav>
+
+        {/* Pinned Bottom User & Logout Section */}
+        <div className="p-3.5 border-t border-slate-800 shrink-0 bg-slate-900/95">
+          <div className="flex items-center justify-between mb-2.5 px-2">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="text-[11px] text-slate-400 font-semibold tracking-wide">
+                Manager Session
+              </span>
+            </div>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400 font-bold border border-slate-700">
+              Active
             </span>
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/30 hover:border-red-500 text-xs text-red-400 font-semibold hover:bg-red-500/10 transition"
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-red-500/30 hover:border-red-500 text-xs text-red-400 font-semibold hover:bg-red-500/10 transition cursor-pointer"
           >
-            <LogOut className="h-4 w-4" />
-            Log Out
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span>Log Out</span>
           </button>
         </div>
       </aside>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* Mobile & Tablet Top Bar Header */}
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shrink-0 sticky top-0 z-30 shadow-2xs">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition cursor-pointer border border-slate-200 shrink-0"
+              aria-label="Open sidebar menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-slate-900 leading-tight truncate">
+                PrintSphere
+              </h2>
+              <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block truncate">
+                {activeTab === "overview" && "Dashboard Overview"}
+                {activeTab === "orders" && "Orders Fulfillment"}
+                {activeTab === "products" && "Products & Submissions"}
+                {activeTab === "pricing" && "Pricing Rules"}
+                {activeTab === "inventory" && "Inventory Stock"}
+                {activeTab === "styles" && "T-Shirt Styles"}
+                {activeTab === "reviews" && "Reviews & Moderation"}
+                {activeTab === "inquiries" && "Customer Inquiries"}
+                {activeTab === "settings" && "Settings & Security"}
+                {activeTab === "store-preview" && "Store Preview"}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-xs">
+              M
+            </div>
+          </div>
+        </header>
+
+        {/* Content Wrapper */}
+        <div className="p-4 sm:p-6 lg:p-8">
         {/* Statistics Widgets */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
@@ -4030,31 +4109,6 @@ export default function ManagerPage() {
               </div>
             </div>
 
-            {/* Notification alert banner */}
-            {reviewNotification && (
-              <div
-                className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-150 ${reviewNotification.type === "success"
-                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                  : "bg-rose-50 text-rose-800 border border-rose-200"
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  {reviewNotification.type === "success" ? (
-                    <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                  )}
-                  <span>{reviewNotification.message}</span>
-                </div>
-                <button
-                  onClick={() => setReviewNotification(null)}
-                  className="text-slate-400 hover:text-slate-600 text-xs p-1"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-
             {/* Metric KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
@@ -4351,25 +4405,11 @@ export default function ManagerPage() {
                           </div>
                         </div>
 
-                        {/* Right: Actions */}
-                        <div className="shrink-0 flex items-center gap-2 self-end md:self-center">
-                          <button
-                            onClick={() => setReviewConfirmDelete(rev)}
-                            disabled={deletingReviewId === rev._id}
-                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 hover:border-rose-600 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-                          >
-                            {deletingReviewId === rev._id ? (
-                              <>
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                <span>Deleting...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span>Delete Comment</span>
-                              </>
-                            )}
-                          </button>
+                        {/* Right: Read-only badge */}
+                        <div className="shrink-0 self-end md:self-center">
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200/80">
+                            Read-Only
+                          </span>
                         </div>
                       </div>
                     );
@@ -5830,83 +5870,6 @@ export default function ManagerPage() {
         </div>
       )}
 
-      {/* Delete Review / Bad Comment Confirmation Modal */}
-      {reviewConfirmDelete && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-rose-100 flex flex-col">
-            <div className="bg-rose-50 border-b border-rose-100 p-6 flex items-start gap-4">
-              <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0">
-                <Trash2 className="h-6 w-6" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-base font-black text-rose-950">
-                  Delete Bad Comment / Review?
-                </h3>
-                <p className="text-xs text-rose-700 mt-1">
-                  This action will permanently remove this customer comment from the store and recalculate product ratings.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                  <span>{reviewConfirmDelete.userName || "Verified Buyer"}</span>
-                  <div className="flex text-amber-400">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star
-                        key={s}
-                        className={`h-3 w-3 ${s <= reviewConfirmDelete.rating
-                          ? "fill-amber-400 text-amber-400"
-                          : "text-slate-200"
-                          }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs text-slate-600 italic">
-                  "{reviewConfirmDelete.comment || "(No comment text)"}"
-                </p>
-              </div>
-
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/80 text-[11px] text-amber-800 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                <span>Removing abusive or inaccurate comments helps maintain customer trust.</span>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border-t flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setReviewConfirmDelete(null)}
-                disabled={deletingReviewId !== null}
-                className="px-4 py-2.5 border border-slate-200 hover:bg-white text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteReview(reviewConfirmDelete._id)}
-                disabled={deletingReviewId !== null}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {deletingReviewId !== null ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Yes, Delete Comment</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Cancel Order Reason Modal */}
       {cancellingOrder && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
@@ -6016,6 +5979,7 @@ export default function ManagerPage() {
         }}
         design={selected3DDesign}
       />
+      </div>
     </div>
   );
 }

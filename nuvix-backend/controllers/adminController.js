@@ -479,4 +479,52 @@ exports.getCustomerSatisfactionReviews = async (req, res) => {
   }
 };
 
+// @desc    Delete a bad or inappropriate customer comment / review
+// @route   DELETE /api/admin/reviews/:id
+exports.deleteReview = async (req, res) => {
+  try {
+    if (!verifyAdmin(req)) {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
+    }
 
+    const { id } = req.params;
+    const review = await Review.findById(id);
+    if (!review) {
+      return res.status(404).json({ message: "Review / comment not found" });
+    }
+
+    const productId = review.productId;
+    const orderId = review.orderId;
+
+    await Review.findByIdAndDelete(id);
+
+    // If review was for a product, recalculate ratings
+    if (productId) {
+      const remainingReviews = await Review.find({ productId });
+      const count = remainingReviews.length;
+      const total = remainingReviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+      const avg = count > 0 ? parseFloat((total / count).toFixed(1)) : 0;
+
+      await Product.findByIdAndUpdate(productId, {
+        averageRating: avg,
+        ratingsCount: count,
+      });
+    }
+
+    // If review was linked to an order, clear the review field
+    if (orderId) {
+      await Order.findByIdAndUpdate(orderId, {
+        $unset: { review: 1 },
+      });
+    }
+
+    res.json({
+      message: "Comment / review deleted successfully",
+      deletedReviewId: id,
+      productId: productId || null,
+    });
+  } catch (error) {
+    console.error("Admin delete review error:", error);
+    res.status(500).json({ message: "Server error while deleting review" });
+  }
+};
