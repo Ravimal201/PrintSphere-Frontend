@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   ShoppingCart, Layers, Settings, LogOut, Loader2, AlertCircle,
   CheckCircle, Plus, Edit2, Check, X, FileText, Download, User, Sparkles,
-  Clock, Ban, Play, Printer, Truck, ArrowRight
+  Clock, Ban, Play, Printer, Truck, ArrowRight, Palette
 } from "lucide-react";
 import axios from "axios";
 import TShirt3DModal from "../components/TShirt3DModal";
@@ -92,6 +92,7 @@ export default function EmployeePage() {
   // Search and filter states for tasks
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [taskSubTab, setTaskSubTab] = useState("active"); // "active" | "completed"
 
   // Employee profile details states
   const [employeeName, setEmployeeName] = useState("");
@@ -151,7 +152,7 @@ export default function EmployeePage() {
         },
         { headers }
       );
-      
+
       const updatedUser = res.data.user;
       localStorage.setItem("user", JSON.stringify(updatedUser));
       setProfileSuccess("Profile details updated successfully!");
@@ -292,27 +293,31 @@ export default function EmployeePage() {
 
           <nav className="p-4 space-y-1">
             <button
-              onClick={() => setActiveTab("tasks")}
+              onClick={() => {
+                setActiveTab("tasks");
+                setTaskSubTab("active");
+                setStatusFilter("All");
+              }}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "tasks"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <span className="flex items-center gap-3.5">
                 <ShoppingCart className="h-4.5 w-4.5" />
                 Assigned Print Tasks
               </span>
-              {assignedOrders.length > 0 && (
+              {assignedOrders.filter(o => o.orderStatus !== "Shipped" && o.orderStatus !== "Delivered" && o.orderStatus !== "Collected" && o.orderStatus !== "Cancelled").length > 0 && (
                 <span className="px-2 py-0.5 text-[10px] font-black bg-indigo-800 text-indigo-100 rounded-full">
-                  {assignedOrders.length}
+                  {assignedOrders.filter(o => o.orderStatus !== "Shipped" && o.orderStatus !== "Delivered" && o.orderStatus !== "Collected" && o.orderStatus !== "Cancelled").length}
                 </span>
               )}
             </button>
             <button
               onClick={() => setActiveTab("submissions")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "submissions"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <span className="flex items-center gap-3.5">
@@ -326,10 +331,17 @@ export default function EmployeePage() {
               )}
             </button>
             <button
+              onClick={() => window.location.href = "/designer"}
+              className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 cursor-pointer"
+            >
+              <Palette className="h-4.5 w-4.5 text-slate-400" />
+              <span>3D Designer</span>
+            </button>
+            <button
               onClick={() => setActiveTab("settings")}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "settings"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
                 }`}
             >
               <Settings className="h-4.5 w-4.5" />
@@ -359,11 +371,22 @@ export default function EmployeePage() {
         {/* Statistics Widgets */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Assigned Orders</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">{assignedOrders.length} active</p>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Assigned Tasks</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <p className="text-2xl font-black text-slate-900">
+                {assignedOrders.filter(o => o.orderStatus !== "Shipped" && o.orderStatus !== "Delivered" && o.orderStatus !== "Collected" && o.orderStatus !== "Cancelled").length}
+              </p>
+              <span className="text-xs font-semibold text-slate-500">
+                active ({assignedOrders.filter(o => o.orderStatus === "Shipped" || o.orderStatus === "Delivered" || o.orderStatus === "Collected").length} completed)
+              </span>
+            </div>
             <div className="flex items-center gap-1.5 text-xs text-indigo-600 mt-2 font-bold">
               <ShoppingCart className="h-3.5 w-3.5" />
-              <span>Pending printing & package</span>
+              <span>
+                {assignedOrders.filter(o => o.orderStatus !== "Shipped" && o.orderStatus !== "Delivered" && o.orderStatus !== "Collected" && o.orderStatus !== "Cancelled").length > 0
+                  ? "Production in progress"
+                  : "All active orders shipped"}
+              </span>
             </div>
           </div>
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
@@ -393,7 +416,14 @@ export default function EmployeePage() {
 
         {/* ================= TAB 1: ASSIGNED TASKS ================= */}
         {activeTab === "tasks" && (() => {
-          const filteredOrders = assignedOrders.filter(order => {
+          const isShippedOrDone = (status) => status === "Shipped" || status === "Delivered" || status === "Collected";
+
+          const activeOrdersList = assignedOrders.filter(o => !isShippedOrDone(o.orderStatus));
+          const completedOrdersList = assignedOrders.filter(o => isShippedOrDone(o.orderStatus));
+
+          const currentPool = taskSubTab === "active" ? activeOrdersList : completedOrdersList;
+
+          const filteredOrders = currentPool.filter(order => {
             if (statusFilter !== "All" && order.orderStatus !== statusFilter) {
               return false;
             }
@@ -401,9 +431,9 @@ export default function EmployeePage() {
               const s = searchTerm.toLowerCase();
               const orderIdMatches = order._id.toLowerCase().includes(s);
               const customerMatches = (order.customerId?.name || "").toLowerCase().includes(s) ||
-                                      (order.customerId?.email || "").toLowerCase().includes(s) ||
-                                      (order.guestEmail || "").toLowerCase().includes(s);
-              const specMatches = order.items.some(item => 
+                (order.customerId?.email || "").toLowerCase().includes(s) ||
+                (order.guestEmail || "").toLowerCase().includes(s);
+              const specMatches = order.items.some(item =>
                 item.itemType?.toLowerCase().includes(s) ||
                 item.tShirtStyle?.toLowerCase().includes(s) ||
                 item.size?.toLowerCase().includes(s) ||
@@ -418,6 +448,10 @@ export default function EmployeePage() {
             return true;
           });
 
+          const activeFilters = ["All", "Processing", "Printing", "Completed"];
+          const completedFilters = ["All", "Shipped", "Delivered", "Collected"];
+          const currentFilterOptions = taskSubTab === "active" ? activeFilters : completedFilters;
+
           return (
             <div className="bg-white border rounded-3xl p-6 shadow-sm">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -430,26 +464,66 @@ export default function EmployeePage() {
                     Manage your assigned print queue, view design specs and 3D assets, and update order progress through the production flow.
                   </p>
                 </div>
-                
+              </div>
+
+              {/* Sub-bar for Active Orders vs Completed Orders */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+                <div className="flex items-center gap-2 bg-slate-100/80 p-1.5 rounded-2xl w-fit">
+                  <button
+                    onClick={() => {
+                      setTaskSubTab("active");
+                      setStatusFilter("All");
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${taskSubTab === "active"
+                        ? "bg-white text-indigo-600 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                      }`}
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Active Orders</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${taskSubTab === "active" ? "bg-indigo-50 text-indigo-600" : "bg-slate-200 text-slate-600"
+                      }`}>
+                      {activeOrdersList.length}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setTaskSubTab("completed");
+                      setStatusFilter("All");
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${taskSubTab === "completed"
+                        ? "bg-white text-emerald-600 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                      }`}
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    <span>Completed Orders</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${taskSubTab === "completed" ? "bg-emerald-50 text-emerald-600" : "bg-slate-200 text-slate-600"
+                      }`}>
+                      {completedOrdersList.length}
+                    </span>
+                  </button>
+                </div>
+
                 {/* Search and Filters */}
-                <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-2.5">
                   <input
                     type="text"
-                    placeholder="Search by ID, customer, size, color..."
+                    placeholder="Search by ID, customer, specs..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="text-xs border rounded-xl px-3 py-2 bg-slate-50/50 w-full sm:w-56 focus:outline-none focus:border-indigo-500"
+                    className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50/50 w-full sm:w-52 focus:outline-none focus:border-indigo-500"
                   />
                   <div className="flex gap-1.5 overflow-x-auto py-1">
-                    {["All", "Processing", "Printing", "Completed", "Shipped", "Collected"].map(st => (
+                    {currentFilterOptions.map(st => (
                       <button
                         key={st}
                         onClick={() => setStatusFilter(st)}
-                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition cursor-pointer shrink-0 ${
-                          statusFilter === st
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition cursor-pointer shrink-0 ${statusFilter === st
                             ? "bg-indigo-600 text-white shadow-xs"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        }`}
+                          }`}
                       >
                         {st}
                       </button>
@@ -459,8 +533,20 @@ export default function EmployeePage() {
               </div>
 
               {filteredOrders.length === 0 ? (
-                <div className="text-center py-16">
-                  <p className="text-sm text-slate-500 font-semibold">No active print orders match the filters.</p>
+                <div className="text-center py-16 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                  <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                    {taskSubTab === "active" ? <Clock className="h-6 w-6" /> : <CheckCircle className="h-6 w-6" />}
+                  </div>
+                  <p className="text-sm text-slate-700 font-bold">
+                    {taskSubTab === "active"
+                      ? "No active print tasks match your criteria."
+                      : "No completed orders found."}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {taskSubTab === "active"
+                      ? "Active orders in progress will appear here."
+                      : "Orders will automatically move here once marked as Shipped."}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -485,26 +571,24 @@ export default function EmployeePage() {
                                 Order ID: <span className="font-mono text-indigo-600">#{order._id.slice(-8)}</span>
                               </span>
                               <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                  order.paymentStatus === "Paid"
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${order.paymentStatus === "Paid"
                                     ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
                                     : "bg-amber-50 text-amber-600 border border-amber-200"
-                                }`}
+                                  }`}
                               >
                                 Payment: {order.paymentStatus}
                               </span>
                               <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                  isCancelled
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${isCancelled
                                     ? "bg-rose-50 text-rose-600 border border-rose-200"
                                     : order.orderStatus === "Completed" || order.orderStatus === "Shipped" || isCollected
-                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                    : order.orderStatus === "Printing"
-                                    ? "bg-purple-50 text-purple-600 border border-purple-200"
-                                    : order.orderStatus === "Processing"
-                                    ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
-                                    : "bg-slate-100 text-slate-700 border border-slate-200"
-                                }`}
+                                      ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                      : order.orderStatus === "Printing"
+                                        ? "bg-purple-50 text-purple-600 border border-purple-200"
+                                        : order.orderStatus === "Processing"
+                                          ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                                          : "bg-slate-100 text-slate-700 border border-slate-200"
+                                  }`}
                               >
                                 Status: {order.orderStatus}
                               </span>
@@ -560,17 +644,16 @@ export default function EmployeePage() {
                                           {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
                                         </p>
                                         <p className="text-slate-500 text-xs mt-0.5">
-                                          Style: <span className="font-semibold text-slate-700">{item.tShirtStyle || "Crew Neck"}</span> | 
-                                          Size: <span className="font-semibold text-slate-700">{item.selectedSize || item.size}</span> | 
-                                          Color: <span className="font-semibold text-slate-700">{resolveColorName(item.selectedColor || item.color)}</span> | 
+                                          Style: <span className="font-semibold text-slate-700">{item.tShirtStyle || "Crew Neck"}</span> |
+                                          Size: <span className="font-semibold text-slate-700">{item.selectedSize || item.size}</span> |
+                                          Color: <span className="font-semibold text-slate-700">{resolveColorName(item.selectedColor || item.color)}</span> |
                                           GSM: <span className="font-semibold text-slate-700">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
                                         </p>
                                       </div>
-                                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
-                                        item.itemType === "Customized" || item.designId
+                                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${item.itemType === "Customized" || item.designId
                                           ? "bg-purple-50 text-purple-700 border border-purple-200"
                                           : "bg-blue-50 text-blue-700 border border-blue-200"
-                                      }`}>
+                                        }`}>
                                         {item.itemType === "Customized" || item.designId ? "Custom 3D Print" : "Ready-Made Product"}
                                       </span>
                                     </div>
@@ -662,13 +745,12 @@ export default function EmployeePage() {
                                 return (
                                   <div key={stage} className="flex items-center shrink-0">
                                     <div
-                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                                        isCurrent
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${isCurrent
                                           ? "bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200"
                                           : isPassed
-                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                          : "bg-slate-100 text-slate-400 border border-slate-200"
-                                      }`}
+                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                            : "bg-slate-100 text-slate-400 border border-slate-200"
+                                        }`}
                                     >
                                       {isPassed ? (
                                         <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
@@ -681,9 +763,8 @@ export default function EmployeePage() {
                                     </div>
                                     {sIdx < pipelineStages.length - 1 && (
                                       <div
-                                        className={`w-3 sm:w-6 h-0.5 mx-1 transition ${
-                                          isPassed ? "bg-emerald-400" : "bg-slate-200"
-                                        }`}
+                                        className={`w-3 sm:w-6 h-0.5 mx-1 transition ${isPassed ? "bg-emerald-400" : "bg-slate-200"
+                                          }`}
                                       />
                                     )}
                                   </div>
@@ -762,9 +843,9 @@ export default function EmployeePage() {
                 </h3>
                 <button
                   onClick={() => window.location.href = "/designer"}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                  className="inline-flex items-center gap-2.5 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-2xl text-sm font-extrabold transition-all shadow-md hover:shadow-indigo-200 cursor-pointer"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-5 w-5 stroke-[2.5]" />
                   Open 3D Designer
                 </button>
               </div>
@@ -807,10 +888,10 @@ export default function EmployeePage() {
                           <td className="py-4 text-xs text-slate-500">{(p.sizes || []).join(", ")}</td>
                           <td className="py-4 text-xs">
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${p.isApproved
-                                ? "bg-emerald-50 text-emerald-600"
-                                : p.status === "Archived"
-                                  ? "bg-rose-50 text-rose-600"
-                                  : "bg-amber-50 text-amber-600"
+                              ? "bg-emerald-50 text-emerald-600"
+                              : p.status === "Archived"
+                                ? "bg-rose-50 text-rose-600"
+                                : "bg-amber-50 text-amber-600"
                               }`}>
                               {p.isApproved ? "Approved" : p.status === "Archived" ? "Rejected" : "Awaiting Review"}
                             </span>
@@ -903,65 +984,65 @@ export default function EmployeePage() {
                   Change Password
                 </h4>
 
-              {passError && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{passError}</span>
+                {passError && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 text-xs font-semibold">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{passError}</span>
+                  </div>
+                )}
+                {passSuccess && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold">
+                    <CheckCircle className="h-4 w-4 shrink-0" />
+                    <span>{passSuccess}</span>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Current Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
                 </div>
-              )}
-              {passSuccess && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold">
-                  <CheckCircle className="h-4 w-4 shrink-0" />
-                  <span>{passSuccess}</span>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
                 </div>
-              )}
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Current Password</label>
-                <input
-                  type="password"
-                  required
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 border rounded-xl text-sm"
-                />
-              </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Confirm New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">New Password</label>
-                <input
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 border rounded-xl text-sm"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Confirm New Password</label>
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 border rounded-xl text-sm"
-                />
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={passLoading}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                >
-                  {passLoading ? "Updating..." : "Update Password"}
-                </button>
-              </div>
-            </form>
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={passLoading}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                  >
+                    {passLoading ? "Updating..." : "Update Password"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
