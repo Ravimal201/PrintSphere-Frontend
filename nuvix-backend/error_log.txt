@@ -1,0 +1,350 @@
+[2026-09-19T15:13:08.867Z] Submit Product Concept Error:
+ValidationError: Product validation failed: sizes.0: `XS` is not a valid enum value for path `sizes.0`., sizes.1: `3XL` is not a valid enum value for path `sizes.1`.
+    at Document.invalidate (D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3387:32)
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3148:17
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Payload:
+{
+  "title": "blue dragon",
+  "description": "s",
+  "category": "Over-Size T-Shirt",
+  "basePrice": 2226,
+  "sizes": [
+    "XS",
+    "3XL"
+  ],
+  "colors": [
+    "#012af9"
+  ],
+  "images": [
+    "/logos/Logo.png"
+  ],
+  "modelPath": "/images/models/oversized t-sdirt1.glb",
+  "defaultColor": "#012af9",
+  "layers": [
+    {
+      "id": "img-1789830777081",
+      "type": "image",
+      "name": "PrintSphere Brand",
+      "url": "/logos/Logo.png",
+      "visible": true,
+      "locked": false,
+      "position": [
+        0.006025001406669639,
+        1.3109908491373066,
+        0.1111544535922698
+      ],
+      "rotation": [
+        0.14470758656786803,
+        3.069920293425967,
+        0
+      ],
+      "scale": [
+        3.0858999174208708,
+        1.2715219258322126,
+        0.25
+      ],
+      "aspectRatio": 2.4269340974212033,
+      "projectedForModel": "/images/models/oversized t-sdirt1.glb",
+      "targetMeshName": "Object_4"
+    }
+  ]
+}
+
+[2026-09-19T15:13:56.909Z] Submit Product Concept Error:
+ValidationError: Product validation failed: sizes.0: `XS` is not a valid enum value for path `sizes.0`., sizes.1: `3XL` is not a valid enum value for path `sizes.1`.
+    at Document.invalidate (D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3387:32)
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3148:17
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Payload:
+{
+  "title": "ds",
+  "description": "ffsd",
+  "category": "Over-Size T-Shirt",
+  "basePrice": 2226,
+  "sizes": [
+    "XS",
+    "3XL"
+  ],
+  "colors": [
+    "#012af9"
+  ],
+  "images": [
+    "/logos/Logo.png"
+  ],
+  "modelPath": "/images/models/oversized t-sdirt1.glb",
+  "defaultColor": "#012af9",
+  "layers": [
+    {
+      "id": "img-1789830777081",
+      "type": "image",
+      "name": "PrintSphere Brand",
+      "url": "/logos/Logo.png",
+      "visible": true,
+      "locked": false,
+      "position": [
+        0.006025001406669639,
+        1.3109908491373066,
+        0.1111544535922698
+      ],
+      "rotation": [
+        0.14470758656786803,
+        3.069920293425967,
+        0
+      ],
+      "scale": [
+        3.0858999174208708,
+        1.2715219258322126,
+        0.25
+      ],
+      "aspectRatio": 2.4269340974212033,
+      "projectedForModel": "/images/models/oversized t-sdirt1.glb",
+      "targetMeshName": "Object_4"
+    }
+  ]
+}
+
+[2026-09-19T15:17:24.716Z] Submit Product Concept Error:
+ValidationError: Product validation failed: sizes.0: `XS` is not a valid enum value for path `sizes.0`., sizes.1: `3XL` is not a valid enum value for path `sizes.1`.
+    at Document.invalidate (D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3387:32)
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3148:17
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Payload:
+{
+  "title": "ds",
+  "description": "ffsd",
+  "category": "Over-Size T-Shirt",
+  "basePrice": 2226,
+  "sizes": [
+    "XS",
+    "3XL"
+  ],
+  "colors": [
+    "#012af9"
+  ],
+  "images": [
+    "/logos/Logo.png"
+  ],
+  "modelPath": "/images/models/oversized t-sdirt1.glb",
+  "defaultColor": "#012af9",
+  "layers": [
+    {
+      "id": "img-1789830777081",
+      "type": "image",
+      "name": "PrintSphere Brand",
+      "url": "/logos/Logo.png",
+      "visible": true,
+      "locked": false,
+      "position": [
+        0.006025001406669639,
+        1.3109908491373066,
+        0.1111544535922698
+      ],
+      "rotation": [
+        0.14470758656786803,
+        3.069920293425967,
+        0
+      ],
+      "scale": [
+        3.0858999174208708,
+        1.2715219258322126,
+        0.25
+      ],
+      "aspectRatio": 2.4269340974212033,
+      "projectedForModel": "/images/models/oversized t-sdirt1.glb",
+      "targetMeshName": "Object_4"
+    }
+  ]
+}
+
+[2026-09-19T15:17:25.378Z] Submit Product Concept Error:
+ValidationError: Product validation failed: sizes.0: `XS` is not a valid enum value for path `sizes.0`., sizes.1: `3XL` is not a valid enum value for path `sizes.1`.
+    at Document.invalidate (D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3387:32)
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3148:17
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Payload:
+{
+  "title": "ds",
+  "description": "ffsd",
+  "category": "Over-Size T-Shirt",
+  "basePrice": 2226,
+  "sizes": [
+    "XS",
+    "3XL"
+  ],
+  "colors": [
+    "#012af9"
+  ],
+  "images": [
+    "/logos/Logo.png"
+  ],
+  "modelPath": "/images/models/oversized t-sdirt1.glb",
+  "defaultColor": "#012af9",
+  "layers": [
+    {
+      "id": "img-1789830777081",
+      "type": "image",
+      "name": "PrintSphere Brand",
+      "url": "/logos/Logo.png",
+      "visible": true,
+      "locked": false,
+      "position": [
+        0.006025001406669639,
+        1.3109908491373066,
+        0.1111544535922698
+      ],
+      "rotation": [
+        0.14470758656786803,
+        3.069920293425967,
+        0
+      ],
+      "scale": [
+        3.0858999174208708,
+        1.2715219258322126,
+        0.25
+      ],
+      "aspectRatio": 2.4269340974212033,
+      "projectedForModel": "/images/models/oversized t-sdirt1.glb",
+      "targetMeshName": "Object_4"
+    }
+  ]
+}
+
+[2026-09-19T15:18:10.408Z] Submit Product Concept Error:
+ValidationError: Product validation failed: sizes.0: `3XL` is not a valid enum value for path `sizes.0`.
+    at Document.invalidate (D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3387:32)
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3148:17
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Payload:
+{
+  "title": "red",
+  "description": "dsf",
+  "category": "Over-Size T-Shirt",
+  "basePrice": 2392,
+  "sizes": [
+    "3XL"
+  ],
+  "colors": [
+    "#ff0000"
+  ],
+  "images": [
+    "/logos/Logo.png"
+  ],
+  "modelPath": "/images/models/oversized t-sdirt1.glb",
+  "defaultColor": "#ff0000",
+  "layers": [
+    {
+      "id": "img-1789831075780",
+      "type": "image",
+      "name": "PrintSphere Brand",
+      "url": "/logos/Logo.png",
+      "visible": true,
+      "locked": false,
+      "position": [
+        0.006025001406669639,
+        1.3109908491373066,
+        0.1111544535922698
+      ],
+      "rotation": [
+        0.14470758656786803,
+        3.069920293425967,
+        0
+      ],
+      "scale": [
+        3.2880027894751587,
+        1.354796899087167,
+        0.25
+      ],
+      "aspectRatio": 2.4269340974212033,
+      "projectedForModel": "/images/models/oversized t-sdirt1.glb",
+      "targetMeshName": "Object_4"
+    }
+  ]
+}
+
+[2026-09-19T15:18:20.138Z] Submit Product Concept Error:
+ValidationError: Product validation failed: sizes.0: `XS` is not a valid enum value for path `sizes.0`.
+    at Document.invalidate (D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3387:32)
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3148:17
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Payload:
+{
+  "title": "fsd",
+  "description": "fds",
+  "category": "Over-Size T-Shirt",
+  "basePrice": 2392,
+  "sizes": [
+    "XS"
+  ],
+  "colors": [
+    "#ff0000"
+  ],
+  "images": [
+    "/logos/Logo.png"
+  ],
+  "modelPath": "/images/models/oversized t-sdirt1.glb",
+  "defaultColor": "#ff0000",
+  "layers": [
+    {
+      "id": "img-1789831075780",
+      "type": "image",
+      "name": "PrintSphere Brand",
+      "url": "/logos/Logo.png",
+      "visible": true,
+      "locked": false,
+      "position": [
+        0.006025001406669639,
+        1.3109908491373066,
+        0.1111544535922698
+      ],
+      "rotation": [
+        0.14470758656786803,
+        3.069920293425967,
+        0
+      ],
+      "scale": [
+        3.2880027894751587,
+        1.354796899087167,
+        0.25
+      ],
+      "aspectRatio": 2.4269340974212033,
+      "projectedForModel": "/images/models/oversized t-sdirt1.glb",
+      "targetMeshName": "Object_4"
+    }
+  ]
+}
+
+[2026-09-19T15:20:04.336Z] Submit Product Concept Error:
+ValidationError: Product validation failed: sizes.0: `xs` is not a valid enum value for path `sizes.0`., sizes.1: `XXXL` is not a valid enum value for path `sizes.1`., sizes.2: `3XL` is not a valid enum value for path `sizes.2`.
+    at Document.invalidate (D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3387:32)
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3148:17
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Payload:
+{
+  "title": "red",
+  "description": "asd",
+  "category": "Over-Size T-Shirt",
+  "basePrice": 1000,
+  "sizes": [
+    "xs",
+    "XXXL",
+    "3XL"
+  ],
+  "colors": [
+    "#ff0000"
+  ],
+  "images": [
+    "/images/dumyImage.png"
+  ],
+  "modelPath": "/images/models/oversized t-sdirt1.glb",
+  "defaultColor": "#ff0000",
+  "layers": []
+}
+
