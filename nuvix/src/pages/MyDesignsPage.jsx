@@ -6,6 +6,7 @@ import Store3DCardPreview from "../components/Store3DCardPreview";
 import TShirt3DModal from "../components/TShirt3DModal";
 import { Palette, Edit, AlertCircle, Trash2 } from "lucide-react";
 import axios from "axios";
+import { safeLocalStorage, createDesignThumbnail } from "../utils/imageOptimizer";
 
 import { API_BASE_URL } from "../config/api";
 
@@ -40,7 +41,7 @@ export default function MyDesignsPage() {
   };
 
   const handleLoadDesign = (design) => {
-    localStorage.setItem("load_custom_design", JSON.stringify(design));
+    safeLocalStorage.setItem("load_custom_design", design);
     window.location.href = "/designer";
   };
 
@@ -52,49 +53,51 @@ export default function MyDesignsPage() {
       return;
     }
 
-    const savedCart = localStorage.getItem("printsphere_cart");
-    let currentCart = [];
-    if (savedCart) {
-      try {
-        currentCart = JSON.parse(savedCart);
-      } catch (e) {
-        console.error(e);
+    try {
+      const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+      let currentCart = Array.isArray(savedCart) ? savedCart : [];
+
+      const designId = design._id || `custom-${Date.now()}`;
+      const selectedSize = design.size || "M";
+      const color = design.fabricColor || design.color || "White";
+      const cartKey = `${designId}-${selectedSize}-${color}`;
+
+      const existingIndex = currentCart.findIndex(item => item.cartKey === cartKey);
+      const thumbImage = design.thumbnailUrl && !design.thumbnailUrl.startsWith("data:image")
+        ? design.thumbnailUrl
+        : createDesignThumbnail(design.layers || []);
+
+      if (existingIndex > -1) {
+        currentCart[existingIndex].quantity = (currentCart[existingIndex].quantity || 1) + 1;
+      } else {
+        const cartItem = {
+          cartKey,
+          designId: design._id,
+          productId: null,
+          title: design.tShirtType || "Custom T-Shirt",
+          basePrice: design.estimatedCost || 0,
+          discount: 0,
+          category: "Customized",
+          size: selectedSize,
+          color: color,
+          material: design.material || "GSM 180",
+          gsm: design.material || "GSM 180",
+          tShirtType: design.tShirtType || "Crew Neck",
+          tShirtStyle: design.tShirtType || "Crew Neck",
+          quantity: 1,
+          image: thumbImage,
+          isCustom: true,
+          layers: design.layers || []
+        };
+        currentCart.push(cartItem);
       }
+
+      safeLocalStorage.setItem("printsphere_cart", currentCart);
+      window.location.href = "/cart";
+    } catch (e) {
+      console.error("Error adding design to cart:", e);
+      window.location.href = "/cart";
     }
-
-    const designId = design._id || `custom-${Date.now()}`;
-    const selectedSize = design.size || "M";
-    const color = design.fabricColor || design.color || "White";
-    const cartKey = `${designId}-${selectedSize}-${color}`;
-
-    const existingIndex = currentCart.findIndex(item => item.cartKey === cartKey);
-    if (existingIndex > -1) {
-      currentCart[existingIndex].quantity = (currentCart[existingIndex].quantity || 1) + 1;
-    } else {
-      const cartItem = {
-        cartKey,
-        designId: design._id,
-        productId: null,
-        title: design.tShirtType || "Custom T-Shirt",
-        basePrice: design.estimatedCost || 0,
-        discount: 0,
-        category: "Customized",
-        size: selectedSize,
-        color: color,
-        material: design.material || "GSM 180",
-        gsm: design.material || "GSM 180",
-        tShirtType: design.tShirtType || "Crew Neck",
-        tShirtStyle: design.tShirtType || "Crew Neck",
-        quantity: 1,
-        image: design.thumbnailUrl || "/images/dumyImage.png",
-        isCustom: true,
-        layers: design.layers || []
-      };
-      currentCart.push(cartItem);
-    }
-
-    localStorage.setItem("printsphere_cart", JSON.stringify(currentCart));
-    window.location.href = "/cart";
   };
 
   const handleDeleteDesign = async (id) => {

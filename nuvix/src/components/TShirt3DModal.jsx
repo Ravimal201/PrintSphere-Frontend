@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, ZoomIn, Download, RefreshCw, Layers, Sparkles, Camera, CheckCircle, Loader2, Edit, FileCode, ShoppingBag } from "lucide-react";
+import { safeLocalStorage, createDesignThumbnail } from "../utils/imageOptimizer";
 
 import Scene from "../three/Scene";
 import {
@@ -150,7 +151,7 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
     if (onCustomize) {
       onCustomize(design);
     } else {
-      localStorage.setItem("load_custom_design", JSON.stringify(design));
+      safeLocalStorage.setItem("load_custom_design", design);
       window.location.href = "/designer";
     }
   };
@@ -165,46 +166,50 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
       window.location.href = "/login?redirect=/cart";
       return;
     }
-    const savedCart = localStorage.getItem("printsphere_cart");
-    let currentCart = [];
-    if (savedCart) {
-      try {
-        currentCart = JSON.parse(savedCart);
-      } catch (e) {
-        console.error(e);
+    try {
+      const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+      let currentCart = Array.isArray(savedCart) ? savedCart : [];
+
+      const designId = design._id || `custom-${Date.now()}`;
+      const selectedSize = design.size || "M";
+      const color = design.fabricColor || design.color || design.selectedColor || "White";
+      const cartKey = `${designId}-${selectedSize}-${color}`;
+      const existingIndex = currentCart.findIndex(item => item.cartKey === cartKey);
+
+      const thumbImage = design.thumbnailUrl && !design.thumbnailUrl.startsWith("data:image")
+        ? design.thumbnailUrl
+        : createDesignThumbnail(layers);
+
+      if (existingIndex > -1) {
+        currentCart[existingIndex].quantity = (currentCart[existingIndex].quantity || 1) + 1;
+      } else {
+        const cartItem = {
+          cartKey,
+          designId: design._id,
+          productId: null,
+          title: design.tShirtType || design.title || "Custom T-Shirt",
+          basePrice: design.estimatedCost || 0,
+          discount: 0,
+          category: "Customized",
+          size: selectedSize,
+          color: color,
+          material: design.material || "GSM 180",
+          gsm: design.material || "GSM 180",
+          tShirtType: design.tShirtType || "Crew Neck",
+          tShirtStyle: design.tShirtType || "Crew Neck",
+          quantity: 1,
+          image: thumbImage,
+          isCustom: true,
+          layers: layers
+        };
+        currentCart.push(cartItem);
       }
+      safeLocalStorage.setItem("printsphere_cart", currentCart);
+      window.location.href = "/cart";
+    } catch (e) {
+      console.error("3D Modal checkout error:", e);
+      window.location.href = "/cart";
     }
-    const designId = design._id || `custom-${Date.now()}`;
-    const selectedSize = design.size || "M";
-    const color = design.fabricColor || design.color || design.selectedColor || "White";
-    const cartKey = `${designId}-${selectedSize}-${color}`;
-    const existingIndex = currentCart.findIndex(item => item.cartKey === cartKey);
-    if (existingIndex > -1) {
-      currentCart[existingIndex].quantity = (currentCart[existingIndex].quantity || 1) + 1;
-    } else {
-      const cartItem = {
-        cartKey,
-        designId: design._id,
-        productId: null,
-        title: design.tShirtType || design.title || "Custom T-Shirt",
-        basePrice: design.estimatedCost || 0,
-        discount: 0,
-        category: "Customized",
-        size: selectedSize,
-        color: color,
-        material: design.material || "GSM 180",
-        gsm: design.material || "GSM 180",
-        tShirtType: design.tShirtType || "Crew Neck",
-        tShirtStyle: design.tShirtType || "Crew Neck",
-        quantity: 1,
-        image: design.thumbnailUrl || "/images/dumyImage.png",
-        isCustom: true,
-        layers: layers
-      };
-      currentCart.push(cartItem);
-    }
-    localStorage.setItem("printsphere_cart", JSON.stringify(currentCart));
-    window.location.href = "/cart";
   };
 
   const resolvedColor = getColorValue(design.fabricColor || design.color || design.selectedColor);

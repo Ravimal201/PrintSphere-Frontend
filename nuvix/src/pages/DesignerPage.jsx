@@ -5,6 +5,7 @@ import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
 import { removeImageBackground } from "../utils/backgroundRemoval";
+import { optimizeImageForLayer, createDesignThumbnail, safeLocalStorage } from "../utils/imageOptimizer";
 import TShirt3DModal from "../components/TShirt3DModal";
 import {
   Layers,
@@ -298,37 +299,7 @@ export default function DesignerPage() {
   }, []);
 
   const generateDesignThumbnail = (layerList) => {
-    const visibleLayers = (layerList || []).filter(l => l.visible !== false);
-    const imgLayer = visibleLayers.find(l => (l.type === "image" || l.type === "logo") && l.url && l.url !== "/images/dumyImage.png");
-    if (imgLayer) return imgLayer.url;
-
-    const textLayer = visibleLayers.find(l => l.type === "text" && l.text);
-    if (textLayer) {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = 512;
-        canvas.height = 256;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, 512, 256);
-          const fontStyle = [
-            textLayer.italic ? "italic" : "",
-            textLayer.bold ? "bold" : "",
-            "44px",
-            `"${textLayer.fontFamily || "Inter"}", sans-serif`
-          ].filter(Boolean).join(" ");
-          ctx.font = fontStyle;
-          ctx.fillStyle = textLayer.color || "#1e293b";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(textLayer.text, 256, 128);
-          return canvas.toDataURL("image/png");
-        }
-      } catch (err) {
-        console.error("Error creating text thumbnail:", err);
-      }
-    }
-    return "/images/dumyImage.png";
+    return createDesignThumbnail(layerList || layers);
   };
 
   const handleSubmitDesignConcept = async (e) => {
@@ -619,26 +590,12 @@ export default function DesignerPage() {
 
   const saveUserImagesToStorage = (imagesList, user = currentUser) => {
     const key = getUserImagesStorageKey(user);
-    const guestKey = "printsphere_user_images_guest";
     let listToSave = Array.isArray(imagesList) ? [...imagesList] : [];
     // Keep reasonable count of recent images to prevent excessive storage
-    if (listToSave.length > 35) {
-      listToSave = listToSave.slice(0, 35);
+    if (listToSave.length > 20) {
+      listToSave = listToSave.slice(0, 20);
     }
-    let saved = false;
-    while (!saved && listToSave.length > 0) {
-      try {
-        const json = JSON.stringify(listToSave);
-        localStorage.setItem(key, json);
-        if (key !== guestKey) {
-          localStorage.setItem(guestKey, json);
-        }
-        saved = true;
-      } catch (err) {
-        console.warn("Storage quota exceeded while saving user images, pruning oldest item...", err);
-        listToSave.pop();
-      }
-    }
+    safeLocalStorage.setItem(key, listToSave);
   };
 
   const [userImages, setUserImages] = useState(() => {
@@ -1017,14 +974,14 @@ export default function DesignerPage() {
     selectLayer(id);
   };
 
-  const processAndImportFile = (file, autoRemoveBg = autoRemoveBgOnUpload) => {
+  const processAndImportFile = async (file, autoRemoveBg = autoRemoveBgOnUpload) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      let dataUrl = reader.result;
-      if (!dataUrl) return;
-
-      const imageName = (file.name || "Imported Graphic").substring(0, 15);
+    try {
+      // 1. Optimize the uploaded image immediately to high-def web size
+      const optimized = await optimizeImageForLayer(file, { maxDimension: 1600, quality: 0.90 });
+      let dataUrl = optimized.dataUrl;
+      const initialAspect = optimized.aspectRatio || 1;
+      const imageName = (file.name || "Imported Graphic").substring(0, 20);
 
       if (autoRemoveBg) {
         setIsUploadingWithBg(true);
@@ -1052,52 +1009,29 @@ export default function DesignerPage() {
       // Auto save imported image into library for quick reuse
       autoSaveImageToLibrary(dataUrl, finalName);
 
-      const img = new Image();
-      img.onload = () => {
-        const aspect = (img.width && img.height && img.height > 0) ? (img.width / img.height) : 1;
-        const validAspect = (aspect > 0 && isFinite(aspect)) ? aspect : 1;
-        const scaleX = 0.3;
-        const scaleY = Math.min(0.6, Math.max(0.08, 0.3 / validAspect));
+      const scaleX = 0.3;
+      const scaleY = Math.min(0.6, Math.max(0.08, 0.3 / initialAspect));
 
-        const id = `img-${Date.now()}`;
-        const { position, rotation } = getInitialPositionAndRotation();
-        const newLayer = {
-          id,
-          type: "image",
-          name: finalName,
-          url: dataUrl,
-          visible: true,
-          locked: false,
-          position: Array.isArray(position) ? position : [0, 0, 0],
-          rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
-          scale: [scaleX, scaleY, 0.25],
-          aspectRatio: validAspect
-        };
-        setLayers((prev) => [...prev, newLayer]);
-        selectLayer(id);
+      const id = `img-${Date.now()}`;
+      const { position, rotation } = getInitialPositionAndRotation();
+      const newLayer = {
+        id,
+        type: "image",
+        name: finalName,
+        url: dataUrl,
+        visible: true,
+        locked: false,
+        position: Array.isArray(position) ? position : [0, 0, 0],
+        rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
+        scale: [scaleX, scaleY, 0.25],
+        aspectRatio: initialAspect
       };
-      img.onerror = (err) => {
-        console.error("Error loading uploaded image dimensions:", err);
-        const id = `img-${Date.now()}`;
-        const { position, rotation } = getInitialPositionAndRotation();
-        const newLayer = {
-          id,
-          type: "image",
-          name: finalName,
-          url: dataUrl,
-          visible: true,
-          locked: false,
-          position: Array.isArray(position) ? position : [0, 0, 0],
-          rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
-          scale: [0.3, 0.3, 0.25],
-          aspectRatio: 1
-        };
-        setLayers((prev) => [...prev, newLayer]);
-        selectLayer(id);
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
+      setLayers((prev) => [...prev, newLayer]);
+      selectLayer(id);
+    } catch (err) {
+      console.error("Error processing uploaded image:", err);
+      alert("Failed to process image. Please try another image file.");
+    }
   };
 
   const handleImageUpload = (e) => {
@@ -1226,10 +1160,24 @@ export default function DesignerPage() {
     }
   };
 
-  const addPresetImage = (url, name) => {
+  const addPresetImage = async (url, name) => {
+    let finalUrl = url;
+    let initialAspect = 1;
+
+    // If url is a large base64 dataUrl, optimize it
+    if (url && url.startsWith("data:image")) {
+      try {
+        const opt = await optimizeImageForLayer(url);
+        finalUrl = opt.dataUrl;
+        initialAspect = opt.aspectRatio || 1;
+      } catch (e) {
+        console.warn("Optimize preset image error:", e);
+      }
+    }
+
     const img = new Image();
     img.onload = () => {
-      const aspect = (img.width && img.height && img.height > 0) ? (img.width / img.height) : 1;
+      const aspect = (img.width && img.height && img.height > 0) ? (img.width / img.height) : initialAspect;
       const validAspect = (aspect > 0 && isFinite(aspect)) ? aspect : 1;
       const scaleX = 0.3;
       const scaleY = Math.min(0.6, Math.max(0.08, 0.3 / validAspect));
@@ -1240,7 +1188,7 @@ export default function DesignerPage() {
         id,
         type: "image",
         name,
-        url,
+        url: finalUrl,
         visible: true,
         locked: false,
         position: Array.isArray(position) ? position : [0, 0, 0],
@@ -1259,7 +1207,7 @@ export default function DesignerPage() {
         id,
         type: "image",
         name,
-        url,
+        url: finalUrl,
         visible: true,
         locked: false,
         position: Array.isArray(position) ? position : [0, 0, 0],
@@ -1270,7 +1218,7 @@ export default function DesignerPage() {
       setLayers((prev) => [...prev, newLayer]);
       selectLayer(id);
     };
-    img.src = url;
+    img.src = finalUrl;
   };
 
   const updateActiveViewFromAngle = (rad) => {
@@ -1413,6 +1361,28 @@ export default function DesignerPage() {
     setModelRotation(theta);
   };
 
+  // Standard T-Shirt Total Surface Area Table by Size (Total cm² = Front + Back combined)
+  const SHIRT_SIZE_TOTAL_SURFACE_AREA = {
+    "XS": 6072,   // 46cm x 66cm -> Front: 3,036 cm² + Back: 3,036 cm² = 6,072 cm²
+    "S": 6762,    // 49cm x 69cm -> Front: 3,381 cm² + Back: 3,381 cm² = 6,762 cm²
+    "M": 7488,    // 52cm x 72cm -> Front: 3,744 cm² + Back: 3,744 cm² = 7,488 cm²
+    "L": 8250,    // 55cm x 75cm -> Front: 4,125 cm² + Back: 4,125 cm² = 8,250 cm²
+    "XL": 9048,   // 58cm x 78cm -> Front: 4,524 cm² + Back: 4,524 cm² = 9,048 cm²
+    "2XL": 10044, // 62cm x 81cm -> Front: 5,022 cm² + Back: 5,022 cm² = 10,044 cm²
+    "XXL": 10044,
+    "3XL": 11088, // 66cm x 84cm -> Front: 5,544 cm² + Back: 5,544 cm² = 11,088 cm²
+    "XXXL": 11088,
+    "4XL": 12180, // 70cm x 87cm -> Front: 6,090 cm² + Back: 6,090 cm² = 12,180 cm²
+    "5XL": 13320  // 74cm x 90cm -> Front: 6,660 cm² + Back: 6,660 cm² = 13,320 cm²
+  };
+
+  const getLayerPrintAreaCm2 = (layer) => {
+    if (!layer.visible) return 0;
+    const widthCm = (layer.scale?.[0] || 0.3) * 65;
+    const heightCm = (layer.scale?.[1] || 0.3) * 65;
+    return widthCm * heightCm;
+  };
+
   const getLayerPrintArea = (layer) => {
     if (!layer.visible) return 0;
     const widthInches = layer.scale[0] * 25;
@@ -1420,15 +1390,22 @@ export default function DesignerPage() {
     return widthInches * heightInches;
   };
 
-  const totalPrintArea = layers.reduce((acc, curr) => acc + getLayerPrintArea(curr), 0);
-  const printableAreaLimit = 12 * 16;
-  const coveragePercentage = Math.min(100, (totalPrintArea / printableAreaLimit) * 100);
+  const normalizedSizeKey = (selectedSize || "M").toUpperCase().replace(/\s+/g, "");
+  const totalSurfaceAreaCm2 = SHIRT_SIZE_TOTAL_SURFACE_AREA[normalizedSizeKey] || SHIRT_SIZE_TOTAL_SURFACE_AREA["M"];
 
-  const visibleLayersCount = layers.filter((l) => l.visible).length;
+  // Total printed area across all layers combined
+  const totalPrintAreaCm2 = layers.reduce((acc, curr) => acc + getLayerPrintAreaCm2(curr), 0);
+  const totalPrintArea = layers.reduce((acc, curr) => acc + getLayerPrintArea(curr), 0);
+
+  // Print area percentage calculated directly based on the Total Surface Area of the T-Shirt
+  const coveragePercentage = Math.min(100, (totalPrintAreaCm2 / totalSurfaceAreaCm2) * 100);
+
+  // Calculate Print Area tier based on total surface area coverage:
+  // < 50% Low, 50%-75% Medium, > 75% High
   let designComplexity = "Low";
-  if (visibleLayersCount >= 4) {
+  if (coveragePercentage > 75) {
     designComplexity = "High";
-  } else if (visibleLayersCount >= 2) {
+  } else if (coveragePercentage >= 50) {
     designComplexity = "Medium";
   }
 
@@ -1486,53 +1463,53 @@ export default function DesignerPage() {
   const totalCost = unitPrice * quantity * discountMultiplier;
 
   const handleAddToCartAndCheckout = () => {
-    const designId = `custom-${Date.now()}`;
-    const cartKey = `${designId}-${selectedSize}-${shirtColor}`;
+    try {
+      const designId = `custom-${Date.now()}`;
+      const cartKey = `${designId}-${selectedSize}-${shirtColor}`;
 
-    const savedCart = localStorage.getItem("printsphere_cart");
-    let currentCart = [];
-    if (savedCart) {
-      try {
-        currentCart = JSON.parse(savedCart);
-      } catch (e) {
-        console.error(e);
-      }
+      const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+      let currentCart = Array.isArray(savedCart) ? savedCart : [];
+
+      const allModelColors = [
+        ...(selectedModel?.colors || []),
+        ...shirtColors
+      ];
+      const matchedColorObj = allModelColors.find(c => c.value && c.value.toLowerCase() === shirtColor.toLowerCase());
+      const resolvedColorNameStr = matchedColorObj ? matchedColorObj.name : resolveColorName(shirtColor);
+
+      const cartItem = {
+        cartKey,
+        designId: designId,
+        productId: null,
+        title: `${selectedModel?.name || shirtType} (Custom Design)`,
+        basePrice: unitPrice,
+        discount: 0,
+        category: "Customized",
+        size: selectedSize,
+        color: resolvedColorNameStr,
+        material: formatGsm(shirtMaterial),
+        gsm: formatGsm(shirtMaterial),
+        tShirtType: shirtType,
+        tShirtStyle: shirtType || selectedModel?.name || "Crew Neck",
+        quantity: quantity,
+        image: generateDesignThumbnail(layers),
+        isCustom: true,
+        layers: layers
+      };
+
+      const updatedCart = [...currentCart, cartItem];
+      safeLocalStorage.setItem("printsphere_cart", updatedCart);
+
+      setAddedItemDetails({
+        name: selectedModel?.name || shirtType,
+        size: selectedSize
+      });
+      setIsPreviewModalOpen(false);
+      setShowCartRedirectModal(true);
+    } catch (err) {
+      console.error("Add to cart / Checkout error:", err);
+      alert("There was an issue preparing your item for checkout. Please try again.");
     }
-
-    const allModelColors = [
-      ...(selectedModel?.colors || []),
-      ...shirtColors
-    ];
-    const matchedColorObj = allModelColors.find(c => c.value && c.value.toLowerCase() === shirtColor.toLowerCase());
-    const resolvedColorNameStr = matchedColorObj ? matchedColorObj.name : resolveColorName(shirtColor);
-
-    const cartItem = {
-      cartKey,
-      designId: designId,
-      productId: null,
-      title: `${selectedModel?.name || shirtType} (Custom Design)`,
-      basePrice: unitPrice,
-      discount: 0,
-      category: "Customized",
-      size: selectedSize,
-      color: resolvedColorNameStr,
-      material: formatGsm(shirtMaterial),
-      gsm: formatGsm(shirtMaterial),
-      tShirtType: shirtType,
-      tShirtStyle: shirtType || selectedModel?.name || "Crew Neck",
-      quantity: quantity,
-      image: "/images/dumyImage.png",
-      isCustom: true,
-      layers: layers
-    };
-
-    localStorage.setItem("printsphere_cart", JSON.stringify([...currentCart, cartItem]));
-    setAddedItemDetails({
-      name: selectedModel?.name || shirtType,
-      size: selectedSize
-    });
-    setIsPreviewModalOpen(false);
-    setShowCartRedirectModal(true);
   };
 
   return (
@@ -3440,7 +3417,7 @@ export default function DesignerPage() {
             {/* Compact Print Specs Summary */}
             <div className="px-4 py-2.5 border-t bg-slate-50/70 space-y-2 shrink-0">
               <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                <span>Print Area: {totalPrintArea.toFixed(1)} in²</span>
+                <span>Print Area: {totalPrintAreaCm2.toFixed(0)} cm² ({coveragePercentage.toFixed(1)}%)</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${designComplexity === "High"
                   ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
                   : designComplexity === "Medium"

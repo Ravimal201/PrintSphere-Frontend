@@ -35,6 +35,7 @@ import Scene from "../three/Scene";
 import TShirt2D from "../components/TShirt2D";
 import Store3DCardPreview from "../components/Store3DCardPreview";
 import { API_BASE_URL } from "../config/api";
+import { safeLocalStorage } from "../utils/imageOptimizer";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
 
 const getOrCreateSessionId = () => {
@@ -413,13 +414,9 @@ export default function StorePage() {
 
   useEffect(() => {
     // Load local cart if any
-    const savedCart = localStorage.getItem("printsphere_cart");
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (err) {
-        console.error("Load cart error:", err);
-      }
+    const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+    if (Array.isArray(savedCart)) {
+      setCart(savedCart);
     }
 
     fetchStoreData();
@@ -484,7 +481,7 @@ export default function StorePage() {
   // Save cart changes
   const saveCart = (newCart) => {
     setCart(newCart);
-    localStorage.setItem("printsphere_cart", JSON.stringify(newCart));
+    safeLocalStorage.setItem("printsphere_cart", newCart);
   };
 
   // Add to cart

@@ -7,6 +7,7 @@ import { CreditCard, ShieldCheck, Lock, AlertCircle, MapPin, Truck, ArrowLeft, L
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { processCardPayment } from "../services/paymentService";
+import { safeLocalStorage } from "../utils/imageOptimizer";
 
 export default function PaymentPage() {
   const [order, setOrder] = useState(null);
@@ -159,7 +160,7 @@ export default function PaymentPage() {
 
       if (data && data.success) {
         localStorage.removeItem("printsphere_pending_order_id");
-        localStorage.setItem("printsphere_cart", JSON.stringify([]));
+        safeLocalStorage.setItem("printsphere_cart", []);
         window.location.href = `/payment/success?order_id=${order._id}&gateway=card`;
       } else {
         throw new Error(data?.message || "Card payment authorization failed.");
@@ -222,7 +223,7 @@ export default function PaymentPage() {
         });
 
         // 3. Save restored cart to localStorage
-        localStorage.setItem("printsphere_cart", JSON.stringify(restoredCart));
+        safeLocalStorage.setItem("printsphere_cart", restoredCart);
       }
 
       // 4. Remove pending order ID
