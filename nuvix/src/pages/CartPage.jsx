@@ -34,8 +34,6 @@ export default function CartPage() {
   const [user, setUser] = useState(null);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [isEditingPaymentMethod, setIsEditingPaymentMethod] = useState(false);
-  const [selectedGateway, setSelectedGateway] = useState("card"); // 'card', 'payhere', 'cod'
-
   // Forms
   const [addressForm, setAddressForm] = useState({
     street: "",
@@ -45,35 +43,6 @@ export default function CartPage() {
     country: "Sri Lanka",
     phone: ""
   });
-
-  const [cardForm, setCardForm] = useState({
-    cardholderName: "",
-    cardNumber: "",
-    expiryDate: "",
-    cvv: "",
-    saveCard: true
-  });
-
-  const loadPayHereScript = () => {
-    return new Promise((resolve, reject) => {
-      if (window.payhere) {
-        resolve(true);
-        return;
-      }
-      const existingScript = document.querySelector('script[src="https://www.payhere.lk/lib/payhere.js"]');
-      if (existingScript) {
-        existingScript.onload = () => resolve(true);
-        existingScript.onerror = () => reject(new Error("Failed to load PayHere SDK"));
-        return;
-      }
-      const script = document.createElement("script");
-      script.type = "text/javascript";
-      script.src = "https://www.payhere.lk/lib/payhere.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => reject(new Error("Failed to load PayHere SDK"));
-      document.body.appendChild(script);
-    });
-  };
 
   useEffect(() => {
     // Load cart
