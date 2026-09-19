@@ -72,7 +72,6 @@ export default function ManagerPage() {
   const [styleForm, setStyleForm] = useState({
     name: "",
     path: "",
-    type: "Crew Neck",
     gsmPrices: [
       { gsm: "GSM 180", price: 1200 },
       { gsm: "GSM 220", price: 1500 },
@@ -793,7 +792,7 @@ export default function ManagerPage() {
     const payload = {
       name: styleForm.name,
       path: styleForm.path,
-      type: styleForm.type || "Crew Neck",
+      type: styleForm.name, // style name is used for type
       gsmPrices: styleForm.gsmPrices,
       colors: styleForm.colors,
     };
@@ -815,10 +814,9 @@ export default function ManagerPage() {
       setStyleForm({
         name: "",
         path: "",
-        type: "Crew Neck",
         gsmPrices: [
-          { gsm: "180GSM", price: 1200 },
-          { gsm: "220GSM", price: 1500 },
+          { gsm: "GSM 180", price: 1200 },
+          { gsm: "GSM 220", price: 1500 },
         ],
         colors: [
           { name: "White", value: "#ffffff" },
@@ -1573,154 +1571,99 @@ export default function ManagerPage() {
                   return (
                     <div
                       key={order._id}
-                      className="border border-slate-200/80 rounded-2xl p-5 hover:border-indigo-200 transition bg-slate-50/20"
+                      className="border border-slate-200/90 rounded-2xl p-4 hover:border-indigo-200 transition bg-white shadow-xs space-y-3"
                     >
-                      {/* Header */}
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-dashed">
-                        <div>
-                          <div className="flex items-center flex-wrap gap-2.5">
-                            <span className="text-xs font-bold text-slate-700">
-                              Order ID: <span className="font-mono text-indigo-600">#{order._id.slice(-8)}</span>
-                            </span>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                order.paymentStatus === "Paid"
-                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                  : "bg-amber-50 text-amber-600 border border-amber-200"
-                              }`}
-                            >
-                              Payment: {order.paymentStatus}
-                            </span>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                isCancelled
-                                  ? "bg-rose-50 text-rose-600 border border-rose-200"
-                                  : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
-                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                  : order.orderStatus === "Printing"
-                                  ? "bg-purple-50 text-purple-600 border border-purple-200"
-                                  : order.orderStatus === "Processing"
-                                  ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
-                                  : "bg-slate-100 text-slate-700 border border-slate-200"
-                              }`}
-                            >
-                              Status: {order.orderStatus}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1.5 flex items-center flex-wrap gap-1">
-                            <span className="font-medium text-slate-600">Customer:</span>{" "}
+                      {/* Compact Order Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+                        <div className="flex items-center flex-wrap gap-2">
+                          <span className="text-xs font-black text-slate-900">
+                            Order <span className="font-mono text-indigo-600 font-bold">#{order._id.slice(-8)}</span>
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                              order.paymentStatus === "Paid"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
+                            {order.paymentStatus}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                              isCancelled
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : order.orderStatus === "Printing"
+                                ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                : order.orderStatus === "Processing"
+                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                : "bg-slate-100 text-slate-700 border border-slate-200"
+                            }`}
+                          >
+                            {order.orderStatus}
+                          </span>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-xs text-slate-600 font-medium">
                             <span className="font-bold text-slate-900">
                               {order.customerId?.name ||
                                 (typeof order.customerId === "object" && order.customerId?.email) ||
                                 order.guestEmail ||
-                                "Unknown"}
+                                "Customer"}
                             </span>
                             {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
-                              <span className="text-slate-400 font-normal">
+                              <span className="text-slate-400 font-normal ml-1">
                                 ({order.customerId?.email || order.guestEmail})
                               </span>
                             ) : null}
-                          </p>
+                          </span>
                         </div>
-                        <div className="text-left md:text-right">
-                          <p className="text-lg font-black text-slate-900">
-                            Rs. {(order.totalCost || 0).toFixed(2)}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 md:justify-end">
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-slate-400 flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            Placed: {new Date(order.createdAt).toLocaleDateString()}
-                          </p>
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="text-base font-black text-slate-950">
+                            Rs. {(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Content Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
-                        {/* Items */}
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                              Order Items
-                            </h4>
-                            <div className="space-y-3">
-                              {order.items.map((item, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="bg-white p-3.5 border rounded-2xl shadow-xs text-xs space-y-3"
-                                  >
-                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-                                      <div>
-                                        <p className="font-extrabold text-slate-900 text-sm">
-                                          {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
-                                        </p>
-                                        <p className="text-slate-500 text-xs mt-0.5">
-                                          Style: <span className="font-semibold text-slate-700">{item.tShirtStyle || "Crew Neck"}</span> | 
-                                          Size: <span className="font-semibold text-slate-700">{item.selectedSize || item.size}</span> | 
-                                          Color: <span className="font-semibold text-slate-700">{resolveColorName(item.selectedColor || item.color)}</span> | 
-                                          GSM: <span className="font-semibold text-slate-700">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
-                                        </p>
-                                      </div>
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                        item.itemType === "Customized" || item.designId
-                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                          : "bg-blue-50 text-blue-700 border border-blue-200"
-                                      }`}>
-                                        {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog Product"}
-                                      </span>
-                                    </div>
-
-                                    {/* Multi-Angle Screenshots (Front, Back, Both Sides) & Downloads */}
-                                    <DesignScreenshotViewer
-                                      item={item}
-                                      orderId={order._id}
-                                      onOpen3DModal={(designToOpen) => {
-                                        setSelected3DDesign(designToOpen);
-                                        setIs3DModalOpen(true);
-                                      }}
-                                    />
-                                  </div>
-                              ))}
-                            </div>
+                      {/* Main Section: Compact Sidebar Meta Info + Wide 3D Views & Items */}
+                      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3 items-start">
+                        {/* Left Sidebar: Shipping & Assigned Employee */}
+                        <div className="space-y-2.5">
+                          {/* Shipping Destination */}
+                          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1">
+                            <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
+                              Shipping Destination
+                            </span>
+                            {order.shippingAddress ? (
+                              <p className="text-xs text-slate-700 font-medium leading-tight">
+                                {order.shippingAddress.street ? `${order.shippingAddress.street}, ` : ""}
+                                {order.shippingAddress.city ? `${order.shippingAddress.city}, ` : ""}
+                                {order.shippingAddress.country || "Sri Lanka"}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic">Address not specified</p>
+                            )}
                           </div>
-                        </div>
 
-                        {/* Ship Address */}
-                        <div>
-                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                            Shipping Destination
-                          </h4>
-                          {order.shippingAddress ? (
-                            <p className="text-xs text-slate-600 leading-relaxed bg-white p-3 border rounded-xl">
-                              {order.shippingAddress.street},{" "}
-                              {order.shippingAddress.city},{" "}
-                              {order.shippingAddress.country}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-slate-400 bg-white p-3 border rounded-xl">
-                              Address not specified
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Employee Assignment */}
-                        <div>
-                          <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-2">
-                            Assigned Employee
-                          </h4>
-                          {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
-                            <div className="bg-white border rounded-xl p-3.5 space-y-2.5 shadow-xs">
+                          {/* Employee Assignment */}
+                          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5">
+                            <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
+                              Assigned Operator
+                            </span>
+                            {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
                               <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="h-6 w-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                                     {order.assignedEmployee.name ? order.assignedEmployee.name.charAt(0).toUpperCase() : "E"}
                                   </div>
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-bold text-slate-900 truncate">
-                                      {order.assignedEmployee.name}
-                                    </p>
-                                    <p className="text-[10px] text-indigo-600 font-semibold">
-                                      Assigned Operator
-                                    </p>
-                                  </div>
+                                  <span className="text-xs font-bold text-slate-900 truncate">
+                                    {order.assignedEmployee.name}
+                                  </span>
                                 </div>
 
                                 {!isCancelled && order.orderStatus !== "Shipped" && (
@@ -1732,124 +1675,148 @@ export default function ManagerPage() {
                                         [order._id]: order.assignedEmployee?._id || "",
                                       }));
                                     }}
-                                    className="px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
-                                    title="Edit / Change assigned employee"
+                                    className="px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition flex items-center gap-1 shrink-0 cursor-pointer bg-white"
+                                    title="Edit assigned employee"
                                   >
-                                    <Edit2 className="h-3 w-3 text-indigo-600" />
+                                    <Edit2 className="h-2.5 w-2.5 text-indigo-600" />
                                     <span>Edit</span>
                                   </button>
                                 )}
                               </div>
-                            </div>
-                          ) : (
-                            <div className="bg-white border rounded-xl p-3 space-y-2 shadow-xs">
-                              {editingEmployeeOrderId === order._id ? (
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] uppercase font-bold text-indigo-700">
-                                      Change Employee
-                                    </span>
-                                    <button
-                                      onClick={() => setEditingEmployeeOrderId(null)}
-                                      className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
-                                      title="Cancel"
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </button>
+                            ) : (
+                              <div>
+                                {editingEmployeeOrderId === order._id ? (
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1">
+                                      <select
+                                        value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
+                                        onChange={(e) =>
+                                          setSelectedEmployeeForOrder((prev) => ({
+                                            ...prev,
+                                            [order._id]: e.target.value,
+                                          }))
+                                        }
+                                        className="flex-1 text-[11px] border border-slate-300 rounded-lg px-2 py-1 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                      >
+                                        <option value="">-- Select Employee --</option>
+                                        {employees.map((emp) => (
+                                          <option key={emp._id} value={emp._id}>
+                                            {emp.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
+                                        onClick={() => {
+                                          const empId = selectedEmployeeForOrder[order._id];
+                                          if (empId) {
+                                            handleAssignEmployee(order._id, empId);
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      >
+                                        {assignLoading[order._id] ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Check className="h-3 w-3" />
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingEmployeeOrderId(null)}
+                                        className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5">
+                                ) : (
+                                  <div className="space-y-1">
                                     <select
-                                      value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
-                                      onChange={(e) =>
-                                        setSelectedEmployeeForOrder((prev) => ({
-                                          ...prev,
-                                          [order._id]: e.target.value,
-                                        }))
-                                      }
-                                      className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                      disabled={assignLoading[order._id] || isCancelled}
+                                      onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
+                                      defaultValue=""
+                                      className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white font-medium text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
                                     >
-                                      <option value="">-- Select Employee --</option>
+                                      <option value="" disabled>
+                                        -- Assign staff --
+                                      </option>
                                       {employees.map((emp) => (
                                         <option key={emp._id} value={emp._id}>
                                           {emp.name}
                                         </option>
                                       ))}
                                     </select>
-                                    <button
-                                      disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
-                                      onClick={() => {
-                                        const empId = selectedEmployeeForOrder[order._id];
-                                        if (empId) {
-                                          handleAssignEmployee(order._id, empId);
-                                        }
-                                      }}
-                                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
-                                      title="Save change"
-                                    >
-                                      {assignLoading[order._id] ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      ) : (
-                                        <Check className="h-3.5 w-3.5" />
-                                      )}
-                                      <span>Save</span>
-                                    </button>
+                                    <p className="text-[9px] text-amber-600 font-semibold flex items-center gap-1">
+                                      <AlertCircle className="h-2.5 w-2.5 shrink-0" />
+                                      No staff assigned
+                                    </p>
                                   </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right Area: Items List with Small 3D Views */}
+                        <div className="space-y-2">
+                          {order.items.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-white p-2.5 border border-slate-200/90 rounded-xl space-y-2"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-black text-slate-900 text-xs">
+                                    {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 font-medium">
+                                    Size: <span className="font-bold text-slate-800">{item.selectedSize || item.size}</span> | 
+                                    Color: <span className="font-bold text-slate-800">{resolveColorName(item.selectedColor || item.color)}</span> | 
+                                    GSM: <span className="font-bold text-slate-800">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
+                                  </span>
                                 </div>
-                              ) : (
-                                <div className="space-y-2">
-                                  <select
-                                    disabled={assignLoading[order._id] || isCancelled}
-                                    onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
-                                    defaultValue=""
-                                    className="w-full text-xs border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50/50 font-bold text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                                  >
-                                    <option value="" disabled>
-                                      -- Assign an employee --
-                                    </option>
-                                    {employees.map((emp) => (
-                                      <option key={emp._id} value={emp._id}>
-                                        {emp.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <p className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
-                                    <AlertCircle className="h-3 w-3 shrink-0" />
-                                    No employee assigned yet
-                                  </p>
-                                </div>
-                              )}
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                  item.itemType === "Customized" || item.designId
+                                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                }`}>
+                                  {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog"}
+                                </span>
+                              </div>
+
+                              {/* Multi-Angle 3D View Small Thumbnails */}
+                              <DesignScreenshotViewer
+                                item={item}
+                                orderId={order._id}
+                                onOpen3DModal={(designToOpen) => {
+                                  setSelected3DDesign(designToOpen);
+                                  setIs3DModalOpen(true);
+                                }}
+                              />
                             </div>
-                          )}
+                          ))}
                         </div>
                       </div>
 
-                      {/* Production Pipeline Status Viewer & Order Actions */}
-                      <div className="pt-4 border-t border-dashed flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        {/* Status / Pipeline Display (Read-Only) */}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                              Production Status:
-                            </span>
-                            {latestTimeline?.note && (
-                              <span className="text-[11px] text-slate-500 italic truncate max-w-md">
-                                ({latestTimeline.note})
-                              </span>
-                            )}
-                          </div>
+                      {/* Compact Bottom Footer: Status Stepper & Cancel Action */}
+                      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                            Status:
+                          </span>
 
                           {isCancelled ? (
-                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
-                              <Ban className="h-4 w-4 text-rose-500 shrink-0" />
-                              <span>Order has been Cancelled</span>
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-[11px] font-bold">
+                              <Ban className="h-3 w-3 text-rose-500 shrink-0" />
+                              Order Cancelled
+                            </span>
                           ) : isPendingPayment ? (
-                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-bold">
-                              <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-                              <span>Awaiting Customer Payment Before Processing</span>
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-[11px] font-bold">
+                              <Clock className="h-3 w-3 text-amber-500 shrink-0" />
+                              Awaiting Customer Payment
+                            </span>
                           ) : (
-                            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
+                            <div className="flex items-center gap-1 overflow-x-auto py-0.5">
                               {pipelineStages.map((stage, sIdx) => {
                                 const isPassed = currentStageIdx > sIdx;
                                 const isCurrent = currentStageIdx === sIdx;
@@ -1857,26 +1824,26 @@ export default function ManagerPage() {
                                 return (
                                   <div key={stage} className="flex items-center shrink-0">
                                     <div
-                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
                                         isCurrent
-                                          ? "bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200"
+                                          ? "bg-indigo-600 text-white shadow-2xs font-black"
                                           : isPassed
                                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                           : "bg-slate-100 text-slate-400 border border-slate-200"
                                       }`}
                                     >
                                       {isPassed ? (
-                                        <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                        <Check className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
                                       ) : isCurrent ? (
-                                        <div className="h-2 w-2 rounded-full bg-white animate-ping shrink-0" />
+                                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping shrink-0" />
                                       ) : (
-                                        <span className="h-2 w-2 rounded-full bg-slate-300 shrink-0" />
+                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-300 shrink-0" />
                                       )}
                                       <span>{stage}</span>
                                     </div>
                                     {sIdx < pipelineStages.length - 1 && (
                                       <div
-                                        className={`w-3 sm:w-6 h-0.5 mx-1 transition ${
+                                        className={`w-2 h-0.5 mx-0.5 transition ${
                                           isPassed ? "bg-emerald-400" : "bg-slate-200"
                                         }`}
                                       />
@@ -1886,33 +1853,31 @@ export default function ManagerPage() {
                               })}
                             </div>
                           )}
+
+                          {latestTimeline?.note && (
+                            <span className="text-[10px] text-slate-400 italic truncate max-w-xs">
+                              ({latestTimeline.note})
+                            </span>
+                          )}
                         </div>
 
-                        {/* Order Management Actions (Cancel Order) */}
-                        <div className="shrink-0 flex items-center gap-2">
+                        {/* Actions */}
+                        <div className="shrink-0">
                           {!isCancelled && order.orderStatus !== "Shipped" ? (
                             <button
                               disabled={assignLoading[order._id]}
                               onClick={() => handleCancelOrder(order._id)}
-                              className="px-3.5 py-2 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              title="Cancel this customer order"
+                              className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                              title="Cancel this order"
                             >
                               {assignLoading[order._id] ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
-                                <Ban className="h-3.5 w-3.5" />
+                                <Ban className="h-3 w-3" />
                               )}
-                              <span>Cancel Order</span>
+                              <span>Cancel</span>
                             </button>
-                          ) : isCancelled ? (
-                            <span className="text-xs font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 flex items-center gap-1.5">
-                              <Ban className="h-3.5 w-3.5" /> Order Cancelled
-                            </span>
-                          ) : (
-                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-1.5">
-                              <CheckCircle className="h-3.5 w-3.5" /> Order Fulfilled & Shipped
-                            </span>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -3305,7 +3270,6 @@ export default function ManagerPage() {
                   setStyleForm({
                     name: "",
                     path: "",
-                    type: "Crew Neck",
                     gsmPrices: [
                       { gsm: "GSM 180", price: 1200 },
                       { gsm: "GSM 220", price: 1500 },
@@ -3342,7 +3306,6 @@ export default function ManagerPage() {
                     setStyleForm({
                       name: "",
                       path: "/images/models/male normal t-shirt1.glb",
-                      type: "Crew Neck",
                       gsmPrices: [
                         { gsm: "GSM 180", price: 1200 },
                         { gsm: "GSM 220", price: 1500 },
@@ -3369,9 +3332,8 @@ export default function ManagerPage() {
                     onEdit={(styleToEdit) => {
                       setEditingStyle(styleToEdit);
                       setStyleForm({
-                        name: styleToEdit.name,
-                        path: styleToEdit.path,
-                        type: styleToEdit.type || "Crew Neck",
+                        name: styleToEdit.name || styleToEdit.type || "",
+                        path: styleToEdit.path || "",
                         gsmPrices:
                           styleToEdit.gsmPrices && styleToEdit.gsmPrices.length > 0
                             ? styleToEdit.gsmPrices
@@ -4341,352 +4303,7 @@ export default function ManagerPage() {
         </div>
       )}
 
-      {showStyleModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-sm uppercase tracking-wider">
-                {editingStyle
-                  ? `Edit Style: ${editingStyle.name}`
-                  : "Add New T-Shirt Style"}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowStyleModal(false);
-                  setEditingStyle(null);
-                }}
-                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            <form
-              onSubmit={handleSaveStyle}
-              className="p-6 space-y-4 overflow-y-auto flex-1"
-            >
-              {stylesError && (
-                <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl text-xs font-semibold">
-                  {stylesError}
-                </div>
-              )}
-
-              {/* Live Frozen 3D Preview */}
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-1.5">
-                  3D Model Preview (Frozen)
-                </label>
-                <Store3DCardPreview
-                  product={{
-                    title: styleForm.name || "Style Preview",
-                    tShirtType: styleForm.name || styleForm.type || "Crew Neck",
-                    path:
-                      styleForm.path ||
-                      "/images/models/male normal t-shirt1.glb",
-                    modelPath:
-                      styleForm.path ||
-                      "/images/models/male normal t-shirt1.glb",
-                    colors: (styleForm.colors || []).map((c) =>
-                      typeof c === "string" ? c : c.value,
-                    ),
-                  }}
-                  activeColor={
-                    styleForm.colors?.[0]
-                      ? typeof styleForm.colors[0] === "string"
-                        ? styleForm.colors[0]
-                        : styleForm.colors[0].value
-                      : "#ffffff"
-                  }
-                  showControls={true}
-                  hideBadge={false}
-                  className="h-44 w-full rounded-2xl bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-100 border border-slate-200/80 shadow-inner"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                  T-Shirt Type
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={styleForm.name}
-                  onChange={(e) =>
-                    setStyleForm((prev) => ({
-                      ...prev,
-                      name: e.target.value,
-                      type: e.target.value,
-                    }))
-                  }
-                  placeholder="e.g. Crew Neck, V-Neck, Polo, Oversized, Hoodie"
-                  className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-indigo-500 font-semibold"
-                />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <span className="text-[9px] font-bold text-slate-400 self-center">Quick Select:</span>
-                  {["Crew Neck", "V-Neck", "Polo", "Oversized", "Hoodie", "Long Sleeve", "Tank Top"].map((tType) => (
-                    <button
-                      key={tType}
-                      type="button"
-                      onClick={() =>
-                        setStyleForm((prev) => ({
-                          ...prev,
-                          name: tType,
-                          type: tType,
-                        }))
-                      }
-                      className={`px-2.5 py-1 border rounded-lg text-[9px] font-bold transition cursor-pointer ${
-                        styleForm.name === tType
-                          ? "bg-indigo-600 border-indigo-600 text-white"
-                          : "bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {tType}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider">
-                    3D GLTF Model File Path
-                  </label>
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={styleForm.path}
-                  onChange={(e) =>
-                    setStyleForm((prev) => ({ ...prev, path: e.target.value }))
-                  }
-                  placeholder="e.g. /images/models/male normal t-shirt1.glb"
-                  className="mt-1.5 w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 font-mono"
-                />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <span className="text-[9px] font-bold text-slate-400 self-center">Presets:</span>
-                  {[
-                    { label: "Male Normal", path: "/images/models/male normal t-shirt1.glb", defaultType: "Crew Neck" },
-                    { label: "Female Normal", path: "/images/models/female normal t-shirt.glb", defaultType: "Crew Neck" },
-                    { label: "Long Sleeve", path: "/images/models/long_sleeve_t-_shirt.glb", defaultType: "Long Sleeve" },
-                    { label: "Oversized", path: "/images/models/oversized t-sdirt1.glb", defaultType: "Oversized" },
-                    { label: "Hoodie", path: "/images/models/t_shirt_hoodie.glb", defaultType: "Hoodie" },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() =>
-                        setStyleForm((prev) => ({
-                          ...prev,
-                          path: preset.path,
-                          type: prev.type || preset.defaultType,
-                        }))
-                      }
-                      className="px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border rounded-lg text-[9px] font-bold transition cursor-pointer"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">
-                  Configure GSM Weights & Prices
-                </label>
-
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    placeholder="GSM name (e.g. 220GSM)"
-                    value={newGsmName}
-                    onChange={(e) => setNewGsmName(e.target.value)}
-                    className="flex-1 px-3 py-2 border rounded-xl text-xs font-semibold"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Price (Rs.)"
-                    value={newGsmPrice}
-                    onChange={(e) => setNewGsmPrice(e.target.value)}
-                    className="w-28 px-3 py-2 border rounded-xl text-xs font-semibold"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newGsmName.trim())
-                        return alert("Please type a GSM name.");
-                      if (!newGsmPrice) return alert("Please type a price.");
-                      setStyleForm((prev) => ({
-                        ...prev,
-                        gsmPrices: [
-                          ...prev.gsmPrices.filter(
-                            (gp) =>
-                              gp.gsm.toLowerCase() !==
-                              formatGsm(newGsmName).toLowerCase(),
-                          ),
-                          {
-                            gsm: formatGsm(newGsmName),
-                            price: Number(newGsmPrice),
-                          },
-                        ],
-                      }));
-                      setNewGsmName("");
-                      setNewGsmPrice("");
-                    }}
-                    className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    Add GSM
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
-                  {styleForm.gsmPrices.length === 0 ? (
-                    <p className="text-[10px] text-slate-400 font-semibold p-2">
-                      No GSM prices added yet.
-                    </p>
-                  ) : (
-                    styleForm.gsmPrices.map((gp, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between bg-white border rounded-xl px-3 py-1.5 text-xs shadow-2xs"
-                      >
-                        <span className="font-semibold text-slate-700">
-                          {gp.gsm}
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <span className="font-black text-slate-900">
-                            Rs. {gp.price.toFixed(2)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStyleForm((prev) => ({
-                                ...prev,
-                                gsmPrices: prev.gsmPrices.filter(
-                                  (_, idx) => idx !== i,
-                                ),
-                              }));
-                            }}
-                            className="text-rose-500 hover:text-rose-700 transition"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block mb-2">
-                  Configure Allowed Brand Colors
-                </label>
-
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    placeholder="Color name (e.g. Royal Blue)"
-                    value={newColor.name}
-                    onChange={(e) =>
-                      setNewColor((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    className="flex-1 px-3 py-2 border rounded-xl text-xs font-semibold"
-                  />
-                  <input
-                    type="color"
-                    value={newColor.value}
-                    onChange={(e) =>
-                      setNewColor((prev) => ({
-                        ...prev,
-                        value: e.target.value,
-                      }))
-                    }
-                    className="h-8 w-12 p-0.5 border rounded-xl cursor-pointer bg-white shrink-0"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newColor.name.trim())
-                        return alert("Please type a color name.");
-                      setStyleForm((prev) => ({
-                        ...prev,
-                        colors: [
-                          ...prev.colors,
-                          { name: newColor.name.trim(), value: newColor.value },
-                        ],
-                      }));
-                      setNewColor({ name: "", value: "#ffffff" });
-                    }}
-                    className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    Add
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/50">
-                  {styleForm.colors.length === 0 ? (
-                    <p className="text-[10px] text-slate-400 font-semibold p-2">
-                      No colors added yet.
-                    </p>
-                  ) : (
-                    styleForm.colors.map((color, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-1.5 bg-white border rounded-full px-2.5 py-1 text-xs shadow-2xs"
-                      >
-                        <span
-                          className="h-3.5 w-3.5 rounded-full border border-slate-200"
-                          style={{ backgroundColor: color.value }}
-                        />
-                        <span className="font-semibold text-slate-700">
-                          {color.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStyleForm((prev) => ({
-                              ...prev,
-                              colors: prev.colors.filter((_, idx) => idx !== i),
-                            }));
-                          }}
-                          className="text-slate-400 hover:text-rose-500 font-bold ml-1 text-[10px] shrink-0"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="border-t pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowStyleModal(false);
-                    setEditingStyle(null);
-                  }}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={stylesLoading}
-                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {stylesLoading && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  )}
-                  {editingStyle ? "Save Changes" : "Create Style"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Add New Inventory Modal */}
       {showInventoryModal && (
@@ -5238,6 +4855,34 @@ export default function ManagerPage() {
                 </div>
               )}
 
+              {/* Live 3D Model Preview */}
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1.5">
+                  3D Model Preview (Live)
+                </label>
+                <Store3DCardPreview
+                  product={{
+                    title: styleForm.name || "T-Shirt Style Preview",
+                    tShirtType: styleForm.name || "Crew Neck",
+                    path: styleForm.path || "/images/models/male normal t-shirt1.glb",
+                    modelPath: styleForm.path || "/images/models/male normal t-shirt1.glb",
+                    colors: (styleForm.colors || []).map((c) =>
+                      typeof c === "string" ? c : c.value
+                    ),
+                  }}
+                  activeColor={
+                    styleForm.colors?.[0]
+                      ? typeof styleForm.colors[0] === "string"
+                        ? styleForm.colors[0]
+                        : styleForm.colors[0].value
+                      : "#ffffff"
+                  }
+                  showControls={true}
+                  hideBadge={false}
+                  className="h-48 w-full rounded-2xl bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-100 border border-slate-200/80 shadow-inner"
+                />
+              </div>
+
               {/* Style Name */}
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
@@ -5246,7 +4891,7 @@ export default function ManagerPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Women's V-Neck, Long Sleeve Shirt, Oversized Tee"
+                  placeholder="e.g. Crew Neck, Women's V-Neck, Long Sleeve Shirt, Oversized Tee, Hoodie"
                   value={styleForm.name}
                   onChange={(e) =>
                     setStyleForm((prev) => ({ ...prev, name: e.target.value }))
@@ -5303,27 +4948,6 @@ export default function ManagerPage() {
                   }
                   className="w-full px-3.5 py-2 border rounded-xl text-xs font-mono text-slate-700 focus:outline-indigo-500 mt-1"
                 />
-              </div>
-
-              {/* Collar / Garment Type */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                  Collar / Garment Category
-                </label>
-                <select
-                  value={styleForm.type}
-                  onChange={(e) =>
-                    setStyleForm((prev) => ({ ...prev, type: e.target.value }))
-                  }
-                  className="w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold focus:outline-indigo-500 bg-white"
-                >
-                  <option value="Crew Neck">Crew Neck</option>
-                  <option value="V-Neck">V-Neck</option>
-                  <option value="Polo">Polo</option>
-                  <option value="Hoodie">Hoodie</option>
-                  <option value="Oversized">Oversized</option>
-                  <option value="Long Sleeve">Long Sleeve</option>
-                </select>
               </div>
 
               {/* GSM Weights & Prices Section */}
