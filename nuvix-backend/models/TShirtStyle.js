@@ -19,6 +19,12 @@ const TShirtStyleSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    sizes: [
+      {
+        type: String,
+        trim: true
+      }
+    ],
     gsms: [
       {
         type: String

@@ -9,6 +9,8 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
+  CheckCircle2,
+  XCircle,
   TrendingUp,
   Sparkles,
   Plus,
@@ -45,6 +47,8 @@ import {
   Star,
   MessageSquare,
   ThumbsDown,
+  ThumbsUp,
+  Eye,
   Mail,
 } from "lucide-react";
 import axios from "axios";
@@ -72,6 +76,7 @@ export default function ManagerPage() {
   const [styleForm, setStyleForm] = useState({
     name: "",
     path: "",
+    sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
     gsmPrices: [
       { gsm: "GSM 180", price: 1200 },
       { gsm: "GSM 220", price: 1500 },
@@ -84,6 +89,7 @@ export default function ManagerPage() {
   const [newGsmName, setNewGsmName] = useState("");
   const [newGsmPrice, setNewGsmPrice] = useState("");
   const [newColor, setNewColor] = useState({ name: "", value: "#ffffff" });
+  const [newCustomSize, setNewCustomSize] = useState("");
 
   // Data states
   const [orders, setOrders] = useState([]);
@@ -139,6 +145,48 @@ export default function ManagerPage() {
   const [productError, setProductError] = useState("");
   const [productSuccess, setProductSuccess] = useState("");
   const [productActionLoading, setProductActionLoading] = useState(false);
+  const [productTabFilter, setProductTabFilter] = useState("all"); // "all" | "pending" | "approved" | "archived"
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [approvingProductId, setApprovingProductId] = useState(null);
+
+  // Orders tab states & filters
+  const [orderTabFilter, setOrderTabFilter] = useState("all"); // "all" | "active" | "pending_payment" | "delivered" | "cancelled"
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+
+  // Order status classification helpers
+  const isDeliveredOrder = (order) => {
+    return (
+      order.orderStatus === "Collected" ||
+      order.orderStatus === "Delivered" ||
+      Boolean(order.isCollected)
+    );
+  };
+
+  const isCancelledOrder = (order) => {
+    return (
+      order.orderStatus === "Cancelled" ||
+      order.orderStatus === "Canceled"
+    );
+  };
+
+  const isPendingPaymentOrder = (order) => {
+    if (isCancelledOrder(order) || isDeliveredOrder(order)) return false;
+    return (
+      order.orderStatus === "Pending Payment" ||
+      order.paymentStatus === "Pending"
+    );
+  };
+
+  const isActiveOrder = (order) => {
+    if (isCancelledOrder(order) || isDeliveredOrder(order) || isPendingPaymentOrder(order)) {
+      return false;
+    }
+    return true; // Processing, Printing, Completed, Shipped
+  };
+
+  // Order cancellation state
+  const [cancellingOrder, setCancellingOrder] = useState(null); // { orderId, orderNumber, customerName }
+  const [cancelReasonInput, setCancelReasonInput] = useState("");
 
   // Pricing rules inputs
   const [pricingForm, setPricingForm] = useState({
@@ -388,10 +436,24 @@ export default function ManagerPage() {
 
   // ================= ORDERS OPERATIONS =================
 
-  const handleCancelOrder = async (orderId) => {
-    if (!window.confirm("Are you sure you want to cancel this order? This action will mark the order as Cancelled.")) {
-      return;
-    }
+  const openCancelOrderModal = (order) => {
+    setCancellingOrder({
+      orderId: order._id,
+      orderNumber: order._id.slice(-8).toUpperCase(),
+      customerName:
+        order.customerId?.name ||
+        (typeof order.customerId === "object" && order.customerId?.email) ||
+        order.guestEmail ||
+        "Customer",
+    });
+    setCancelReasonInput("");
+  };
+
+  const handleConfirmCancelOrder = async () => {
+    if (!cancellingOrder) return;
+    const orderId = cancellingOrder.orderId;
+    const finalReason = cancelReasonInput.trim() || "Order cancelled by store manager.";
+
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -399,13 +461,20 @@ export default function ManagerPage() {
       setAssignLoading((prev) => ({ ...prev, [orderId]: true }));
       const response = await axios.put(
         `${API_BASE_URL}/manager/orders/${orderId}/status`,
-        { status: "Cancelled", note: "Order cancelled by manager." },
+        {
+          status: "Cancelled",
+          note: finalReason,
+          cancellationReason: finalReason,
+          cancelReason: finalReason,
+        },
         { headers },
       );
 
       setOrders((prev) =>
         prev.map((o) => (o._id === orderId ? response.data.order : o)),
       );
+      setCancellingOrder(null);
+      setCancelReasonInput("");
     } catch (err) {
       console.error("Cancel order error:", err);
       alert(err.response?.data?.message || "Failed to cancel order");
@@ -477,20 +546,25 @@ export default function ManagerPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
+      setApprovingProductId(id);
       const res = await axios.put(
         `${API_BASE_URL}/manager/products/${id}/approve`,
         { action },
         { headers },
       );
-      alert(res.data.message);
       // reload products
       const productsRes = await axios.get(`${API_BASE_URL}/manager/products`, {
         headers,
       });
       setProducts(productsRes.data);
+      if (selectedSubmissionProduct && selectedSubmissionProduct._id === id) {
+        setSelectedSubmissionProduct(null);
+      }
     } catch (err) {
       console.error("Draft action error:", err);
-      alert("Failed to process draft design");
+      alert(err.response?.data?.message || "Failed to process draft design");
+    } finally {
+      setApprovingProductId(null);
     }
   };
 
@@ -793,6 +867,7 @@ export default function ManagerPage() {
       name: styleForm.name,
       path: styleForm.path,
       type: styleForm.name, // style name is used for type
+      sizes: styleForm.sizes && styleForm.sizes.length > 0 ? styleForm.sizes : ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
       gsmPrices: styleForm.gsmPrices,
       colors: styleForm.colors,
     };
@@ -814,6 +889,7 @@ export default function ManagerPage() {
       setStyleForm({
         name: "",
         path: "",
+        sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
         gsmPrices: [
           { gsm: "GSM 180", price: 1200 },
           { gsm: "GSM 220", price: 1500 },
@@ -939,7 +1015,7 @@ export default function ManagerPage() {
 
   // Helper selectors / values
   const pendingDrafts = products.filter(
-    (p) => !p.isApproved && p.status === "Draft",
+    (p) => !p.isApproved && p.status !== "Archived",
   );
   const lowStockItems = inventory.filter(
     (item) => item.quantity <= item.minThreshold,
@@ -1106,22 +1182,20 @@ export default function ManagerPage() {
           <nav className="p-4 space-y-1">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "overview"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "overview"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <BarChart3 className="h-4.5 w-4.5" />
               Dashboard Overview
             </button>
             <button
               onClick={() => setActiveTab("orders")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "orders"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "orders"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <ShoppingCart className="h-4.5 w-4.5" />
@@ -1135,11 +1209,10 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("products")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "products"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "products"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Layers className="h-4.5 w-4.5" />
@@ -1153,22 +1226,20 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("pricing")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "pricing"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "pricing"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <Sparkles className="h-4.5 w-4.5" />
               Pricing Rules
             </button>
             <button
               onClick={() => setActiveTab("inventory")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "inventory"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inventory"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Inbox className="h-4.5 w-4.5" />
@@ -1182,22 +1253,20 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("styles")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "styles"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "styles"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <Layers className="h-4.5 w-4.5" />
               T-Shirt Styles
             </button>
             <button
               onClick={() => setActiveTab("reviews")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "reviews"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "reviews"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <MessageSquare className="h-4.5 w-4.5" />
@@ -1214,11 +1283,10 @@ export default function ManagerPage() {
                 setActiveTab("inquiries");
                 fetchInquiries();
               }}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "inquiries"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "inquiries"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <Mail className="h-4.5 w-4.5" />
@@ -1232,11 +1300,10 @@ export default function ManagerPage() {
             </button>
             <button
               onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                activeTab === "settings"
-                  ? "bg-indigo-600 text-white shadow-lg"
-                  : "hover:bg-slate-800 hover:text-slate-200"
-              }`}
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "settings"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
             >
               <Settings className="h-4.5 w-4.5" />
               Settings & Security
@@ -1248,11 +1315,10 @@ export default function ManagerPage() {
                   setActiveTab("store-preview");
                   setShowStorePreview(true);
                 }}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${
-                  activeTab === "store-preview"
-                    ? "bg-indigo-600 text-white shadow-lg"
-                    : "hover:bg-slate-800 hover:text-slate-200"
-                }`}
+                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "store-preview"
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "hover:bg-slate-800 hover:text-slate-200"
+                  }`}
               >
                 <Award className="h-4.5 w-4.5" />
                 Store Preview
@@ -1379,25 +1445,24 @@ export default function ManagerPage() {
                 <TrendingUp className="h-5 w-5 text-indigo-600" />
                 Live Shop Operations & Active Pipeline
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 py-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 py-2">
                 {[
-                  "Pending Payment",
-                  "Processing",
-                  "Printing",
-                  "Completed",
-                  "Shipped",
-                  "Cancelled",
-                ].map((status, index) => {
-                  const count = orders.filter(
-                    (o) => o.orderStatus === status,
-                  ).length;
+                  { label: "Pending Payment", filter: (o) => isPendingPaymentOrder(o) },
+                  { label: "Processing", filter: (o) => o.orderStatus === "Processing" && !isDeliveredOrder(o) },
+                  { label: "Printing", filter: (o) => o.orderStatus === "Printing" && !isDeliveredOrder(o) },
+                  { label: "Completed", filter: (o) => o.orderStatus === "Completed" && !isDeliveredOrder(o) },
+                  { label: "Shipped", filter: (o) => o.orderStatus === "Shipped" && !isDeliveredOrder(o) },
+                  { label: "Delivered", filter: (o) => isDeliveredOrder(o) },
+                  { label: "Cancelled", filter: (o) => isCancelledOrder(o) },
+                ].map((item, index) => {
+                  const count = orders.filter(item.filter).length;
                   return (
                     <div
-                      key={status}
-                      className="border border-slate-100 rounded-2xl p-4 text-center bg-slate-50/50"
+                      key={item.label}
+                      className="border border-slate-100 rounded-2xl p-3 text-center bg-slate-50/50"
                     >
                       <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                        {status}
+                        {item.label}
                       </span>
                       <p className="text-xl font-black text-slate-900 mt-1">
                         {count}
@@ -1457,45 +1522,71 @@ export default function ManagerPage() {
 
               {/* Pending Employee Designs */}
               <div className="bg-white border rounded-3xl p-6 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-950 mb-4 flex items-center gap-2">
-                  <Award className="h-4.5 w-4.5 text-purple-500" />
-                  Designs Awaiting Approval ({pendingDrafts.length})
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
+                    <Award className="h-4.5 w-4.5 text-purple-500" />
+                    Designs Awaiting Approval ({pendingDrafts.length})
+                  </h3>
+                  {pendingDrafts.length > 0 && (
+                    <button
+                      onClick={() => setActiveTab("products")}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition"
+                    >
+                      <span>Manage All in Products</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
                 {pendingDrafts.length === 0 ? (
                   <div className="text-center py-10">
-                    <p className="text-sm text-slate-500 font-semibold">
-                      All employee submissions approved & active.
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm text-slate-700 font-bold">
+                      All Submissions Reviewed
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      All employee design submissions are approved & active.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                     {pendingDrafts.map((draft) => (
                       <div
                         key={draft._id}
-                        className="flex items-center justify-between border rounded-2xl p-4 hover:bg-slate-50 transition"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between border border-slate-200/90 rounded-2xl p-4 hover:border-purple-200 hover:bg-purple-50/20 transition gap-3"
                       >
                         <div className="flex items-center gap-4">
-                          <TShirt2D
-                            color={draft.colors?.[0]}
-                            designUrl={draft.images?.[0]}
-                            className="h-16 w-16 bg-slate-50 border rounded-xl shrink-0"
-                          />
+                          <div className="w-16 h-16 shrink-0 relative rounded-xl overflow-hidden shadow-2xs border border-slate-200 bg-slate-50">
+                            <Store3DCardPreview
+                              product={draft}
+                              activeColor={draft.colors?.[0] || "#ffffff"}
+                              showControls={false}
+                              hideBadge={true}
+                              className="!h-16 !w-16 !rounded-xl !p-0"
+                              onClick={() => {
+                                setSelectedSubmissionProduct(draft);
+                                setSubmissionSide("front");
+                                setSubmissionZoom(0.85);
+                              }}
+                            />
+                          </div>
                           <div>
                             <p className="text-sm font-bold text-slate-900">
                               {draft.title}
                             </p>
                             <p className="text-[11px] text-slate-500">
                               {draft.category} — Rs.{" "}
-                              {draft.basePrice.toFixed(2)}
+                              {(draft.basePrice || 0).toFixed(2)}
                             </p>
                             {draft.createdBy && (
-                              <span className="text-[9px] text-purple-600 font-extrabold bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-block">
-                                By {draft.createdBy.name || "Employee"}
+                              <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-flex items-center gap-1">
+                                <User className="h-3 w-3 text-purple-500" /> By {draft.createdBy.name || "Employee"}
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
                           <button
                             onClick={() => {
                               setSelectedSubmissionProduct(draft);
@@ -1508,22 +1599,34 @@ export default function ManagerPage() {
                             <span>View 3D</span>
                           </button>
                           <button
+                            disabled={approvingProductId === draft._id}
                             onClick={() =>
                               handleApproveProductDraft(draft._id, "approve")
                             }
-                            className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                             title="Approve & Publish"
                           >
-                            <Check className="h-4 w-4" />
+                            {approvingProductId === draft._id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                            )}
+                            <span>Approve</span>
                           </button>
                           <button
+                            disabled={approvingProductId === draft._id}
                             onClick={() =>
                               handleApproveProductDraft(draft._id, "reject")
                             }
-                            className="p-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                            title="Reject"
+                            className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                            title="Disapprove / Reject"
                           >
-                            <X className="h-4 w-4" />
+                            {approvingProductId === draft._id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                            )}
+                            <span>Disapprove</span>
                           </button>
                         </div>
                       </div>
@@ -1536,493 +1639,944 @@ export default function ManagerPage() {
         )}
 
         {/* ================= TAB 2: ORDERS fulfillment ================= */}
-        {activeTab === "orders" && (
-          <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5 text-indigo-600" />
-                  Customer Orders & Production Pipeline
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Assign staff to orders, monitor production pipeline status, or manage order cancellations.
-                </p>
-              </div>
-              <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold">
-                {orders.length} Total Orders
-              </span>
-            </div>
+        {activeTab === "orders" && (() => {
+          const orderCounts = {
+            all: orders.length,
+            active: orders.filter(isActiveOrder).length,
+            pending_payment: orders.filter(isPendingPaymentOrder).length,
+            delivered: orders.filter(isDeliveredOrder).length,
+            cancelled: orders.filter(isCancelledOrder).length,
+          };
 
-            {orders.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-sm text-slate-500 font-semibold">
-                  No customer orders found in the database.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {orders.map((order) => {
-                  const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
-                  const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
-                  const isCancelled = order.orderStatus === "Cancelled";
-                  const isPendingPayment = order.orderStatus === "Pending Payment";
-                  const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
+          const filteredOrders = orders.filter((order) => {
+            if (orderTabFilter === "active" && !isActiveOrder(order)) return false;
+            if (orderTabFilter === "pending_payment" && !isPendingPaymentOrder(order)) return false;
+            if (orderTabFilter === "delivered" && !isDeliveredOrder(order)) return false;
+            if (orderTabFilter === "cancelled" && !isCancelledOrder(order)) return false;
 
-                  return (
-                    <div
-                      key={order._id}
-                      className="border border-slate-200/90 rounded-2xl p-4 hover:border-indigo-200 transition bg-white shadow-xs space-y-3"
+            if (orderSearchQuery.trim()) {
+              const q = orderSearchQuery.toLowerCase().trim();
+              const orderIdMatch = (order._id || "").toLowerCase().includes(q) || (order._id || "").slice(-8).toLowerCase().includes(q);
+              const custName = (order.customerId?.name || "").toLowerCase();
+              const custEmail = ((typeof order.customerId === "object" ? order.customerId?.email : "") || order.guestEmail || "").toLowerCase();
+              const custPhone = (order.shippingAddress?.phone || order.customerId?.phone || "").toLowerCase();
+              const city = (order.shippingAddress?.city || order.shippingAddress?.street || "").toLowerCase();
+              const itemsMatch = (order.items || []).some((it) =>
+                (it.tShirtStyle || "").toLowerCase().includes(q) ||
+                (it.itemType || "").toLowerCase().includes(q) ||
+                (it.selectedColor || it.color || "").toLowerCase().includes(q) ||
+                (it.selectedSize || it.size || "").toLowerCase().includes(q)
+              );
+              return orderIdMatch || custName.includes(q) || custEmail.includes(q) || custPhone.includes(q) || city.includes(q) || itemsMatch;
+            }
+
+            return true;
+          });
+
+          return (
+            <div className="bg-white border rounded-3xl p-6 shadow-sm space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-indigo-600" />
+                    Customer Orders & Production Pipeline
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Filter by active, payment pending, delivered, or canceled orders. Assign staff and manage production workflow.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5" />
+                    {orders.length} Total Orders
+                  </span>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search Bar */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                {/* Status Filter Tabs */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                  {[
+                    { id: "all", label: "All Orders", count: orderCounts.all },
+                    { id: "active", label: "Active Orders", count: orderCounts.active },
+                    { id: "pending_payment", label: "Payment Pending", count: orderCounts.pending_payment },
+                    { id: "delivered", label: "Delivered Orders", count: orderCounts.delivered },
+                    { id: "cancelled", label: "Canceled Orders", count: orderCounts.cancelled },
+                  ].map((tab) => {
+                    const isActive = orderTabFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setOrderTabFilter(tab.id)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
+                          isActive
+                            ? "bg-slate-950 text-white shadow-xs"
+                            : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70"
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span
+                          className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                            isActive
+                              ? "bg-white/20 text-white"
+                              : "bg-white text-slate-700 border border-slate-200"
+                          }`}
+                        >
+                          {tab.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Search Box */}
+                <div className="relative min-w-[240px] md:w-72">
+                  <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search order #, customer, item..."
+                    value={orderSearchQuery}
+                    onChange={(e) => setOrderSearchQuery(e.target.value)}
+                    className="w-full text-xs pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
+                  />
+                  {orderSearchQuery && (
+                    <button
+                      onClick={() => setOrderSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                      title="Clear search"
                     >
-                      {/* Compact Order Header */}
-                      <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
-                        <div className="flex items-center flex-wrap gap-2">
-                          <span className="text-xs font-black text-slate-900">
-                            Order <span className="font-mono text-indigo-600 font-bold">#{order._id.slice(-8)}</span>
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                              order.paymentStatus === "Paid"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border border-amber-200"
-                            }`}
-                          >
-                            {order.paymentStatus}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                              isCancelled
-                                ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : order.orderStatus === "Printing"
-                                ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                : order.orderStatus === "Processing"
-                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                : "bg-slate-100 text-slate-700 border border-slate-200"
-                            }`}
-                          >
-                            {order.orderStatus}
-                          </span>
-                          <span className="text-slate-300">|</span>
-                          <span className="text-xs text-slate-600 font-medium">
-                            <span className="font-bold text-slate-900">
-                              {order.customerId?.name ||
-                                (typeof order.customerId === "object" && order.customerId?.email) ||
-                                order.guestEmail ||
-                                "Customer"}
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Order List / Empty States */}
+              {orders.length === 0 ? (
+                <div className="text-center py-16 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                  <Package className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600 font-bold">No customer orders found in the database.</p>
+                </div>
+              ) : filteredOrders.length === 0 ? (
+                <div className="text-center py-14 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                  <Filter className="h-9 w-9 text-slate-300 mx-auto" />
+                  <div>
+                    <p className="text-sm text-slate-700 font-bold">No orders match the selected filter.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Try switching filter tabs or clearing your search query.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setOrderTabFilter("all");
+                      setOrderSearchQuery("");
+                    }}
+                    className="px-3.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredOrders.map((order) => {
+                    const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
+                    const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
+                    const isCancelled = isCancelledOrder(order);
+                    const isPendingPayment = isPendingPaymentOrder(order);
+                    const isDelivered = isDeliveredOrder(order);
+                    const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
+
+                    return (
+                      <div
+                        key={order._id}
+                        className="border border-slate-200/90 rounded-2xl p-4 hover:border-indigo-200 transition bg-white shadow-xs space-y-3"
+                      >
+                        {/* Compact Order Header */}
+                        <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <span className="text-xs font-black text-slate-900">
+                              Order <span className="font-mono text-indigo-600 font-bold">#{order._id.slice(-8)}</span>
                             </span>
-                            {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
-                              <span className="text-slate-400 font-normal ml-1">
-                                ({order.customerId?.email || order.guestEmail})
+
+                            {/* Payment Status Badge */}
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                order.paymentStatus === "Paid"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                              }`}
+                            >
+                              {order.paymentStatus || "Pending"}
+                            </span>
+
+                            {/* Order Status Badge */}
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1 ${
+                                isCancelled
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : isDelivered
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : isPendingPayment
+                                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                      : order.orderStatus === "Completed" || order.orderStatus === "Shipped"
+                                        ? "bg-sky-50 text-sky-700 border border-sky-200"
+                                        : order.orderStatus === "Printing"
+                                          ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                          : order.orderStatus === "Processing"
+                                            ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                            : "bg-slate-100 text-slate-700 border border-slate-200"
+                              }`}
+                            >
+                              {isDelivered && <CheckCircle2 className="h-3 w-3 text-emerald-600" />}
+                              {isCancelled && <Ban className="h-3 w-3 text-rose-500" />}
+                              <span>{isDelivered ? "Delivered (Collected)" : order.orderStatus}</span>
+                            </span>
+
+                            <span className="text-slate-300">|</span>
+                            <span className="text-xs text-slate-600 font-medium">
+                              <span className="font-bold text-slate-900">
+                                {order.customerId?.name ||
+                                  (typeof order.customerId === "object" && order.customerId?.email) ||
+                                  order.guestEmail ||
+                                  "Customer"}
                               </span>
-                            ) : null}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-slate-400 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {new Date(order.createdAt).toLocaleDateString()}
-                          </span>
-                          <span className="text-base font-black text-slate-950">
-                            Rs. {(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Main Section: Compact Sidebar Meta Info + Wide 3D Views & Items */}
-                      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3 items-start">
-                        {/* Left Sidebar: Shipping & Assigned Employee */}
-                        <div className="space-y-2.5">
-                          {/* Shipping Destination */}
-                          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1">
-                            <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
-                              Shipping Destination
+                              {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
+                                <span className="text-slate-400 font-normal ml-1">
+                                  ({order.customerId?.email || order.guestEmail})
+                                </span>
+                              ) : null}
                             </span>
-                            {order.shippingAddress ? (
-                              <p className="text-xs text-slate-700 font-medium leading-tight">
-                                {order.shippingAddress.street ? `${order.shippingAddress.street}, ` : ""}
-                                {order.shippingAddress.city ? `${order.shippingAddress.city}, ` : ""}
-                                {order.shippingAddress.country || "Sri Lanka"}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-slate-400 italic">Address not specified</p>
-                            )}
                           </div>
 
-                          {/* Employee Assignment */}
-                          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5">
-                            <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
-                              Assigned Operator
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(order.createdAt).toLocaleDateString()}
                             </span>
-                            {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="h-6 w-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
-                                    {order.assignedEmployee.name ? order.assignedEmployee.name.charAt(0).toUpperCase() : "E"}
-                                  </div>
-                                  <span className="text-xs font-bold text-slate-900 truncate">
-                                    {order.assignedEmployee.name}
-                                  </span>
-                                </div>
+                            <span className="text-base font-black text-slate-950">
+                              Rs. {(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
 
-                                {!isCancelled && order.orderStatus !== "Shipped" && (
-                                  <button
-                                    onClick={() => {
-                                      setEditingEmployeeOrderId(order._id);
-                                      setSelectedEmployeeForOrder((prev) => ({
-                                        ...prev,
-                                        [order._id]: order.assignedEmployee?._id || "",
-                                      }));
-                                    }}
-                                    className="px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition flex items-center gap-1 shrink-0 cursor-pointer bg-white"
-                                    title="Edit assigned employee"
-                                  >
-                                    <Edit2 className="h-2.5 w-2.5 text-indigo-600" />
-                                    <span>Edit</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <div>
-                                {editingEmployeeOrderId === order._id ? (
-                                  <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1">
+                        {/* Main Section: Compact Sidebar Meta Info + Wide 3D Views & Items */}
+                        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3 items-start">
+                          {/* Left Sidebar: Shipping & Assigned Employee */}
+                          <div className="space-y-2.5">
+                            {/* Shipping Destination */}
+                            <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1">
+                              <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
+                                Shipping Destination
+                              </span>
+                              {order.shippingAddress ? (
+                                <p className="text-xs text-slate-700 font-medium leading-tight">
+                                  {order.shippingAddress.street ? `${order.shippingAddress.street}, ` : ""}
+                                  {order.shippingAddress.city ? `${order.shippingAddress.city}, ` : ""}
+                                  {order.shippingAddress.country || "Sri Lanka"}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-slate-400 italic">Address not specified</p>
+                              )}
+                            </div>
+
+                            {/* Employee Assignment */}
+                            <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-1.5">
+                              <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">
+                                Assigned Operator
+                              </span>
+                              {order.assignedEmployee && editingEmployeeOrderId !== order._id ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="h-6 w-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                                      {order.assignedEmployee.name ? order.assignedEmployee.name.charAt(0).toUpperCase() : "E"}
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-900 truncate">
+                                      {order.assignedEmployee.name}
+                                    </span>
+                                  </div>
+
+                                  {!isCancelled && !isDelivered && order.orderStatus !== "Shipped" && (
+                                    <button
+                                      onClick={() => {
+                                        setEditingEmployeeOrderId(order._id);
+                                        setSelectedEmployeeForOrder((prev) => ({
+                                          ...prev,
+                                          [order._id]: order.assignedEmployee?._id || "",
+                                        }));
+                                      }}
+                                      className="px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition flex items-center gap-1 shrink-0 cursor-pointer bg-white"
+                                      title="Edit assigned employee"
+                                    >
+                                      <Edit2 className="h-2.5 w-2.5 text-indigo-600" />
+                                      <span>Edit</span>
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div>
+                                  {editingEmployeeOrderId === order._id ? (
+                                    <div className="space-y-1.5">
+                                      <div className="flex items-center gap-1">
+                                        <select
+                                          value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
+                                          onChange={(e) =>
+                                            setSelectedEmployeeForOrder((prev) => ({
+                                              ...prev,
+                                              [order._id]: e.target.value,
+                                            }))
+                                          }
+                                          className="flex-1 text-[11px] border border-slate-300 rounded-lg px-2 py-1 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                        >
+                                          <option value="">-- Select Employee --</option>
+                                          {employees.map((emp) => (
+                                            <option key={emp._id} value={emp._id}>
+                                              {emp.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
+                                          onClick={() => {
+                                            const empId = selectedEmployeeForOrder[order._id];
+                                            if (empId) {
+                                              handleAssignEmployee(order._id, empId);
+                                            }
+                                          }}
+                                          className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                        >
+                                          {assignLoading[order._id] ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Check className="h-3 w-3" />
+                                          )}
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingEmployeeOrderId(null)}
+                                          className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1">
                                       <select
-                                        value={selectedEmployeeForOrder[order._id] || order.assignedEmployee?._id || ""}
-                                        onChange={(e) =>
-                                          setSelectedEmployeeForOrder((prev) => ({
-                                            ...prev,
-                                            [order._id]: e.target.value,
-                                          }))
-                                        }
-                                        className="flex-1 text-[11px] border border-slate-300 rounded-lg px-2 py-1 bg-white font-medium focus:outline-none focus:border-indigo-500"
+                                        disabled={assignLoading[order._id] || isCancelled || isDelivered}
+                                        onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
+                                        defaultValue=""
+                                        className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white font-medium text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-50"
                                       >
-                                        <option value="">-- Select Employee --</option>
+                                        <option value="" disabled>
+                                          -- Assign staff --
+                                        </option>
                                         {employees.map((emp) => (
                                           <option key={emp._id} value={emp._id}>
                                             {emp.name}
                                           </option>
                                         ))}
                                       </select>
-                                      <button
-                                        disabled={assignLoading[order._id] || !selectedEmployeeForOrder[order._id]}
-                                        onClick={() => {
-                                          const empId = selectedEmployeeForOrder[order._id];
-                                          if (empId) {
-                                            handleAssignEmployee(order._id, empId);
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                      >
-                                        {assignLoading[order._id] ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                          <Check className="h-3 w-3" />
-                                        )}
-                                      </button>
-                                      <button
-                                        onClick={() => setEditingEmployeeOrderId(null)}
-                                        className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
+                                      {!order.assignedEmployee && !isCancelled && !isDelivered && (
+                                        <p className="text-[9px] text-amber-600 font-semibold flex items-center gap-1">
+                                          <AlertCircle className="h-2.5 w-2.5 shrink-0" />
+                                          No staff assigned
+                                        </p>
+                                      )}
                                     </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right Area: Items List with Small 3D Views */}
+                          <div className="space-y-2">
+                            {order.items.map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-white p-2.5 border border-slate-200/90 rounded-xl space-y-2"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-black text-slate-900 text-xs">
+                                      {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                      Size: <span className="font-bold text-slate-800">{item.selectedSize || item.size}</span> |
+                                      Color: <span className="font-bold text-slate-800">{resolveColorName(item.selectedColor || item.color)}</span> |
+                                      GSM: <span className="font-bold text-slate-800">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
+                                    </span>
                                   </div>
-                                ) : (
-                                  <div className="space-y-1">
-                                    <select
-                                      disabled={assignLoading[order._id] || isCancelled}
-                                      onChange={(e) => handleAssignEmployee(order._id, e.target.value)}
-                                      defaultValue=""
-                                      className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white font-medium text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                                    >
-                                      <option value="" disabled>
-                                        -- Assign staff --
-                                      </option>
-                                      {employees.map((emp) => (
-                                        <option key={emp._id} value={emp._id}>
-                                          {emp.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <p className="text-[9px] text-amber-600 font-semibold flex items-center gap-1">
-                                      <AlertCircle className="h-2.5 w-2.5 shrink-0" />
-                                      No staff assigned
-                                    </p>
-                                  </div>
-                                )}
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${item.itemType === "Customized" || item.designId
+                                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                    }`}>
+                                    {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog"}
+                                  </span>
+                                </div>
+
+                                {/* Multi-Angle 3D View Small Thumbnails */}
+                                <DesignScreenshotViewer
+                                  item={item}
+                                  orderId={order._id}
+                                  onOpen3DModal={(designToOpen) => {
+                                    setSelected3DDesign(designToOpen);
+                                    setIs3DModalOpen(true);
+                                  }}
+                                />
                               </div>
-                            )}
+                            ))}
                           </div>
                         </div>
 
-                        {/* Right Area: Items List with Small 3D Views */}
-                        <div className="space-y-2">
-                          {order.items.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-white p-2.5 border border-slate-200/90 rounded-xl space-y-2"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-black text-slate-900 text-xs">
-                                    {item.tShirtStyle || (item.itemType ? `${item.itemType} T-shirt` : "T-Shirt")} (x{item.quantity})
-                                  </span>
-                                  <span className="text-[10px] text-slate-500 font-medium">
-                                    Size: <span className="font-bold text-slate-800">{item.selectedSize || item.size}</span> | 
-                                    Color: <span className="font-bold text-slate-800">{resolveColorName(item.selectedColor || item.color)}</span> | 
-                                    GSM: <span className="font-bold text-slate-800">{formatGsm(item.gsm || item.material || "GSM 180")}</span>
-                                  </span>
-                                </div>
-                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                  item.itemType === "Customized" || item.designId
-                                    ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                    : "bg-blue-50 text-blue-700 border border-blue-200"
-                                }`}>
-                                  {item.itemType === "Customized" || item.designId ? "Custom Print" : "Catalog"}
-                                </span>
-                              </div>
-
-                              {/* Multi-Angle 3D View Small Thumbnails */}
-                              <DesignScreenshotViewer
-                                item={item}
-                                orderId={order._id}
-                                onOpen3DModal={(designToOpen) => {
-                                  setSelected3DDesign(designToOpen);
-                                  setIs3DModalOpen(true);
-                                }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Compact Bottom Footer: Status Stepper & Cancel Action */}
-                      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                            Status:
-                          </span>
-
-                          {isCancelled ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-[11px] font-bold">
-                              <Ban className="h-3 w-3 text-rose-500 shrink-0" />
-                              Order Cancelled
+                        {/* Compact Bottom Footer: Status Stepper & Cancel Action */}
+                        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                              Status:
                             </span>
-                          ) : isPendingPayment ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-[11px] font-bold">
-                              <Clock className="h-3 w-3 text-amber-500 shrink-0" />
-                              Awaiting Customer Payment
-                            </span>
-                          ) : (
-                            <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-                              {pipelineStages.map((stage, sIdx) => {
-                                const isPassed = currentStageIdx > sIdx;
-                                const isCurrent = currentStageIdx === sIdx;
 
-                                return (
-                                  <div key={stage} className="flex items-center shrink-0">
-                                    <div
-                                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
-                                        isCurrent
+                            {isCancelled ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-[11px] font-bold">
+                                <Ban className="h-3 w-3 text-rose-500 shrink-0" />
+                                Order Cancelled
+                              </span>
+                            ) : isDelivered ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-[11px] font-bold">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                <span>Order Delivered & Collected by Customer</span>
+                                {order.collectedAt && (
+                                  <span className="text-[10px] font-normal text-emerald-600 ml-1">
+                                    ({new Date(order.collectedAt).toLocaleDateString()})
+                                  </span>
+                                )}
+                              </span>
+                            ) : isPendingPayment ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-[11px] font-bold">
+                                <Clock className="h-3 w-3 text-amber-500 shrink-0" />
+                                Awaiting Customer Payment
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+                                {pipelineStages.map((stage, sIdx) => {
+                                  const isPassed = currentStageIdx > sIdx;
+                                  const isCurrent = currentStageIdx === sIdx;
+
+                                  return (
+                                    <div key={stage} className="flex items-center shrink-0">
+                                      <div
+                                        className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition ${isCurrent
                                           ? "bg-indigo-600 text-white shadow-2xs font-black"
                                           : isPassed
-                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                          : "bg-slate-100 text-slate-400 border border-slate-200"
-                                      }`}
-                                    >
-                                      {isPassed ? (
-                                        <Check className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
-                                      ) : isCurrent ? (
-                                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping shrink-0" />
-                                      ) : (
-                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-300 shrink-0" />
+                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                            : "bg-slate-100 text-slate-400 border border-slate-200"
+                                          }`}
+                                      >
+                                        {isPassed ? (
+                                          <Check className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                        ) : isCurrent ? (
+                                          <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping shrink-0" />
+                                        ) : (
+                                          <span className="h-1.5 w-1.5 rounded-full bg-slate-300 shrink-0" />
+                                        )}
+                                        <span>{stage}</span>
+                                      </div>
+                                      {sIdx < pipelineStages.length - 1 && (
+                                        <div
+                                          className={`w-2 h-0.5 mx-0.5 transition ${isPassed ? "bg-emerald-400" : "bg-slate-200"
+                                            }`}
+                                        />
                                       )}
-                                      <span>{stage}</span>
                                     </div>
-                                    {sIdx < pipelineStages.length - 1 && (
-                                      <div
-                                        className={`w-2 h-0.5 mx-0.5 transition ${
-                                          isPassed ? "bg-emerald-400" : "bg-slate-200"
-                                        }`}
-                                      />
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                                  );
+                                })}
+                              </div>
+                            )}
 
-                          {latestTimeline?.note && (
-                            <span className="text-[10px] text-slate-400 italic truncate max-w-xs">
-                              ({latestTimeline.note})
-                            </span>
-                          )}
-                        </div>
+                            {latestTimeline?.note && (
+                              <span className="text-[10px] text-slate-400 italic truncate max-w-xs">
+                                ({latestTimeline.note})
+                              </span>
+                            )}
+                          </div>
 
-                        {/* Actions */}
-                        <div className="shrink-0">
-                          {!isCancelled && order.orderStatus !== "Shipped" ? (
-                            <button
-                              disabled={assignLoading[order._id]}
-                              onClick={() => handleCancelOrder(order._id)}
-                              className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                              title="Cancel this order"
-                            >
-                              {assignLoading[order._id] ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Ban className="h-3 w-3" />
-                              )}
-                              <span>Cancel</span>
-                            </button>
-                          ) : null}
+                          {/* Actions */}
+                          <div className="shrink-0">
+                            {!isCancelled && !isDelivered && order.orderStatus !== "Shipped" ? (
+                              <button
+                                disabled={assignLoading[order._id]}
+                                onClick={() => openCancelOrderModal(order)}
+                                className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 text-rose-600 rounded-lg text-[10px] font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                title="Cancel this order"
+                              >
+                                {assignLoading[order._id] ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Ban className="h-3 w-3" />
+                                )}
+                                <span>Cancel</span>
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
-        {/* ================= TAB 3: PRODUCT CATALOG ================= */}
+        {/* ================= TAB 3: PRODUCT CATALOG & SUBMISSIONS ================= */}
         {activeTab === "products" && (
           <div className="space-y-8">
-            {/* Catalog Grid */}
+            {/* Header */}
             <div className="bg-white border rounded-3xl p-6 shadow-sm">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                    <Layers className="h-5 w-5 text-indigo-600" />
-                    Product Catalog & Categories
-                  </h3>
+              <div>
+                <h3 className="text-xl font-black text-slate-950 flex items-center gap-2.5">
+                  <Layers className="h-6 w-6 text-indigo-600" />
+                  Products & Design Submissions
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Review employee design submissions, approve or disapprove designs, and manage the live product catalog.
+                </p>
+              </div>
+            </div>
+
+            {/* SECTION 1: EMPLOYEE SUBMISSIONS & PENDING APPROVALS SHOWCASE */}
+            <div className="bg-white border rounded-3xl p-6 sm:p-7 shadow-sm space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
+                    <Award className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-base font-black text-slate-900">
+                        Employee Design Submissions
+                      </h4>
+                      {pendingDrafts.length > 0 ? (
+                        <span className="px-2.5 py-0.5 bg-purple-100 text-purple-700 font-black text-xs rounded-full animate-pulse">
+                          {pendingDrafts.length} Pending Review
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> All Reviewed
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Designs created by staff members that require manager approval before being published to the store.
+                    </p>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setEditingProduct(null);
-                    resetProductForm();
-                    setShowProductModal(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Product
-                </button>
               </div>
 
-              {products.length === 0 ? (
-                <div className="text-center py-16">
-                  <p className="text-sm text-slate-500 font-semibold">
-                    No catalog products loaded.
+              {pendingDrafts.length === 0 ? (
+                <div className="text-center py-10 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 p-8">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 border border-emerald-100">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800">
+                    All Employee Submissions Reviewed
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    There are currently no staff design concepts waiting for your approval. New submissions will appear here automatically.
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                        <th className="pb-3">Title</th>
-                        <th className="pb-3">Category</th>
-                        <th className="pb-3">Price</th>
-                        <th className="pb-3">Discount</th>
-                        <th className="pb-3">Sizes</th>
-                        <th className="pb-3">GSMs</th>
-                        <th className="pb-3">Status</th>
-                        <th className="pb-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((p) => (
-                        <tr
-                          key={p._id}
-                          className="border-b last:border-b-0 hover:bg-slate-50/50 transition"
-                        >
-                          <td className="py-4 font-bold text-slate-900">
-                            <div className="flex items-center gap-3">
-                              <TShirt2D
-                                color={p.colors?.[0]}
-                                designUrl={p.images?.[0]}
-                                className="h-10 w-10 bg-slate-50 border rounded-lg shrink-0"
-                              />
-                              <div>
-                                <p>{p.title}</p>
-                                {!p.isApproved && (
-                                  <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[8px] font-black rounded-full uppercase mt-1 inline-block">
-                                    Awaiting Approval
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 text-xs text-slate-600">
-                            {p.category}
-                          </td>
-                          <td className="py-4 text-xs font-bold text-slate-900">
-                            Rs. {(p.basePrice || 0).toFixed(2)}
-                          </td>
-                          <td className="py-4 text-xs">
-                            {p.discount > 0 ? (
-                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-bold">
-                                {p.discount}% Off
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                  {pendingDrafts.map((draft) => (
+                    <div
+                      key={draft._id}
+                      className="border border-slate-200/90 hover:border-purple-300 rounded-2xl p-5 bg-white shadow-xs hover:shadow-md transition flex flex-col justify-between space-y-4 group"
+                    >
+                      {/* Top info */}
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                            {draft.category || "T-Shirts"}
+                          </span>
+                          <span className="text-xs font-black text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
+                            Rs. {(draft.basePrice || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        {/* 3D Frozen T-Shirt Card Preview like in Store */}
+                        <div className="relative rounded-2xl overflow-hidden shadow-xs border border-slate-100">
+                          <Store3DCardPreview
+                            product={draft}
+                            activeColor={draft.colors?.[0] || "#ffffff"}
+                            onClick={() => {
+                              setSelectedSubmissionProduct(draft);
+                              setSubmissionSide("front");
+                              setSubmissionZoom(0.85);
+                            }}
+                          />
+                        </div>
+
+                        {/* Details */}
+                        <div>
+                          <h5 className="font-bold text-slate-900 text-sm line-clamp-1">
+                            {draft.title}
+                          </h5>
+                          {draft.description && (
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                              {draft.description}
+                            </p>
+                          )}
+                          <div className="flex items-center flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100">
+                            {draft.createdBy && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md">
+                                <User className="h-3 w-3" />
+                                {draft.createdBy.name || "Employee"}
                               </span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
                             )}
-                          </td>
-                          <td className="py-4 text-xs text-slate-500">
-                            {(p.sizes || []).join(", ")}
-                          </td>
-                          <td className="py-4 text-xs font-medium text-slate-700">
-                            {(() => {
-                              if (p.gsms && p.gsms.length > 0) {
-                                return p.gsms.join(", ");
-                              }
-                              const matchedStyle = styles.find((s) => s.path === p.modelPath);
-                              if (matchedStyle) {
-                                if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
-                                  return matchedStyle.gsmPrices.map((gp) => gp.gsm).join(", ");
-                                }
-                                if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
-                                  return matchedStyle.gsms.join(", ");
-                                }
-                              }
-                              return "GSM 180";
-                            })()}
-                          </td>
-                          <td className="py-4 text-xs">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                                p.status === "Active"
-                                  ? "bg-emerald-50 text-emerald-600"
-                                  : "bg-slate-100 text-slate-600"
-                              }`}
-                            >
-                              {p.status}
-                            </span>
-                          </td>
-                          <td className="py-4 text-right space-x-2">
-                            <button
-                              onClick={() => openEditProduct(p)}
-                              className="inline-flex items-center p-1.5 rounded-lg border hover:bg-slate-50 transition"
-                            >
-                              <Edit2 className="h-3.5 w-3.5 text-slate-500" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteProduct(p._id)}
-                              className="inline-flex items-center p-1.5 rounded-lg border border-red-50 text-red-500 hover:bg-red-50 transition"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            {draft.sizes && draft.sizes.length > 0 && (
+                              <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">
+                                Sizes: {draft.sizes.join(", ")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CLEAR APPROVE & DISAPPROVE BUTTONS */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <button
+                          disabled={approvingProductId === draft._id}
+                          onClick={() =>
+                            handleApproveProductDraft(draft._id, "approve")
+                          }
+                          className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-sm hover:shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          title="Approve submission and publish to live store"
+                        >
+                          {approvingProductId === draft._id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4 stroke-[2.5]" />
+                          )}
+                          <span>Approve & Publish</span>
+                        </button>
+                        <button
+                          disabled={approvingProductId === draft._id}
+                          onClick={() =>
+                            handleApproveProductDraft(draft._id, "reject")
+                          }
+                          className="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition shadow-sm hover:shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          title="Disapprove / Reject submission"
+                        >
+                          {approvingProductId === draft._id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <X className="h-4 w-4 stroke-[2.5]" />
+                          )}
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
+            </div>
+
+            {/* SECTION 2: COMPLETE CATALOG & SUBMISSIONS TABLE */}
+            <div className="bg-white border rounded-3xl p-6 sm:p-7 shadow-sm space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                    <Package className="h-5 w-5 text-indigo-600" />
+                    Live Products & Submissions Directory
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Filter by status, search items, and perform instant approvals or edits.
+                  </p>
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs">
+                  <button
+                    onClick={() => setProductTabFilter("all")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "all"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                      }`}
+                  >
+                    All ({products.length})
+                  </button>
+                  <button
+                    onClick={() => setProductTabFilter("pending")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${productTabFilter === "pending"
+                      ? "bg-purple-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                      }`}
+                  >
+                    <span>Pending</span>
+                    {pendingDrafts.length > 0 && (
+                      <span className="px-1.5 py-0.2 bg-purple-200 text-purple-900 rounded-full text-[10px] font-black">
+                        {pendingDrafts.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setProductTabFilter("approved")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "approved"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                      }`}
+                  >
+                    Approved ({products.filter((p) => p.isApproved).length})
+                  </button>
+                  <button
+                    onClick={() => setProductTabFilter("archived")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${productTabFilter === "archived"
+                      ? "bg-rose-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                      }`}
+                  >
+                    Disapproved ({products.filter((p) => p.status === "Archived" || (!p.isApproved && p.status !== "Draft")).length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search products by title, category, or creator name..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+              </div>
+
+              {/* Filtered Products Table */}
+              {(() => {
+                const filteredProducts = products.filter((p) => {
+                  if (productTabFilter === "pending") {
+                    if (p.isApproved || p.status === "Archived") return false;
+                  } else if (productTabFilter === "approved") {
+                    if (!p.isApproved) return false;
+                  } else if (productTabFilter === "archived") {
+                    if (p.status !== "Archived" && (p.isApproved || p.status === "Draft")) return false;
+                  }
+
+                  if (productSearchQuery.trim()) {
+                    const q = productSearchQuery.toLowerCase();
+                    const matchTitle = (p.title || "").toLowerCase().includes(q);
+                    const matchCat = (p.category || "").toLowerCase().includes(q);
+                    const matchCreator = (p.createdBy?.name || "").toLowerCase().includes(q);
+                    if (!matchTitle && !matchCat && !matchCreator) return false;
+                  }
+
+                  return true;
+                });
+
+                if (filteredProducts.length === 0) {
+                  return (
+                    <div className="text-center py-16">
+                      <p className="text-sm text-slate-500 font-semibold">
+                        No products match the selected criteria.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                          <th className="pb-3">Product / Design</th>
+                          <th className="pb-3">Category</th>
+                          <th className="pb-3">Price</th>
+                          <th className="pb-3">Discount</th>
+                          <th className="pb-3">Sizes & GSM</th>
+                          <th className="pb-3">Approval Status</th>
+                          <th className="pb-3 text-right">Review & Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredProducts.map((p) => {
+                          const isPending = !p.isApproved && p.status !== "Archived";
+                          const isDisapproved = p.status === "Archived";
+                          const isApproved = p.isApproved;
+
+                          return (
+                            <tr
+                              key={p._id}
+                              className="border-b last:border-b-0 hover:bg-slate-50/70 transition"
+                            >
+                              <td className="py-4 font-bold text-slate-900">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-12 h-12 shrink-0 relative rounded-xl overflow-hidden shadow-2xs border border-slate-200 bg-slate-50">
+                                    <Store3DCardPreview
+                                      product={p}
+                                      activeColor={p.colors?.[0] || "#ffffff"}
+                                      showControls={false}
+                                      hideBadge={true}
+                                      className="!h-12 !w-12 !rounded-xl !p-0"
+                                      onClick={() => {
+                                        setSelectedSubmissionProduct(p);
+                                        setSubmissionSide("front");
+                                        setSubmissionZoom(0.85);
+                                      }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm">{p.title}</p>
+                                    {p.createdBy && (
+                                      <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full mt-0.5 inline-flex items-center gap-1">
+                                        <User className="h-3 w-3" /> By {p.createdBy.name || "Employee"}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-4 text-xs text-slate-600 font-medium">
+                                {p.category}
+                              </td>
+                              <td className="py-4 text-xs font-black text-slate-900">
+                                Rs. {(p.basePrice || 0).toFixed(2)}
+                              </td>
+                              <td className="py-4 text-xs">
+                                {p.discount > 0 ? (
+                                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-bold">
+                                    {p.discount}% Off
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
+                              </td>
+                              <td className="py-4 text-xs text-slate-500">
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold text-slate-700">{(p.sizes || []).join(", ") || "All Sizes"}</p>
+                                  <p className="text-[11px] text-slate-400">
+                                    {(() => {
+                                      if (p.gsms && p.gsms.length > 0) {
+                                        return p.gsms.join(", ");
+                                      }
+                                      const matchedStyle = styles.find((s) => s.path === p.modelPath);
+                                      if (matchedStyle) {
+                                        if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+                                          return matchedStyle.gsmPrices.map((gp) => gp.gsm).join(", ");
+                                        }
+                                        if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+                                          return matchedStyle.gsms.join(", ");
+                                        }
+                                      }
+                                      return "GSM 180";
+                                    })()}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="py-4 text-xs">
+                                {isApproved ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-bold">
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Approved & Live
+                                  </span>
+                                ) : isPending ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[11px] font-bold animate-pulse">
+                                    <Clock className="h-3.5 w-3.5" /> Pending Review
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[11px] font-bold">
+                                    <Ban className="h-3.5 w-3.5" /> Disapproved
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* CLEAR APPROVE & DISAPPROVE BUTTONS IN TABLE */}
+                                  {!isApproved && (
+                                    <button
+                                      disabled={approvingProductId === p._id}
+                                      onClick={() => handleApproveProductDraft(p._id, "approve")}
+                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      title="Approve & Publish to Store"
+                                    >
+                                      {approvingProductId === p._id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                                      )}
+                                      <span>Approve</span>
+                                    </button>
+                                  )}
+
+                                  {isApproved ? (
+                                    <button
+                                      disabled={approvingProductId === p._id}
+                                      onClick={() => handleApproveProductDraft(p._id, "reject")}
+                                      className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      title="Revoke Approval / Disapprove"
+                                    >
+                                      {approvingProductId === p._id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <X className="h-3.5 w-3.5 stroke-[2]" />
+                                      )}
+                                      <span>Disapprove</span>
+                                    </button>
+                                  ) : !isDisapproved ? (
+                                    <button
+                                      disabled={approvingProductId === p._id}
+                                      onClick={() => handleApproveProductDraft(p._id, "reject")}
+                                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      title="Disapprove / Reject"
+                                    >
+                                      {approvingProductId === p._id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                                      )}
+                                      <span>Disapprove</span>
+                                    </button>
+                                  ) : null}
+
+                                  {/* 3D Preview */}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedSubmissionProduct(p);
+                                      setSubmissionSide("front");
+                                      setSubmissionZoom(0.85);
+                                    }}
+                                    className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition"
+                                    title="Inspect in 3D"
+                                  >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                  </button>
+
+                                  {/* Edit */}
+                                  <button
+                                    onClick={() => openEditProduct(p)}
+                                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600"
+                                    title="Edit Product Details"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </button>
+
+                                  {/* Delete */}
+                                  <button
+                                    onClick={() => handleDeleteProduct(p._id)}
+                                    className="p-1.5 border border-rose-100 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                    title="Delete Product"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Product Create/Edit Modal */}
@@ -2253,11 +2807,10 @@ export default function ManagerPage() {
                           return (
                             <label
                               key={size}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
-                                isSelected
-                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
-                                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                              }`}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
+                                ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
+                                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                }`}
                             >
                               <input
                                 type="checkbox"
@@ -2309,11 +2862,10 @@ export default function ManagerPage() {
                             return (
                               <label
                                 key={gsm}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
-                                  isSelected
-                                    ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
-                                    : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                                }`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
+                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
+                                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                  }`}
                               >
                                 <input
                                   type="checkbox"
@@ -2353,11 +2905,11 @@ export default function ManagerPage() {
                           let availableStyleColors = matchedStyle && matchedStyle.colors && matchedStyle.colors.length > 0
                             ? matchedStyle.colors
                             : [
-                                { name: "White", value: "#ffffff" },
-                                { name: "Black", value: "#111827" },
-                                { name: "Navy Blue", value: "#1e3a8a" },
-                                { name: "Red", value: "#dc2626" },
-                              ];
+                              { name: "White", value: "#ffffff" },
+                              { name: "Black", value: "#111827" },
+                              { name: "Navy Blue", value: "#1e3a8a" },
+                              { name: "Red", value: "#dc2626" },
+                            ];
 
                           return availableStyleColors.map((cObj) => {
                             const hexVal = typeof cObj === "string" ? cObj : cObj.value;
@@ -2389,11 +2941,10 @@ export default function ManagerPage() {
                                     };
                                   });
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${
-                                  isSelected
-                                    ? "bg-slate-900 border-slate-900 text-white shadow-xs"
-                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                                }`}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer select-none ${isSelected
+                                  ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                  }`}
                               >
                                 <span
                                   className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
@@ -2797,8 +3348,8 @@ export default function ManagerPage() {
                     itemType: inventoryCategoryFilter === "INK"
                       ? "Printing Ink"
                       : inventoryCategoryFilter === "PAPERS_PACKAGING"
-                      ? "Transfer Paper"
-                      : "Plain T-Shirt",
+                        ? "Transfer Paper"
+                        : "Plain T-Shirt",
                     tShirtType: defaultStyleName,
                     color: defaultStyle?.colors?.[0]?.value || "#ffffff",
                     colorName: defaultStyle?.colors?.[0]?.name || "White",
@@ -2860,19 +3411,17 @@ export default function ManagerPage() {
                       setInventorySizeFilter("ALL");
                       setInventoryColorFilter("ALL");
                     }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                      isActive
-                        ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/10"
-                        : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${isActive
+                      ? "bg-slate-900 text-white shadow-md ring-2 ring-slate-900/10"
+                      : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
+                      }`}
                   >
                     <span>{cat.label}</span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        isActive
-                          ? "bg-indigo-500 text-white"
-                          : "bg-slate-200 text-slate-700"
-                      }`}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${isActive
+                        ? "bg-indigo-500 text-white"
+                        : "bg-slate-200 text-slate-700"
+                        }`}
                     >
                       {count}
                     </span>
@@ -3199,11 +3748,10 @@ export default function ManagerPage() {
                             </td>
                             <td className="py-4 text-xs">
                               <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                                  isLow
-                                    ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
-                                    : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
-                                }`}
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isLow
+                                  ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
+                                  : "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                                  }`}
                               >
                                 {isLow ? "Low stock" : "In Stock"}
                               </span>
@@ -3278,6 +3826,7 @@ export default function ManagerPage() {
                       { name: "White", value: "#ffffff" },
                       { name: "Black", value: "#111827" },
                     ],
+                    sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
                   });
                   setShowStyleModal(true);
                 }}
@@ -3314,6 +3863,7 @@ export default function ManagerPage() {
                         { name: "White", value: "#ffffff" },
                         { name: "Black", value: "#111827" },
                       ],
+                      sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
                     });
                     setShowStyleModal(true);
                   }}
@@ -3338,10 +3888,14 @@ export default function ManagerPage() {
                           styleToEdit.gsmPrices && styleToEdit.gsmPrices.length > 0
                             ? styleToEdit.gsmPrices
                             : (styleToEdit.gsms || []).map((g) => ({
-                                gsm: g,
-                                price: styleToEdit.price || 1200,
-                              })),
+                              gsm: g,
+                              price: styleToEdit.price || 1200,
+                            })),
                         colors: styleToEdit.colors || [],
+                        sizes:
+                          styleToEdit.sizes && styleToEdit.sizes.length > 0
+                            ? styleToEdit.sizes
+                            : ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
                       });
                       setShowStyleModal(true);
                     }}
@@ -3479,11 +4033,10 @@ export default function ManagerPage() {
             {/* Notification alert banner */}
             {reviewNotification && (
               <div
-                className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-150 ${
-                  reviewNotification.type === "success"
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                    : "bg-rose-50 text-rose-800 border border-rose-200"
-                }`}
+                className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-150 ${reviewNotification.type === "success"
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  : "bg-rose-50 text-rose-800 border border-rose-200"
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   {reviewNotification.type === "success" ? (
@@ -3528,11 +4081,10 @@ export default function ManagerPage() {
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star
                       key={s}
-                      className={`h-2.5 w-2.5 ${
-                        s <= Math.round(reviewStats.averageRating || 0)
-                          ? "fill-amber-400 text-amber-400"
-                          : "text-slate-200"
-                      }`}
+                      className={`h-2.5 w-2.5 ${s <= Math.round(reviewStats.averageRating || 0)
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-slate-200"
+                        }`}
                     />
                   ))}
                 </div>
@@ -3540,11 +4092,10 @@ export default function ManagerPage() {
 
               <div
                 onClick={() => setReviewFilterRating(reviewFilterRating === "BAD" ? "ALL" : "BAD")}
-                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${
-                  reviewFilterRating === "BAD"
-                    ? "bg-rose-50 border-rose-300 ring-2 ring-rose-400"
-                    : "bg-white border-slate-200/80 hover:border-rose-200 hover:bg-rose-50/20"
-                }`}
+                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${reviewFilterRating === "BAD"
+                  ? "bg-rose-50 border-rose-300 ring-2 ring-rose-400"
+                  : "bg-white border-slate-200/80 hover:border-rose-200 hover:bg-rose-50/20"
+                  }`}
               >
                 <div className="flex items-center justify-between text-slate-400 mb-1">
                   <span className="text-[10px] uppercase font-black tracking-wider text-rose-600 flex items-center gap-1">
@@ -3638,15 +4189,14 @@ export default function ManagerPage() {
                   <button
                     key={tab.key}
                     onClick={() => setReviewFilterRating(tab.key)}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
-                      reviewFilterRating === tab.key
-                        ? tab.key === "BAD"
-                          ? "bg-rose-600 text-white shadow-sm"
-                          : "bg-indigo-600 text-white shadow-sm"
-                        : tab.alert
+                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${reviewFilterRating === tab.key
+                      ? tab.key === "BAD"
+                        ? "bg-rose-600 text-white shadow-sm"
+                        : "bg-indigo-600 text-white shadow-sm"
+                      : tab.alert
                         ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -3720,9 +4270,8 @@ export default function ManagerPage() {
                     return (
                       <div
                         key={rev._id}
-                        className={`bg-white border rounded-2xl p-5 shadow-xs transition hover:shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                          isBad ? "border-rose-200 bg-rose-50/10" : "border-slate-200/80"
-                        }`}
+                        className={`bg-white border rounded-2xl p-5 shadow-xs transition hover:shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isBad ? "border-rose-200 bg-rose-50/10" : "border-slate-200/80"
+                          }`}
                       >
                         {/* Left: Customer info & review details */}
                         <div className="flex-1 space-y-2.5">
@@ -3750,11 +4299,10 @@ export default function ManagerPage() {
                                 {[1, 2, 3, 4, 5].map((s) => (
                                   <Star
                                     key={s}
-                                    className={`h-3 w-3 ${
-                                      s <= rev.rating
-                                        ? "fill-amber-400 text-amber-400"
-                                        : "text-slate-200"
-                                    }`}
+                                    className={`h-3 w-3 ${s <= rev.rating
+                                      ? "fill-amber-400 text-amber-400"
+                                      : "text-slate-200"
+                                      }`}
                                   />
                                 ))}
                               </div>
@@ -3773,11 +4321,10 @@ export default function ManagerPage() {
 
                           {/* Comment Content */}
                           <div
-                            className={`p-3 rounded-xl text-xs leading-relaxed ${
-                              isBad
-                                ? "bg-rose-50/50 border border-rose-100 text-rose-950 font-medium"
-                                : "bg-slate-50 border border-slate-100 text-slate-700"
-                            }`}
+                            className={`p-3 rounded-xl text-xs leading-relaxed ${isBad
+                              ? "bg-rose-50/50 border border-rose-100 text-rose-950 font-medium"
+                              : "bg-slate-50 border border-slate-100 text-slate-700"
+                              }`}
                           >
                             <p className="italic">
                               "{rev.comment || "(No text comment provided, star rating only)"}"
@@ -3871,11 +4418,10 @@ export default function ManagerPage() {
 
               <div
                 onClick={() => setInquiryStatusFilter(inquiryStatusFilter === "New" ? "ALL" : "New")}
-                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${
-                  inquiryStatusFilter === "New"
-                    ? "bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400"
-                    : "bg-white border-slate-200/80 hover:bg-indigo-50/30"
-                }`}
+                className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition ${inquiryStatusFilter === "New"
+                  ? "bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400"
+                  : "bg-white border-slate-200/80 hover:bg-indigo-50/30"
+                  }`}
               >
                 <div className="flex items-center justify-between text-slate-400 mb-1">
                   <span className="text-[10px] uppercase font-black tracking-wider text-indigo-600 flex items-center gap-1">
@@ -3955,11 +4501,10 @@ export default function ManagerPage() {
                   <button
                     key={tab.key}
                     onClick={() => setInquiryStatusFilter(tab.key)}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${
-                      inquiryStatusFilter === tab.key
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                    }`}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 cursor-pointer ${inquiryStatusFilter === tab.key
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -4023,13 +4568,12 @@ export default function ManagerPage() {
                     return (
                       <div
                         key={inq._id}
-                        className={`bg-white border rounded-3xl p-5 md:p-6 transition shadow-xs flex flex-col md:flex-row md:items-start justify-between gap-5 ${
-                          isNew
-                            ? "border-indigo-200 bg-indigo-50/10"
-                            : isResolved
+                        className={`bg-white border rounded-3xl p-5 md:p-6 transition shadow-xs flex flex-col md:flex-row md:items-start justify-between gap-5 ${isNew
+                          ? "border-indigo-200 bg-indigo-50/10"
+                          : isResolved
                             ? "border-slate-200/80 opacity-90"
                             : "border-slate-200/80"
-                        }`}
+                          }`}
                       >
                         {/* Left Inquiry Info */}
                         <div className="flex-1 space-y-3">
@@ -4052,13 +4596,12 @@ export default function ManagerPage() {
 
                             {/* Status Badge */}
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
-                                isNew
-                                  ? "bg-indigo-100 text-indigo-700 border-indigo-200"
-                                  : isResolved
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${isNew
+                                ? "bg-indigo-100 text-indigo-700 border-indigo-200"
+                                : isResolved
                                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                   : "bg-amber-50 text-amber-700 border-amber-200"
-                              }`}
+                                }`}
                             >
                               {inq.status || "New"}
                             </span>
@@ -4140,11 +4683,10 @@ export default function ManagerPage() {
                   <button
                     key={side}
                     onClick={() => setSubmissionSide(side)}
-                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${
-                      submissionSide === side
-                        ? "bg-purple-600 border-purple-600 text-white"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
+                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${submissionSide === side
+                      ? "bg-purple-600 border-purple-600 text-white"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
                   >
                     {side}
                   </button>
@@ -4162,8 +4704,8 @@ export default function ManagerPage() {
                   zoomLevel={submissionZoom}
                   layers={getSubmissionLayers()}
                   selectedLayerId={null}
-                  onSelectLayer={() => {}}
-                  onUpdateLayers={() => {}}
+                  onSelectLayer={() => { }}
+                  onUpdateLayers={() => { }}
                 />
               </div>
 
@@ -4270,32 +4812,40 @@ export default function ManagerPage() {
               </div>
 
               {/* Action buttons */}
-              <div className="mt-8 pt-4 border-t flex flex-col gap-2">
+              <div className="mt-8 pt-4 border-t flex flex-col gap-2.5">
                 <button
+                  disabled={approvingProductId === selectedSubmissionProduct._id}
                   onClick={() => {
                     handleApproveProductDraft(
                       selectedSubmissionProduct._id,
                       "approve",
                     );
-                    setSelectedSubmissionProduct(null);
                   }}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <Check className="h-4 w-4" />
+                  {approvingProductId === selectedSubmissionProduct._id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4.5 w-4.5 stroke-[2.5]" />
+                  )}
                   <span>Approve & Publish to Store</span>
                 </button>
                 <button
+                  disabled={approvingProductId === selectedSubmissionProduct._id}
                   onClick={() => {
                     handleApproveProductDraft(
                       selectedSubmissionProduct._id,
                       "reject",
                     );
-                    setSelectedSubmissionProduct(null);
                   }}
-                  className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <X className="h-4 w-4" />
-                  <span>Reject Submission</span>
+                  {approvingProductId === selectedSubmissionProduct._id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <X className="h-4.5 w-4.5 stroke-[2.5]" />
+                  )}
+                  <span>Disapprove / Reject Submission</span>
                 </button>
               </div>
             </div>
@@ -4462,11 +5012,10 @@ export default function ManagerPage() {
                               color: ink.name,
                             }));
                           }}
-                          className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition cursor-pointer ${
-                            isSelected
-                              ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50/80 shadow-xs"
-                              : "border-slate-200 bg-white hover:bg-slate-100/70"
-                          }`}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition cursor-pointer ${isSelected
+                            ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50/80 shadow-xs"
+                            : "border-slate-200 bg-white hover:bg-slate-100/70"
+                            }`}
                         >
                           <div className="flex items-center gap-2.5">
                             <span
@@ -4576,11 +5125,10 @@ export default function ManagerPage() {
                                   color: c.value,
                                 }))
                               }
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer ${
-                                inventoryForm.colorName === c.name
-                                  ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50 text-indigo-950 font-bold"
-                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                              }`}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer ${inventoryForm.colorName === c.name
+                                ? "ring-2 ring-indigo-600 border-indigo-600 bg-indigo-50 text-indigo-950 font-bold"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
                             >
                               <span
                                 className="h-3.5 w-3.5 rounded-full border border-slate-300 shrink-0"
@@ -5111,6 +5659,149 @@ export default function ManagerPage() {
                 </div>
               </div>
 
+              {/* Available Sizes Section */}
+              <div className="space-y-2.5 border rounded-2xl p-4 bg-slate-50/70">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                      Available Sizes for Designing
+                    </label>
+                    <span className="text-[10px] text-slate-400">
+                      Users & employees can only choose from these sizes in 3D designer
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-2xs">
+                    {styleForm.sizes?.length || 0} of 7 Selected
+                  </span>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStyleForm((prev) => ({
+                        ...prev,
+                        sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
+                      }))
+                    }
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStyleForm((prev) => ({
+                        ...prev,
+                        sizes: ["S", "M", "L", "XL", "XXL"],
+                      }))
+                    }
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                  >
+                    Standard (S-XXL)
+                  </button>
+                </div>
+
+                {/* Sizes grid toggle buttons */}
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 pt-1">
+                  {["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((sz) => {
+                    const isSelected = (styleForm.sizes || []).includes(sz);
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => {
+                          setStyleForm((prev) => {
+                            const current = prev.sizes || [];
+                            if (current.includes(sz)) {
+                              if (current.length === 1) return prev; // Keep at least one size
+                              return {
+                                ...prev,
+                                sizes: current.filter((s) => s !== sz),
+                              };
+                            } else {
+                              return {
+                                ...prev,
+                                sizes: [...current, sz],
+                              };
+                            }
+                          });
+                        }}
+                        className={`py-2 px-2 rounded-xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                          isSelected
+                            ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
+                            : "border-slate-200 bg-white hover:bg-slate-100 text-slate-700 opacity-60"
+                        }`}
+                      >
+                        <span className="text-xs font-extrabold">{sz}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Additional Custom Sizes (if any) */}
+                {(styleForm.sizes || []).some(
+                  (s) => !["XS", "S", "M", "L", "XL", "XXL", "3XL"].includes(s)
+                ) && (
+                  <div className="pt-2 flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] font-bold text-slate-400">Custom Sizes:</span>
+                    {(styleForm.sizes || [])
+                      .filter((s) => !["XS", "S", "M", "L", "XL", "XXL", "3XL"].includes(s))
+                      .map((customSz, cIdx) => (
+                        <span
+                          key={cIdx}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-xs font-black"
+                        >
+                          {customSz}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStyleForm((prev) => ({
+                                ...prev,
+                                sizes: prev.sizes.filter((s) => s !== customSz),
+                              }));
+                            }}
+                            className="hover:text-rose-200 cursor-pointer"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                )}
+
+                {/* Add Custom Size Input */}
+                <div className="flex items-center gap-2 pt-1.5">
+                  <input
+                    type="text"
+                    placeholder="Add custom size (e.g. 4XL, Youth M)"
+                    value={newCustomSize}
+                    onChange={(e) => setNewCustomSize(e.target.value)}
+                    className="flex-1 px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = newCustomSize.trim().toUpperCase();
+                      if (!trimmed) return;
+                      setStyleForm((prev) => {
+                        const current = prev.sizes || [];
+                        if (current.includes(trimmed)) return prev;
+                        return {
+                          ...prev,
+                          sizes: [...current, trimmed],
+                        };
+                      });
+                      setNewCustomSize("");
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Size
+                  </button>
+                </div>
+              </div>
+
               {/* Actions */}
               <div className="pt-3 border-t flex items-center gap-3">
                 <button
@@ -5165,11 +5856,10 @@ export default function ManagerPage() {
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
-                        className={`h-3 w-3 ${
-                          s <= reviewConfirmDelete.rating
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-slate-200"
-                        }`}
+                        className={`h-3 w-3 ${s <= reviewConfirmDelete.rating
+                          ? "fill-amber-400 text-amber-400"
+                          : "text-slate-200"
+                          }`}
                       />
                     ))}
                   </div>
@@ -5212,6 +5902,107 @@ export default function ManagerPage() {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Order Reason Modal */}
+      {cancellingOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
+          <div className="bg-white rounded-3xl max-w-md w-full border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-slate-950 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-rose-500/20 border border-rose-500/30 rounded-xl text-rose-400">
+                  <Ban className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Cancel Order #{cancellingOrder.orderNumber}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Customer: {cancellingOrder.customerName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setCancellingOrder(null);
+                  setCancelReasonInput("");
+                }}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-800 block mb-1">
+                  Reason for Cancellation
+                </label>
+                <p className="text-[11px] text-slate-500 mb-2.5 leading-relaxed">
+                  Please provide a clear reason for cancelling this order. This message will be displayed directly to the customer on their order details page.
+                </p>
+
+                {/* Quick reason suggestions */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {[
+                    "Fabric or color out of stock",
+                    "Print artwork resolution too low",
+                    "Your Design cannot approve",
+                    "Delivery address unreachable",
+                    "Payment verification issue",
+                  ].map((quickReason) => (
+                    <button
+                      key={quickReason}
+                      type="button"
+                      onClick={() => setCancelReasonInput(quickReason)}
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition cursor-pointer ${cancelReasonInput === quickReason
+                        ? "bg-rose-50 border-rose-200 text-rose-700 font-bold"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                    >
+                      {quickReason}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={cancelReasonInput}
+                  onChange={(e) => setCancelReasonInput(e.target.value)}
+                  placeholder="e.g. Due to fabric inventory shortage for XL Navy Blue, we cannot fulfill this order..."
+                  className="w-full p-3 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 focus:outline-none transition resize-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCancellingOrder(null);
+                    setCancelReasonInput("");
+                  }}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="button"
+                  disabled={assignLoading[cancellingOrder.orderId]}
+                  onClick={handleConfirmCancelOrder}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {assignLoading[cancellingOrder.orderId] ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Ban className="h-3.5 w-3.5" />
+                  )}
+                  <span>Confirm Cancellation</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
