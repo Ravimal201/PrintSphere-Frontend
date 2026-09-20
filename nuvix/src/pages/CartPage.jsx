@@ -164,8 +164,8 @@ export default function CartPage() {
 
   // Open Checkout Popup Window
   const handleOpenCheckoutModal = async (overrideSelectedKeys = null) => {
-    const keysToCheck = overrideSelectedKeys || selectedCartKeys;
-    const itemsToPay = cart.filter(item => keysToCheck.has(item.cartKey));
+    const keysToCheck = (overrideSelectedKeys instanceof Set) ? overrideSelectedKeys : selectedCartKeys;
+    const itemsToPay = cart.filter(item => keysToCheck && keysToCheck.has && keysToCheck.has(item.cartKey));
     if (itemsToPay.length === 0) {
       alert("Please select at least one item to proceed to checkout.");
       return;
@@ -590,7 +590,7 @@ export default function CartPage() {
                     </div>
 
                     <button
-                      onClick={handleOpenCheckoutModal}
+                      onClick={() => handleOpenCheckoutModal()}
                       disabled={selectedItems.length === 0}
                       className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition shadow-sm mt-2 flex items-center justify-center gap-2 cursor-pointer"
                     >
