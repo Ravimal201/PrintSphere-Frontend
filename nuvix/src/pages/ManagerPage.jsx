@@ -6055,6 +6055,7 @@ export default function ManagerPage() {
         }}
         design={selected3DDesign}
         showCustomize={false}
+        allowDownloads={true}
       />
       </div>
     </div>

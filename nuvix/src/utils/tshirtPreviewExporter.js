@@ -1,4 +1,5 @@
 import { getColorValue, filterLayersForView } from "../components/TShirt2D";
+import JSZip from "jszip";
 
 /**
  * Load an image with CORS handling and timeout safety
@@ -789,4 +790,165 @@ export const downloadDirectAsset = async (url, fileName = "graphic-asset.png") =
     link.click();
     document.body.removeChild(link);
   }
+};
+
+/**
+ * Render a text layer onto a clean transparent canvas PNG blob
+ */
+export const renderTextLayerToBlob = (layer, width = 1200, height = 400) => {
+  return new Promise((resolve) => {
+    const text = layer.text || layer.name || "";
+    if (!text) {
+      resolve(null);
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      resolve(null);
+      return;
+    }
+    ctx.clearRect(0, 0, width, height);
+
+    const fontSize = Math.round(height * 0.4);
+    const fontStyle = [
+      layer.italic ? "italic" : "normal",
+      layer.bold ? "bold" : "normal",
+      `${fontSize}px`,
+      `"${layer.fontFamily || "Inter"}", system-ui, -apple-system, sans-serif`
+    ].join(" ");
+
+    ctx.font = fontStyle;
+    ctx.fillStyle = layer.color || "#1e293b";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(text, width / 2, height / 2);
+
+    canvas.toBlob((blob) => {
+      resolve(blob);
+    }, "image/png");
+  });
+};
+
+/**
+ * Fetch an image URL safely as a Blob
+ */
+export const fetchImageLayerAsBlob = async (url) => {
+  if (!url || url === "/images/dumyImage.png") return null;
+
+  if (url.startsWith("data:")) {
+    try {
+      const res = await fetch(url);
+      return await res.blob();
+    } catch {
+      // fallback
+    }
+  }
+
+  try {
+    const response = await fetch(url);
+    if (response.ok) {
+      return await response.blob();
+    }
+  } catch (err) {
+    console.warn("Direct blob fetch failed, falling back to canvas draw:", err);
+  }
+
+  const img = await loadImageSafe(url);
+  if (img && img.width > 0 && img.height > 0) {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(null);
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+  }
+
+  return null;
+};
+
+/**
+ * Package all graphic & text decal assets into a single downloadable .ZIP folder
+ */
+export const downloadAllDecalsAsZip = async ({
+  layers = [],
+  designUrl = "",
+  title = "tshirt-design",
+  orderShortId = "order",
+  onProgress
+}) => {
+  const zip = new JSZip();
+  const safeTitle = (title || "design").replace(/[^a-z0-9]/gi, "-").toLowerCase();
+  let addedCount = 0;
+
+  const validLayers = (layers || []).filter((l) => l && l.visible !== false);
+
+  if (validLayers.length > 0) {
+    for (let i = 0; i < validLayers.length; i++) {
+      const layer = validLayers[i];
+      const layerName = (layer.name || `layer-${i + 1}`).replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      const view = layer.view || "front";
+
+      if (onProgress) {
+        onProgress(`Processing decal asset ${i + 1}/${validLayers.length}...`);
+      }
+
+      if (layer.type === "text") {
+        const textBlob = await renderTextLayerToBlob(layer);
+        if (textBlob) {
+          zip.file(`${orderShortId}_${view}_${layerName}_text.png`, textBlob);
+          addedCount++;
+        }
+      } else {
+        const imgUrl = layer.url || layer.image || layer.src;
+        if (imgUrl && imgUrl !== "/images/dumyImage.png") {
+          const imgBlob = await fetchImageLayerAsBlob(imgUrl);
+          if (imgBlob) {
+            const ext = imgBlob.type === "image/jpeg" ? "jpg" : "png";
+            zip.file(`${orderShortId}_${view}_${layerName}_graphic.${ext}`, imgBlob);
+            addedCount++;
+          }
+        }
+      }
+    }
+  }
+
+  if (addedCount === 0 && designUrl && designUrl !== "/images/dumyImage.png") {
+    if (onProgress) onProgress("Adding graphic artwork...");
+    const imgBlob = await fetchImageLayerAsBlob(designUrl);
+    if (imgBlob) {
+      zip.file(`${orderShortId}_front_custom_graphic.png`, imgBlob);
+      addedCount++;
+    }
+  }
+
+  if (addedCount === 0) {
+    throw new Error("No graphic or text decals found to export.");
+  }
+
+  if (onProgress) onProgress("Packing decals zip folder...");
+
+  const zipBlob = await zip.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 }
+  });
+
+  const zipUrl = URL.createObjectURL(zipBlob);
+  const link = document.createElement("a");
+  link.href = zipUrl;
+  link.download = `${orderShortId}-${safeTitle}-decals.zip`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(zipUrl), 2000);
+
+  if (onProgress) onProgress(`Downloaded ${addedCount} decal assets in zip folder!`);
+  return true;
 };

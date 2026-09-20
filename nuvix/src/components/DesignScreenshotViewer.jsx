@@ -1,14 +1,10 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
-import { Download, Sparkles, Layers, Check, Loader2, Image as ImageIcon } from "lucide-react";
-import Store3DCardPreview, {
-  snapshotCache,
-  get3DSnapshotCacheKey
-} from "./Store3DCardPreview";
+import React, { useState, useMemo } from "react";
+import { Download, Sparkles, Layers, Check, Loader2, Type, Image as ImageIcon, FolderDown } from "lucide-react";
 import {
   downloadDirectAsset,
-  download3DSnapshotWithFormat
+  downloadAllDecalsAsZip,
+  renderTextLayerToBlob
 } from "../utils/tshirtPreviewExporter";
-import { render3DDesignToDataUrl } from "../utils/tshirt3DExporter";
 import { alertAction } from "../context/ConfirmContext";
 
 export default function DesignScreenshotViewer({
@@ -16,24 +12,40 @@ export default function DesignScreenshotViewer({
   orderId,
   onOpen3DModal
 }) {
-  const [downloadFormat, setDownloadFormat] = useState("png"); // "png" | "jpg" | "webp"
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState("");
-  const [capturedSnapshots, setCapturedSnapshots] = useState({});
-
-  const containerRef = useRef(null);
+  const [downloadingLayerId, setDownloadingLayerId] = useState(null);
 
   const isCustom = item.itemType === "Customized" || Boolean(item.designId);
   const design = (typeof item.designId === "object" && item.designId !== null) ? item.designId : {};
   const product = (typeof item.productId === "object" && item.productId !== null) ? item.productId : {};
 
   const color = design.fabricColor || item.selectedColor || item.color || "#ffffff";
-  const layers = design.layers?.length ? design.layers : (item.layers || []);
+  const rawLayers = design.layers?.length ? design.layers : (item.layers || []);
   const thumbnail = design.thumbnailUrl || product.images?.[0] || item.image || item.designUrl || "/images/dumyImage.png";
   const title = isCustom ? (design.tShirtType || item.tShirtStyle || "Custom T-Shirt") : (product.title || item.tShirtStyle || "T-Shirt");
   const orderShortId = orderId ? orderId.slice(-6) : "order";
   const safeTitle = title.toLowerCase().replace(/[^a-z0-9]/gi, "-");
+
+  // Normalized decal layers list
+  const decalLayers = useMemo(() => {
+    if (rawLayers && rawLayers.length > 0) {
+      return rawLayers.filter((l) => l && l.visible !== false);
+    }
+    if (thumbnail && thumbnail !== "/images/dumyImage.png") {
+      return [
+        {
+          id: "primary-graphic",
+          type: "image",
+          name: "Custom Graphic Artwork",
+          url: thumbnail,
+          view: "front"
+        }
+      ];
+    }
+    return [];
+  }, [rawLayers, thumbnail]);
 
   const productData = useMemo(() => {
     return {
@@ -44,91 +56,82 @@ export default function DesignScreenshotViewer({
       fabricColor: color,
       material: design.material || item.gsm || item.material || "180GSM Cotton",
       size: item.selectedSize || item.size || "M",
-      layers: layers.length > 0 ? layers : (thumbnail && thumbnail !== "/images/dumyImage.png" ? [
-        {
-          id: "logo-layer",
-          type: "image",
-          name: "Custom Logo",
-          url: thumbnail,
-          visible: true,
-          position: [0, 0.1, 0.15],
-          rotation: [0, 0, 0],
-          scale: [0.35, 0.35, 0.35]
-        }
-      ] : []),
+      layers: decalLayers,
       thumbnailUrl: thumbnail,
       images: thumbnail ? [thumbnail] : [],
       colors: [color]
     };
-  }, [design, item, orderId, product, isCustom, title, color, layers, thumbnail]);
+  }, [design, item, orderId, product, isCustom, title, color, decalLayers, thumbnail]);
 
-  const handleSnapshotReady = useCallback((angle, dataUrl) => {
-    if (dataUrl && dataUrl.length > 5000) {
-      setCapturedSnapshots((prev) => ({ ...prev, [angle]: dataUrl }));
-    }
-  }, []);
-
-  const getOrGenerate3DSnapshot = async (angle) => {
-    if (capturedSnapshots[angle] && capturedSnapshots[angle].length > 5000) {
-      return capturedSnapshots[angle];
-    }
-    const cacheKey = get3DSnapshotCacheKey(productData, color, angle);
-    const cached = snapshotCache.get(cacheKey);
-    if (cached && cached.length > 5000) {
-      return cached;
-    }
-
-    const renderedUrl = await render3DDesignToDataUrl({
-      modelPath: productData.modelPath,
-      fabricColor: color,
-      layers: productData.layers,
-      viewAngle: angle,
-      width: 1400,
-      height: 1400,
-      transparentBg: downloadFormat === "png"
-    });
-
-    if (renderedUrl && renderedUrl.length > 5000) {
-      snapshotCache.set(cacheKey, renderedUrl);
-      setCapturedSnapshots((prev) => ({ ...prev, [angle]: renderedUrl }));
-      return renderedUrl;
-    }
-
-    return null;
-  };
-
-  const handleDownloadAll3DAngles = async () => {
-    setIsDownloading(true);
-    setDownloadProgress(`Preparing 3D views (${downloadFormat.toUpperCase()})...`);
-
-    const anglesToDownload = [
-      { id: "front", label: "Front" },
-      { id: "back", label: "Back" },
-      { id: "left", label: "Left Side" },
-      { id: "right", label: "Right Side" }
-    ];
+  // Handle single decal download
+  const handleDownloadSingleDecal = async (layer, idx) => {
+    const layerKey = layer.id || `layer-${idx}`;
+    setDownloadingLayerId(layerKey);
 
     try {
-      for (let i = 0; i < anglesToDownload.length; i++) {
-        const { id, label } = anglesToDownload[i];
-        setDownloadProgress(`Rendering ${label} [${i + 1}/4]...`);
+      const view = layer.view || "front";
+      const layerName = (layer.name || `decal-${idx + 1}`).replace(/[^a-z0-9]/gi, "-").toLowerCase();
 
-        const dataUrl = await getOrGenerate3DSnapshot(id);
-        const baseName = `${orderShortId}-${safeTitle}-${id}-3d-view`;
-
-        if (dataUrl) {
-          await download3DSnapshotWithFormat(dataUrl, baseName, downloadFormat);
+      if (layer.type === "text") {
+        const textBlob = await renderTextLayerToBlob(layer);
+        if (textBlob) {
+          const url = URL.createObjectURL(textBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `${orderShortId}-${view}-${layerName}-text.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
-        await new Promise((res) => setTimeout(res, 200));
+      } else {
+        const imgUrl = layer.url || layer.image || layer.src || thumbnail;
+        if (imgUrl && imgUrl !== "/images/dumyImage.png") {
+          await downloadDirectAsset(imgUrl, `${orderShortId}-${view}-${layerName}-graphic.png`);
+        }
       }
-
-      setDownloadSuccessMsg(`Downloaded all 4 3D views (${downloadFormat.toUpperCase()})!`);
-      setTimeout(() => setDownloadSuccessMsg(""), 3000);
     } catch (err) {
-      console.error("3D views download error:", err);
+      console.error("Error downloading decal:", err);
       alertAction({
         title: "Download Failed",
-        message: "Error downloading 3D views. Please try again.",
+        message: "Failed to download this graphic asset. Please try again.",
+        type: "danger"
+      });
+    } finally {
+      setDownloadingLayerId(null);
+    }
+  };
+
+  // Handle downloading all decals packed into a ZIP folder
+  const handleDownloadAllDecals = async () => {
+    if (decalLayers.length === 0) {
+      alertAction({
+        title: "No Decals Available",
+        message: "There are no graphic or text decal assets to download for this garment.",
+        type: "info"
+      });
+      return;
+    }
+
+    setIsDownloading(true);
+    setDownloadProgress("Packaging decals folder...");
+
+    try {
+      await downloadAllDecalsAsZip({
+        layers: decalLayers,
+        designUrl: thumbnail,
+        title: safeTitle,
+        orderShortId,
+        onProgress: (msg) => setDownloadProgress(msg)
+      });
+
+      setDownloadSuccessMsg(`Decals folder downloaded (${decalLayers.length} assets)!`);
+      setTimeout(() => setDownloadSuccessMsg(""), 3500);
+    } catch (err) {
+      console.error("Download all decals error:", err);
+      alertAction({
+        title: "Decals Download Failed",
+        message: err.message || "Failed to download decals zip package.",
         type: "danger"
       });
     } finally {
@@ -137,163 +140,156 @@ export default function DesignScreenshotViewer({
     }
   };
 
-  const angles = [
-    { id: "front", label: "Front" },
-    { id: "back", label: "Back" },
-    { id: "left", label: "Left" },
-    { id: "right", label: "Right" }
-  ];
-
   return (
-    <div ref={containerRef} className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 space-y-2.5 select-none">
+    <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3 space-y-3 select-none shadow-2xs">
       
-      {/* Compact Header: 3D Views Title + Format Pill + Download All Button */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2">
-        <div className="flex items-center gap-1.5">
-          <ImageIcon className="h-3.5 w-3.5 text-indigo-600" />
-          <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wide">
-            3D Views
-          </span>
-          <span className="text-[10px] text-slate-400 font-medium">
-            (4 angles)
-          </span>
+      {/* Header: Decals Title + Inspector + Download All Decals Button */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2.5">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-indigo-100/70 text-indigo-700 rounded-lg">
+            <Layers className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                Graphic Decals
+              </span>
+              <span className="px-2 py-0.2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black rounded-full">
+                {decalLayers.length} {decalLayers.length === 1 ? "Asset" : "Assets"}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 font-medium">
+              High-resolution print artwork & 3D model
+            </p>
+          </div>
         </div>
 
-        {/* Action controls */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Format selector */}
-          <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 text-[9px] font-bold text-slate-600 shadow-2xs">
-            <span className="px-1 text-[8px] text-slate-400 font-extrabold uppercase">Fmt:</span>
-            {["png", "jpg", "webp"].map((fmt) => (
-              <button
-                key={fmt}
-                type="button"
-                onClick={() => setDownloadFormat(fmt)}
-                className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-black transition cursor-pointer ${
-                  downloadFormat === fmt
-                    ? "bg-slate-900 text-white shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                }`}
-              >
-                {fmt}
-              </button>
-            ))}
-          </div>
-
+        {/* Action Buttons: Inspector & Download All Decals Folder */}
+        <div className="flex items-center gap-1.5">
           {onOpen3DModal && (
             <button
               type="button"
               onClick={() => onOpen3DModal(productData)}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[10px] font-bold rounded-lg transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-xl transition cursor-pointer shadow-2xs"
               title="Open interactive 3D model inspector"
             >
-              <Sparkles className="h-3 w-3 text-indigo-600 animate-pulse" />
+              <Sparkles className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
               <span>Inspector</span>
             </button>
           )}
 
-          {/* Download all views button */}
-          <button
-            type="button"
-            disabled={isDownloading}
-            onClick={handleDownloadAll3DAngles}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[10px] font-extrabold rounded-lg transition shadow-2xs disabled:opacity-50 cursor-pointer"
-            title={`Download all 4 views as .${downloadFormat}`}
-          >
-            {isDownloading ? (
-              <Loader2 className="h-3 w-3 animate-spin text-white" />
-            ) : (
-              <Download className="h-3 w-3" />
-            )}
-            <span>Download All ({downloadFormat.toUpperCase()})</span>
-          </button>
+          {decalLayers.length > 0 && (
+            <button
+              type="button"
+              disabled={isDownloading}
+              onClick={handleDownloadAllDecals}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-extrabold rounded-xl transition shadow-2xs disabled:opacity-50 cursor-pointer"
+              title="Download all decal files in a single zip folder"
+            >
+              {isDownloading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+              ) : (
+                <FolderDown className="h-3.5 w-3.5" />
+              )}
+              <span>Download All Decals (ZIP)</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 4 Small, Compact 3D View Thumbnails in a single row */}
-      <div className="grid grid-cols-4 gap-1.5">
-        {angles.map(({ id, label }) => (
-          <div
-            key={id}
-            className="bg-white p-1 rounded-lg border border-slate-200/80 flex flex-col items-center justify-between shadow-2xs hover:border-indigo-300 transition"
-          >
-            <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-tight mb-0.5">
-              {label}
-            </span>
-            <div className="h-20 w-full flex items-center justify-center overflow-hidden rounded bg-slate-50/50">
-              <Store3DCardPreview
-                product={productData}
-                activeColor={color}
-                fixedView={id}
-                showControls={false}
-                hideBadge={true}
-                className="h-full w-full !border-0 !shadow-none !bg-transparent !p-0.5 cursor-default"
-                onSnapshotReady={handleSnapshotReady}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Decals List */}
+      {decalLayers.length === 0 ? (
+        <div className="py-3 px-4 bg-white rounded-xl border border-slate-200/60 text-center text-xs text-slate-400 italic">
+          No graphic or text decals applied to this product.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {decalLayers.map((layer, idx) => {
+            const layerKey = layer.id || `layer-${idx}`;
+            const isText = layer.type === "text";
+            const isLayerDownloading = downloadingLayerId === layerKey;
+            const viewTag = (layer.view || "front").toUpperCase();
+            const displayName = layer.name || (isText ? `Text: "${layer.text}"` : `Decal Graphic ${idx + 1}`);
 
-      {/* Downloading / Success Message */}
+            return (
+              <div
+                key={layerKey}
+                className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-indigo-200 transition flex items-center justify-between gap-2.5"
+              >
+                {/* Thumbnail / Icon */}
+                <div className="h-11 w-11 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0 relative">
+                  {isText ? (
+                    <div className="flex flex-col items-center justify-center p-1 text-center">
+                      <Type className="h-4 w-4 text-indigo-600" />
+                      <span className="text-[7px] font-black text-slate-600 uppercase tracking-tighter truncate max-w-full">
+                        Text
+                      </span>
+                    </div>
+                  ) : (
+                    <img
+                      src={layer.url || layer.image || layer.src || thumbnail}
+                      alt={displayName}
+                      className="h-full w-full object-contain p-0.5"
+                      onError={(e) => {
+                        e.currentTarget.src = "/images/dumyImage.png";
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Layer Details */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-1.5 py-0.2 bg-slate-100 border border-slate-200 text-slate-700 text-[9px] font-black rounded-md uppercase">
+                      {viewTag}
+                    </span>
+                    <p className="font-extrabold text-slate-900 text-xs truncate capitalize" title={displayName}>
+                      {displayName}
+                    </p>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
+                    {isText
+                      ? `Font: ${layer.fontFamily || "Inter"}`
+                      : "High-Res Graphic PNG"}
+                  </p>
+                </div>
+
+                {/* Individual Download Button */}
+                <button
+                  type="button"
+                  disabled={isLayerDownloading}
+                  onClick={() => handleDownloadSingleDecal(layer, idx)}
+                  className="p-1.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 rounded-lg text-xs font-bold transition flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50"
+                  title="Download this decal asset"
+                >
+                  {isLayerDownloading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Progress & Success Alerts */}
       {isDownloading && (
-        <div className="p-1.5 bg-indigo-50 border border-indigo-200 text-indigo-800 text-[10px] font-bold rounded-lg flex items-center gap-1.5 animate-pulse">
-          <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />
-          <span>{downloadProgress || "Rendering 3D views..."}</span>
+        <div className="p-2 bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-bold rounded-xl flex items-center gap-2 animate-pulse">
+          <Loader2 className="h-4 w-4 animate-spin text-indigo-600 shrink-0" />
+          <span>{downloadProgress || "Packaging all decals folder..."}</span>
         </div>
       )}
 
       {downloadSuccessMsg && (
-        <div className="p-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold rounded-lg flex items-center justify-between animate-in fade-in duration-200">
-          <span className="flex items-center gap-1">
-            <Check className="h-3 w-3 text-emerald-600" />
-            {downloadSuccessMsg}
-          </span>
+        <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+          <div className="flex items-center gap-1.5">
+            <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>{downloadSuccessMsg}</span>
+          </div>
         </div>
       )}
-
-      {/* Original Decal Graphic Source Downloads (if custom decals exist) */}
-      {(() => {
-        const imgLayers = productData.layers.filter((l) => (l.type === "image" || l.type === "logo") && l.url && l.url !== "/images/dumyImage.png");
-        if (imgLayers.length === 0) return null;
-
-        return (
-          <div className="pt-1.5 border-t border-dashed border-slate-200 space-y-1">
-            <span className="text-[9px] font-black uppercase text-slate-400 tracking-wide flex items-center gap-1">
-              <Layers className="h-2.5 w-2.5 text-slate-400" />
-              Graphic Decals ({imgLayers.length}):
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-              {imgLayers.map((layer, lIdx) => (
-                <div
-                  key={lIdx}
-                  className="flex items-center justify-between bg-white px-2 py-1 rounded border border-slate-200/80 text-[9px]"
-                >
-                  <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                    <img
-                      src={layer.url}
-                      alt={layer.name || "Asset"}
-                      className="h-4 w-4 object-contain bg-slate-50 rounded border shrink-0"
-                      onError={(e) => (e.target.style.display = "none")}
-                    />
-                    <span className="font-semibold text-slate-700 truncate max-w-[100px]">
-                      {layer.name || `Asset #${lIdx + 1}`}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => downloadDirectAsset(layer.url, `${orderShortId}-graphic-asset-${lIdx + 1}.png`)}
-                    className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-0.5 hover:underline shrink-0 bg-indigo-50 px-1.5 py-0.5 rounded cursor-pointer"
-                    title="Download original high-res asset file"
-                  >
-                    <Download className="h-2 w-2" /> Decal
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
