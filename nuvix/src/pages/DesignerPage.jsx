@@ -470,19 +470,6 @@ export default function DesignerPage() {
   };
 
   const handleSaveBtnClick = async () => {
-    if (isEmployee || isManager) {
-      setSubmitError("");
-      setSubmitSuccess("");
-      setSubmitForm({
-        title: "",
-        description: "",
-        category: selectedModel?.name || "",
-        basePrice: Math.round(unitPrice)
-      });
-      setShowSubmitModal(true);
-      return;
-    }
-
     const token = localStorage.getItem("token");
     if (!token) {
       await alertAction({
@@ -531,7 +518,9 @@ export default function DesignerPage() {
       setShowSaveChoiceModal(false);
       await alertAction({
         title: "Design Successfully Saved!",
-        message: "Your personalized 3D T-shirt design has been saved to your account.\nYou can access or re-order it anytime from 'My Designs'.",
+        message: isEmployee
+          ? "Your 3D design draft has been saved to your account.\nYou can access it anytime from 'My Saved Designs' in the Employee Portal."
+          : "Your personalized 3D T-shirt design has been saved to your account.\nYou can access or re-order it anytime from 'My Designs'.",
         type: "success",
         confirmText: "OK"
       });
@@ -1889,13 +1878,16 @@ export default function DesignerPage() {
           )}
 
           <div className="flex items-center gap-2 lg:gap-2.5 shrink-0">
-            {/* My Designs Quick Link (for customer) */}
-            {!isEmployee && !isManager && (
+            {/* My Designs Quick Link (for customer or employee) */}
+            {!isManager && (
               <button
                 type="button"
-                onClick={() => safeNavigate("/my-designs")}
+                onClick={() => {
+                  if (isEmployee) safeNavigate("/employee?tab=designs");
+                  else safeNavigate("/my-designs");
+                }}
                 className="hidden sm:inline-flex items-center gap-2 h-9 px-3.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-indigo-600 rounded-xl font-bold text-xs border border-slate-200/90 shadow-2xs transition active:scale-95 cursor-pointer group"
-                title="View My Saved Designs"
+                title={isEmployee ? "View My Saved Designs & Drafts" : "View My Saved Designs"}
               >
                 <Palette className="h-4 w-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
                 <span>My Designs</span>
@@ -1919,31 +1911,29 @@ export default function DesignerPage() {
             )}
 
             {/* Save Design / Publish Button */}
-            {!isEmployee && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (isManager) {
-                    setSubmitError("");
-                    setSubmitSuccess("");
-                    setSubmitForm({
-                      title: "",
-                      description: "",
-                      category: selectedModel?.name || "",
-                      basePrice: Math.round(unitPrice)
-                    });
-                    setShowSubmitModal(true);
-                  } else {
-                    handleSaveBtnClick();
-                  }
-                }}
-                className="inline-flex items-center gap-2 h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_2px_8px_rgba(99,102,241,0.25)] hover:shadow-md transition active:scale-95 cursor-pointer shrink-0"
-                title={isManager ? "Publish to Store" : "Save Design to Cloud"}
-              >
-                <Save className="h-4 w-4 shrink-0" />
-                <span>{isManager ? "Publish to Store" : "Save Design"}</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (isManager) {
+                  setSubmitError("");
+                  setSubmitSuccess("");
+                  setSubmitForm({
+                    title: "",
+                    description: "",
+                    category: selectedModel?.name || "",
+                    basePrice: Math.round(unitPrice)
+                  });
+                  setShowSubmitModal(true);
+                } else {
+                  handleSaveBtnClick();
+                }
+              }}
+              className="inline-flex items-center gap-2 h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_2px_8px_rgba(99,102,241,0.25)] hover:shadow-md transition active:scale-95 cursor-pointer shrink-0"
+              title={isManager ? "Publish to Store" : isEmployee ? "Save Design Draft" : "Save Design to Cloud"}
+            >
+              <Save className="h-4 w-4 shrink-0" />
+              <span>{isManager ? "Publish to Store" : "Save Design"}</span>
+            </button>
 
             {/* User Profile / Account Quick Link */}
             {currentUser ? (
@@ -3864,23 +3854,34 @@ export default function DesignerPage() {
                 </button>
 
                 {isEmployee ? (
-                  <button
-                    onClick={() => {
-                      setSubmitError("");
-                      setSubmitSuccess("");
-                      setSubmitForm({
-                        title: "",
-                        description: "",
-                        category: selectedModel?.name || "",
-                        basePrice: Math.round(unitPrice)
-                      });
-                      setShowSubmitModal(true);
-                    }}
-                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight cursor-pointer active:scale-[0.99]"
-                  >
-                    <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Submit Concept to Manager</span>
-                    <span className="text-xs mt-0.5 opacity-90">Send for review & catalog listing</span>
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveBtnClick}
+                      className="w-full py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 border border-indigo-200/80 transition cursor-pointer shadow-2xs active:scale-[0.99]"
+                      title="Save your current progress to My Saved Designs"
+                    >
+                      <Save className="h-4 w-4 text-indigo-600" />
+                      <span>Save Current Work (Draft)</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSubmitError("");
+                        setSubmitSuccess("");
+                        setSubmitForm({
+                          title: "",
+                          description: "",
+                          category: selectedModel?.name || "",
+                          basePrice: Math.round(unitPrice)
+                        });
+                        setShowSubmitModal(true);
+                      }}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all flex flex-col items-center justify-center leading-tight cursor-pointer active:scale-[0.99]"
+                    >
+                      <span className="text-[11px] uppercase tracking-widest text-indigo-100 font-black">Submit Concept to Manager</span>
+                      <span className="text-xs mt-0.5 opacity-90">Send for review & catalog listing</span>
+                    </button>
+                  </div>
                 ) : isManager ? (
                   <button
                     onClick={() => {
