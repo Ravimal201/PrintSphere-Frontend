@@ -237,8 +237,9 @@ export default function CartPage() {
         const formattedGsm = formatGsm(item.gsm || item.material || "GSM 180");
         if (item.isCustom || item.designId?.startsWith("custom-")) {
           const payload = {
-            tShirtType: item.tShirtType || item.title || "Custom T-Shirt",
-            fabricColor: colorName,
+            tShirtType: item.tShirtType || item.tShirtStyle || item.title || "Custom T-Shirt",
+            modelPath: item.modelPath || item.modelUrl || "/images/models/male normal t-shirt1.glb",
+            fabricColor: item.fabricColor || item.shirtColor || colorName,
             material: formattedGsm,
             size: item.size || "M",
             layers: item.layers || [],
@@ -256,7 +257,8 @@ export default function CartPage() {
             color: colorName,
             selectedColor: colorName,
             tShirtStyle: item.tShirtType || item.tShirtStyle || item.title || "Crew Neck",
-            gsm: formattedGsm
+            gsm: formattedGsm,
+            modelPath: item.modelPath || item.modelUrl || "/images/models/male normal t-shirt1.glb"
           });
         } else {
           resolvedItems.push({

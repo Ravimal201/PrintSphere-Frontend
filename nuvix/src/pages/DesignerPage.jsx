@@ -164,12 +164,60 @@ export default function DesignerPage() {
 
   const [availableStyles, setAvailableStyles] = useState([]);
   const [showCartRedirectModal, setShowCartRedirectModal] = useState(false);
-  const [addedItemDetails, setAddedItemDetails] = useState({ name: "", size: "" });
+  const [showStyleChangeWarningModal, setShowStyleChangeWarningModal] = useState(false);
+  const [pendingStyleChange, setPendingStyleChange] = useState(null);
+  const [addedItemDetails, setAddedItemDetails] = useState({
+    name: "",
+    size: "M",
+    gsm: "180 GSM",
+    material: "180 GSM",
+    color: "White",
+    shirtColor: "#ffffff",
+    quantity: 1,
+    unitPrice: 0,
+    totalCost: 0
+  });
 
   const [isDarkStudio, setIsDarkStudio] = useState(() => {
     const saved = localStorage.getItem("printsphere_studio_theme");
     return saved ? saved === "dark" : false;
   });
+
+  const [cartCount, setCartCount] = useState(() => {
+    try {
+      const saved = safeLocalStorage.getItem("printsphere_cart", []);
+      if (Array.isArray(saved)) {
+        return saved.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  const updateCartCount = () => {
+    try {
+      const saved = safeLocalStorage.getItem("printsphere_cart", []);
+      if (Array.isArray(saved)) {
+        setCartCount(saved.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0));
+      } else {
+        setCartCount(0);
+      }
+    } catch {
+      setCartCount(0);
+    }
+  };
+
+  useEffect(() => {
+    updateCartCount();
+    const handleCartUpdated = () => updateCartCount();
+    window.addEventListener("storage", handleCartUpdated);
+    window.addEventListener("cartUpdated", handleCartUpdated);
+    return () => {
+      window.removeEventListener("storage", handleCartUpdated);
+      window.removeEventListener("cartUpdated", handleCartUpdated);
+    };
+  }, []);
 
   const toggleStudioTheme = () => {
     setIsDarkStudio((prev) => {
@@ -1487,10 +1535,16 @@ export default function DesignerPage() {
         category: "Customized",
         size: selectedSize,
         color: resolvedColorNameStr,
+        fabricColor: shirtColor,
+        shirtColor: shirtColor,
+        selectedColor: resolvedColorNameStr,
         material: formatGsm(shirtMaterial),
         gsm: formatGsm(shirtMaterial),
-        tShirtType: shirtType,
-        tShirtStyle: shirtType || selectedModel?.name || "Crew Neck",
+        tShirtType: selectedModel?.name || shirtType,
+        tShirtStyle: selectedModel?.name || shirtType || "Crew Neck",
+        modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
+        modelUrl: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
+        selectedModel: selectedModel,
         quantity: quantity,
         image: generateDesignThumbnail(layers),
         isCustom: true,
@@ -1499,16 +1553,70 @@ export default function DesignerPage() {
 
       const updatedCart = [...currentCart, cartItem];
       safeLocalStorage.setItem("printsphere_cart", updatedCart);
+      updateCartCount();
+      window.dispatchEvent(new Event("cartUpdated"));
 
       setAddedItemDetails({
         name: selectedModel?.name || shirtType,
-        size: selectedSize
+        size: selectedSize,
+        color: resolvedColorNameStr,
+        shirtColor: shirtColor,
+        material: formatGsm(shirtMaterial),
+        gsm: formatGsm(shirtMaterial),
+        quantity: quantity,
+        unitPrice: unitPrice,
+        totalCost: totalCost
       });
       setIsPreviewModalOpen(false);
       setShowCartRedirectModal(true);
     } catch (err) {
       console.error("Add to cart / Checkout error:", err);
       alert("There was an issue preparing your item for checkout. Please try again.");
+    }
+  };
+
+  const applyStyleChange = (model, resetLayers = true) => {
+    setSelectedModel(model);
+    setShirtType(model.type);
+    if (resetLayers) {
+      setLayers([]);
+      setSelectedLayerId(null);
+    }
+    if (model.colors && model.colors.length > 0) {
+      setShirtColor(model.colors[0].value);
+    }
+    const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
+      ? model.gsmPrices.map(gp => gp.gsm)
+      : (model.gsms || []);
+    if (modelGSMs.length > 0) {
+      const exists = modelGSMs.some(
+        g => g.replace(/\s+/g, "").toUpperCase() === (shirtMaterial || "").replace(/\s+/g, "").toUpperCase()
+      );
+      if (!exists) {
+        setShirtMaterial(modelGSMs[0]);
+      }
+    }
+    const modelSizes = model.sizes && Array.isArray(model.sizes) && model.sizes.length > 0
+      ? model.sizes
+      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+    if (!modelSizes.includes(selectedSize)) {
+      setSelectedSize(modelSizes[0] || "M");
+    }
+    setSelectedStoreSizes((prev) => {
+      const valid = prev.filter(s => modelSizes.includes(s));
+      return valid.length > 0 ? valid : modelSizes;
+    });
+    setPendingStyleChange(null);
+    setShowStyleChangeWarningModal(false);
+  };
+
+  const handleStyleSelection = (model) => {
+    if (selectedModel?.path === model.path) return;
+    if (layers.length > 0) {
+      setPendingStyleChange(model);
+      setShowStyleChangeWarningModal(true);
+    } else {
+      applyStyleChange(model, false);
     }
   };
 
@@ -1749,10 +1857,18 @@ export default function DesignerPage() {
 
           <div className="flex items-center gap-3 lg:gap-4 shrink-0">
             {!isEmployee && !isManager && (
-              <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-700 font-bold text-xs">
-                <ShoppingBag className="h-3.5 w-3.5" />
-                <span>Cart ({quantity})</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => window.location.href = "/cart"}
+                className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3.5 py-2 rounded-xl font-bold text-xs transition cursor-pointer border border-indigo-200/60 shadow-2xs group active:scale-95"
+                title="View Shopping Cart"
+              >
+                <ShoppingBag className="h-4 w-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+                <span>Cart</span>
+                <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">
+                  {cartCount}
+                </span>
+              </button>
             )}
 
             {!isEmployee && (
@@ -1876,6 +1992,16 @@ export default function DesignerPage() {
                 {/* 1. T-Shirt Style */}
                 {activeLeftPanel === "style" && (
                   <div className="space-y-3">
+                    {/* Active Design Warning Banner */}
+                    {layers.length > 0 && (
+                      <div className="p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl flex items-center gap-2 text-xs text-amber-900 shadow-2xs animate-in fade-in duration-150">
+                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <p className="text-[11px] font-semibold text-amber-900 leading-tight">
+                          Changing style will clear your current design.
+                        </p>
+                      </div>
+                    )}
+
                     {availableStyles.length === 0 ? (
                       <div className="p-6 text-center text-slate-400 text-xs border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                         <Shirt className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
@@ -1889,34 +2015,7 @@ export default function DesignerPage() {
                           return (
                             <button
                               key={model.name}
-                              onClick={() => {
-                                setSelectedModel(model);
-                                setShirtType(model.type);
-                                if (model.colors && model.colors.length > 0) {
-                                  setShirtColor(model.colors[0].value);
-                                }
-                                const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
-                                  ? model.gsmPrices.map(gp => gp.gsm)
-                                  : (model.gsms || []);
-                                if (modelGSMs.length > 0) {
-                                  const exists = modelGSMs.some(
-                                    g => g.replace(/\s+/g, "").toUpperCase() === (shirtMaterial || "").replace(/\s+/g, "").toUpperCase()
-                                  );
-                                  if (!exists) {
-                                    setShirtMaterial(modelGSMs[0]);
-                                  }
-                                }
-                                const modelSizes = model.sizes && Array.isArray(model.sizes) && model.sizes.length > 0
-                                  ? model.sizes
-                                  : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
-                                if (!modelSizes.includes(selectedSize)) {
-                                  setSelectedSize(modelSizes[0] || "M");
-                                }
-                                setSelectedStoreSizes((prev) => {
-                                  const valid = prev.filter(s => modelSizes.includes(s));
-                                  return valid.length > 0 ? valid : modelSizes;
-                                });
-                              }}
+                              onClick={() => handleStyleSelection(model)}
                               className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${isSelected
                                 ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
                                 : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
@@ -2725,29 +2824,12 @@ export default function DesignerPage() {
                     </button>
                   </div>
                 </div>
-              ) : !isEmployee ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                    <Shirt className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                    <span>{selectedModel?.name || shirtType}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                    <div
-                      className="h-3.5 w-3.5 rounded-full border border-slate-300 shadow-2xs"
-                      style={{ backgroundColor: shirtColor }}
-                    />
-                    <span>{resolveColorName(shirtColor)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                    <Ruler className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Size: {selectedSize}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
-                    <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                    <span>{formatGsm(shirtMaterial)}</span>
-                  </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 font-medium py-0.5 select-none">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-500/70" />
+                  <span>Select any text or image layer on the shirt to customize properties</span>
                 </div>
-              ) : null}
+              )}
             </div>
 
             {/* Canvas Angle View Controls */}
@@ -3851,39 +3933,146 @@ export default function DesignerPage() {
         </div>
       )}
 
-      {/* Confirmation Modal for Cart Redirect */}
-      {showCartRedirectModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 p-6 flex flex-col items-center text-center">
-            <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-4 border border-emerald-100">
-              <CheckCircle className="h-9 w-9" />
+      {/* Warning Modal when changing T-Shirt Style with existing design layers */}
+      {showStyleChangeWarningModal && pendingStyleChange && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 p-6 flex flex-col items-center text-center select-none">
+            {/* Warning Icon */}
+            <div className="h-14 w-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 mb-3 border border-amber-200 shadow-xs">
+              <AlertCircle className="h-7 w-7" />
             </div>
 
-            <h3 className="text-lg font-bold text-slate-950 mb-1">Added to Cart!</h3>
-            <p className="text-sm text-slate-500 mb-6">
-              <strong className="text-slate-800 font-semibold">{addedItemDetails.name} ({addedItemDetails.size})</strong> has been successfully added to your cart.
+            <h3 className="text-lg font-black text-slate-950 mb-1">Change T-Shirt Style?</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Your current design will be <strong className="text-rose-600 font-bold">lost</strong> if you switch styles.
             </p>
 
-            <p className="text-xs text-slate-500 mb-6 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100 font-medium">
-              Would you like to redirect to checkout now?
-            </p>
+            <div className="w-full bg-slate-50 border border-slate-200/70 rounded-xl p-3 mb-5 flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">New Style:</span>
+              <span className="font-bold text-slate-900 flex items-center gap-1">
+                <Shirt className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                {pendingStyleChange.name}
+              </span>
+            </div>
 
-            <div className="flex gap-3 w-full">
+            {/* Modal Actions */}
+            <div className="flex gap-2.5 w-full">
               <button
+                type="button"
                 onClick={() => {
-                  setShowCartRedirectModal(false);
+                  setShowStyleChangeWarningModal(false);
+                  setPendingStyleChange(null);
                 }}
-                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all focus:outline-none"
+                className="flex-1 py-2.5 px-3 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  window.location.href = "/store";
-                }}
-                className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_12px_rgba(99,102,241,0.2)] focus:outline-none"
+                type="button"
+                onClick={() => applyStyleChange(pendingStyleChange, true)}
+                className="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
               >
-                Go to Checkout
+                Change Style
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Cart / Checkout Redirect */}
+      {showCartRedirectModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 p-6 flex flex-col items-center text-center select-none">
+            {/* Success Icon */}
+            <div className="h-14 w-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 mb-3 border border-emerald-100 shadow-xs">
+              <CheckCircle className="h-7 w-7" />
+            </div>
+
+            <h3 className="text-xl font-black text-slate-950 mb-1">Item Ready for Checkout!</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Your customized garment has been added to your cart with the selected configurations:
+            </p>
+
+            {/* Clearly Display Garment Specifications (Size, GSM, Color, Style, Quantity) */}
+            <div className="w-full bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3 mb-5 text-left">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                <span className="text-xs font-semibold text-slate-500">Garment Style</span>
+                <span className="text-xs font-black text-slate-900 truncate max-w-[200px] flex items-center gap-1.5">
+                  <Shirt className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                  {addedItemDetails.name || shirtType}
+                </span>
+              </div>
+
+              {/* 2x2 Grid for prominent Size, GSM, Color, Quantity */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* 1. Selected Size */}
+                <div className="bg-white p-3 rounded-xl border-2 border-indigo-100 shadow-2xs flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-amber-50 text-amber-600 shrink-0">
+                    <Ruler className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Selected Size</p>
+                    <p className="text-sm font-black text-indigo-600">{addedItemDetails.size || "M"}</p>
+                  </div>
+                </div>
+
+                {/* 2. Selected GSM */}
+                <div className="bg-white p-3 rounded-xl border-2 border-teal-100 shadow-2xs flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-teal-50 text-teal-600 shrink-0">
+                    <Scale className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fabric GSM</p>
+                    <p className="text-sm font-black text-teal-700 truncate">{addedItemDetails.gsm || addedItemDetails.material || "180 GSM"}</p>
+                  </div>
+                </div>
+
+                {/* 3. Color */}
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200/70 shadow-2xs flex items-center gap-2.5">
+                  <div
+                    className="h-6 w-6 rounded-full border border-slate-300 shadow-2xs shrink-0 ring-2 ring-slate-100"
+                    style={{ backgroundColor: addedItemDetails.shirtColor || shirtColor }}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Color</p>
+                    <p className="text-xs font-bold text-slate-800 truncate">{addedItemDetails.color || resolveColorName(shirtColor)}</p>
+                  </div>
+                </div>
+
+                {/* 4. Quantity & Total */}
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200/70 shadow-2xs flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600 shrink-0">
+                    <ShoppingBag className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty & Price</p>
+                    <p className="text-xs font-black text-slate-900">
+                      {addedItemDetails.quantity || 1} pcs • Rs. {Number(addedItemDetails.totalCost || totalCost || unitPrice).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCartRedirectModal(false);
+                }}
+                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all focus:outline-none cursor-pointer"
+              >
+                Keep Designing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/cart";
+                }}
+                className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_12px_rgba(99,102,241,0.25)] focus:outline-none cursor-pointer"
+              >
+                Proceed to Checkout
               </button>
             </div>
           </div>

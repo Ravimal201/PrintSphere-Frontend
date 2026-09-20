@@ -12,17 +12,24 @@ import {
 
 const colorMap = {
   white: "#ffffff",
+  "pure white": "#ffffff",
   black: "#111827",
+  "jet black": "#111827",
   charcoal: "#4b5563",
   "navy blue": "#1e3a8a",
   navy: "#1e3a8a",
   red: "#dc2626",
+  crimson: "#dc2626",
   gold: "#fbbf24",
   yellow: "#fbbf24",
   green: "#16a34a",
+  emerald: "#10b981",
+  teal: "#14b8a6",
   violet: "#6d28d9",
   purple: "#6d28d9",
+  indigo: "#4f46e5",
   pink: "#f472b6",
+  rose: "#f43f5e",
   beige: "#f5f5dc",
   "light grey": "#e5e7eb",
   "light gray": "#e5e7eb",
@@ -35,21 +42,39 @@ const colorMap = {
 
 const getColorValue = (colorStr) => {
   if (!colorStr) return "#ffffff";
-  if (colorStr.startsWith("#")) return colorStr;
+  if (colorStr.startsWith("#") || colorStr.startsWith("rgb")) return colorStr;
   const lower = colorStr.toLowerCase().trim();
   return colorMap[lower] || colorStr;
 };
 
 const getModelPath = (design) => {
   if (!design) return "/images/models/male normal t-shirt1.glb";
+  
+  // 1. Direct model path property
   if (design.modelPath && typeof design.modelPath === "string" && (design.modelPath.toLowerCase().endsWith(".glb") || design.modelPath.toLowerCase().endsWith(".gltf") || design.modelPath.toLowerCase().endsWith(".fbx"))) {
     return design.modelPath;
+  }
+  if (design.path && typeof design.path === "string" && (design.path.toLowerCase().endsWith(".glb") || design.path.toLowerCase().endsWith(".gltf") || design.path.toLowerCase().endsWith(".fbx"))) {
+    return design.path;
   }
   if (design.modelUrl && typeof design.modelUrl === "string" && (design.modelUrl.toLowerCase().endsWith(".glb") || design.modelUrl.toLowerCase().endsWith(".gltf") || design.modelUrl.toLowerCase().endsWith(".fbx"))) {
     return design.modelUrl;
   }
+  if (design.selectedModel?.path) {
+    return design.selectedModel.path;
+  }
 
+  // 2. Check if any layer has projectedForModel
+  if (design.layers && Array.isArray(design.layers)) {
+    const layerWithModel = design.layers.find(l => l.projectedForModel);
+    if (layerWithModel?.projectedForModel) {
+      return layerWithModel.projectedForModel;
+    }
+  }
+
+  // 3. Fallback to style/type matching
   const textStr = (
+    design.tShirtStyle ||
     design.tShirtType ||
     design.shirtType ||
     design.type ||
@@ -60,17 +85,23 @@ const getModelPath = (design) => {
     (typeof design === "string" ? design : "")
   ).toLowerCase();
 
-  if (textStr.includes("female") || textStr.includes("women") || textStr.includes("v-neck") || textStr.includes("woman")) {
+  if (textStr.includes("female") || textStr.includes("women") || textStr.includes("woman") || textStr.includes("v-neck")) {
     return "/images/models/female normal t-shirt.glb";
   }
-  if (textStr.includes("long sleeve") || textStr.includes("long-sleeve")) {
+  if (textStr.includes("long sleeve") || textStr.includes("long-sleeve") || textStr.includes("longsleeve")) {
     return "/images/models/long_sleeve_t-_shirt.glb";
   }
-  if (textStr.includes("oversized")) {
+  if (textStr.includes("oversized") || textStr.includes("oversize")) {
     return "/images/models/oversized t-sdirt1.glb";
   }
-  if (textStr.includes("hoodie") || textStr.includes("polo")) {
+  if (textStr.includes("hoodie")) {
     return "/images/models/t_shirt_hoodie.glb";
+  }
+  if (textStr.includes("polo") || textStr.includes("collar") || textStr.includes("orange")) {
+    return "/images/models/orange_shirt_with_collar.glb";
+  }
+  if (textStr.includes("traditional") || textStr.includes("amazigh")) {
+    return "/images/models/amazigh_traditional_t-shirt.glb";
   }
   if (textStr.includes("fbx") || textStr.includes("classic")) {
     return "/images/models/T SHIRT.fbx";
@@ -212,7 +243,7 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
     }
   };
 
-  const resolvedColor = getColorValue(design.fabricColor || design.color || design.selectedColor);
+  const resolvedColor = getColorValue(design.fabricColor || design.shirtColor || design.color || design.selectedColor || design.defaultColor);
   const resolvedModelPath = getModelPath(design);
   const layers = getLayersFromDesign(design);
   const titleName = (design.tShirtType || design.title || "custom-shirt").replace(/[^a-z0-9]/gi, "-").toLowerCase();
