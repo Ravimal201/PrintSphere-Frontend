@@ -6,7 +6,7 @@ import TShirt2D from "../components/TShirt2D";
 import TShirt3DModal from "../components/TShirt3DModal";
 import { 
   ShoppingCart, Trash2, Plus, Minus, AlertCircle, ShoppingBag, CheckCircle, 
-  Loader2, Wallet, CreditCard, X, MapPin, ShieldCheck, Edit3, Truck, Info 
+  Loader2, Wallet, CreditCard, X, MapPin, ShieldCheck, Edit3, Truck, Info, Check 
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -52,11 +52,20 @@ export default function CartPage() {
     cvv: ""
   });
 
+  const [selectedCartKeys, setSelectedCartKeys] = useState(() => {
+    const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+    if (Array.isArray(savedCart)) {
+      return new Set(savedCart.map((item) => item.cartKey));
+    }
+    return new Set();
+  });
+
   useEffect(() => {
     // Load cart
     const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
     if (Array.isArray(savedCart)) {
       setCart(savedCart);
+      setSelectedCartKeys(new Set(savedCart.map((item) => item.cartKey)));
     }
 
     // Load local user profile
@@ -91,6 +100,28 @@ export default function CartPage() {
     safeLocalStorage.setItem("printsphere_cart", newCart);
   };
 
+  const handleToggleSelectItem = (cartKey) => {
+    setSelectedCartKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(cartKey)) {
+        next.delete(cartKey);
+      } else {
+        next.add(cartKey);
+      }
+      return next;
+    });
+  };
+
+  const isAllSelected = cart.length > 0 && selectedCartKeys.size === cart.length;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedCartKeys(new Set());
+    } else {
+      setSelectedCartKeys(new Set(cart.map((item) => item.cartKey)));
+    }
+  };
+
   const handleUpdateQuantity = (cartKey, delta) => {
     const updatedCart = cart.map(item => {
       if (item.cartKey === cartKey) {
@@ -105,28 +136,41 @@ export default function CartPage() {
   const handleRemoveItem = (cartKey) => {
     const updatedCart = cart.filter(item => item.cartKey !== cartKey);
     saveCart(updatedCart);
+    setSelectedCartKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(cartKey);
+      return next;
+    });
   };
 
-  // Calculations for cart
-  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const cartSubtotal = cart.reduce((sum, item) => {
+  // Calculations for selected items
+  const selectedItems = cart.filter((item) => selectedCartKeys.has(item.cartKey));
+  const selectedItemCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const selectedSubtotal = selectedItems.reduce((sum, item) => {
     const itemPrice = item.basePrice * (1 - (item.discount / 100));
     return sum + (itemPrice * item.quantity);
   }, 0);
 
-  // Apply volume discount if quantity threshold met
+  // Apply volume discount if selected quantity threshold met
   const isVolumeDiscountEligible = pricingRules && 
     pricingRules.volumeDiscount && 
-    cartItemCount >= pricingRules.volumeDiscount.thresholdQty;
+    selectedItemCount >= pricingRules.volumeDiscount.thresholdQty;
   
   const volumeDiscountAmount = isVolumeDiscountEligible 
-    ? cartSubtotal * (pricingRules.volumeDiscount.discountPercentage / 100) 
+    ? selectedSubtotal * (pricingRules.volumeDiscount.discountPercentage / 100) 
     : 0;
 
-  const cartTotal = cartSubtotal - volumeDiscountAmount;
+  const selectedTotal = selectedSubtotal - volumeDiscountAmount;
 
   // Open Checkout Popup Window
-  const handleOpenCheckoutModal = async () => {
+  const handleOpenCheckoutModal = async (overrideSelectedKeys = null) => {
+    const keysToCheck = overrideSelectedKeys || selectedCartKeys;
+    const itemsToPay = cart.filter(item => keysToCheck.has(item.cartKey));
+    if (itemsToPay.length === 0) {
+      alert("Please select at least one item to proceed to checkout.");
+      return;
+    }
+
     const token = localStorage.getItem("token");
     if (!token) {
       alert("Please log in to complete your checkout.");
@@ -155,7 +199,7 @@ export default function CartPage() {
         // If user has a saved payment method, show saved method view by default
         if (profileRes.data.savedPaymentMethod && profileRes.data.savedPaymentMethod.cardLast4) {
           setIsEditingPaymentMethod(false);
-          setSelectedGateway(profileRes.data.savedPaymentMethod.methodType || "card");
+          setSelectedPaymentMethod(profileRes.data.savedPaymentMethod.methodType || "Card");
         } else {
           setIsEditingPaymentMethod(true);
         }
@@ -167,6 +211,16 @@ export default function CartPage() {
 
     setIsEditingAddress(false);
     setIsCheckoutModalOpen(true);
+  };
+
+  const handleDirectItemCheckout = (item) => {
+    setIs3DModalOpen(false);
+    setSelected3DDesign(null);
+
+    const targetKey = item?.cartKey || cart.find(c => (c.designId && c.designId === item?.designId) || (c.designId && c.designId === item?._id))?.cartKey;
+    const newSelectedSet = targetKey ? new Set([targetKey]) : new Set(cart.map(c => c.cartKey));
+    setSelectedCartKeys(newSelectedSet);
+    handleOpenCheckoutModal(newSelectedSet);
   };
 
   // Card Number Formatter
@@ -197,6 +251,11 @@ export default function CartPage() {
   // Confirm Order & Redirect to Payment Interface
   const handleConfirmCheckout = async (e) => {
     if (e) e.preventDefault();
+
+    if (selectedItems.length === 0) {
+      alert("Please select at least one item to proceed to checkout.");
+      return;
+    }
 
     const token = localStorage.getItem("token");
     if (!token) {
@@ -230,9 +289,9 @@ export default function CartPage() {
         }
       }
 
-      // 2. Resolve custom designs and items
+      // 2. Resolve custom designs and items for selected items only
       const resolvedItems = [];
-      for (const item of cart) {
+      for (const item of selectedItems) {
         const colorName = resolveColorName(item.color);
         const formattedGsm = formatGsm(item.gsm || item.material || "GSM 180");
         if (item.isCustom || item.designId?.startsWith("custom-")) {
@@ -278,20 +337,21 @@ export default function CartPage() {
       // 3. Create order in backend DB with Pending Payment status
       const orderPayload = {
         items: resolvedItems,
-        subtotal: cartSubtotal,
+        subtotal: selectedSubtotal,
         printCost: 0,
         complexityFee: 0,
-        totalCost: cartTotal,
+        totalCost: selectedTotal,
         shippingAddress
       };
 
       const orderRes = await axios.post(`${API_BASE_URL}/auth/orders`, orderPayload, { headers });
       const orderId = orderRes.data.order._id;
 
-
-      // 4. Save pending order ID, clear cart, and navigate to Payment Interface
+      // 4. Save pending order ID, remove paid items from cart (retaining unselected items), and navigate to Payment Interface
       localStorage.setItem("printsphere_pending_order_id", orderId);
-      saveCart([]);
+      const remainingCart = cart.filter((item) => !selectedCartKeys.has(item.cartKey));
+      saveCart(remainingCart);
+      setSelectedCartKeys(new Set(remainingCart.map((item) => item.cartKey)));
       setIsCheckoutModalOpen(false);
       window.location.href = `/payment?order_id=${orderId}`;
     } catch (err) {
@@ -357,21 +417,73 @@ export default function CartPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Cart Items List */}
                 <div className="md:col-span-2 space-y-4">
+                  {/* Select All & Selection Status Bar */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-3 flex items-center justify-between shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={handleToggleSelectAll}
+                      className="flex items-center gap-2.5 text-xs font-extrabold text-slate-700 hover:text-indigo-600 transition cursor-pointer select-none"
+                    >
+                      <div
+                        className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all ${
+                          isAllSelected
+                            ? "bg-indigo-600 border-indigo-600 text-white shadow-xs"
+                            : selectedCartKeys.size > 0
+                            ? "bg-indigo-50 border-indigo-400 text-indigo-600"
+                            : "bg-white border-slate-300 text-transparent"
+                        }`}
+                      >
+                        <Check className="h-3.5 w-3.5 stroke-[3]" />
+                      </div>
+                      <span>Select All ({cart.length} item{cart.length !== 1 ? "s" : ""})</span>
+                    </button>
+
+                    <span className="text-xs font-bold text-slate-500">
+                      <span className="text-indigo-600 font-extrabold">{selectedItems.length}</span> of {cart.length} selected
+                    </span>
+                  </div>
+
                   {cart.map((item) => {
                     const priceAfterDiscount = item.basePrice * (1 - (item.discount / 100));
+                    const isSelected = selectedCartKeys.has(item.cartKey);
+
                     return (
-                      <div key={item.cartKey} className="bg-white border border-slate-200/80 rounded-3xl p-4 flex gap-4 shadow-sm hover:shadow-md transition">
+                      <div 
+                        key={item.cartKey} 
+                        className={`bg-white border rounded-3xl p-4 flex items-center gap-3.5 shadow-sm hover:shadow-md transition ${
+                          isSelected ? "border-indigo-300 ring-2 ring-indigo-500/10" : "border-slate-200/80 opacity-75 bg-slate-50/40"
+                        }`}
+                      >
+                        {/* Item Selection Tickbox */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSelectItem(item.cartKey)}
+                          className="p-1 -ml-1 text-slate-400 hover:text-indigo-600 transition cursor-pointer shrink-0"
+                          title={isSelected ? "Deselect item" : "Select item to pay now"}
+                        >
+                          <div
+                            className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all ${
+                              isSelected
+                                ? "bg-indigo-600 border-indigo-600 text-white shadow-xs scale-105"
+                                : "bg-white border-slate-300 hover:border-indigo-400 text-transparent"
+                            }`}
+                          >
+                            <Check className="h-3.5 w-3.5 stroke-[3]" />
+                          </div>
+                        </button>
+
                         <div className="h-20 w-20 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center p-2 shrink-0">
                           <TShirt2D color={item.color} designUrl={item.image} className="h-16 w-16" />
                         </div>
                         
-                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
                           <div>
                             <div className="flex justify-between items-start">
                               <h4 className="font-extrabold text-slate-900 text-sm truncate leading-tight pr-2 capitalize">{item.title}</h4>
                               <button 
                                 onClick={() => handleRemoveItem(item.cartKey)}
                                 className="text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                                title="Remove item from cart"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -421,12 +533,17 @@ export default function CartPage() {
                 {/* Summary / Checkout Panel */}
                 <div className="space-y-6">
                   <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-                    <h3 className="text-sm font-extrabold text-slate-900 pb-3 border-b">Order Summary</h3>
+                    <div className="flex items-center justify-between pb-3 border-b">
+                      <h3 className="text-sm font-extrabold text-slate-900">Order Summary</h3>
+                      <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                        {selectedItems.length} of {cart.length} selected
+                      </span>
+                    </div>
                     
                     <div className="space-y-2.5 text-xs text-slate-500 font-medium">
                       <div className="flex justify-between">
-                        <span>Subtotal ({cartItemCount} items)</span>
-                        <span className="text-slate-800 font-bold">Rs. {cartSubtotal.toFixed(2)}</span>
+                        <span>Selected Subtotal ({selectedItemCount} items)</span>
+                        <span className="text-slate-800 font-bold">Rs. {selectedSubtotal.toFixed(2)}</span>
                       </div>
                       
                       {isVolumeDiscountEligible && (
@@ -440,7 +557,7 @@ export default function CartPage() {
                         <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-[10px] text-indigo-700 font-semibold leading-snug flex items-start gap-2">
                           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                           <span>
-                            Order {pricingRules.volumeDiscount.thresholdQty} units or more to get a {pricingRules.volumeDiscount.discountPercentage}% bulk discount!
+                            Select {pricingRules.volumeDiscount.thresholdQty} units or more to get a {pricingRules.volumeDiscount.discountPercentage}% bulk discount!
                           </span>
                         </div>
                       )}
@@ -456,8 +573,8 @@ export default function CartPage() {
                       </div>
 
                       <div className="flex justify-between text-sm font-black text-slate-950 pt-2 border-t">
-                        <span>Items Total</span>
-                        <span className="text-indigo-650 font-black">Rs. {cartTotal.toFixed(2)}</span>
+                        <span>Payable Now</span>
+                        <span className="text-indigo-650 font-black">Rs. {selectedTotal.toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -474,10 +591,15 @@ export default function CartPage() {
 
                     <button
                       onClick={handleOpenCheckoutModal}
-                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm mt-2 flex items-center justify-center gap-2 cursor-pointer"
+                      disabled={selectedItems.length === 0}
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition shadow-sm mt-2 flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <CreditCard className="h-4 w-4" />
-                      <span>Proceed to Checkout</span>
+                      <span>
+                        {selectedItems.length > 0
+                          ? `Proceed to Checkout (${selectedItems.length} item${selectedItems.length !== 1 ? "s" : ""})`
+                          : "Select Items to Proceed"}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -516,10 +638,10 @@ export default function CartPage() {
             {/* Section 1: Items & T-Shirt Design Preview */}
             <div className="space-y-3">
               <h4 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                Order Items & Designs ({cart.length})
+                Order Items & Designs ({selectedItems.length})
               </h4>
               <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-                {cart.map((item) => (
+                {selectedItems.map((item) => (
                   <div key={item.cartKey} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-150 rounded-2xl">
                     <div className="flex items-center gap-3">
                       <div className="h-14 w-14 bg-white border border-slate-200 rounded-xl flex items-center justify-center p-1 shrink-0">
@@ -653,7 +775,7 @@ export default function CartPage() {
               <div className="flex justify-between items-center bg-slate-900 text-white rounded-2xl p-4">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Items Amount Payable Now</span>
-                  <span className="text-xl font-black">Rs. {cartTotal.toFixed(2)}</span>
+                  <span className="text-xl font-black">Rs. {selectedTotal.toFixed(2)}</span>
                   <span className="text-[10px] text-amber-400 block mt-0.5 font-medium">+ Courier delivery fee payable upon package receipt</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold">
@@ -703,6 +825,7 @@ export default function CartPage() {
           setSelected3DDesign(null);
         }}
         design={selected3DDesign}
+        onCheckout={handleDirectItemCheckout}
       />
     </div>
   );

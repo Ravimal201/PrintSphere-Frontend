@@ -219,7 +219,7 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
           designId: design._id,
           productId: null,
           title: design.tShirtType || design.title || "Custom T-Shirt",
-          basePrice: design.estimatedCost || 0,
+          basePrice: design.basePrice || design.estimatedCost || design.price || 0,
           discount: 0,
           category: "Customized",
           size: selectedSize,
@@ -620,11 +620,11 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
 
           {/* Footer with Checkout Action & Estimated Cost */}
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-3 select-none">
-            {design.estimatedCost ? (
+            {(design.basePrice || design.estimatedCost || design.price) ? (
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase">Estimated Cost</span>
+                <span className="text-xs font-bold text-slate-400 uppercase">Unit Price</span>
                 <span className="text-lg font-black text-slate-900">
-                  Rs. {typeof design.estimatedCost === "number" ? design.estimatedCost.toFixed(2) : design.estimatedCost}
+                  Rs. {Number(design.basePrice || design.estimatedCost || design.price || 0).toFixed(2)}
                 </span>
               </div>
             ) : null}
