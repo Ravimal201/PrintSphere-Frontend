@@ -59,6 +59,8 @@ import {
   Box,
   CheckCheck,
   AlertTriangle,
+  RotateCcw,
+  RotateCw,
 } from "lucide-react";
 import axios from "axios";
 import Scene from "../three/Scene";
@@ -275,6 +277,15 @@ export default function ManagerPage() {
     useState(null);
   const [submissionSide, setSubmissionSide] = useState("front");
   const [submissionZoom, setSubmissionZoom] = useState(0.85);
+  const [submissionRotation, setSubmissionRotation] = useState(0);
+  const [submissionAutoRotate, setSubmissionAutoRotate] = useState(false);
+
+  useEffect(() => {
+    if (submissionSide === "front") setSubmissionRotation(0);
+    else if (submissionSide === "back") setSubmissionRotation(Math.PI);
+    else if (submissionSide === "left") setSubmissionRotation(Math.PI / 2);
+    else if (submissionSide === "right") setSubmissionRotation(-Math.PI / 2);
+  }, [submissionSide]);
 
   // Manager 3D preview modal state for custom customer designs in orders
   const [selected3DDesign, setSelected3DDesign] = useState(null);
@@ -5466,30 +5477,46 @@ export default function ManagerPage() {
 
             {/* Left 3D Panel */}
             <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-6 border-b md:border-b-0 md:border-r">
-              <div className="absolute top-4 left-4 z-10">
-                <span className="px-3 py-1 bg-purple-50 border border-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-wider">
+              {/* Top Left info badge */}
+              <div className="absolute top-4 left-4 z-10 flex flex-col gap-1 pointer-events-none">
+                <span className="px-3 py-1 bg-purple-50/90 backdrop-blur-md border border-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-2xs">
+                  <Sparkles className="h-3 w-3 text-purple-600 animate-pulse" />
                   Employee Submission 3D Review
+                </span>
+                <span className="text-[10px] text-slate-400 font-bold pl-1">
+                  Drag to rotate • Wheel / Slider to zoom
                 </span>
               </div>
 
               {/* Preset Side buttons */}
               <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
-                {["front", "back", "left", "right"].map((side) => (
+                {[
+                  { id: "front", label: "Front", rot: 0 },
+                  { id: "back", label: "Back", rot: Math.PI },
+                  { id: "left", label: "Left", rot: Math.PI / 2 },
+                  { id: "right", label: "Right", rot: -Math.PI / 2 },
+                ].map((item) => (
                   <button
-                    key={side}
-                    onClick={() => setSubmissionSide(side)}
-                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs ${submissionSide === side
-                      ? "bg-purple-600 border-purple-600 text-white"
-                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSubmissionSide(item.id);
+                      setSubmissionRotation(item.rot);
+                      setSubmissionAutoRotate(false);
+                    }}
+                    className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border transition shadow-xs cursor-pointer ${
+                      submissionSide === item.id && !submissionAutoRotate
+                        ? "bg-purple-600 border-purple-600 text-white shadow-purple-200"
+                        : "bg-white/90 backdrop-blur-xs border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
                   >
-                    {side}
+                    {item.label}
                   </button>
                 ))}
               </div>
 
               {/* 3D Scene container */}
-              <div className="w-full h-full min-h-[280px] md:min-h-0 flex-1">
+              <div className="w-full h-full min-h-[280px] md:min-h-0 flex-1 relative">
                 <Scene
                   modelPath={getSubmissionModelPath()}
                   shirtColor={
@@ -5501,25 +5528,76 @@ export default function ManagerPage() {
                   selectedLayerId={null}
                   onSelectLayer={() => { }}
                   onUpdateLayers={() => { }}
+                  modelRotation={submissionRotation}
+                  orbitEnabled={true}
+                  autoRotate={submissionAutoRotate}
                 />
               </div>
 
-              {/* Zoom control */}
-              <div className="flex items-center gap-3 bg-white/80 backdrop-blur-xs border rounded-2xl px-4 py-2 self-center z-10 shadow-xs">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">
-                  Zoom
-                </span>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="1.5"
-                  step="0.05"
-                  value={submissionZoom}
-                  onChange={(e) =>
-                    setSubmissionZoom(parseFloat(e.target.value))
-                  }
-                  className="w-28 accent-purple-600 h-1 bg-slate-200 rounded-lg appearance-none"
-                />
+              {/* Controls Toolbar: Zoom, Step Rotate, Reset */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white/90 backdrop-blur-xs border border-slate-200 rounded-2xl px-3 py-2 z-10 shadow-xs">
+                {/* Zoom control */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">
+                    Zoom
+                  </span>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="1.5"
+                    step="0.05"
+                    value={submissionZoom}
+                    onChange={(e) =>
+                      setSubmissionZoom(parseFloat(e.target.value))
+                    }
+                    className="w-20 accent-purple-600 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-[10px] font-black text-slate-700">
+                    {Math.round(submissionZoom * 100)}%
+                  </span>
+                </div>
+
+                {/* Manual Rotation & Reset controls */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    Rotate
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmissionRotation((prev) => prev - Math.PI / 4);
+                      setSubmissionAutoRotate(false);
+                    }}
+                    className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-purple-600 rounded-lg transition border border-slate-200 cursor-pointer"
+                    title="Rotate Left 45°"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmissionRotation((prev) => prev + Math.PI / 4);
+                      setSubmissionAutoRotate(false);
+                    }}
+                    className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-purple-600 rounded-lg transition border border-slate-200 cursor-pointer"
+                    title="Rotate Right 45°"
+                  >
+                    <RotateCw className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmissionSide("front");
+                      setSubmissionRotation(0);
+                      setSubmissionZoom(0.85);
+                      setSubmissionAutoRotate(false);
+                    }}
+                    className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-lg transition border border-slate-200 cursor-pointer"
+                    title="Reset 3D View"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             </div>
 
