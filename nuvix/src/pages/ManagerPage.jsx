@@ -64,6 +64,7 @@ import Store3DCardPreview from "../components/Store3DCardPreview";
 
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { sortSizesAscending, getSizeFullName, formatSizeList, getSizeInfo } from "../utils/sizeHelper";
 
 export default function ManagerPage() {
   const [isManager, setIsManager] = useState(false);
@@ -93,7 +94,6 @@ export default function ManagerPage() {
   const [newGsmName, setNewGsmName] = useState("");
   const [newGsmPrice, setNewGsmPrice] = useState("");
   const [newColor, setNewColor] = useState({ name: "", value: "#ffffff" });
-  const [newCustomSize, setNewCustomSize] = useState("");
 
   // Data states
   const [orders, setOrders] = useState([]);
@@ -795,7 +795,11 @@ export default function ManagerPage() {
   const handleRestockQuantity = async (itemId) => {
     const restockVal = Number(restockQuantities[itemId]);
     if (Number.isNaN(restockVal)) {
-      alert("Please enter a valid number");
+      alertAction({
+        title: "Invalid Quantity",
+        message: "Please enter a valid number.",
+        type: "warning",
+      });
       return;
     }
 
@@ -808,7 +812,11 @@ export default function ManagerPage() {
       const newQty = currentQty + restockVal;
 
       if (newQty < 0) {
-        alert("Stock is insufficient to remove that quantity");
+        alertAction({
+          title: "Insufficient Stock",
+          message: "Stock is insufficient to remove that quantity.",
+          type: "warning",
+        });
         return;
       }
 
@@ -822,23 +830,33 @@ export default function ManagerPage() {
         prev.map((i) => (i._id === itemId ? res.data.item : i)),
       );
       setRestockQuantities((prev) => ({ ...prev, [itemId]: "" }));
-      alert(
-        restockVal < 0
-          ? "Stock removed successfully!"
-          : "Stock added successfully!",
-      );
+      alertAction({
+        title: "Stock Updated",
+        message:
+          restockVal < 0
+            ? "Stock removed successfully!"
+            : "Stock added successfully!",
+        type: "success",
+      });
     } catch (err) {
       console.error("Restock error:", err);
-      alert(
-        err.response?.data?.message || "Failed to update inventory quantity",
-      );
+      alertAction({
+        title: "Update Failed",
+        message:
+          err.response?.data?.message || "Failed to update inventory quantity",
+        type: "danger",
+      });
     }
   };
 
   const handleUpdateMinThreshold = async (itemId) => {
     const thresholdValue = Number(thresholdInputs[itemId]);
     if (Number.isNaN(thresholdValue) || thresholdValue < 0) {
-      alert("Please enter a valid minimum threshold");
+      alertAction({
+        title: "Invalid Threshold",
+        message: "Please enter a valid minimum threshold.",
+        type: "warning",
+      });
       return;
     }
 
@@ -856,12 +874,19 @@ export default function ManagerPage() {
         prev.map((i) => (i._id === itemId ? res.data.item : i)),
       );
       setEditingThresholdId(null);
-      alert("Minimum threshold updated successfully!");
+      alertAction({
+        title: "Threshold Updated",
+        message: "Minimum threshold updated successfully!",
+        type: "success",
+      });
     } catch (err) {
       console.error("Threshold update error:", err);
-      alert(
-        err.response?.data?.message || "Failed to update minimum threshold",
-      );
+      alertAction({
+        title: "Update Failed",
+        message:
+          err.response?.data?.message || "Failed to update minimum threshold",
+        type: "danger",
+      });
     }
   };
 
@@ -1046,9 +1071,20 @@ export default function ManagerPage() {
         quantity: 50,
         minThreshold: 15,
       });
+      alertAction({
+        title: "Inventory Added",
+        message: "New inventory item added successfully!",
+        type: "success",
+      });
     } catch (err) {
       console.error("Save inventory item error:", err);
-      setInventoryError(err.response?.data?.message || "Failed to add inventory item.");
+      const errMsg = err.response?.data?.message || "Failed to add inventory item.";
+      setInventoryError(errMsg);
+      alertAction({
+        title: "Failed to Add Inventory",
+        message: errMsg,
+        type: "danger",
+      });
     } finally {
       setInventoryActionLoading(false);
     }
@@ -2350,7 +2386,7 @@ export default function ManagerPage() {
                             )}
                             {draft.sizes && draft.sizes.length > 0 && (
                               <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">
-                                Sizes: {draft.sizes.join(", ")}
+                                Sizes: {formatSizeList(draft.sizes)}
                               </span>
                             )}
                           </div>
@@ -2567,7 +2603,7 @@ export default function ManagerPage() {
                               </td>
                               <td className="py-4 text-xs text-slate-500">
                                 <div className="space-y-0.5">
-                                  <p className="font-semibold text-slate-700">{(p.sizes || []).join(", ") || "All Sizes"}</p>
+                                  <p className="font-semibold text-slate-700">{formatSizeList(p.sizes)}</p>
                                   <p className="text-[11px] text-slate-400">
                                     {(() => {
                                       if (p.gsms && p.gsms.length > 0) {
@@ -2912,12 +2948,13 @@ export default function ManagerPage() {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
                         <span>Available Sizes</span>
                         <span className="text-[9px] text-indigo-600 font-normal">
-                          Selected: {(productForm.sizes || []).join(", ") || "None"}
+                          Selected: {formatSizeList(productForm.sizes)}
                         </span>
                       </label>
                       <div className="flex flex-wrap gap-2 pt-0.5">
-                        {["S", "M", "L", "XL", "XXL"].map((size) => {
+                        {["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((size) => {
                           const isSelected = (productForm.sizes || []).includes(size);
+                          const sizeMeta = getSizeInfo(size);
                           return (
                             <label
                               key={size}
@@ -2925,6 +2962,7 @@ export default function ManagerPage() {
                                 ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
                                 : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                 }`}
+                              title={`${size} (${sizeMeta.label})`}
                             >
                               <input
                                 type="checkbox"
@@ -2934,7 +2972,7 @@ export default function ManagerPage() {
                                   setProductForm((prev) => {
                                     const currentSizes = prev.sizes || [];
                                     const updatedSizes = checked
-                                      ? [...currentSizes, size]
+                                      ? sortSizesAscending([...currentSizes, size])
                                       : currentSizes.filter((s) => s !== size);
                                     return { ...prev, sizes: updatedSizes };
                                   });
@@ -4899,12 +4937,13 @@ export default function ManagerPage() {
                     Sizes Included
                   </span>
                   <div className="flex gap-1.5 flex-wrap">
-                    {selectedSubmissionProduct.sizes?.map((sz) => (
+                    {sortSizesAscending(selectedSubmissionProduct.sizes || []).map((sz) => (
                       <span
                         key={sz}
                         className="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs"
+                        title={getSizeFullName(sz)}
                       >
-                        {sz}
+                        {sz} ({getSizeFullName(sz)})
                       </span>
                     ))}
                   </div>
@@ -5855,67 +5894,6 @@ export default function ManagerPage() {
                     );
                   })}
                 </div>
-
-                {/* Additional Custom Sizes (if any) */}
-                {(styleForm.sizes || []).some(
-                  (s) => !["XS", "S", "M", "L", "XL", "XXL", "3XL"].includes(s)
-                ) && (
-                  <div className="pt-2 flex flex-wrap gap-1.5 items-center">
-                    <span className="text-[10px] font-bold text-slate-400">Custom Sizes:</span>
-                    {(styleForm.sizes || [])
-                      .filter((s) => !["XS", "S", "M", "L", "XL", "XXL", "3XL"].includes(s))
-                      .map((customSz, cIdx) => (
-                        <span
-                          key={cIdx}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-xs font-black"
-                        >
-                          {customSz}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStyleForm((prev) => ({
-                                ...prev,
-                                sizes: prev.sizes.filter((s) => s !== customSz),
-                              }));
-                            }}
-                            className="hover:text-rose-200 cursor-pointer"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                  </div>
-                )}
-
-                {/* Add Custom Size Input */}
-                <div className="flex items-center gap-2 pt-1.5">
-                  <input
-                    type="text"
-                    placeholder="Add custom size (e.g. 4XL, Youth M)"
-                    value={newCustomSize}
-                    onChange={(e) => setNewCustomSize(e.target.value)}
-                    className="flex-1 px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-indigo-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const trimmed = newCustomSize.trim().toUpperCase();
-                      if (!trimmed) return;
-                      setStyleForm((prev) => {
-                        const current = prev.sizes || [];
-                        if (current.includes(trimmed)) return prev;
-                        return {
-                          ...prev,
-                          sizes: [...current, trimmed],
-                        };
-                      });
-                      setNewCustomSize("");
-                    }}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Size
-                  </button>
-                </div>
               </div>
 
               {/* Actions */}
@@ -6056,6 +6034,7 @@ export default function ManagerPage() {
         design={selected3DDesign}
         showCustomize={false}
         allowDownloads={true}
+        hideAction={true}
       />
       </div>
     </div>

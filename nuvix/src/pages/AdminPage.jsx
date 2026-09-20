@@ -273,7 +273,11 @@ export default function AdminPage() {
   const handleRestockQuantity = async (itemId) => {
     const restockVal = Number(restockQuantities[itemId]);
     if (Number.isNaN(restockVal)) {
-      alert("Please enter a valid number");
+      alertAction({
+        title: "Invalid Quantity",
+        message: "Please enter a valid number.",
+        type: "warning",
+      });
       return;
     }
 
@@ -286,7 +290,11 @@ export default function AdminPage() {
       const newQty = currentQty + restockVal;
 
       if (newQty < 0) {
-        alert("Stock is insufficient to remove that quantity");
+        alertAction({
+          title: "Insufficient Stock",
+          message: "Stock is insufficient to remove that quantity.",
+          type: "warning",
+        });
         return;
       }
 
@@ -300,24 +308,34 @@ export default function AdminPage() {
         prev.map((i) => (i._id === itemId ? res.data.item : i))
       );
       setRestockQuantities((prev) => ({ ...prev, [itemId]: "" }));
-      alert(
-        restockVal < 0
-          ? "Stock removed successfully!"
-          : "Stock added successfully!"
-      );
+      alertAction({
+        title: "Stock Updated",
+        message:
+          restockVal < 0
+            ? "Stock removed successfully!"
+            : "Stock added successfully!",
+        type: "success",
+      });
       fetchAnalytics();
     } catch (err) {
       console.error("Restock error:", err);
-      alert(
-        err.response?.data?.message || "Failed to update inventory quantity"
-      );
+      alertAction({
+        title: "Update Failed",
+        message:
+          err.response?.data?.message || "Failed to update inventory quantity",
+        type: "danger",
+      });
     }
   };
 
   const handleUpdateMinThreshold = async (itemId) => {
     const thresholdValue = Number(thresholdInputs[itemId]);
     if (Number.isNaN(thresholdValue) || thresholdValue < 0) {
-      alert("Please enter a valid minimum threshold");
+      alertAction({
+        title: "Invalid Threshold",
+        message: "Please enter a valid minimum threshold.",
+        type: "warning",
+      });
       return;
     }
 
@@ -335,13 +353,20 @@ export default function AdminPage() {
         prev.map((i) => (i._id === itemId ? res.data.item : i))
       );
       setEditingThresholdId(null);
-      alert("Minimum threshold updated successfully!");
+      alertAction({
+        title: "Threshold Updated",
+        message: "Minimum threshold updated successfully!",
+        type: "success",
+      });
       fetchAnalytics();
     } catch (err) {
       console.error("Threshold update error:", err);
-      alert(
-        err.response?.data?.message || "Failed to update minimum threshold"
-      );
+      alertAction({
+        title: "Update Failed",
+        message:
+          err.response?.data?.message || "Failed to update minimum threshold",
+        type: "danger",
+      });
     }
   };
 
@@ -428,10 +453,20 @@ export default function AdminPage() {
         quantity: 50,
         minThreshold: 15,
       });
-      alert("Inventory item added successfully!");
+      alertAction({
+        title: "Inventory Added",
+        message: "Inventory item added successfully!",
+        type: "success",
+      });
     } catch (err) {
       console.error("Save inventory item error:", err);
-      setInventoryError(err.response?.data?.message || "Failed to add inventory item.");
+      const errMsg = err.response?.data?.message || "Failed to add inventory item.";
+      setInventoryError(errMsg);
+      alertAction({
+        title: "Failed to Add Inventory",
+        message: errMsg,
+        type: "danger",
+      });
     } finally {
       setInventoryActionLoading(false);
     }

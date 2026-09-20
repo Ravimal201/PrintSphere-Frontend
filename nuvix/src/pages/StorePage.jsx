@@ -38,6 +38,7 @@ import Store3DCardPreview from "../components/Store3DCardPreview";
 import { API_BASE_URL } from "../config/api";
 import { safeLocalStorage } from "../utils/imageOptimizer";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { sortSizesAscending, getSizeFullName, formatSizeList } from "../utils/sizeHelper";
 
 const getOrCreateSessionId = () => {
   let sessionId = localStorage.getItem("printsphere_session_id");
@@ -1125,7 +1126,7 @@ export default function StorePage() {
                               )}
                             </div>
                             <div className="flex flex-col items-end text-[9px] font-bold text-slate-400">
-                              <span>Sizes: {(p.sizes || []).join(", ")}</span>
+                              <span>Sizes: {formatSizeList(p.sizes)}</span>
                               <span className="text-indigo-600">GSM: {(p.gsms || []).join(", ") || p.gsm || "180GSM"}</span>
                             </div>
                           </div>
@@ -1593,14 +1594,15 @@ export default function StorePage() {
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                     Select Size
                   </span>
-                  <div className="flex gap-2">
-                    {selected3DProduct.sizes?.map((sz) => (
+                  <div className="flex gap-2 flex-wrap">
+                    {sortSizesAscending(selected3DProduct.sizes || []).map((sz) => (
                       <button
                         key={sz}
                         onClick={() => setModalSize(sz)}
-                        className={`w-9 h-9 text-xs font-bold rounded-xl border flex items-center justify-center transition ${
+                        title={getSizeFullName(sz)}
+                        className={`min-w-[36px] h-9 px-2 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
                           modalSize === sz
-                            ? "bg-slate-900 border-slate-900 text-white"
+                            ? "bg-slate-900 border-slate-900 text-white shadow-xs"
                             : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                         }`}
                       >

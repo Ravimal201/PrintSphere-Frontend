@@ -4,12 +4,14 @@ import Scene from "../three/Scene";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { sortSizesAscending, getSizeFullName, getSizeInfo, formatSizeList } from "../utils/sizeHelper";
 import { removeImageBackground } from "../utils/backgroundRemoval";
 import { optimizeImageForLayer, createDesignThumbnail, safeLocalStorage } from "../utils/imageOptimizer";
 import { confirmAction, alertAction } from "../context/ConfirmContext";
 
 import TShirt3DModal from "../components/TShirt3DModal";
 import {
+  ArrowLeft,
   Layers,
   Type,
   Upload,
@@ -55,7 +57,8 @@ import {
   ChevronDown,
   ChevronUp,
   ShoppingCart,
-  Settings
+  Settings,
+  Send
 } from "lucide-react";
 
 const shirtColors = [
@@ -376,7 +379,7 @@ export default function DesignerPage() {
       description: submitForm.description,
       category: submitForm.category,
       basePrice: submitForm.basePrice,
-      sizes: (isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize],
+      sizes: sortSizesAscending((isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize]),
       colors: [shirtColor],
       images: [thumb],
       modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
@@ -536,38 +539,31 @@ export default function DesignerPage() {
     { code: "3XL", label: "Triple Extra Large", desc: "Chest: 46-48\"" }
   ];
 
-  const activeModelSizes =
+  const activeModelSizes = sortSizesAscending(
     selectedModel?.sizes && Array.isArray(selectedModel.sizes) && selectedModel.sizes.length > 0
       ? selectedModel.sizes
-      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]
+  );
 
   const getActiveSizeList = () => {
-    return activeModelSizes.map((code) => {
-      const found = ALL_SHIRT_SIZES.find((s) => s.code.toUpperCase() === code.toUpperCase());
-      return (
-        found || {
-          code: code,
-          label: code,
-          desc: "Custom Sizing",
-        }
-      );
-    });
+    return activeModelSizes.map((code) => getSizeInfo(code));
   };
 
   const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
   const [selectedStoreSizes, setSelectedStoreSizes] = useState(() => {
     if (initialDraft?.sizes && Array.isArray(initialDraft.sizes) && initialDraft.sizes.length > 0) {
-      return initialDraft.sizes;
+      return sortSizesAscending(initialDraft.sizes);
     }
-    return ["S", "M", "L", "XL", "XXL"];
+    return ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
   });
 
   useEffect(() => {
     if (!selectedModel) return;
-    const modelSizes =
+    const modelSizes = sortSizesAscending(
       selectedModel.sizes && Array.isArray(selectedModel.sizes) && selectedModel.sizes.length > 0
         ? selectedModel.sizes
-        : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+        : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]
+    );
 
     if (!modelSizes.includes(selectedSize)) {
       setSelectedSize(modelSizes[0] || "M");
@@ -575,7 +571,7 @@ export default function DesignerPage() {
 
     setSelectedStoreSizes((prev) => {
       const valid = prev.filter((s) => modelSizes.includes(s));
-      return valid.length > 0 ? valid : modelSizes;
+      return sortSizesAscending(valid.length > 0 ? valid : modelSizes);
     });
   }, [selectedModel]);
 
@@ -1676,193 +1672,42 @@ export default function DesignerPage() {
   return (
     <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
 
-      {/* Leftmost Sidebar */}
-      <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
-        {isEmployee ? (
-          <>
-            <div>
-              <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
-                  E
-                </div>
-                <div>
-                  <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
-                  <span className="text-[10px] text-teal-400 uppercase tracking-widest font-bold">Operator Desk</span>
-                </div>
-              </div>
-
-              <nav className="p-4 space-y-1">
-                <button
-                  onClick={() => safeNavigate("/employee")}
-                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
-                >
-                  <ShoppingCart className="h-4.5 w-4.5" />
-                  <span>Assigned Print Tasks</span>
-                </button>
-                <button
-                  onClick={() => safeNavigate("/employee")}
-                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
-                >
-                  <Layers className="h-4.5 w-4.5" />
-                  <span>My Concept Designs</span>
-                </button>
-                <button
-                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition bg-indigo-600 text-white shadow-lg cursor-pointer"
-                >
-                  <Palette className="h-4.5 w-4.5 text-white" />
-                  <span>3D Designer</span>
-                </button>
-                <button
-                  onClick={() => safeNavigate("/employee")}
-                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
-                >
-                  <Settings className="h-4.5 w-4.5" />
-                  <span>Settings & Security</span>
-                </button>
-              </nav>
-            </div>
-
-            <div className="p-4 border-t border-slate-800">
-              <div className="flex items-center gap-2 mb-3 px-2">
-                <div className="h-2.5 w-2.5 rounded-full bg-teal-400 animate-pulse" />
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Operator Session</span>
-              </div>
-              <button
-                onClick={() => {
-                  safeNavigate(() => {
-                    localStorage.clear();
-                    window.location.href = "/login";
-                  });
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/30 hover:border-red-500 text-xs text-red-400 font-semibold hover:bg-red-500/10 transition cursor-pointer"
-              >
-                <LogOut className="h-4 w-4" />
-                Log Out
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
-                  P
-                </div>
-                <div>
-                  <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">3D Customizer</span>
-                </div>
-              </div>
-
-              <nav className="p-4 space-y-1">
-                {(isManager
-                  ? [
-                    { id: "dashboard", label: "Manager Dashboard", icon: Sparkles, path: "/manager" },
-                    { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
-                    { id: "store", label: "Store Catalog", icon: ShoppingBag, path: "/store" },
-                  ]
-                  : [
-                    { id: "dashboard", label: "Dashboard", icon: Sparkles, path: "/customer-home" },
-                    { id: "store", label: "Store", icon: ShoppingBag, path: "/store" },
-                    { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
-                    { id: "my-orders", label: "My Orders", icon: FolderHeart, path: "/my-orders" },
-                    { id: "my-designs", label: "My Designs", icon: Palette, path: "/my-designs" }
-                  ]
-                ).map((item) => {
-                  const Icon = item.icon;
-                  const isActive = item.id === "3d-designer";
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        if (item.path) {
-                          safeNavigate(item.path);
-                        }
-                      }}
-                      className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
-                        ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.25)]"
-                        : "hover:bg-slate-800 hover:text-slate-200"
-                        }`}
-                    >
-                      <Icon className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-
-            <div className="p-4 border-t border-slate-800 space-y-3">
-              {currentUser ? (
-                <div className="space-y-3">
-                  <div
-                    onClick={() => {
-                      if (isManager) safeNavigate("/manager");
-                      else safeNavigate("/account");
-                    }}
-                    className="flex items-center gap-3 px-2 py-1.5 cursor-pointer rounded-xl hover:bg-slate-800/40 transition group select-none"
-                  >
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
-                      alt="Avatar"
-                      className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover group-hover:ring-indigo-500 transition duration-200"
-                    />
-                    <div className="leading-tight">
-                      <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition duration-200">{currentUser.name}</p>
-                      <span className="text-xs text-slate-500">{currentUser.role || "Customer"}</span>
-                    </div>
-                  </div>
-                  <div className="px-1.5">
-                    <button
-                      onClick={() => {
-                        safeNavigate(() => {
-                          localStorage.removeItem("token");
-                          localStorage.removeItem("printsphere_cart");
-                          window.location.href = "/login";
-                        });
-                      }}
-                      className="w-full py-2 px-4 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/20 hover:border-transparent rounded-xl font-bold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-                    >
-                      <LogOut className="h-3.5 w-3.5" />
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="px-1.5 pb-1">
-                  <button
-                    onClick={() => safeNavigate("/login?redirect=/designer")}
-                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-                  >
-                    <LogIn className="h-4 w-4" />
-                    Login / Sign Up
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </aside>
-
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <header className="h-16 border-b bg-white flex items-center justify-between px-6 lg:px-8 select-none shrink-0 z-10 gap-4">
-          <div className="flex items-center gap-2 text-sm text-slate-400 shrink-0">
-            <span
-              onClick={() => safeNavigate(isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home")}
-              className="hover:text-indigo-600 cursor-pointer transition font-medium"
+        <header className="h-16 border-b bg-white flex items-center justify-between px-4 lg:px-7 select-none shrink-0 z-10 gap-3">
+          <div className="flex items-center gap-3.5 shrink-0">
+            {/* Universal Back Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (isEmployee) safeNavigate("/employee");
+                else if (isManager) safeNavigate("/manager");
+                else safeNavigate("/customer-home");
+              }}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-sm transition-all duration-200 cursor-pointer active:scale-95 group"
+              title="Back to Home"
             >
-              {isEmployee ? "Employee Dashboard" : isManager ? "Manager Dashboard" : "Store"}
-            </span>
-            <span>/</span>
-            <span className="text-slate-600 font-semibold">
-              {isEmployee ? "3D Concept Designer" : isManager ? "Store Concept Creator" : "3D Customizer"}
-            </span>
+              <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+              <span>Back to Home</span>
+            </button>
+
+            <div className="hidden sm:flex items-center gap-2 text-sm text-slate-400 shrink-0">
+              <span
+                onClick={() => safeNavigate(isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home")}
+                className="hover:text-indigo-600 cursor-pointer transition font-medium"
+              >
+                {isEmployee ? "Employee Desk" : isManager ? "Manager Desk" : "PrintSphere"}
+              </span>
+              <span>/</span>
+              <span className="text-slate-700 font-semibold">
+                {isEmployee ? "3D Concept Designer" : isManager ? "Store Concept Creator" : "3D Customizer"}
+              </span>
+            </div>
           </div>
 
           {/* Active T-Shirt Configurations Display (Style, Color, Size, GSM) */}
           {!isEmployee && (
-            <div className="hidden md:flex items-center gap-1.5 lg:gap-2 bg-slate-50/90 hover:bg-slate-100/70 p-1 rounded-2xl border border-slate-200/80 shadow-2xs transition">
+            <div className="hidden xl:flex items-center gap-1.5 bg-slate-50/90 hover:bg-slate-100/70 p-1 rounded-2xl border border-slate-200/80 shadow-2xs transition">
               {/* Style */}
               <button
                 type="button"
@@ -1912,7 +1757,21 @@ export default function DesignerPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-3 lg:gap-4 shrink-0">
+          <div className="flex items-center gap-2 lg:gap-3 shrink-0">
+            {/* My Designs Quick Link (for customer) */}
+            {!isEmployee && !isManager && (
+              <button
+                type="button"
+                onClick={() => safeNavigate("/my-designs")}
+                className="hidden md:flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-xl font-bold text-xs transition cursor-pointer border border-slate-200/80 shadow-2xs group active:scale-95"
+                title="View My Saved Designs"
+              >
+                <Palette className="h-3.5 w-3.5 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+                <span>My Designs</span>
+              </button>
+            )}
+
+            {/* Cart Button */}
             {!isEmployee && !isManager && (
               <button
                 type="button"
@@ -1928,6 +1787,7 @@ export default function DesignerPage() {
               </button>
             )}
 
+            {/* Save Design / Publish Button */}
             {!isEmployee && (
               <button
                 onClick={() => {
@@ -1945,10 +1805,40 @@ export default function DesignerPage() {
                     handleSaveBtnClick();
                   }
                 }}
-                className="flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition cursor-pointer"
+                className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition cursor-pointer active:scale-95"
               >
                 <Save className="h-4 w-4" />
-                {isManager ? "Publish to Store" : "Save Design"}
+                <span>{isManager ? "Publish to Store" : "Save Design"}</span>
+              </button>
+            )}
+
+            {/* User Profile / Account Quick Link */}
+            {currentUser ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isManager) safeNavigate("/manager");
+                  else if (isEmployee) safeNavigate("/employee");
+                  else safeNavigate("/account");
+                }}
+                className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl hover:bg-slate-100 transition cursor-pointer border border-slate-200/80 group"
+                title={`Logged in as ${currentUser.name}`}
+              >
+                <img
+                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
+                  alt="Avatar"
+                  className="h-7 w-7 rounded-full ring-1 ring-indigo-500/30 object-cover group-hover:ring-indigo-500 transition"
+                />
+                <span className="hidden lg:inline text-xs font-bold text-slate-700 max-w-[90px] truncate">{currentUser.name}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => safeNavigate("/login?redirect=/designer")}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-sm transition cursor-pointer active:scale-95"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                <span>Login</span>
               </button>
             )}
           </div>
@@ -2018,18 +1908,18 @@ export default function DesignerPage() {
                 <div>
                   <h2 className="text-sm font-black text-slate-900 leading-tight">
                     {activeLeftPanel === "style" && "T-Shirt Style"}
-                    {activeLeftPanel === "gsm" && "Fabric Weight (GSM)"}
+                    {activeLeftPanel === "gsm" && (isEmployee ? "Available Fabric GSMs" : "Fabric Weight (GSM)")}
                     {activeLeftPanel === "colors" && "Fabric Color"}
-                    {activeLeftPanel === "sizes" && "Select Size"}
+                    {activeLeftPanel === "sizes" && (isEmployee || isManager ? "Catalog Target Sizes" : "Select Size")}
                     {activeLeftPanel === "uploads" && "Images & Uploads"}
                     {activeLeftPanel === "text" && "Add Typography"}
                     {activeLeftPanel === "logos" && "Preset Logos & Graphics"}
                   </h2>
                   <p className="text-[11px] text-slate-400 font-medium mt-0.5">
                     {activeLeftPanel === "style" && "Choose 3D model & silhouette"}
-                    {activeLeftPanel === "gsm" && "Fabric density & base pricing"}
+                    {activeLeftPanel === "gsm" && (isEmployee ? `Configured GSM weights for ${selectedModel?.name || shirtType} (View Only)` : "Fabric density & base pricing")}
                     {activeLeftPanel === "colors" && "Pick standard or model-exclusive shades"}
-                    {activeLeftPanel === "sizes" && "Garment dimensions & fitting"}
+                    {activeLeftPanel === "sizes" && (isEmployee || isManager ? "Check all sizes this design supports" : "Garment dimensions & fitting")}
                     {activeLeftPanel === "uploads" && "Upload custom art & AI cutouts"}
                     {activeLeftPanel === "text" && "Custom text layers & styled presets"}
                     {activeLeftPanel === "logos" && "Sample stamps and brand assets"}
@@ -2100,6 +1990,18 @@ export default function DesignerPage() {
                 {/* 2. Fabric GSM */}
                 {activeLeftPanel === "gsm" && (
                   <div className="space-y-3">
+                    {isEmployee && (
+                      <div className="p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-2xl flex items-start gap-2.5 text-xs text-indigo-900 select-none shadow-2xs">
+                        <Scale className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-extrabold text-slate-900">Available GSMs for {selectedModel?.name || shirtType}</p>
+                          <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                            These fabric weights are configured for this T-Shirt style. This information is reference-only; when your design concept is approved, all available GSM options will be enabled in the store.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {getModelGsmOptions().length === 0 ? (
                       <div className="p-6 text-center text-slate-400 text-xs border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                         <Scale className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
@@ -2116,6 +2018,33 @@ export default function DesignerPage() {
                         if (clean.includes("220")) gsmDesc = "Midweight premium structured fabric";
                         if (clean.includes("280")) gsmDesc = "Heavyweight durable cotton blend";
                         if (clean.includes("320")) gsmDesc = "Ultra heavyweight luxury streetwear";
+
+                        if (isEmployee) {
+                          return (
+                            <div
+                              key={gsm}
+                              className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 shadow-2xs"
+                            >
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-extrabold text-slate-900">
+                                    {gsm}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold">
+                                    Available
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium leading-tight">
+                                  {gsmDesc}
+                                </p>
+                              </div>
+                              <div className="text-right shrink-0 pl-2">
+                                <span className="text-xs font-black text-indigo-600">{priceLabel}</span>
+                                <span className="block text-[9px] text-slate-400 font-semibold uppercase">Base Price</span>
+                              </div>
+                            </div>
+                          );
+                        }
 
                         return (
                           <button
@@ -2252,15 +2181,15 @@ export default function DesignerPage() {
                                   toggleStoreSize(sizeObj.code);
                                 }}
                                 className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none ${isChecked
-                                    ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500/20"
-                                    : "border-slate-200/80 bg-white hover:bg-slate-50 opacity-60"
+                                  ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500/20"
+                                  : "border-slate-200/80 bg-white hover:bg-slate-50 opacity-60"
                                   }`}
                               >
                                 <div className="flex items-center gap-3">
                                   <div
                                     className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${isChecked
-                                        ? "bg-indigo-600 border-indigo-600 text-white shadow-2xs"
-                                        : "border-slate-300 bg-white"
+                                      ? "bg-indigo-600 border-indigo-600 text-white shadow-2xs"
+                                      : "border-slate-300 bg-white"
                                       }`}
                                   >
                                     {isChecked && (
@@ -2280,8 +2209,8 @@ export default function DesignerPage() {
 
                                 <span
                                   className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isChecked
-                                      ? "bg-indigo-100 text-indigo-700"
-                                      : "bg-slate-100 text-slate-400"
+                                    ? "bg-indigo-100 text-indigo-700"
+                                    : "bg-slate-100 text-slate-400"
                                     }`}
                                 >
                                   {isChecked ? "Available" : "Disabled"}
@@ -2305,21 +2234,23 @@ export default function DesignerPage() {
                       <>
                         <div className="space-y-2">
                           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Available Sizes</span>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                             {activeModelSizes.map((size) => {
                               const isSelected = selectedSize === size;
+                              const sizeInfo = getSizeInfo(size);
                               return (
                                 <button
                                   key={size}
                                   onClick={() => setSelectedSize(size)}
-                                  className={`py-3 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
+                                  className={`py-2.5 px-2 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
                                     ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                                     : "border-slate-200 hover:bg-slate-50 text-slate-700 bg-white"
                                     }`}
+                                  title={`${size} (${sizeInfo.label}) - ${sizeInfo.desc}`}
                                 >
-                                  <span className="text-sm leading-none">{size}</span>
-                                  <span className={`text-[9px] uppercase font-semibold ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
-                                    Regular
+                                  <span className="text-sm leading-none font-black">{size}</span>
+                                  <span className={`text-[9px] uppercase font-bold truncate max-w-full px-0.5 ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
+                                    {sizeInfo.label}
                                   </span>
                                 </button>
                               );
@@ -3638,7 +3569,7 @@ export default function DesignerPage() {
                   type="button"
                   onClick={() => setIsGsmSelectorOpen(!isGsmSelectorOpen)}
                   className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-100/70 transition cursor-pointer"
-                  title={isGsmSelectorOpen ? "Collapse GSM options" : "Click to view/change Fabric GSM"}
+                  title={isGsmSelectorOpen ? "Collapse GSM options" : isEmployee ? "Click to view available Fabric GSM weights" : "Click to view/change Fabric GSM"}
                 >
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <Scale className="h-3.5 w-3.5 text-indigo-600" />
@@ -3646,7 +3577,9 @@ export default function DesignerPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full ring-1 ring-indigo-200/70">
-                      {formatGsm(shirtMaterial)} · {getGsmPriceLabel(shirtMaterial)}
+                      {isEmployee
+                        ? `${getModelGsmOptions().length} Available GSMs`
+                        : `${formatGsm(shirtMaterial)} · ${getGsmPriceLabel(shirtMaterial)}`}
                     </span>
                     {isGsmSelectorOpen ? (
                       <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
@@ -3658,48 +3591,83 @@ export default function DesignerPage() {
 
                 {/* Collapsible Content */}
                 {isGsmSelectorOpen && (
-                  <div className="p-2.5 pt-1 border-t border-slate-200/60 grid grid-cols-2 gap-1.5 animate-in slide-in-from-top-1 duration-150">
-                    {getModelGsmOptions().map((gsmOption) => {
-                      const isSelected =
-                        shirtMaterial.replace(/\s+/g, "").toUpperCase() ===
-                        gsmOption.replace(/\s+/g, "").toUpperCase();
-                      const priceFormatted = getGsmPriceLabel(gsmOption);
-                      return (
-                        <button
-                          key={gsmOption}
-                          type="button"
-                          onClick={() => setShirtMaterial(gsmOption)}
-                          className={`flex flex-col p-1.5 rounded-lg text-left transition-all border cursor-pointer ${isSelected
-                            ? "border-indigo-600 bg-white ring-2 ring-indigo-500/20 shadow-xs"
-                            : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300 text-slate-600"
-                            }`}
-                          title={`Select ${gsmOption} (${priceFormatted})`}
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span className={`text-[10px] font-extrabold leading-tight ${isSelected ? "text-indigo-950" : "text-slate-800"}`}>
-                              {gsmOption}
-                            </span>
-                            {isSelected && (
-                              <span className="h-3 w-3 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[7px] font-bold">
-                                ✓
+                  <div className="p-2.5 pt-1 border-t border-slate-200/60 animate-in slide-in-from-top-1 duration-150">
+                    {isEmployee ? (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] text-slate-500 font-semibold px-0.5">
+                          Available GSMs for {selectedModel?.name || shirtType} (View Only):
+                        </p>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {getModelGsmOptions().map((gsmOption) => {
+                            const priceFormatted = getGsmPriceLabel(gsmOption);
+                            return (
+                              <div
+                                key={gsmOption}
+                                className="flex flex-col p-2 rounded-lg text-left border border-slate-200/90 bg-white shadow-2xs"
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="text-[10px] font-extrabold text-slate-900">
+                                    {gsmOption}
+                                  </span>
+                                  <span className="text-[8px] font-extrabold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded">
+                                    ✓
+                                  </span>
+                                </div>
+                                <span className="text-[9px] font-bold mt-0.5 text-indigo-600">
+                                  {priceFormatted}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {getModelGsmOptions().map((gsmOption) => {
+                          const isSelected =
+                            shirtMaterial.replace(/\s+/g, "").toUpperCase() ===
+                            gsmOption.replace(/\s+/g, "").toUpperCase();
+                          const priceFormatted = getGsmPriceLabel(gsmOption);
+                          return (
+                            <button
+                              key={gsmOption}
+                              type="button"
+                              onClick={() => setShirtMaterial(gsmOption)}
+                              className={`flex flex-col p-1.5 rounded-lg text-left transition-all border cursor-pointer ${isSelected
+                                ? "border-indigo-600 bg-white ring-2 ring-indigo-500/20 shadow-xs"
+                                : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300 text-slate-600"
+                                }`}
+                              title={`Select ${gsmOption} (${priceFormatted})`}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className={`text-[10px] font-extrabold leading-tight ${isSelected ? "text-indigo-950" : "text-slate-800"}`}>
+                                  {gsmOption}
+                                </span>
+                                {isSelected && (
+                                  <span className="h-3 w-3 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[7px] font-bold">
+                                    ✓
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`text-[9px] font-semibold mt-0.5 ${isSelected ? "text-indigo-600 font-bold" : "text-slate-500"}`}>
+                                {priceFormatted}
                               </span>
-                            )}
-                          </div>
-                          <span className={`text-[9px] font-semibold mt-0.5 ${isSelected ? "text-indigo-600 font-bold" : "text-slate-500"}`}>
-                            {priceFormatted}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                  <span className="flex items-center gap-1 truncate max-w-[190px]" title={`Base Price (${selectedModel?.name || shirtType} · ${formatGsm(shirtMaterial)})`}>
+                  <span className="flex items-center gap-1 truncate max-w-[190px]" title={`Base Price (${selectedModel?.name || shirtType})`}>
                     <span>Base Price</span>
-                    <span className="text-[10px] text-slate-400 font-normal">({formatGsm(shirtMaterial)})</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {isEmployee ? `(${selectedModel?.name || shirtType})` : `(${formatGsm(shirtMaterial)})`}
+                    </span>
                   </span>
                   <span className="font-bold text-slate-800 shrink-0">Rs. {getBasePrice().toFixed(2)}</span>
                 </div>
@@ -4501,7 +4469,32 @@ export default function DesignerPage() {
           thumbnailUrl: generateDesignThumbnail(layers)
         }}
         onCustomize={() => setIsPreviewModalOpen(false)}
-        onCheckout={isEmployee || isManager ? undefined : handleAddToCartAndCheckout}
+        actionButtonLabel={
+          isEmployee
+            ? "Submit to Manager"
+            : isManager
+              ? "Publish to Store"
+              : "Proceed to Checkout"
+        }
+        actionButtonIcon={
+          isEmployee ? Send : isManager ? Upload : ShoppingBag
+        }
+        onAction={() => {
+          setIsPreviewModalOpen(false);
+          if (isEmployee || isManager) {
+            setSubmitError("");
+            setSubmitSuccess("");
+            setSubmitForm({
+              title: "",
+              description: "",
+              category: selectedModel?.name || "",
+              basePrice: Math.round(unitPrice)
+            });
+            setShowSubmitModal(true);
+          } else {
+            handleAddToCartAndCheckout();
+          }
+        }}
       />
     </div>
   );
