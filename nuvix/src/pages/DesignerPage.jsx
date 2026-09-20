@@ -11,6 +11,7 @@ import { confirmAction, alertAction } from "../context/ConfirmContext";
 
 import TShirt3DModal from "../components/TShirt3DModal";
 import {
+  ArrowLeft,
   Layers,
   Type,
   Upload,
@@ -1671,188 +1672,137 @@ export default function DesignerPage() {
   return (
     <div className="h-screen w-full flex bg-[#f8fafc] font-sans overflow-hidden text-slate-800">
 
-      {/* Leftmost Sidebar */}
-      <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
-        {isEmployee ? (
-          <>
-            <div>
-              <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
-                  E
-                </div>
-                <div>
-                  <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
-                  <span className="text-[10px] text-teal-400 uppercase tracking-widest font-bold">Operator Desk</span>
-                </div>
+      {/* Leftmost Sidebar - Hidden for employees to make designer full width */}
+      {!isEmployee && (
+        <aside className="w-64 bg-slate-900 flex flex-col justify-between shrink-0 select-none text-slate-400">
+          <div>
+            <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
+                P
               </div>
-
-              <nav className="p-4 space-y-1">
-                <button
-                  onClick={() => safeNavigate("/employee")}
-                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
-                >
-                  <ShoppingCart className="h-4.5 w-4.5" />
-                  <span>Assigned Print Tasks</span>
-                </button>
-                <button
-                  onClick={() => safeNavigate("/employee")}
-                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
-                >
-                  <Layers className="h-4.5 w-4.5" />
-                  <span>My Concept Designs</span>
-                </button>
-                <button
-                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition bg-indigo-600 text-white shadow-lg cursor-pointer"
-                >
-                  <Palette className="h-4.5 w-4.5 text-white" />
-                  <span>3D Designer</span>
-                </button>
-                <button
-                  onClick={() => safeNavigate("/employee")}
-                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
-                >
-                  <Settings className="h-4.5 w-4.5" />
-                  <span>Settings & Security</span>
-                </button>
-              </nav>
+              <div>
+                <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">3D Customizer</span>
+              </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800">
-              <div className="flex items-center gap-2 mb-3 px-2">
-                <div className="h-2.5 w-2.5 rounded-full bg-teal-400 animate-pulse" />
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Operator Session</span>
-              </div>
-              <button
-                onClick={() => {
-                  safeNavigate(() => {
-                    localStorage.clear();
-                    window.location.href = "/login";
-                  });
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/30 hover:border-red-500 text-xs text-red-400 font-semibold hover:bg-red-500/10 transition cursor-pointer"
-              >
-                <LogOut className="h-4 w-4" />
-                Log Out
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)]">
-                  P
-                </div>
-                <div>
-                  <h1 className="font-extrabold text-white text-lg tracking-wide leading-none">PrintSphere</h1>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">3D Customizer</span>
-                </div>
-              </div>
-
-              <nav className="p-4 space-y-1">
-                {(isManager
-                  ? [
-                    { id: "dashboard", label: "Manager Dashboard", icon: Sparkles, path: "/manager" },
-                    { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
-                    { id: "store", label: "Store Catalog", icon: ShoppingBag, path: "/store" },
-                  ]
-                  : [
-                    { id: "dashboard", label: "Dashboard", icon: Sparkles, path: "/customer-home" },
-                    { id: "store", label: "Store", icon: ShoppingBag, path: "/store" },
-                    { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
-                    { id: "my-orders", label: "My Orders", icon: FolderHeart, path: "/my-orders" },
-                    { id: "my-designs", label: "My Designs", icon: Palette, path: "/my-designs" }
-                  ]
-                ).map((item) => {
-                  const Icon = item.icon;
-                  const isActive = item.id === "3d-designer";
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        if (item.path) {
-                          safeNavigate(item.path);
-                        }
-                      }}
-                      className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
-                        ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.25)]"
-                        : "hover:bg-slate-800 hover:text-slate-200"
-                        }`}
-                    >
-                      <Icon className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-
-            <div className="p-4 border-t border-slate-800 space-y-3">
-              {currentUser ? (
-                <div className="space-y-3">
-                  <div
-                    onClick={() => {
-                      if (isManager) safeNavigate("/manager");
-                      else safeNavigate("/account");
-                    }}
-                    className="flex items-center gap-3 px-2 py-1.5 cursor-pointer rounded-xl hover:bg-slate-800/40 transition group select-none"
-                  >
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
-                      alt="Avatar"
-                      className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover group-hover:ring-indigo-500 transition duration-200"
-                    />
-                    <div className="leading-tight">
-                      <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition duration-200">{currentUser.name}</p>
-                      <span className="text-xs text-slate-500">{currentUser.role || "Customer"}</span>
-                    </div>
-                  </div>
-                  <div className="px-1.5">
-                    <button
-                      onClick={() => {
-                        safeNavigate(() => {
-                          localStorage.removeItem("token");
-                          localStorage.removeItem("printsphere_cart");
-                          window.location.href = "/login";
-                        });
-                      }}
-                      className="w-full py-2 px-4 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/20 hover:border-transparent rounded-xl font-bold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-                    >
-                      <LogOut className="h-3.5 w-3.5" />
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="px-1.5 pb-1">
+            <nav className="p-4 space-y-1">
+              {(isManager
+                ? [
+                  { id: "dashboard", label: "Manager Dashboard", icon: Sparkles, path: "/manager" },
+                  { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
+                  { id: "store", label: "Store Catalog", icon: ShoppingBag, path: "/store" },
+                ]
+                : [
+                  { id: "dashboard", label: "Dashboard", icon: Sparkles, path: "/customer-home" },
+                  { id: "store", label: "Store", icon: ShoppingBag, path: "/store" },
+                  { id: "3d-designer", label: "3D Designer", icon: Layers, path: "/designer" },
+                  { id: "my-orders", label: "My Orders", icon: FolderHeart, path: "/my-orders" },
+                  { id: "my-designs", label: "My Designs", icon: Palette, path: "/my-designs" }
+                ]
+              ).map((item) => {
+                const Icon = item.icon;
+                const isActive = item.id === "3d-designer";
+                return (
                   <button
-                    onClick={() => safeNavigate("/login?redirect=/designer")}
-                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    key={item.id}
+                    onClick={() => {
+                      if (item.path) {
+                        safeNavigate(item.path);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
+                      ? "bg-indigo-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.25)]"
+                      : "hover:bg-slate-800 hover:text-slate-200"
+                      }`}
                   >
-                    <LogIn className="h-4 w-4" />
-                    Login / Sign Up
+                    <Icon className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="p-4 border-t border-slate-800 space-y-3">
+            {currentUser ? (
+              <div className="space-y-3">
+                <div
+                  onClick={() => {
+                    if (isManager) safeNavigate("/manager");
+                    else safeNavigate("/account");
+                  }}
+                  className="flex items-center gap-3 px-2 py-1.5 cursor-pointer rounded-xl hover:bg-slate-800/40 transition group select-none"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
+                    alt="Avatar"
+                    className="h-10 w-10 rounded-full ring-2 ring-indigo-500/20 object-cover group-hover:ring-indigo-500 transition duration-200"
+                  />
+                  <div className="leading-tight">
+                    <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition duration-200">{currentUser.name}</p>
+                    <span className="text-xs text-slate-500">{currentUser.role || "Customer"}</span>
+                  </div>
+                </div>
+                <div className="px-1.5">
+                  <button
+                    onClick={() => {
+                      safeNavigate(() => {
+                        localStorage.removeItem("token");
+                        localStorage.removeItem("printsphere_cart");
+                        window.location.href = "/login";
+                      });
+                    }}
+                    className="w-full py-2 px-4 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/20 hover:border-transparent rounded-xl font-bold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Logout
                   </button>
                 </div>
-              )}
-            </div>
-          </>
-        )}
-      </aside>
+              </div>
+            ) : (
+              <div className="px-1.5 pb-1">
+                <button
+                  onClick={() => safeNavigate("/login?redirect=/designer")}
+                  className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Login / Sign Up
+                </button>
+              </div>
+            )}
+          </div>
+        </aside>
+      )}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         <header className="h-16 border-b bg-white flex items-center justify-between px-6 lg:px-8 select-none shrink-0 z-10 gap-4">
-          <div className="flex items-center gap-2 text-sm text-slate-400 shrink-0">
-            <span
-              onClick={() => safeNavigate(isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home")}
-              className="hover:text-indigo-600 cursor-pointer transition font-medium"
-            >
-              {isEmployee ? "Employee Dashboard" : isManager ? "Manager Dashboard" : "Store"}
-            </span>
-            <span>/</span>
-            <span className="text-slate-600 font-semibold">
-              {isEmployee ? "3D Concept Designer" : isManager ? "Store Concept Creator" : "3D Customizer"}
-            </span>
+          <div className="flex items-center gap-4 shrink-0">
+            {isEmployee && (
+              <button
+                type="button"
+                onClick={() => safeNavigate("/employee")}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-sm transition-all duration-200 cursor-pointer active:scale-95 group"
+                title="Back to Employee Dashboard"
+              >
+                <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+                <span>Back to Employee Page</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-2 text-sm text-slate-400 shrink-0">
+              <span
+                onClick={() => safeNavigate(isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home")}
+                className="hover:text-indigo-600 cursor-pointer transition font-medium"
+              >
+                {isEmployee ? "Employee Dashboard" : isManager ? "Manager Dashboard" : "Store"}
+              </span>
+              <span>/</span>
+              <span className="text-slate-600 font-semibold">
+                {isEmployee ? "3D Concept Designer" : isManager ? "Store Concept Creator" : "3D Customizer"}
+              </span>
+            </div>
           </div>
 
           {/* Active T-Shirt Configurations Display (Style, Color, Size, GSM) */}
