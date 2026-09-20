@@ -93,7 +93,6 @@ export default function ManagerPage() {
   const [newGsmName, setNewGsmName] = useState("");
   const [newGsmPrice, setNewGsmPrice] = useState("");
   const [newColor, setNewColor] = useState({ name: "", value: "#ffffff" });
-  const [newCustomSize, setNewCustomSize] = useState("");
 
   // Data states
   const [orders, setOrders] = useState([]);
@@ -5854,67 +5853,6 @@ export default function ManagerPage() {
                       </button>
                     );
                   })}
-                </div>
-
-                {/* Additional Custom Sizes (if any) */}
-                {(styleForm.sizes || []).some(
-                  (s) => !["XS", "S", "M", "L", "XL", "XXL", "3XL"].includes(s)
-                ) && (
-                  <div className="pt-2 flex flex-wrap gap-1.5 items-center">
-                    <span className="text-[10px] font-bold text-slate-400">Custom Sizes:</span>
-                    {(styleForm.sizes || [])
-                      .filter((s) => !["XS", "S", "M", "L", "XL", "XXL", "3XL"].includes(s))
-                      .map((customSz, cIdx) => (
-                        <span
-                          key={cIdx}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-xs font-black"
-                        >
-                          {customSz}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStyleForm((prev) => ({
-                                ...prev,
-                                sizes: prev.sizes.filter((s) => s !== customSz),
-                              }));
-                            }}
-                            className="hover:text-rose-200 cursor-pointer"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                  </div>
-                )}
-
-                {/* Add Custom Size Input */}
-                <div className="flex items-center gap-2 pt-1.5">
-                  <input
-                    type="text"
-                    placeholder="Add custom size (e.g. 4XL, Youth M)"
-                    value={newCustomSize}
-                    onChange={(e) => setNewCustomSize(e.target.value)}
-                    className="flex-1 px-3 py-1.5 border rounded-xl text-xs bg-white focus:outline-indigo-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const trimmed = newCustomSize.trim().toUpperCase();
-                      if (!trimmed) return;
-                      setStyleForm((prev) => {
-                        const current = prev.sizes || [];
-                        if (current.includes(trimmed)) return prev;
-                        return {
-                          ...prev,
-                          sizes: [...current, trimmed],
-                        };
-                      });
-                      setNewCustomSize("");
-                    }}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Size
-                  </button>
                 </div>
               </div>
 
