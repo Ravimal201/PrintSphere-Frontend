@@ -151,6 +151,8 @@ export default function ManagerPage() {
   const [approvingProductId, setApprovingProductId] = useState(null);
 
   // Orders tab states & filters
+  const [orderTabFilter, setOrderTabFilter] = useState("all"); // "all" | "active" | "delivered" | "cancelled"
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [orderTabFilter, setOrderTabFilter] = useState("all");
 
   // Order status classification helpers
@@ -1589,13 +1591,13 @@ export default function ManagerPage() {
                 <TrendingUp className="h-5 w-5 text-indigo-600" />
                 Live Shop Operations & Active Pipeline
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-3 py-2">
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 py-2">
                 {[
-                  { label: "Active (Unassigned)", filter: (o) => isActiveOrder(o) },
-                  { label: "Processing", filter: (o) => isProgressOrder(o) },
-                  { label: "Printing", filter: (o) => isPrintingOrder(o) },
-                  { label: "Completed", filter: (o) => isCompletedOrder(o) },
-                  { label: "Shipped", filter: (o) => isShippedOrder(o) },
+                  { label: "Processing", filter: (o) => o.orderStatus === "Processing" && !isDeliveredOrder(o) },
+                  { label: "Printing", filter: (o) => o.orderStatus === "Printing" && !isDeliveredOrder(o) },
+                  { label: "Completed", filter: (o) => o.orderStatus === "Completed" && !isDeliveredOrder(o) },
+                  { label: "Shipped", filter: (o) => o.orderStatus === "Shipped" && !isDeliveredOrder(o) },
                   { label: "Delivered", filter: (o) => isDeliveredOrder(o) },
                   { label: "Cancelled", filter: (o) => isCancelledOrder(o) },
                   { label: "Pending Payment", filter: (o) => isPendingPaymentOrder(o) },
@@ -1818,7 +1820,7 @@ export default function ManagerPage() {
                     Customer Orders & Production Pipeline
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Filter by active (unassigned), progress orders, printing orders, completed orders, shipped orders, delivered orders, or cancelled orders. Assign staff and manage production workflow.
+                    Filter by active, delivered, or canceled orders. Assign staff and manage production workflow.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

@@ -5,7 +5,9 @@ import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
 import { removeImageBackground } from "../utils/backgroundRemoval";
+import { optimizeImageForLayer, createDesignThumbnail, safeLocalStorage } from "../utils/imageOptimizer";
 import { confirmAction, alertAction } from "../context/ConfirmContext";
+
 import TShirt3DModal from "../components/TShirt3DModal";
 import {
   Layers,
@@ -84,9 +86,9 @@ const fontFamilies = [
 
 const presetLogos = [
   { name: "PrintSphere Brand", url: "/logos/Logo.png" },
-  { name: "Logo 1", url: "/logos/logo1.jpeg" },
-  { name: "Logo 2", url: "/logos/logo2.jpeg" },
-  { name: "Logo 3", url: "/logos/logo3.jpeg" }
+  { name: "Logo 2", url: "/logos/Logo 2.png" },
+  { name: "Logo 3", url: "/logos/Logo 3.png" },
+  { name: "Logo 4", url: "/logos/Logo 4.png" }
 ];
 
 const findMatchingModel = (design, styles = []) => {
@@ -164,12 +166,60 @@ export default function DesignerPage() {
 
   const [availableStyles, setAvailableStyles] = useState([]);
   const [showCartRedirectModal, setShowCartRedirectModal] = useState(false);
-  const [addedItemDetails, setAddedItemDetails] = useState({ name: "", size: "" });
+  const [showStyleChangeWarningModal, setShowStyleChangeWarningModal] = useState(false);
+  const [pendingStyleChange, setPendingStyleChange] = useState(null);
+  const [addedItemDetails, setAddedItemDetails] = useState({
+    name: "",
+    size: "M",
+    gsm: "180 GSM",
+    material: "180 GSM",
+    color: "White",
+    shirtColor: "#ffffff",
+    quantity: 1,
+    unitPrice: 0,
+    totalCost: 0
+  });
 
   const [isDarkStudio, setIsDarkStudio] = useState(() => {
     const saved = localStorage.getItem("printsphere_studio_theme");
     return saved ? saved === "dark" : false;
   });
+
+  const [cartCount, setCartCount] = useState(() => {
+    try {
+      const saved = safeLocalStorage.getItem("printsphere_cart", []);
+      if (Array.isArray(saved)) {
+        return saved.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  const updateCartCount = () => {
+    try {
+      const saved = safeLocalStorage.getItem("printsphere_cart", []);
+      if (Array.isArray(saved)) {
+        setCartCount(saved.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0));
+      } else {
+        setCartCount(0);
+      }
+    } catch {
+      setCartCount(0);
+    }
+  };
+
+  useEffect(() => {
+    updateCartCount();
+    const handleCartUpdated = () => updateCartCount();
+    window.addEventListener("storage", handleCartUpdated);
+    window.addEventListener("cartUpdated", handleCartUpdated);
+    return () => {
+      window.removeEventListener("storage", handleCartUpdated);
+      window.removeEventListener("cartUpdated", handleCartUpdated);
+    };
+  }, []);
 
   const toggleStudioTheme = () => {
     setIsDarkStudio((prev) => {
@@ -299,37 +349,7 @@ export default function DesignerPage() {
   }, []);
 
   const generateDesignThumbnail = (layerList) => {
-    const visibleLayers = (layerList || []).filter(l => l.visible !== false);
-    const imgLayer = visibleLayers.find(l => (l.type === "image" || l.type === "logo") && l.url && l.url !== "/images/dumyImage.png");
-    if (imgLayer) return imgLayer.url;
-
-    const textLayer = visibleLayers.find(l => l.type === "text" && l.text);
-    if (textLayer) {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = 512;
-        canvas.height = 256;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, 512, 256);
-          const fontStyle = [
-            textLayer.italic ? "italic" : "",
-            textLayer.bold ? "bold" : "",
-            "44px",
-            `"${textLayer.fontFamily || "Inter"}", sans-serif`
-          ].filter(Boolean).join(" ");
-          ctx.font = fontStyle;
-          ctx.fillStyle = textLayer.color || "#1e293b";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(textLayer.text, 256, 128);
-          return canvas.toDataURL("image/png");
-        }
-      } catch (err) {
-        console.error("Error creating text thumbnail:", err);
-      }
-    }
-    return "/images/dumyImage.png";
+    return createDesignThumbnail(layerList || layers);
   };
 
   const handleSubmitDesignConcept = async (e) => {
@@ -620,26 +640,12 @@ export default function DesignerPage() {
 
   const saveUserImagesToStorage = (imagesList, user = currentUser) => {
     const key = getUserImagesStorageKey(user);
-    const guestKey = "printsphere_user_images_guest";
     let listToSave = Array.isArray(imagesList) ? [...imagesList] : [];
     // Keep reasonable count of recent images to prevent excessive storage
-    if (listToSave.length > 35) {
-      listToSave = listToSave.slice(0, 35);
+    if (listToSave.length > 20) {
+      listToSave = listToSave.slice(0, 20);
     }
-    let saved = false;
-    while (!saved && listToSave.length > 0) {
-      try {
-        const json = JSON.stringify(listToSave);
-        localStorage.setItem(key, json);
-        if (key !== guestKey) {
-          localStorage.setItem(guestKey, json);
-        }
-        saved = true;
-      } catch (err) {
-        console.warn("Storage quota exceeded while saving user images, pruning oldest item...", err);
-        listToSave.pop();
-      }
-    }
+    safeLocalStorage.setItem(key, listToSave);
   };
 
   const [userImages, setUserImages] = useState(() => {
@@ -1018,14 +1024,14 @@ export default function DesignerPage() {
     selectLayer(id);
   };
 
-  const processAndImportFile = (file, autoRemoveBg = autoRemoveBgOnUpload) => {
+  const processAndImportFile = async (file, autoRemoveBg = autoRemoveBgOnUpload) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      let dataUrl = reader.result;
-      if (!dataUrl) return;
-
-      const imageName = (file.name || "Imported Graphic").substring(0, 15);
+    try {
+      // 1. Optimize the uploaded image immediately to high-def web size
+      const optimized = await optimizeImageForLayer(file, { maxDimension: 1600, quality: 0.90 });
+      let dataUrl = optimized.dataUrl;
+      const initialAspect = optimized.aspectRatio || 1;
+      const imageName = (file.name || "Imported Graphic").substring(0, 20);
 
       if (autoRemoveBg) {
         setIsUploadingWithBg(true);
@@ -1053,52 +1059,29 @@ export default function DesignerPage() {
       // Auto save imported image into library for quick reuse
       autoSaveImageToLibrary(dataUrl, finalName);
 
-      const img = new Image();
-      img.onload = () => {
-        const aspect = (img.width && img.height && img.height > 0) ? (img.width / img.height) : 1;
-        const validAspect = (aspect > 0 && isFinite(aspect)) ? aspect : 1;
-        const scaleX = 0.3;
-        const scaleY = Math.min(0.6, Math.max(0.08, 0.3 / validAspect));
+      const scaleX = 0.3;
+      const scaleY = Math.min(0.6, Math.max(0.08, 0.3 / initialAspect));
 
-        const id = `img-${Date.now()}`;
-        const { position, rotation } = getInitialPositionAndRotation();
-        const newLayer = {
-          id,
-          type: "image",
-          name: finalName,
-          url: dataUrl,
-          visible: true,
-          locked: false,
-          position: Array.isArray(position) ? position : [0, 0, 0],
-          rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
-          scale: [scaleX, scaleY, 0.25],
-          aspectRatio: validAspect
-        };
-        setLayers((prev) => [...prev, newLayer]);
-        selectLayer(id);
+      const id = `img-${Date.now()}`;
+      const { position, rotation } = getInitialPositionAndRotation();
+      const newLayer = {
+        id,
+        type: "image",
+        name: finalName,
+        url: dataUrl,
+        visible: true,
+        locked: false,
+        position: Array.isArray(position) ? position : [0, 0, 0],
+        rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
+        scale: [scaleX, scaleY, 0.25],
+        aspectRatio: initialAspect
       };
-      img.onerror = (err) => {
-        console.error("Error loading uploaded image dimensions:", err);
-        const id = `img-${Date.now()}`;
-        const { position, rotation } = getInitialPositionAndRotation();
-        const newLayer = {
-          id,
-          type: "image",
-          name: finalName,
-          url: dataUrl,
-          visible: true,
-          locked: false,
-          position: Array.isArray(position) ? position : [0, 0, 0],
-          rotation: Array.isArray(rotation) ? rotation : [0, 0, 0],
-          scale: [0.3, 0.3, 0.25],
-          aspectRatio: 1
-        };
-        setLayers((prev) => [...prev, newLayer]);
-        selectLayer(id);
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
+      setLayers((prev) => [...prev, newLayer]);
+      selectLayer(id);
+    } catch (err) {
+      console.error("Error processing uploaded image:", err);
+      alert("Failed to process image. Please try another image file.");
+    }
   };
 
   const handleImageUpload = (e) => {
@@ -1233,10 +1216,24 @@ export default function DesignerPage() {
     }
   };
 
-  const addPresetImage = (url, name) => {
+  const addPresetImage = async (url, name) => {
+    let finalUrl = url;
+    let initialAspect = 1;
+
+    // If url is a large base64 dataUrl, optimize it
+    if (url && url.startsWith("data:image")) {
+      try {
+        const opt = await optimizeImageForLayer(url);
+        finalUrl = opt.dataUrl;
+        initialAspect = opt.aspectRatio || 1;
+      } catch (e) {
+        console.warn("Optimize preset image error:", e);
+      }
+    }
+
     const img = new Image();
     img.onload = () => {
-      const aspect = (img.width && img.height && img.height > 0) ? (img.width / img.height) : 1;
+      const aspect = (img.width && img.height && img.height > 0) ? (img.width / img.height) : initialAspect;
       const validAspect = (aspect > 0 && isFinite(aspect)) ? aspect : 1;
       const scaleX = 0.3;
       const scaleY = Math.min(0.6, Math.max(0.08, 0.3 / validAspect));
@@ -1247,7 +1244,7 @@ export default function DesignerPage() {
         id,
         type: "image",
         name,
-        url,
+        url: finalUrl,
         visible: true,
         locked: false,
         position: Array.isArray(position) ? position : [0, 0, 0],
@@ -1266,7 +1263,7 @@ export default function DesignerPage() {
         id,
         type: "image",
         name,
-        url,
+        url: finalUrl,
         visible: true,
         locked: false,
         position: Array.isArray(position) ? position : [0, 0, 0],
@@ -1277,7 +1274,7 @@ export default function DesignerPage() {
       setLayers((prev) => [...prev, newLayer]);
       selectLayer(id);
     };
-    img.src = url;
+    img.src = finalUrl;
   };
 
   const updateActiveViewFromAngle = (rad) => {
@@ -1420,6 +1417,28 @@ export default function DesignerPage() {
     setModelRotation(theta);
   };
 
+  // Standard T-Shirt Total Surface Area Table by Size (Total cm² = Front + Back combined)
+  const SHIRT_SIZE_TOTAL_SURFACE_AREA = {
+    "XS": 6072,   // 46cm x 66cm -> Front: 3,036 cm² + Back: 3,036 cm² = 6,072 cm²
+    "S": 6762,    // 49cm x 69cm -> Front: 3,381 cm² + Back: 3,381 cm² = 6,762 cm²
+    "M": 7488,    // 52cm x 72cm -> Front: 3,744 cm² + Back: 3,744 cm² = 7,488 cm²
+    "L": 8250,    // 55cm x 75cm -> Front: 4,125 cm² + Back: 4,125 cm² = 8,250 cm²
+    "XL": 9048,   // 58cm x 78cm -> Front: 4,524 cm² + Back: 4,524 cm² = 9,048 cm²
+    "2XL": 10044, // 62cm x 81cm -> Front: 5,022 cm² + Back: 5,022 cm² = 10,044 cm²
+    "XXL": 10044,
+    "3XL": 11088, // 66cm x 84cm -> Front: 5,544 cm² + Back: 5,544 cm² = 11,088 cm²
+    "XXXL": 11088,
+    "4XL": 12180, // 70cm x 87cm -> Front: 6,090 cm² + Back: 6,090 cm² = 12,180 cm²
+    "5XL": 13320  // 74cm x 90cm -> Front: 6,660 cm² + Back: 6,660 cm² = 13,320 cm²
+  };
+
+  const getLayerPrintAreaCm2 = (layer) => {
+    if (!layer.visible) return 0;
+    const widthCm = (layer.scale?.[0] || 0.3) * 65;
+    const heightCm = (layer.scale?.[1] || 0.3) * 65;
+    return widthCm * heightCm;
+  };
+
   const getLayerPrintArea = (layer) => {
     if (!layer.visible) return 0;
     const widthInches = layer.scale[0] * 25;
@@ -1427,15 +1446,22 @@ export default function DesignerPage() {
     return widthInches * heightInches;
   };
 
-  const totalPrintArea = layers.reduce((acc, curr) => acc + getLayerPrintArea(curr), 0);
-  const printableAreaLimit = 12 * 16;
-  const coveragePercentage = Math.min(100, (totalPrintArea / printableAreaLimit) * 100);
+  const normalizedSizeKey = (selectedSize || "M").toUpperCase().replace(/\s+/g, "");
+  const totalSurfaceAreaCm2 = SHIRT_SIZE_TOTAL_SURFACE_AREA[normalizedSizeKey] || SHIRT_SIZE_TOTAL_SURFACE_AREA["M"];
 
-  const visibleLayersCount = layers.filter((l) => l.visible).length;
+  // Total printed area across all layers combined
+  const totalPrintAreaCm2 = layers.reduce((acc, curr) => acc + getLayerPrintAreaCm2(curr), 0);
+  const totalPrintArea = layers.reduce((acc, curr) => acc + getLayerPrintArea(curr), 0);
+
+  // Print area percentage calculated directly based on the Total Surface Area of the T-Shirt
+  const coveragePercentage = Math.min(100, (totalPrintAreaCm2 / totalSurfaceAreaCm2) * 100);
+
+  // Calculate Print Area tier based on total surface area coverage:
+  // < 50% Low, 50%-75% Medium, > 75% High
   let designComplexity = "Low";
-  if (visibleLayersCount >= 4) {
+  if (coveragePercentage > 75) {
     designComplexity = "High";
-  } else if (visibleLayersCount >= 2) {
+  } else if (coveragePercentage >= 50) {
     designComplexity = "Medium";
   }
 
@@ -1493,53 +1519,113 @@ export default function DesignerPage() {
   const totalCost = unitPrice * quantity * discountMultiplier;
 
   const handleAddToCartAndCheckout = () => {
-    const designId = `custom-${Date.now()}`;
-    const cartKey = `${designId}-${selectedSize}-${shirtColor}`;
+    try {
+      const designId = `custom-${Date.now()}`;
+      const cartKey = `${designId}-${selectedSize}-${shirtColor}`;
 
-    const savedCart = localStorage.getItem("printsphere_cart");
-    let currentCart = [];
-    if (savedCart) {
-      try {
-        currentCart = JSON.parse(savedCart);
-      } catch (e) {
-        console.error(e);
+      const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+      let currentCart = Array.isArray(savedCart) ? savedCart : [];
+
+      const allModelColors = [
+        ...(selectedModel?.colors || []),
+        ...shirtColors
+      ];
+      const matchedColorObj = allModelColors.find(c => c.value && c.value.toLowerCase() === shirtColor.toLowerCase());
+      const resolvedColorNameStr = matchedColorObj ? matchedColorObj.name : resolveColorName(shirtColor);
+
+      const cartItem = {
+        cartKey,
+        designId: designId,
+        productId: null,
+        title: `${selectedModel?.name || shirtType} (Custom Design)`,
+        basePrice: unitPrice,
+        discount: 0,
+        category: "Customized",
+        size: selectedSize,
+        color: resolvedColorNameStr,
+        fabricColor: shirtColor,
+        shirtColor: shirtColor,
+        selectedColor: resolvedColorNameStr,
+        material: formatGsm(shirtMaterial),
+        gsm: formatGsm(shirtMaterial),
+        tShirtType: selectedModel?.name || shirtType,
+        tShirtStyle: selectedModel?.name || shirtType || "Crew Neck",
+        modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
+        modelUrl: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
+        selectedModel: selectedModel,
+        quantity: quantity,
+        image: generateDesignThumbnail(layers),
+        isCustom: true,
+        layers: layers
+      };
+
+      const updatedCart = [...currentCart, cartItem];
+      safeLocalStorage.setItem("printsphere_cart", updatedCart);
+      updateCartCount();
+      window.dispatchEvent(new Event("cartUpdated"));
+
+      setAddedItemDetails({
+        name: selectedModel?.name || shirtType,
+        size: selectedSize,
+        color: resolvedColorNameStr,
+        shirtColor: shirtColor,
+        material: formatGsm(shirtMaterial),
+        gsm: formatGsm(shirtMaterial),
+        quantity: quantity,
+        unitPrice: unitPrice,
+        totalCost: totalCost
+      });
+      setIsPreviewModalOpen(false);
+      setShowCartRedirectModal(true);
+    } catch (err) {
+      console.error("Add to cart / Checkout error:", err);
+      alert("There was an issue preparing your item for checkout. Please try again.");
+    }
+  };
+
+  const applyStyleChange = (model, resetLayers = true) => {
+    setSelectedModel(model);
+    setShirtType(model.type);
+    if (resetLayers) {
+      setLayers([]);
+      setSelectedLayerId(null);
+    }
+    if (model.colors && model.colors.length > 0) {
+      setShirtColor(model.colors[0].value);
+    }
+    const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
+      ? model.gsmPrices.map(gp => gp.gsm)
+      : (model.gsms || []);
+    if (modelGSMs.length > 0) {
+      const exists = modelGSMs.some(
+        g => g.replace(/\s+/g, "").toUpperCase() === (shirtMaterial || "").replace(/\s+/g, "").toUpperCase()
+      );
+      if (!exists) {
+        setShirtMaterial(modelGSMs[0]);
       }
     }
-
-    const allModelColors = [
-      ...(selectedModel?.colors || []),
-      ...shirtColors
-    ];
-    const matchedColorObj = allModelColors.find(c => c.value && c.value.toLowerCase() === shirtColor.toLowerCase());
-    const resolvedColorNameStr = matchedColorObj ? matchedColorObj.name : resolveColorName(shirtColor);
-
-    const cartItem = {
-      cartKey,
-      designId: designId,
-      productId: null,
-      title: `${selectedModel?.name || shirtType} (Custom Design)`,
-      basePrice: unitPrice,
-      discount: 0,
-      category: "Customized",
-      size: selectedSize,
-      color: resolvedColorNameStr,
-      material: formatGsm(shirtMaterial),
-      gsm: formatGsm(shirtMaterial),
-      tShirtType: shirtType,
-      tShirtStyle: shirtType || selectedModel?.name || "Crew Neck",
-      quantity: quantity,
-      image: "/images/dumyImage.png",
-      isCustom: true,
-      layers: layers
-    };
-
-    localStorage.setItem("printsphere_cart", JSON.stringify([...currentCart, cartItem]));
-    setAddedItemDetails({
-      name: selectedModel?.name || shirtType,
-      size: selectedSize
+    const modelSizes = model.sizes && Array.isArray(model.sizes) && model.sizes.length > 0
+      ? model.sizes
+      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+    if (!modelSizes.includes(selectedSize)) {
+      setSelectedSize(modelSizes[0] || "M");
+    }
+    setSelectedStoreSizes((prev) => {
+      const valid = prev.filter(s => modelSizes.includes(s));
+      return valid.length > 0 ? valid : modelSizes;
     });
-    setIsPreviewModalOpen(false);
-    setShowCartRedirectModal(true);
+    setPendingStyleChange(null);
+    setShowStyleChangeWarningModal(false);
+  };
+
+  const handleStyleSelection = (model) => {
+    if (selectedModel?.path === model.path) return;
+    if (layers.length > 0) {
+      setPendingStyleChange(model);
+      setShowStyleChangeWarningModal(true);
+    } else {
+      applyStyleChange(model, false);
+    }
   };
 
   return (
@@ -1711,8 +1797,8 @@ export default function DesignerPage() {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <header className="h-16 border-b bg-white flex items-center justify-between px-8 select-none shrink-0 z-10">
-          <div className="flex items-center gap-2 text-sm text-slate-400">
+        <header className="h-16 border-b bg-white flex items-center justify-between px-6 lg:px-8 select-none shrink-0 z-10 gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-400 shrink-0">
             <span
               onClick={() => window.location.href = isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home"}
               className="hover:text-indigo-600 cursor-pointer transition font-medium"
@@ -1725,12 +1811,72 @@ export default function DesignerPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Active T-Shirt Configurations Display (Style, Color, Size, GSM) */}
+          {!isEmployee && (
+            <div className="hidden md:flex items-center gap-1.5 lg:gap-2 bg-slate-50/90 hover:bg-slate-100/70 p-1 rounded-2xl border border-slate-200/80 shadow-2xs transition">
+              {/* Style */}
+              <button
+                type="button"
+                onClick={() => setActiveLeftPanel(prev => prev === "style" ? null : "style")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50/60 border border-slate-200/70 text-xs font-bold text-slate-700 hover:text-indigo-600 transition shadow-2xs cursor-pointer group"
+                title="Click to change T-Shirt Style"
+              >
+                <Shirt className="h-3.5 w-3.5 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+                <span className="truncate max-w-[120px]">{selectedModel?.name || shirtType}</span>
+              </button>
+
+              {/* Color */}
+              <button
+                type="button"
+                onClick={() => setActiveLeftPanel(prev => prev === "colors" ? null : "colors")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50/60 border border-slate-200/70 text-xs font-bold text-slate-700 hover:text-indigo-600 transition shadow-2xs cursor-pointer group"
+                title="Click to change T-Shirt Color"
+              >
+                <div
+                  className="h-3.5 w-3.5 rounded-full border border-slate-300 shadow-2xs shrink-0 group-hover:scale-110 transition-transform"
+                  style={{ backgroundColor: shirtColor }}
+                />
+                <span className="truncate max-w-[100px]">{resolveColorName(shirtColor)}</span>
+              </button>
+
+              {/* Size */}
+              <button
+                type="button"
+                onClick={() => setActiveLeftPanel(prev => prev === "sizes" ? null : "sizes")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50/60 border border-slate-200/70 text-xs font-bold text-slate-700 hover:text-indigo-600 transition shadow-2xs cursor-pointer group"
+                title="Click to change Garment Size"
+              >
+                <Ruler className="h-3.5 w-3.5 text-amber-500 group-hover:scale-110 transition-transform shrink-0" />
+                <span>Size: <strong className="text-indigo-600">{selectedSize}</strong></span>
+              </button>
+
+              {/* GSM */}
+              <button
+                type="button"
+                onClick={() => setActiveLeftPanel(prev => prev === "gsm" ? null : "gsm")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50/60 border border-slate-200/70 text-xs font-bold text-slate-700 hover:text-indigo-600 transition shadow-2xs cursor-pointer group"
+                title="Click to change Fabric GSM"
+              >
+                <Scale className="h-3.5 w-3.5 text-teal-600 group-hover:scale-110 transition-transform shrink-0" />
+                <span>{formatGsm(shirtMaterial)}</span>
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 lg:gap-4 shrink-0">
             {!isEmployee && !isManager && (
-              <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-700 font-bold text-xs">
-                <ShoppingBag className="h-3.5 w-3.5" />
-                <span>Cart ({quantity})</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => window.location.href = "/cart"}
+                className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3.5 py-2 rounded-xl font-bold text-xs transition cursor-pointer border border-indigo-200/60 shadow-2xs group active:scale-95"
+                title="View Shopping Cart"
+              >
+                <ShoppingBag className="h-4 w-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+                <span>Cart</span>
+                <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">
+                  {cartCount}
+                </span>
+              </button>
             )}
 
             {!isEmployee && (
@@ -1854,6 +2000,16 @@ export default function DesignerPage() {
                 {/* 1. T-Shirt Style */}
                 {activeLeftPanel === "style" && (
                   <div className="space-y-3">
+                    {/* Active Design Warning Banner */}
+                    {layers.length > 0 && (
+                      <div className="p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl flex items-center gap-2 text-xs text-amber-900 shadow-2xs animate-in fade-in duration-150">
+                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <p className="text-[11px] font-semibold text-amber-900 leading-tight">
+                          Changing style will clear your current design.
+                        </p>
+                      </div>
+                    )}
+
                     {availableStyles.length === 0 ? (
                       <div className="p-6 text-center text-slate-400 text-xs border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                         <Shirt className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
@@ -1867,34 +2023,7 @@ export default function DesignerPage() {
                           return (
                             <button
                               key={model.name}
-                              onClick={() => {
-                                setSelectedModel(model);
-                                setShirtType(model.type);
-                                if (model.colors && model.colors.length > 0) {
-                                  setShirtColor(model.colors[0].value);
-                                }
-                                const modelGSMs = model.gsmPrices && model.gsmPrices.length > 0
-                                  ? model.gsmPrices.map(gp => gp.gsm)
-                                  : (model.gsms || []);
-                                if (modelGSMs.length > 0) {
-                                  const exists = modelGSMs.some(
-                                    g => g.replace(/\s+/g, "").toUpperCase() === (shirtMaterial || "").replace(/\s+/g, "").toUpperCase()
-                                  );
-                                  if (!exists) {
-                                    setShirtMaterial(modelGSMs[0]);
-                                  }
-                                }
-                                const modelSizes = model.sizes && Array.isArray(model.sizes) && model.sizes.length > 0
-                                  ? model.sizes
-                                  : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
-                                if (!modelSizes.includes(selectedSize)) {
-                                  setSelectedSize(modelSizes[0] || "M");
-                                }
-                                setSelectedStoreSizes((prev) => {
-                                  const valid = prev.filter(s => modelSizes.includes(s));
-                                  return valid.length > 0 ? valid : modelSizes;
-                                });
-                              }}
+                              onClick={() => handleStyleSelection(model)}
                               className={`flex flex-col items-center justify-center p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${isSelected
                                 ? "border-indigo-600 bg-indigo-50/30 ring-2 ring-indigo-500/20 shadow-xs"
                                 : "border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
@@ -2703,30 +2832,12 @@ export default function DesignerPage() {
                     </button>
                   </div>
                 </div>
-              ) : !isEmployee ? (
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                      <Shirt className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                      <span>{selectedModel?.name || shirtType}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                      <div
-                        className="h-3.5 w-3.5 rounded-full border border-slate-300 shadow-2xs"
-                        style={{ backgroundColor: shirtColor }}
-                      />
-                      <span>{resolveColorName(shirtColor)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
-                      <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                      <span>{formatGsm(shirtMaterial)}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden md:block">
-                    💡 Select any layer on the 3D model or layers tab to edit properties
-                  </p>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 font-medium py-0.5 select-none">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-500/70" />
+                  <span>Select any text or image layer on the shirt to customize properties</span>
                 </div>
-              ) : null}
+              )}
             </div>
 
             {/* Canvas Angle View Controls */}
@@ -3452,7 +3563,7 @@ export default function DesignerPage() {
             {/* Compact Print Specs Summary */}
             <div className="px-4 py-2.5 border-t bg-slate-50/70 space-y-2 shrink-0">
               <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                <span>Print Area: {totalPrintArea.toFixed(1)} in²</span>
+                <span>Print Area: {totalPrintAreaCm2.toFixed(0)} cm² ({coveragePercentage.toFixed(1)}%)</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${designComplexity === "High"
                   ? "bg-rose-50 text-rose-600 ring-1 ring-rose-100"
                   : designComplexity === "Medium"
@@ -3830,39 +3941,146 @@ export default function DesignerPage() {
         </div>
       )}
 
-      {/* Confirmation Modal for Cart Redirect */}
-      {showCartRedirectModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 p-6 flex flex-col items-center text-center">
-            <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-4 border border-emerald-100">
-              <CheckCircle className="h-9 w-9" />
+      {/* Warning Modal when changing T-Shirt Style with existing design layers */}
+      {showStyleChangeWarningModal && pendingStyleChange && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 p-6 flex flex-col items-center text-center select-none">
+            {/* Warning Icon */}
+            <div className="h-14 w-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 mb-3 border border-amber-200 shadow-xs">
+              <AlertCircle className="h-7 w-7" />
             </div>
 
-            <h3 className="text-lg font-bold text-slate-950 mb-1">Added to Cart!</h3>
-            <p className="text-sm text-slate-500 mb-6">
-              <strong className="text-slate-800 font-semibold">{addedItemDetails.name} ({addedItemDetails.size})</strong> has been successfully added to your cart.
+            <h3 className="text-lg font-black text-slate-950 mb-1">Change T-Shirt Style?</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Your current design will be <strong className="text-rose-600 font-bold">lost</strong> if you switch styles.
             </p>
 
-            <p className="text-xs text-slate-500 mb-6 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100 font-medium">
-              Would you like to redirect to checkout now?
-            </p>
+            <div className="w-full bg-slate-50 border border-slate-200/70 rounded-xl p-3 mb-5 flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">New Style:</span>
+              <span className="font-bold text-slate-900 flex items-center gap-1">
+                <Shirt className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                {pendingStyleChange.name}
+              </span>
+            </div>
 
-            <div className="flex gap-3 w-full">
+            {/* Modal Actions */}
+            <div className="flex gap-2.5 w-full">
               <button
+                type="button"
                 onClick={() => {
-                  setShowCartRedirectModal(false);
+                  setShowStyleChangeWarningModal(false);
+                  setPendingStyleChange(null);
                 }}
-                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all focus:outline-none"
+                className="flex-1 py-2.5 px-3 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  window.location.href = "/store";
-                }}
-                className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_12px_rgba(99,102,241,0.2)] focus:outline-none"
+                type="button"
+                onClick={() => applyStyleChange(pendingStyleChange, true)}
+                className="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
               >
-                Go to Checkout
+                Change Style
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Cart / Checkout Redirect */}
+      {showCartRedirectModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 p-6 flex flex-col items-center text-center select-none">
+            {/* Success Icon */}
+            <div className="h-14 w-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 mb-3 border border-emerald-100 shadow-xs">
+              <CheckCircle className="h-7 w-7" />
+            </div>
+
+            <h3 className="text-xl font-black text-slate-950 mb-1">Item Ready for Checkout!</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Your customized garment has been added to your cart with the selected configurations:
+            </p>
+
+            {/* Clearly Display Garment Specifications (Size, GSM, Color, Style, Quantity) */}
+            <div className="w-full bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3 mb-5 text-left">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                <span className="text-xs font-semibold text-slate-500">Garment Style</span>
+                <span className="text-xs font-black text-slate-900 truncate max-w-[200px] flex items-center gap-1.5">
+                  <Shirt className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                  {addedItemDetails.name || shirtType}
+                </span>
+              </div>
+
+              {/* 2x2 Grid for prominent Size, GSM, Color, Quantity */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* 1. Selected Size */}
+                <div className="bg-white p-3 rounded-xl border-2 border-indigo-100 shadow-2xs flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-amber-50 text-amber-600 shrink-0">
+                    <Ruler className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Selected Size</p>
+                    <p className="text-sm font-black text-indigo-600">{addedItemDetails.size || "M"}</p>
+                  </div>
+                </div>
+
+                {/* 2. Selected GSM */}
+                <div className="bg-white p-3 rounded-xl border-2 border-teal-100 shadow-2xs flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-teal-50 text-teal-600 shrink-0">
+                    <Scale className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fabric GSM</p>
+                    <p className="text-sm font-black text-teal-700 truncate">{addedItemDetails.gsm || addedItemDetails.material || "180 GSM"}</p>
+                  </div>
+                </div>
+
+                {/* 3. Color */}
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200/70 shadow-2xs flex items-center gap-2.5">
+                  <div
+                    className="h-6 w-6 rounded-full border border-slate-300 shadow-2xs shrink-0 ring-2 ring-slate-100"
+                    style={{ backgroundColor: addedItemDetails.shirtColor || shirtColor }}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Color</p>
+                    <p className="text-xs font-bold text-slate-800 truncate">{addedItemDetails.color || resolveColorName(shirtColor)}</p>
+                  </div>
+                </div>
+
+                {/* 4. Quantity & Total */}
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200/70 shadow-2xs flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600 shrink-0">
+                    <ShoppingBag className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty & Price</p>
+                    <p className="text-xs font-black text-slate-900">
+                      {addedItemDetails.quantity || 1} pcs • Rs. {Number(addedItemDetails.totalCost || totalCost || unitPrice).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCartRedirectModal(false);
+                }}
+                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all focus:outline-none cursor-pointer"
+              >
+                Keep Designing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/cart";
+                }}
+                className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_12px_rgba(99,102,241,0.25)] focus:outline-none cursor-pointer"
+              >
+                Proceed to Checkout
               </button>
             </div>
           </div>

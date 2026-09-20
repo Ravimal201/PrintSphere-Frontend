@@ -713,18 +713,10 @@ function DecalItem({
 
   const handleDeleteClick = async (e) => {
     e.stopPropagation();
-    const isConfirmed = await confirmAction({
-      title: "Delete Design Layer",
-      message: "Are you sure you want to delete this layer from your 3D design?",
-      confirmText: "Delete",
-      type: "danger"
-    });
-    if (isConfirmed) {
-      if (onDeleteLayer) {
-        onDeleteLayer(layer.id);
-      } else if (onUpdateLayers) {
-        onUpdateLayers((prev) => prev.filter((l) => l.id !== layer.id));
-      }
+    if (onDeleteLayer) {
+      onDeleteLayer(layer.id);
+    } else if (onUpdateLayers) {
+      onUpdateLayers((prev) => prev.filter((l) => l.id !== layer.id));
     }
   };
 

@@ -31,6 +31,7 @@ import Store3DCardPreview from "../Store3DCardPreview";
 import Scene from "../../three/Scene";
 import { API_BASE_URL } from "../../config/api";
 import { resolveColorName, formatGsm } from "../../utils/colorHelper";
+import { safeLocalStorage } from "../../utils/imageOptimizer";
 
 const getOrCreateSessionId = () => {
   let sessionId = localStorage.getItem("printsphere_session_id");
@@ -280,11 +281,9 @@ export default function PopularProducts() {
     };
 
     // Load cart
-    try {
-      const savedCart = localStorage.getItem("printsphere_cart");
-      if (savedCart) setCart(JSON.parse(savedCart));
-    } catch (e) {
-      console.error("Failed to parse cart:", e);
+    const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+    if (Array.isArray(savedCart)) {
+      setCart(savedCart);
     }
 
     fetchInitialData();
@@ -292,7 +291,7 @@ export default function PopularProducts() {
 
   const saveCart = (newCart) => {
     setCart(newCart);
-    localStorage.setItem("printsphere_cart", JSON.stringify(newCart));
+    safeLocalStorage.setItem("printsphere_cart", newCart);
     window.dispatchEvent(new Event("cartUpdated"));
   };
 

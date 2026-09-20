@@ -12,6 +12,7 @@ import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { processAccountPayment, processCardPayment } from "../services/paymentService";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { safeLocalStorage } from "../utils/imageOptimizer";
 
 export default function CartPage() {
   const [cart, setCart] = useState([]);
@@ -43,16 +44,19 @@ export default function CartPage() {
     country: "Sri Lanka",
     phone: ""
   });
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("Direct"); // "Direct" | "Card"
+  const [cardForm, setCardForm] = useState({
+    cardNumber: "",
+    cardholderName: "",
+    expiryDate: "",
+    cvv: ""
+  });
 
   useEffect(() => {
     // Load cart
-    const savedCart = localStorage.getItem("printsphere_cart");
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (e) {
-        console.error(e);
-      }
+    const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+    if (Array.isArray(savedCart)) {
+      setCart(savedCart);
     }
 
     // Load local user profile
@@ -84,7 +88,7 @@ export default function CartPage() {
 
   const saveCart = (newCart) => {
     setCart(newCart);
-    localStorage.setItem("printsphere_cart", JSON.stringify(newCart));
+    safeLocalStorage.setItem("printsphere_cart", newCart);
   };
 
   const handleUpdateQuantity = (cartKey, delta) => {
@@ -233,8 +237,9 @@ export default function CartPage() {
         const formattedGsm = formatGsm(item.gsm || item.material || "GSM 180");
         if (item.isCustom || item.designId?.startsWith("custom-")) {
           const payload = {
-            tShirtType: item.tShirtType || item.title || "Custom T-Shirt",
-            fabricColor: colorName,
+            tShirtType: item.tShirtType || item.tShirtStyle || item.title || "Custom T-Shirt",
+            modelPath: item.modelPath || item.modelUrl || "/images/models/male normal t-shirt1.glb",
+            fabricColor: item.fabricColor || item.shirtColor || colorName,
             material: formattedGsm,
             size: item.size || "M",
             layers: item.layers || [],
@@ -252,7 +257,8 @@ export default function CartPage() {
             color: colorName,
             selectedColor: colorName,
             tShirtStyle: item.tShirtType || item.tShirtStyle || item.title || "Crew Neck",
-            gsm: formattedGsm
+            gsm: formattedGsm,
+            modelPath: item.modelPath || item.modelUrl || "/images/models/male normal t-shirt1.glb"
           });
         } else {
           resolvedItems.push({

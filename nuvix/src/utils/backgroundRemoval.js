@@ -1,4 +1,5 @@
 import { removeBackground } from "@imgly/background-removal";
+import { optimizeImageForLayer } from "./imageOptimizer";
 
 /**
  * Converts a Blob to a base64 Data URL
@@ -23,6 +24,14 @@ export const blobToDataURL = (blob) => {
  */
 export const removeImageBackground = async (imageSource, options = {}, onProgress = null) => {
   try {
+    let preprocessedSource = imageSource;
+
+    // Pre-scale extremely high-res images to max 1600px so ONNX doesn't run out of memory
+    if (typeof imageSource === "string" && imageSource.startsWith("data:image")) {
+      const opt = await optimizeImageForLayer(imageSource, { maxDimension: 1600 });
+      preprocessedSource = opt.dataUrl;
+    }
+
     const config = {
       progress: (key, current, total) => {
         if (typeof onProgress === "function") {
@@ -32,11 +41,15 @@ export const removeImageBackground = async (imageSource, options = {}, onProgres
       ...options
     };
 
-    const blob = await removeBackground(imageSource, config);
+    const blob = await removeBackground(preprocessedSource, config);
     const dataUrl = await blobToDataURL(blob);
-    return dataUrl;
+    
+    // Optimize the resulting transparent PNG to keep storage and layers light
+    const finalOpt = await optimizeImageForLayer(dataUrl, { maxDimension: 1600 });
+    return finalOpt.dataUrl || dataUrl;
   } catch (error) {
     console.error("AI Background Removal Error:", error);
     throw error;
   }
 };
+

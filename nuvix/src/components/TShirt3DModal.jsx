@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, ZoomIn, Download, RefreshCw, Layers, Sparkles, Camera, CheckCircle, Loader2, Edit, FileCode, ShoppingBag } from "lucide-react";
+import { safeLocalStorage, createDesignThumbnail } from "../utils/imageOptimizer";
 
 import Scene from "../three/Scene";
 import {
@@ -11,17 +12,24 @@ import {
 
 const colorMap = {
   white: "#ffffff",
+  "pure white": "#ffffff",
   black: "#111827",
+  "jet black": "#111827",
   charcoal: "#4b5563",
   "navy blue": "#1e3a8a",
   navy: "#1e3a8a",
   red: "#dc2626",
+  crimson: "#dc2626",
   gold: "#fbbf24",
   yellow: "#fbbf24",
   green: "#16a34a",
+  emerald: "#10b981",
+  teal: "#14b8a6",
   violet: "#6d28d9",
   purple: "#6d28d9",
+  indigo: "#4f46e5",
   pink: "#f472b6",
+  rose: "#f43f5e",
   beige: "#f5f5dc",
   "light grey": "#e5e7eb",
   "light gray": "#e5e7eb",
@@ -34,21 +42,39 @@ const colorMap = {
 
 const getColorValue = (colorStr) => {
   if (!colorStr) return "#ffffff";
-  if (colorStr.startsWith("#")) return colorStr;
+  if (colorStr.startsWith("#") || colorStr.startsWith("rgb")) return colorStr;
   const lower = colorStr.toLowerCase().trim();
   return colorMap[lower] || colorStr;
 };
 
 const getModelPath = (design) => {
   if (!design) return "/images/models/male normal t-shirt1.glb";
+  
+  // 1. Direct model path property
   if (design.modelPath && typeof design.modelPath === "string" && (design.modelPath.toLowerCase().endsWith(".glb") || design.modelPath.toLowerCase().endsWith(".gltf") || design.modelPath.toLowerCase().endsWith(".fbx"))) {
     return design.modelPath;
+  }
+  if (design.path && typeof design.path === "string" && (design.path.toLowerCase().endsWith(".glb") || design.path.toLowerCase().endsWith(".gltf") || design.path.toLowerCase().endsWith(".fbx"))) {
+    return design.path;
   }
   if (design.modelUrl && typeof design.modelUrl === "string" && (design.modelUrl.toLowerCase().endsWith(".glb") || design.modelUrl.toLowerCase().endsWith(".gltf") || design.modelUrl.toLowerCase().endsWith(".fbx"))) {
     return design.modelUrl;
   }
+  if (design.selectedModel?.path) {
+    return design.selectedModel.path;
+  }
 
+  // 2. Check if any layer has projectedForModel
+  if (design.layers && Array.isArray(design.layers)) {
+    const layerWithModel = design.layers.find(l => l.projectedForModel);
+    if (layerWithModel?.projectedForModel) {
+      return layerWithModel.projectedForModel;
+    }
+  }
+
+  // 3. Fallback to style/type matching
   const textStr = (
+    design.tShirtStyle ||
     design.tShirtType ||
     design.shirtType ||
     design.type ||
@@ -59,17 +85,23 @@ const getModelPath = (design) => {
     (typeof design === "string" ? design : "")
   ).toLowerCase();
 
-  if (textStr.includes("female") || textStr.includes("women") || textStr.includes("v-neck") || textStr.includes("woman")) {
+  if (textStr.includes("female") || textStr.includes("women") || textStr.includes("woman") || textStr.includes("v-neck")) {
     return "/images/models/female normal t-shirt.glb";
   }
-  if (textStr.includes("long sleeve") || textStr.includes("long-sleeve")) {
+  if (textStr.includes("long sleeve") || textStr.includes("long-sleeve") || textStr.includes("longsleeve")) {
     return "/images/models/long_sleeve_t-_shirt.glb";
   }
-  if (textStr.includes("oversized")) {
+  if (textStr.includes("oversized") || textStr.includes("oversize")) {
     return "/images/models/oversized t-sdirt1.glb";
   }
-  if (textStr.includes("hoodie") || textStr.includes("polo")) {
+  if (textStr.includes("hoodie")) {
     return "/images/models/t_shirt_hoodie.glb";
+  }
+  if (textStr.includes("polo") || textStr.includes("collar") || textStr.includes("orange")) {
+    return "/images/models/orange_shirt_with_collar.glb";
+  }
+  if (textStr.includes("traditional") || textStr.includes("amazigh")) {
+    return "/images/models/amazigh_traditional_t-shirt.glb";
   }
   if (textStr.includes("fbx") || textStr.includes("classic")) {
     return "/images/models/T SHIRT.fbx";
@@ -150,12 +182,68 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
     if (onCustomize) {
       onCustomize(design);
     } else {
-      localStorage.setItem("load_custom_design", JSON.stringify(design));
+      safeLocalStorage.setItem("load_custom_design", design);
       window.location.href = "/designer";
     }
   };
 
-  const resolvedColor = getColorValue(design.fabricColor || design.color || design.selectedColor);
+  const handleCheckout = () => {
+    if (onCheckout) {
+      onCheckout(design);
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/login?redirect=/cart";
+      return;
+    }
+    try {
+      const savedCart = safeLocalStorage.getItem("printsphere_cart", []);
+      let currentCart = Array.isArray(savedCart) ? savedCart : [];
+
+      const designId = design._id || `custom-${Date.now()}`;
+      const selectedSize = design.size || "M";
+      const color = design.fabricColor || design.color || design.selectedColor || "White";
+      const cartKey = `${designId}-${selectedSize}-${color}`;
+      const existingIndex = currentCart.findIndex(item => item.cartKey === cartKey);
+
+      const thumbImage = design.thumbnailUrl && !design.thumbnailUrl.startsWith("data:image")
+        ? design.thumbnailUrl
+        : createDesignThumbnail(layers);
+
+      if (existingIndex > -1) {
+        currentCart[existingIndex].quantity = (currentCart[existingIndex].quantity || 1) + 1;
+      } else {
+        const cartItem = {
+          cartKey,
+          designId: design._id,
+          productId: null,
+          title: design.tShirtType || design.title || "Custom T-Shirt",
+          basePrice: design.estimatedCost || 0,
+          discount: 0,
+          category: "Customized",
+          size: selectedSize,
+          color: color,
+          material: design.material || "GSM 180",
+          gsm: design.material || "GSM 180",
+          tShirtType: design.tShirtType || "Crew Neck",
+          tShirtStyle: design.tShirtType || "Crew Neck",
+          quantity: 1,
+          image: thumbImage,
+          isCustom: true,
+          layers: layers
+        };
+        currentCart.push(cartItem);
+      }
+      safeLocalStorage.setItem("printsphere_cart", currentCart);
+      window.location.href = "/cart";
+    } catch (e) {
+      console.error("3D Modal checkout error:", e);
+      window.location.href = "/cart";
+    }
+  };
+
+  const resolvedColor = getColorValue(design.fabricColor || design.shirtColor || design.color || design.selectedColor || design.defaultColor);
   const resolvedModelPath = getModelPath(design);
   const layers = getLayersFromDesign(design);
   const titleName = (design.tShirtType || design.title || "custom-shirt").replace(/[^a-z0-9]/gi, "-").toLowerCase();
@@ -528,33 +616,23 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
             </div>
           </div>
 
-          {/* Footer with Checkout / Customize Action & Estimated Cost */}
+          {/* Footer with Checkout Action & Estimated Cost */}
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-3 select-none">
-            {design.estimatedCost && (
+            {design.estimatedCost ? (
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase">Estimated Cost</span>
                 <span className="text-lg font-black text-slate-900">
                   Rs. {typeof design.estimatedCost === "number" ? design.estimatedCost.toFixed(2) : design.estimatedCost}
                 </span>
               </div>
-            )}
-            {onCheckout ? (
-              <button
-                onClick={onCheckout}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(99,102,241,0.3)] cursor-pointer"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                <span>Continue to Checkout</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleCustomize}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-              >
-                <Edit className="h-4 w-4" />
-                <span>Customize Design in 3D</span>
-              </button>
-            )}
+            ) : null}
+            <button
+              onClick={handleCheckout}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(99,102,241,0.3)] cursor-pointer"
+            >
+              <ShoppingBag className="h-4 w-4" />
+              <span>Proceed to Checkout</span>
+            </button>
           </div>
 
         </div>
