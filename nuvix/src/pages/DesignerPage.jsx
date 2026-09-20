@@ -560,7 +560,7 @@ export default function DesignerPage() {
     if (initialDraft?.sizes && Array.isArray(initialDraft.sizes) && initialDraft.sizes.length > 0) {
       return initialDraft.sizes;
     }
-    return ["S", "M", "L", "XL", "XXL"];
+    return ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
   });
 
   useEffect(() => {
