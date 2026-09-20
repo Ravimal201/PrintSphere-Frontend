@@ -4,6 +4,7 @@ import Scene from "../three/Scene";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { sortSizesAscending, getSizeFullName, getSizeInfo, formatSizeList } from "../utils/sizeHelper";
 import { removeImageBackground } from "../utils/backgroundRemoval";
 import { optimizeImageForLayer, createDesignThumbnail, safeLocalStorage } from "../utils/imageOptimizer";
 import { confirmAction, alertAction } from "../context/ConfirmContext";
@@ -377,7 +378,7 @@ export default function DesignerPage() {
       description: submitForm.description,
       category: submitForm.category,
       basePrice: submitForm.basePrice,
-      sizes: (isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize],
+      sizes: sortSizesAscending((isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize]),
       colors: [shirtColor],
       images: [thumb],
       modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
@@ -537,38 +538,31 @@ export default function DesignerPage() {
     { code: "3XL", label: "Triple Extra Large", desc: "Chest: 46-48\"" }
   ];
 
-  const activeModelSizes =
+  const activeModelSizes = sortSizesAscending(
     selectedModel?.sizes && Array.isArray(selectedModel.sizes) && selectedModel.sizes.length > 0
       ? selectedModel.sizes
-      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]
+  );
 
   const getActiveSizeList = () => {
-    return activeModelSizes.map((code) => {
-      const found = ALL_SHIRT_SIZES.find((s) => s.code.toUpperCase() === code.toUpperCase());
-      return (
-        found || {
-          code: code,
-          label: code,
-          desc: "Custom Sizing",
-        }
-      );
-    });
+    return activeModelSizes.map((code) => getSizeInfo(code));
   };
 
   const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
   const [selectedStoreSizes, setSelectedStoreSizes] = useState(() => {
     if (initialDraft?.sizes && Array.isArray(initialDraft.sizes) && initialDraft.sizes.length > 0) {
-      return initialDraft.sizes;
+      return sortSizesAscending(initialDraft.sizes);
     }
-    return ["S", "M", "L", "XL", "XXL"];
+    return ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
   });
 
   useEffect(() => {
     if (!selectedModel) return;
-    const modelSizes =
+    const modelSizes = sortSizesAscending(
       selectedModel.sizes && Array.isArray(selectedModel.sizes) && selectedModel.sizes.length > 0
         ? selectedModel.sizes
-        : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+        : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]
+    );
 
     if (!modelSizes.includes(selectedSize)) {
       setSelectedSize(modelSizes[0] || "M");
@@ -576,7 +570,7 @@ export default function DesignerPage() {
 
     setSelectedStoreSizes((prev) => {
       const valid = prev.filter((s) => modelSizes.includes(s));
-      return valid.length > 0 ? valid : modelSizes;
+      return sortSizesAscending(valid.length > 0 ? valid : modelSizes);
     });
   }, [selectedModel]);
 
@@ -2019,18 +2013,18 @@ export default function DesignerPage() {
                 <div>
                   <h2 className="text-sm font-black text-slate-900 leading-tight">
                     {activeLeftPanel === "style" && "T-Shirt Style"}
-                    {activeLeftPanel === "gsm" && "Fabric Weight (GSM)"}
+                    {activeLeftPanel === "gsm" && (isEmployee ? "Available Fabric GSMs" : "Fabric Weight (GSM)")}
                     {activeLeftPanel === "colors" && "Fabric Color"}
-                    {activeLeftPanel === "sizes" && "Select Size"}
+                    {activeLeftPanel === "sizes" && (isEmployee || isManager ? "Catalog Target Sizes" : "Select Size")}
                     {activeLeftPanel === "uploads" && "Images & Uploads"}
                     {activeLeftPanel === "text" && "Add Typography"}
                     {activeLeftPanel === "logos" && "Preset Logos & Graphics"}
                   </h2>
                   <p className="text-[11px] text-slate-400 font-medium mt-0.5">
                     {activeLeftPanel === "style" && "Choose 3D model & silhouette"}
-                    {activeLeftPanel === "gsm" && "Fabric density & base pricing"}
+                    {activeLeftPanel === "gsm" && (isEmployee ? `Configured GSM weights for ${selectedModel?.name || shirtType} (View Only)` : "Fabric density & base pricing")}
                     {activeLeftPanel === "colors" && "Pick standard or model-exclusive shades"}
-                    {activeLeftPanel === "sizes" && "Garment dimensions & fitting"}
+                    {activeLeftPanel === "sizes" && (isEmployee || isManager ? "Check all sizes this design supports" : "Garment dimensions & fitting")}
                     {activeLeftPanel === "uploads" && "Upload custom art & AI cutouts"}
                     {activeLeftPanel === "text" && "Custom text layers & styled presets"}
                     {activeLeftPanel === "logos" && "Sample stamps and brand assets"}
@@ -2101,6 +2095,18 @@ export default function DesignerPage() {
                 {/* 2. Fabric GSM */}
                 {activeLeftPanel === "gsm" && (
                   <div className="space-y-3">
+                    {isEmployee && (
+                      <div className="p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-2xl flex items-start gap-2.5 text-xs text-indigo-900 select-none shadow-2xs">
+                        <Scale className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-extrabold text-slate-900">Available GSMs for {selectedModel?.name || shirtType}</p>
+                          <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                            These fabric weights are configured for this T-Shirt style. This information is reference-only; when your design concept is approved, all available GSM options will be enabled in the store.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {getModelGsmOptions().length === 0 ? (
                       <div className="p-6 text-center text-slate-400 text-xs border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                         <Scale className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
@@ -2117,6 +2123,33 @@ export default function DesignerPage() {
                         if (clean.includes("220")) gsmDesc = "Midweight premium structured fabric";
                         if (clean.includes("280")) gsmDesc = "Heavyweight durable cotton blend";
                         if (clean.includes("320")) gsmDesc = "Ultra heavyweight luxury streetwear";
+
+                        if (isEmployee) {
+                          return (
+                            <div
+                              key={gsm}
+                              className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 shadow-2xs"
+                            >
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-extrabold text-slate-900">
+                                    {gsm}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold">
+                                    Available
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium leading-tight">
+                                  {gsmDesc}
+                                </p>
+                              </div>
+                              <div className="text-right shrink-0 pl-2">
+                                <span className="text-xs font-black text-indigo-600">{priceLabel}</span>
+                                <span className="block text-[9px] text-slate-400 font-semibold uppercase">Base Price</span>
+                              </div>
+                            </div>
+                          );
+                        }
 
                         return (
                           <button
@@ -2306,21 +2339,23 @@ export default function DesignerPage() {
                       <>
                         <div className="space-y-2">
                           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Available Sizes</span>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                             {activeModelSizes.map((size) => {
                               const isSelected = selectedSize === size;
+                              const sizeInfo = getSizeInfo(size);
                               return (
                                 <button
                                   key={size}
                                   onClick={() => setSelectedSize(size)}
-                                  className={`py-3 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
+                                  className={`py-2.5 px-2 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
                                     ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                                     : "border-slate-200 hover:bg-slate-50 text-slate-700 bg-white"
                                     }`}
+                                  title={`${size} (${sizeInfo.label}) - ${sizeInfo.desc}`}
                                 >
-                                  <span className="text-sm leading-none">{size}</span>
-                                  <span className={`text-[9px] uppercase font-semibold ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
-                                    Regular
+                                  <span className="text-sm leading-none font-black">{size}</span>
+                                  <span className={`text-[9px] uppercase font-bold truncate max-w-full px-0.5 ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
+                                    {sizeInfo.label}
                                   </span>
                                 </button>
                               );
@@ -3639,7 +3674,7 @@ export default function DesignerPage() {
                   type="button"
                   onClick={() => setIsGsmSelectorOpen(!isGsmSelectorOpen)}
                   className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-100/70 transition cursor-pointer"
-                  title={isGsmSelectorOpen ? "Collapse GSM options" : "Click to view/change Fabric GSM"}
+                  title={isGsmSelectorOpen ? "Collapse GSM options" : isEmployee ? "Click to view available Fabric GSM weights" : "Click to view/change Fabric GSM"}
                 >
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <Scale className="h-3.5 w-3.5 text-indigo-600" />
@@ -3647,7 +3682,9 @@ export default function DesignerPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full ring-1 ring-indigo-200/70">
-                      {formatGsm(shirtMaterial)} · {getGsmPriceLabel(shirtMaterial)}
+                      {isEmployee
+                        ? `${getModelGsmOptions().length} Available GSMs`
+                        : `${formatGsm(shirtMaterial)} · ${getGsmPriceLabel(shirtMaterial)}`}
                     </span>
                     {isGsmSelectorOpen ? (
                       <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
@@ -3659,48 +3696,83 @@ export default function DesignerPage() {
 
                 {/* Collapsible Content */}
                 {isGsmSelectorOpen && (
-                  <div className="p-2.5 pt-1 border-t border-slate-200/60 grid grid-cols-2 gap-1.5 animate-in slide-in-from-top-1 duration-150">
-                    {getModelGsmOptions().map((gsmOption) => {
-                      const isSelected =
-                        shirtMaterial.replace(/\s+/g, "").toUpperCase() ===
-                        gsmOption.replace(/\s+/g, "").toUpperCase();
-                      const priceFormatted = getGsmPriceLabel(gsmOption);
-                      return (
-                        <button
-                          key={gsmOption}
-                          type="button"
-                          onClick={() => setShirtMaterial(gsmOption)}
-                          className={`flex flex-col p-1.5 rounded-lg text-left transition-all border cursor-pointer ${isSelected
-                            ? "border-indigo-600 bg-white ring-2 ring-indigo-500/20 shadow-xs"
-                            : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300 text-slate-600"
-                            }`}
-                          title={`Select ${gsmOption} (${priceFormatted})`}
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span className={`text-[10px] font-extrabold leading-tight ${isSelected ? "text-indigo-950" : "text-slate-800"}`}>
-                              {gsmOption}
-                            </span>
-                            {isSelected && (
-                              <span className="h-3 w-3 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[7px] font-bold">
-                                ✓
+                  <div className="p-2.5 pt-1 border-t border-slate-200/60 animate-in slide-in-from-top-1 duration-150">
+                    {isEmployee ? (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] text-slate-500 font-semibold px-0.5">
+                          Available GSMs for {selectedModel?.name || shirtType} (View Only):
+                        </p>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {getModelGsmOptions().map((gsmOption) => {
+                            const priceFormatted = getGsmPriceLabel(gsmOption);
+                            return (
+                              <div
+                                key={gsmOption}
+                                className="flex flex-col p-2 rounded-lg text-left border border-slate-200/90 bg-white shadow-2xs"
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="text-[10px] font-extrabold text-slate-900">
+                                    {gsmOption}
+                                  </span>
+                                  <span className="text-[8px] font-extrabold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded">
+                                    ✓
+                                  </span>
+                                </div>
+                                <span className="text-[9px] font-bold mt-0.5 text-indigo-600">
+                                  {priceFormatted}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {getModelGsmOptions().map((gsmOption) => {
+                          const isSelected =
+                            shirtMaterial.replace(/\s+/g, "").toUpperCase() ===
+                            gsmOption.replace(/\s+/g, "").toUpperCase();
+                          const priceFormatted = getGsmPriceLabel(gsmOption);
+                          return (
+                            <button
+                              key={gsmOption}
+                              type="button"
+                              onClick={() => setShirtMaterial(gsmOption)}
+                              className={`flex flex-col p-1.5 rounded-lg text-left transition-all border cursor-pointer ${isSelected
+                                ? "border-indigo-600 bg-white ring-2 ring-indigo-500/20 shadow-xs"
+                                : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300 text-slate-600"
+                                }`}
+                              title={`Select ${gsmOption} (${priceFormatted})`}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className={`text-[10px] font-extrabold leading-tight ${isSelected ? "text-indigo-950" : "text-slate-800"}`}>
+                                  {gsmOption}
+                                </span>
+                                {isSelected && (
+                                  <span className="h-3 w-3 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[7px] font-bold">
+                                    ✓
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`text-[9px] font-semibold mt-0.5 ${isSelected ? "text-indigo-600 font-bold" : "text-slate-500"}`}>
+                                {priceFormatted}
                               </span>
-                            )}
-                          </div>
-                          <span className={`text-[9px] font-semibold mt-0.5 ${isSelected ? "text-indigo-600 font-bold" : "text-slate-500"}`}>
-                            {priceFormatted}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                  <span className="flex items-center gap-1 truncate max-w-[190px]" title={`Base Price (${selectedModel?.name || shirtType} · ${formatGsm(shirtMaterial)})`}>
+                  <span className="flex items-center gap-1 truncate max-w-[190px]" title={`Base Price (${selectedModel?.name || shirtType})`}>
                     <span>Base Price</span>
-                    <span className="text-[10px] text-slate-400 font-normal">({formatGsm(shirtMaterial)})</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {isEmployee ? `(${selectedModel?.name || shirtType})` : `(${formatGsm(shirtMaterial)})`}
+                    </span>
                   </span>
                   <span className="font-bold text-slate-800 shrink-0">Rs. {getBasePrice().toFixed(2)}</span>
                 </div>

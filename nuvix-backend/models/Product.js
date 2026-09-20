@@ -70,7 +70,7 @@ const ProductSchema = new mongoose.Schema(
     sizes: [
       {
         type: String,
-        enum: ["S", "M", "L", "XL", "XXL"]
+        trim: true
       }
     ],
     gsm: {

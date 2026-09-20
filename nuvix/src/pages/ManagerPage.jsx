@@ -64,6 +64,7 @@ import Store3DCardPreview from "../components/Store3DCardPreview";
 
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { sortSizesAscending, getSizeFullName, formatSizeList, getSizeInfo } from "../utils/sizeHelper";
 
 export default function ManagerPage() {
   const [isManager, setIsManager] = useState(false);
@@ -2349,7 +2350,7 @@ export default function ManagerPage() {
                             )}
                             {draft.sizes && draft.sizes.length > 0 && (
                               <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">
-                                Sizes: {draft.sizes.join(", ")}
+                                Sizes: {formatSizeList(draft.sizes)}
                               </span>
                             )}
                           </div>
@@ -2566,7 +2567,7 @@ export default function ManagerPage() {
                               </td>
                               <td className="py-4 text-xs text-slate-500">
                                 <div className="space-y-0.5">
-                                  <p className="font-semibold text-slate-700">{(p.sizes || []).join(", ") || "All Sizes"}</p>
+                                  <p className="font-semibold text-slate-700">{formatSizeList(p.sizes)}</p>
                                   <p className="text-[11px] text-slate-400">
                                     {(() => {
                                       if (p.gsms && p.gsms.length > 0) {
@@ -2911,12 +2912,13 @@ export default function ManagerPage() {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
                         <span>Available Sizes</span>
                         <span className="text-[9px] text-indigo-600 font-normal">
-                          Selected: {(productForm.sizes || []).join(", ") || "None"}
+                          Selected: {formatSizeList(productForm.sizes)}
                         </span>
                       </label>
                       <div className="flex flex-wrap gap-2 pt-0.5">
-                        {["S", "M", "L", "XL", "XXL"].map((size) => {
+                        {["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((size) => {
                           const isSelected = (productForm.sizes || []).includes(size);
+                          const sizeMeta = getSizeInfo(size);
                           return (
                             <label
                               key={size}
@@ -2924,6 +2926,7 @@ export default function ManagerPage() {
                                 ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs"
                                 : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                 }`}
+                              title={`${size} (${sizeMeta.label})`}
                             >
                               <input
                                 type="checkbox"
@@ -2933,7 +2936,7 @@ export default function ManagerPage() {
                                   setProductForm((prev) => {
                                     const currentSizes = prev.sizes || [];
                                     const updatedSizes = checked
-                                      ? [...currentSizes, size]
+                                      ? sortSizesAscending([...currentSizes, size])
                                       : currentSizes.filter((s) => s !== size);
                                     return { ...prev, sizes: updatedSizes };
                                   });
@@ -4898,12 +4901,13 @@ export default function ManagerPage() {
                     Sizes Included
                   </span>
                   <div className="flex gap-1.5 flex-wrap">
-                    {selectedSubmissionProduct.sizes?.map((sz) => (
+                    {sortSizesAscending(selectedSubmissionProduct.sizes || []).map((sz) => (
                       <span
                         key={sz}
                         className="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs"
+                        title={getSizeFullName(sz)}
                       >
-                        {sz}
+                        {sz} ({getSizeFullName(sz)})
                       </span>
                     ))}
                   </div>

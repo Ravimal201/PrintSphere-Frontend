@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Edit2, Trash2, Layers, Check } from "lucide-react";
 import Store3DCardPreview from "./Store3DCardPreview";
+import { sortSizesAscending, getSizeFullName } from "../utils/sizeHelper";
 
 export default function TShirtStyleCard({ style, onEdit, onDelete }) {
   const defaultColor =
@@ -120,13 +121,14 @@ export default function TShirtStyleCard({ style, onEdit, onDelete }) {
         {/* Available Sizes */}
         <div className="mb-3.5">
           <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1.5">
-            Available Sizes ({((style.sizes && style.sizes.length > 0) ? style.sizes : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]).length})
+            Available Sizes ({sortSizesAscending((style.sizes && style.sizes.length > 0) ? style.sizes : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]).length})
           </span>
           <div className="flex flex-wrap gap-1.5">
-            {((style.sizes && style.sizes.length > 0) ? style.sizes : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]).map((sz, idx) => (
+            {sortSizesAscending((style.sizes && style.sizes.length > 0) ? style.sizes : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]).map((sz, idx) => (
               <span
                 key={idx}
                 className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-[10px] font-black"
+                title={getSizeFullName(sz)}
               >
                 {sz}
               </span>

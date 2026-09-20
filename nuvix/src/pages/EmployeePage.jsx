@@ -11,6 +11,7 @@ import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
 
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { sortSizesAscending, getSizeFullName, formatSizeList } from "../utils/sizeHelper";
 
 // Helper to determine the single next actionable status in the pipeline
 const getNextPipelineAction = (currentStatus) => {
@@ -1136,7 +1137,23 @@ export default function EmployeePage() {
                           <td className="py-4 font-bold text-slate-900">{p.title}</td>
                           <td className="py-4 text-xs text-slate-600">{p.category}</td>
                           <td className="py-4 text-xs font-bold text-slate-950">Rs. {p.basePrice.toFixed(2)}</td>
-                          <td className="py-4 text-xs text-slate-500">{(p.sizes || []).join(", ")}</td>
+                          <td className="py-4 text-xs text-slate-700">
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {sortSizesAscending(p.sizes).length > 0 ? (
+                                sortSizesAscending(p.sizes).map((sz) => (
+                                  <span
+                                    key={sz}
+                                    className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10px] font-bold transition"
+                                    title={getSizeFullName(sz)}
+                                  >
+                                    {sz}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-slate-400 italic text-[11px]">All Sizes</span>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-4 text-xs">
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${p.isApproved
                               ? "bg-emerald-50 text-emerald-600"
