@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
@@ -15,6 +15,18 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const orderRef = useRef(order);
+  const processingRef = useRef(processingPayment);
+  const isLeavingRef = useRef(false);
+
+  useEffect(() => {
+    orderRef.current = order;
+  }, [order]);
+
+  useEffect(() => {
+    processingRef.current = processingPayment;
+  }, [processingPayment]);
 
   // Card Form State
   const [cardForm, setCardForm] = useState({
@@ -36,6 +48,28 @@ export default function PaymentPage() {
   useEffect(() => {
     fetchOrderDetails();
   }, [orderId]);
+
+  // Handle Browser Back Button: Trigger the same Cancel Checkout confirmation popup
+  useEffect(() => {
+    window.history.pushState({ isPaymentPage: true }, "", window.location.href);
+
+    const handlePopState = (e) => {
+      if (isLeavingRef.current) return;
+
+      // Maintain history entry so user stays on payment page if they choose not to cancel
+      window.history.pushState({ isPaymentPage: true }, "", window.location.href);
+
+      if (processingRef.current) return;
+
+      // Trigger the Cancel Checkout & Restore Cart modal
+      handleCancelCheckout();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   const fetchOrderDetails = async () => {
     const token = localStorage.getItem("token");
@@ -120,7 +154,8 @@ export default function PaymentPage() {
     if (e) e.preventDefault();
     setErrorMessage("");
 
-    if (!order) {
+    const currentOrder = orderRef.current || order;
+    if (!currentOrder) {
       alert("No valid order found.");
       return;
     }
@@ -151,7 +186,7 @@ export default function PaymentPage() {
         return;
       }
 
-      const data = await processCardPayment(order._id, {
+      const data = await processCardPayment(currentOrder._id, {
         cardNumber: cardForm.cardNumber,
         cardholderName: cardForm.cardholderName,
         expiryDate: cardForm.expiryDate,
@@ -160,9 +195,10 @@ export default function PaymentPage() {
       });
 
       if (data && data.success) {
+        isLeavingRef.current = true;
         localStorage.removeItem("printsphere_pending_order_id");
         safeLocalStorage.setItem("printsphere_cart", []);
-        window.location.href = `/payment/success?order_id=${order._id}&gateway=card`;
+        window.location.href = `/payment/success?order_id=${currentOrder._id}&gateway=card`;
       } else {
         throw new Error(data?.message || "Card payment authorization failed.");
       }
@@ -175,8 +211,10 @@ export default function PaymentPage() {
   };
 
   const handleCancelCheckout = async (e) => {
-    if (e) e.preventDefault();
-    if (!order) {
+    if (e && e.preventDefault) e.preventDefault();
+    const currentOrder = orderRef.current || order;
+    if (!currentOrder) {
+      isLeavingRef.current = true;
       window.location.href = "/cart";
       return;
     }
@@ -198,11 +236,11 @@ export default function PaymentPage() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       // 1. Call backend API to cancel the order
-      await axios.put(`${API_BASE_URL}/auth/orders/${order._id}/cancel`, {}, { headers });
+      await axios.put(`${API_BASE_URL}/auth/orders/${currentOrder._id}/cancel`, {}, { headers });
 
       // 2. Reconstruct cart from order items
-      if (order.items && order.items.length > 0) {
-        const restoredCart = order.items.map(item => {
+      if (currentOrder.items && currentOrder.items.length > 0) {
+        const restoredCart = currentOrder.items.map(item => {
           const isCustom = !!item.designId;
           const designInfo = isCustom ? item.designId : {};
           const productInfo = !isCustom ? item.productId : {};
@@ -237,6 +275,7 @@ export default function PaymentPage() {
       localStorage.removeItem("printsphere_pending_order_id");
 
       // 5. Navigate to Cart
+      isLeavingRef.current = true;
       window.location.href = "/cart";
     } catch (err) {
       console.error("Cancel checkout error:", err);
