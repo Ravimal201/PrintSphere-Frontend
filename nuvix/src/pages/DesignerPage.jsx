@@ -84,9 +84,9 @@ const fontFamilies = [
 
 const presetLogos = [
   { name: "PrintSphere Brand", url: "/logos/Logo.png" },
-  { name: "Logo 1", url: "/logos/logo1.jpeg" },
-  { name: "Logo 2", url: "/logos/logo2.jpeg" },
-  { name: "Logo 3", url: "/logos/logo3.jpeg" }
+  { name: "Logo 2", url: "/logos/Logo 2.png" },
+  { name: "Logo 3", url: "/logos/Logo 3.png" },
+  { name: "Logo 4", url: "/logos/Logo 4.png" }
 ];
 
 const findMatchingModel = (design, styles = []) => {
@@ -1681,8 +1681,8 @@ export default function DesignerPage() {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <header className="h-16 border-b bg-white flex items-center justify-between px-8 select-none shrink-0 z-10">
-          <div className="flex items-center gap-2 text-sm text-slate-400">
+        <header className="h-16 border-b bg-white flex items-center justify-between px-6 lg:px-8 select-none shrink-0 z-10 gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-400 shrink-0">
             <span
               onClick={() => window.location.href = isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home"}
               className="hover:text-indigo-600 cursor-pointer transition font-medium"
@@ -1695,7 +1695,59 @@ export default function DesignerPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Active T-Shirt Configurations Display (Style, Color, Size, GSM) */}
+          {!isEmployee && (
+            <div className="hidden md:flex items-center gap-1.5 lg:gap-2 bg-slate-50/90 hover:bg-slate-100/70 p-1 rounded-2xl border border-slate-200/80 shadow-2xs transition">
+              {/* Style */}
+              <button
+                type="button"
+                onClick={() => setActiveLeftPanel(prev => prev === "style" ? null : "style")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50/60 border border-slate-200/70 text-xs font-bold text-slate-700 hover:text-indigo-600 transition shadow-2xs cursor-pointer group"
+                title="Click to change T-Shirt Style"
+              >
+                <Shirt className="h-3.5 w-3.5 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+                <span className="truncate max-w-[120px]">{selectedModel?.name || shirtType}</span>
+              </button>
+
+              {/* Color */}
+              <button
+                type="button"
+                onClick={() => setActiveLeftPanel(prev => prev === "colors" ? null : "colors")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50/60 border border-slate-200/70 text-xs font-bold text-slate-700 hover:text-indigo-600 transition shadow-2xs cursor-pointer group"
+                title="Click to change T-Shirt Color"
+              >
+                <div
+                  className="h-3.5 w-3.5 rounded-full border border-slate-300 shadow-2xs shrink-0 group-hover:scale-110 transition-transform"
+                  style={{ backgroundColor: shirtColor }}
+                />
+                <span className="truncate max-w-[100px]">{resolveColorName(shirtColor)}</span>
+              </button>
+
+              {/* Size */}
+              <button
+                type="button"
+                onClick={() => setActiveLeftPanel(prev => prev === "sizes" ? null : "sizes")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50/60 border border-slate-200/70 text-xs font-bold text-slate-700 hover:text-indigo-600 transition shadow-2xs cursor-pointer group"
+                title="Click to change Garment Size"
+              >
+                <Ruler className="h-3.5 w-3.5 text-amber-500 group-hover:scale-110 transition-transform shrink-0" />
+                <span>Size: <strong className="text-indigo-600">{selectedSize}</strong></span>
+              </button>
+
+              {/* GSM */}
+              <button
+                type="button"
+                onClick={() => setActiveLeftPanel(prev => prev === "gsm" ? null : "gsm")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50/60 border border-slate-200/70 text-xs font-bold text-slate-700 hover:text-indigo-600 transition shadow-2xs cursor-pointer group"
+                title="Click to change Fabric GSM"
+              >
+                <Scale className="h-3.5 w-3.5 text-teal-600 group-hover:scale-110 transition-transform shrink-0" />
+                <span>{formatGsm(shirtMaterial)}</span>
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 lg:gap-4 shrink-0">
             {!isEmployee && !isManager && (
               <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-700 font-bold text-xs">
                 <ShoppingBag className="h-3.5 w-3.5" />
@@ -2674,7 +2726,7 @@ export default function DesignerPage() {
                   </div>
                 </div>
               ) : !isEmployee ? (
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
                     <Shirt className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                     <span>{selectedModel?.name || shirtType}</span>
@@ -2685,6 +2737,10 @@ export default function DesignerPage() {
                       style={{ backgroundColor: shirtColor }}
                     />
                     <span>{resolveColorName(shirtColor)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                    <Ruler className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Size: {selectedSize}</span>
                   </div>
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
                     <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />

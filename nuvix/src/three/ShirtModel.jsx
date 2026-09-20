@@ -712,12 +712,10 @@ function DecalItem({
 
   const handleDeleteClick = (e) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to delete this layer?")) {
-      if (onDeleteLayer) {
-        onDeleteLayer(layer.id);
-      } else if (onUpdateLayers) {
-        onUpdateLayers((prev) => prev.filter((l) => l.id !== layer.id));
-      }
+    if (onDeleteLayer) {
+      onDeleteLayer(layer.id);
+    } else if (onUpdateLayers) {
+      onUpdateLayers((prev) => prev.filter((l) => l.id !== layer.id));
     }
   };
 
