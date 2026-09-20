@@ -168,6 +168,8 @@ export default function DesignerPage() {
   const [showCartRedirectModal, setShowCartRedirectModal] = useState(false);
   const [showStyleChangeWarningModal, setShowStyleChangeWarningModal] = useState(false);
   const [pendingStyleChange, setPendingStyleChange] = useState(null);
+  const [showLeaveWarningModal, setShowLeaveWarningModal] = useState(false);
+  const [pendingNavigationTarget, setPendingNavigationTarget] = useState(null);
   const [addedItemDetails, setAddedItemDetails] = useState({
     name: "",
     size: "M",
@@ -625,13 +627,56 @@ export default function DesignerPage() {
         position: Array.isArray(l.position) ? l.position : [0, 0, 0],
         rotation: Array.isArray(l.rotation) ? l.rotation : [0, 0, 0],
         scale: Array.isArray(l.scale) ? l.scale : [0.3, 0.3, 0.25],
-        projectedForModel: l.projectedForModel || initialModel?.path || null,
+        projectedForModel: l.projectedForModel || initialDraft?.modelPath || null,
         targetMeshName: l.targetMeshName || null,
         aspectRatio: l.aspectRatio || 1
       }));
     }
     return [];
   });
+
+  const isCheckingOutRef = useRef(false);
+
+  const executePendingNavigation = (target = pendingNavigationTarget) => {
+    if (!target) return;
+    isCheckingOutRef.current = true;
+    if (typeof target === "string") {
+      window.location.href = target;
+    } else if (typeof target === "function") {
+      target();
+    } else if (target.callback && typeof target.callback === "function") {
+      target.callback();
+    }
+  };
+
+  const safeNavigate = (target) => {
+    if (layers && layers.length > 0) {
+      setPendingNavigationTarget(typeof target === "string" ? target : { callback: target });
+      setShowLeaveWarningModal(true);
+    } else {
+      executePendingNavigation(target);
+    }
+  };
+
+  const confirmLeaveWithoutSaving = () => {
+    isCheckingOutRef.current = true;
+    setShowLeaveWarningModal(false);
+    executePendingNavigation();
+  };
+
+  // Browser-level reload/close warning when design is in progress
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isCheckingOutRef.current) return;
+      if (layers && layers.length > 0) {
+        e.preventDefault();
+        e.returnValue = "Save your work! Unsaved design changes will be lost.";
+        return "Save your work! Unsaved design changes will be lost.";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [layers]);
 
   const getUserImagesStorageKey = (user = currentUser) => {
     const userId = user?.id || user?._id || (typeof window !== "undefined" && localStorage.getItem("user") ? (JSON.parse(localStorage.getItem("user") || "{}").id || JSON.parse(localStorage.getItem("user") || "{}")._id) : null) || "guest";
@@ -1648,14 +1693,14 @@ export default function DesignerPage() {
 
               <nav className="p-4 space-y-1">
                 <button
-                  onClick={() => window.location.href = "/employee"}
+                  onClick={() => safeNavigate("/employee")}
                   className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
                 >
                   <ShoppingCart className="h-4.5 w-4.5" />
                   <span>Assigned Print Tasks</span>
                 </button>
                 <button
-                  onClick={() => window.location.href = "/employee"}
+                  onClick={() => safeNavigate("/employee")}
                   className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
                 >
                   <Layers className="h-4.5 w-4.5" />
@@ -1668,7 +1713,7 @@ export default function DesignerPage() {
                   <span>3D Designer</span>
                 </button>
                 <button
-                  onClick={() => window.location.href = "/employee"}
+                  onClick={() => safeNavigate("/employee")}
                   className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 text-slate-400 cursor-pointer"
                 >
                   <Settings className="h-4.5 w-4.5" />
@@ -1684,8 +1729,10 @@ export default function DesignerPage() {
               </div>
               <button
                 onClick={() => {
-                  localStorage.clear();
-                  window.location.href = "/login";
+                  safeNavigate(() => {
+                    localStorage.clear();
+                    window.location.href = "/login";
+                  });
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/30 hover:border-red-500 text-xs text-red-400 font-semibold hover:bg-red-500/10 transition cursor-pointer"
               >
@@ -1729,7 +1776,7 @@ export default function DesignerPage() {
                       key={item.id}
                       onClick={() => {
                         if (item.path) {
-                          window.location.href = item.path;
+                          safeNavigate(item.path);
                         }
                       }}
                       className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
@@ -1750,8 +1797,8 @@ export default function DesignerPage() {
                 <div className="space-y-3">
                   <div
                     onClick={() => {
-                      if (isManager) window.location.href = "/manager";
-                      else window.location.href = "/account";
+                      if (isManager) safeNavigate("/manager");
+                      else safeNavigate("/account");
                     }}
                     className="flex items-center gap-3 px-2 py-1.5 cursor-pointer rounded-xl hover:bg-slate-800/40 transition group select-none"
                   >
@@ -1768,9 +1815,11 @@ export default function DesignerPage() {
                   <div className="px-1.5">
                     <button
                       onClick={() => {
-                        localStorage.removeItem("token");
-                        localStorage.removeItem("printsphere_cart");
-                        window.location.href = "/login";
+                        safeNavigate(() => {
+                          localStorage.removeItem("token");
+                          localStorage.removeItem("printsphere_cart");
+                          window.location.href = "/login";
+                        });
                       }}
                       className="w-full py-2 px-4 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/20 hover:border-transparent rounded-xl font-bold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                     >
@@ -1782,7 +1831,7 @@ export default function DesignerPage() {
               ) : (
                 <div className="px-1.5 pb-1">
                   <button
-                    onClick={() => window.location.href = "/login?redirect=/designer"}
+                    onClick={() => safeNavigate("/login?redirect=/designer")}
                     className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                   >
                     <LogIn className="h-4 w-4" />
@@ -1800,7 +1849,7 @@ export default function DesignerPage() {
         <header className="h-16 border-b bg-white flex items-center justify-between px-6 lg:px-8 select-none shrink-0 z-10 gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-400 shrink-0">
             <span
-              onClick={() => window.location.href = isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home"}
+              onClick={() => safeNavigate(isEmployee ? "/employee" : isManager ? "/manager" : "/customer-home")}
               className="hover:text-indigo-600 cursor-pointer transition font-medium"
             >
               {isEmployee ? "Employee Dashboard" : isManager ? "Manager Dashboard" : "Store"}
@@ -1867,7 +1916,7 @@ export default function DesignerPage() {
             {!isEmployee && !isManager && (
               <button
                 type="button"
-                onClick={() => window.location.href = "/cart"}
+                onClick={() => safeNavigate("/cart")}
                 className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3.5 py-2 rounded-xl font-bold text-xs transition cursor-pointer border border-indigo-200/60 shadow-2xs group active:scale-95"
                 title="View Shopping Cart"
               >
@@ -3987,6 +4036,60 @@ export default function DesignerPage() {
         </div>
       )}
 
+      {/* Warning Modal when user leaves Designer with active design layers */}
+      {showLeaveWarningModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 p-6 flex flex-col items-center text-center select-none">
+            {/* Warning Icon */}
+            <div className="h-14 w-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 mb-3 border border-amber-200 shadow-xs">
+              <AlertCircle className="h-7 w-7" />
+            </div>
+
+            <h3 className="text-lg font-black text-slate-950 mb-1">Save Your Work</h3>
+            <p className="text-xs text-slate-500 mb-4 max-w-[290px] leading-relaxed">
+              Your current design has unsaved changes and will be <strong className="text-rose-600 font-bold">lost</strong> if you leave. Please save your work before leaving if you wish to keep it.
+            </p>
+
+            {/* Design summary badge */}
+            <div className="w-full bg-slate-50 border border-slate-200/70 rounded-2xl p-3 mb-5 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className="h-4 w-4 rounded-full border border-slate-300 shadow-2xs shrink-0"
+                  style={{ backgroundColor: shirtColor }}
+                />
+                <span className="font-bold text-slate-800 truncate max-w-[130px]">
+                  {selectedModel?.name || shirtType}
+                </span>
+              </div>
+              <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 shrink-0">
+                {layers.length} element{layers.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Modal Actions - strictly Keep Editing & Leave buttons */}
+            <div className="flex gap-2.5 w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLeaveWarningModal(false);
+                  setPendingNavigationTarget(null);
+                }}
+                className="flex-1 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-98"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={confirmLeaveWithoutSaving}
+                className="flex-1 py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-98"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirmation Modal for Cart / Checkout Redirect */}
       {showCartRedirectModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -4076,6 +4179,7 @@ export default function DesignerPage() {
               <button
                 type="button"
                 onClick={() => {
+                  isCheckingOutRef.current = true;
                   window.location.href = "/cart";
                 }}
                 className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_12px_rgba(99,102,241,0.25)] focus:outline-none cursor-pointer"
