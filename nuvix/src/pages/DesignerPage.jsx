@@ -1757,16 +1757,16 @@ export default function DesignerPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-2 lg:gap-3 shrink-0">
+          <div className="flex items-center gap-2 lg:gap-2.5 shrink-0">
             {/* My Designs Quick Link (for customer) */}
             {!isEmployee && !isManager && (
               <button
                 type="button"
                 onClick={() => safeNavigate("/my-designs")}
-                className="hidden md:flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-xl font-bold text-xs transition cursor-pointer border border-slate-200/80 shadow-2xs group active:scale-95"
+                className="hidden sm:inline-flex items-center gap-2 h-9 px-3.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-indigo-600 rounded-xl font-bold text-xs border border-slate-200/90 shadow-2xs transition active:scale-95 cursor-pointer group"
                 title="View My Saved Designs"
               >
-                <Palette className="h-3.5 w-3.5 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+                <Palette className="h-4 w-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
                 <span>My Designs</span>
               </button>
             )}
@@ -1776,12 +1776,12 @@ export default function DesignerPage() {
               <button
                 type="button"
                 onClick={() => safeNavigate("/cart")}
-                className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3.5 py-2 rounded-xl font-bold text-xs transition cursor-pointer border border-indigo-200/60 shadow-2xs group active:scale-95"
+                className="inline-flex items-center gap-2 h-9 px-3.5 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs border border-indigo-200/80 shadow-2xs transition active:scale-95 cursor-pointer group"
                 title="View Shopping Cart"
               >
                 <ShoppingBag className="h-4 w-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
                 <span>Cart</span>
-                <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">
+                <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
                   {cartCount}
                 </span>
               </button>
@@ -1790,6 +1790,7 @@ export default function DesignerPage() {
             {/* Save Design / Publish Button */}
             {!isEmployee && (
               <button
+                type="button"
                 onClick={() => {
                   if (isManager) {
                     setSubmitError("");
@@ -1805,9 +1806,10 @@ export default function DesignerPage() {
                     handleSaveBtnClick();
                   }
                 }}
-                className="flex items-center gap-1.5 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_4px_12px_rgba(99,102,241,0.25)] transition cursor-pointer active:scale-95"
+                className="inline-flex items-center gap-2 h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_2px_8px_rgba(99,102,241,0.25)] hover:shadow-md transition active:scale-95 cursor-pointer shrink-0"
+                title={isManager ? "Publish to Store" : "Save Design to Cloud"}
               >
-                <Save className="h-4 w-4" />
+                <Save className="h-4 w-4 shrink-0" />
                 <span>{isManager ? "Publish to Store" : "Save Design"}</span>
               </button>
             )}
@@ -1821,23 +1823,24 @@ export default function DesignerPage() {
                   else if (isEmployee) safeNavigate("/employee");
                   else safeNavigate("/account");
                 }}
-                className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl hover:bg-slate-100 transition cursor-pointer border border-slate-200/80 group"
+                className="inline-flex items-center gap-2 h-9 pl-1.5 pr-3 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl font-bold text-xs border border-slate-200/90 shadow-2xs transition active:scale-95 cursor-pointer group shrink-0"
                 title={`Logged in as ${currentUser.name}`}
               >
                 <img
                   src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop"
                   alt="Avatar"
-                  className="h-7 w-7 rounded-full ring-1 ring-indigo-500/30 object-cover group-hover:ring-indigo-500 transition"
+                  className="h-6 w-6 rounded-full ring-1.5 ring-indigo-500/30 object-cover group-hover:ring-indigo-500 transition shrink-0"
                 />
-                <span className="hidden lg:inline text-xs font-bold text-slate-700 max-w-[90px] truncate">{currentUser.name}</span>
+                <span className="hidden md:inline max-w-[90px] truncate">{currentUser.name}</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => safeNavigate("/login?redirect=/designer")}
-                className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-sm transition cursor-pointer active:scale-95"
+                className="inline-flex items-center gap-2 h-9 px-3.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-2xs transition active:scale-95 cursor-pointer shrink-0"
+                title="Log in to your account"
               >
-                <LogIn className="h-3.5 w-3.5" />
+                <LogIn className="h-4 w-4 shrink-0" />
                 <span>Login</span>
               </button>
             )}
