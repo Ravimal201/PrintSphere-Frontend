@@ -84,6 +84,77 @@ const getPreviousPipelineAction = (currentStatus) => {
   }
 };
 
+// Helper to extract customer name, email, and phone reliably across populated and unpopulated schemas
+const resolveCustomerInfo = (order) => {
+  if (!order) return { name: "Customer", email: "", phone: "" };
+
+  // 1. Customer Name
+  let name = "";
+  if (typeof order.customerId === "object" && order.customerId) {
+    name = order.customerId.name || order.customerId.fullName || order.customerId.username || "";
+  }
+  if (!name && typeof order.userId === "object" && order.userId) {
+    name = order.userId.name || order.userId.fullName || order.userId.username || "";
+  }
+  if (!name && typeof order.user === "object" && order.user) {
+    name = order.user.name || order.user.fullName || order.user.username || "";
+  }
+  if (!name && typeof order.customer === "object" && order.customer) {
+    name = order.customer.name || order.customer.fullName || "";
+  }
+  if (!name) {
+    name = order.customerName ||
+      order.guestName ||
+      order.shippingAddress?.fullName ||
+      order.shippingAddress?.name ||
+      order.shippingAddress?.recipientName ||
+      order.shippingAddress?.recipient ||
+      order.billingAddress?.fullName ||
+      order.billingAddress?.name ||
+      "";
+  }
+
+  // 2. Customer Email
+  let email = "";
+  if (typeof order.customerId === "object" && order.customerId?.email) {
+    email = order.customerId.email;
+  } else if (typeof order.userId === "object" && order.userId?.email) {
+    email = order.userId.email;
+  } else if (typeof order.user === "object" && order.user?.email) {
+    email = order.user.email;
+  } else if (order.customerEmail) {
+    email = order.customerEmail;
+  } else if (order.guestEmail) {
+    email = order.guestEmail;
+  } else if (order.email) {
+    email = order.email;
+  }
+
+  // 3. Customer Phone
+  const phone = (typeof order.customerId === "object" && order.customerId?.phone) ||
+    (typeof order.userId === "object" && order.userId?.phone) ||
+    order.customerPhone ||
+    order.shippingAddress?.phone ||
+    order.phone ||
+    "";
+
+  // Fallback for name if still empty
+  if (!name) {
+    if (email) {
+      const emailPrefix = email.split("@")[0];
+      name = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+    } else if (typeof order.customerId === "string" && order.customerId.length > 0) {
+      name = `Customer #${order.customerId.slice(-6).toUpperCase()}`;
+    } else if (order._id) {
+      name = `Customer #${order._id.slice(-6).toUpperCase()}`;
+    } else {
+      name = "Customer";
+    }
+  }
+
+  return { name, email, phone };
+};
+
 export default function EmployeePage() {
   const [isEmployee, setIsEmployee] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -282,8 +353,29 @@ export default function EmployeePage() {
         { headers }
       );
 
-      setAssignedOrders(prev => prev.map(o => o._id === orderId ? response.data.order : o));
+      // Merge updated order while preserving already-populated customerId and items objects
+      setAssignedOrders(prev => prev.map(o => {
+        if (o._id === orderId) {
+          const updated = response.data?.order || {};
+          const prevCustObj = (typeof o.customerId === "object" && o.customerId) ? o.customerId : null;
+          const newCustObj = (typeof updated.customerId === "object" && updated.customerId) ? updated.customerId : null;
+          
+          return {
+            ...o,
+            ...updated,
+            customerId: newCustObj || prevCustObj || updated.customerId || o.customerId,
+            items: (updated.items && updated.items.length > 0 && typeof updated.items[0]?.designId === "object")
+              ? updated.items
+              : (o.items || updated.items)
+          };
+        }
+        return o;
+      }));
       setOrderNotes(prev => ({ ...prev, [orderId]: "" }));
+      
+      // Silently refresh employee data to guarantee all relations are fresh from DB
+      fetchEmployeeData();
+
       await alertAction({
         title: isRevert ? "Status Reverted" : "Status Updated",
         message: `Order #${orderId.slice(-8)} status successfully ${isRevert ? "reverted" : "updated"} to "${status}"!`,
@@ -535,9 +627,10 @@ export default function EmployeePage() {
             if (searchTerm.trim() !== "") {
               const s = searchTerm.toLowerCase();
               const orderIdMatches = order._id.toLowerCase().includes(s);
-              const customerMatches = (order.customerId?.name || "").toLowerCase().includes(s) ||
-                (order.customerId?.email || "").toLowerCase().includes(s) ||
-                (order.guestEmail || "").toLowerCase().includes(s);
+              const custInfo = resolveCustomerInfo(order);
+              const customerMatches = custInfo.name.toLowerCase().includes(s) ||
+                custInfo.email.toLowerCase().includes(s) ||
+                custInfo.phone.toLowerCase().includes(s);
               const specMatches = order.items.some(item =>
                 item.itemType?.toLowerCase().includes(s) ||
                 item.tShirtStyle?.toLowerCase().includes(s) ||
@@ -733,20 +826,25 @@ export default function EmployeePage() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-slate-500 mt-1.5 flex items-center flex-wrap gap-1">
-                              <span className="font-medium text-slate-600">Customer:</span>{" "}
-                              <span className="font-bold text-slate-900">
-                                {order.customerId?.name ||
-                                  (typeof order.customerId === "object" && order.customerId?.email) ||
-                                  order.guestEmail ||
-                                  "Unknown"}
-                              </span>
-                              {order.customerId?.name && (order.customerId?.email || order.guestEmail) ? (
-                                <span className="text-slate-400 font-normal">
-                                  ({order.customerId?.email || order.guestEmail})
-                                </span>
-                              ) : null}
-                            </p>
+                            {(() => {
+                              const custInfo = resolveCustomerInfo(order);
+                              return (
+                                <p className="text-xs text-slate-500 mt-1.5 flex items-center flex-wrap gap-1">
+                                  <span className="font-medium text-slate-600">Customer:</span>{" "}
+                                  <span className="font-bold text-slate-900">{custInfo.name}</span>
+                                  {custInfo.email && (
+                                    <span className="text-slate-400 font-normal">
+                                      ({custInfo.email})
+                                    </span>
+                                  )}
+                                  {custInfo.phone && (
+                                    <span className="text-slate-400 font-normal">
+                                      • {custInfo.phone}
+                                    </span>
+                                  )}
+                                </p>
+                              );
+                            })()}
                           </div>
                           <div className="text-left md:text-right">
                             <p className="text-lg font-black text-slate-900">
