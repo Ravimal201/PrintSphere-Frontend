@@ -515,9 +515,22 @@ export default function EmployeePage() {
               ? cancelledOrdersList
               : completedOrdersList;
 
+          const activeFilterButtons = [
+            { key: "All", label: "All" },
+            { key: "Processing", label: "In Progress" },
+            { key: "Printing", label: "Printing" },
+            { key: "Completed", label: "Complete" }
+          ];
+
           const filteredOrders = currentPool.filter(order => {
-            if (statusFilter !== "All" && order.orderStatus !== statusFilter) {
-              return false;
+            if (taskSubTab === "active" && statusFilter !== "All") {
+              if (statusFilter === "Processing") {
+                if (order.orderStatus !== "Processing" && order.orderStatus !== "Pending" && order.orderStatus !== "Assigned") {
+                  return false;
+                }
+              } else if (order.orderStatus !== statusFilter) {
+                return false;
+              }
             }
             if (searchTerm.trim() !== "") {
               const s = searchTerm.toLowerCase();
@@ -539,15 +552,6 @@ export default function EmployeePage() {
             }
             return true;
           });
-
-          const activeFilters = ["All", "Processing", "Printing", "Completed"];
-          const cancelledFilters = ["All"];
-          const completedFilters = ["All", "Shipped", "Delivered", "Collected"];
-          const currentFilterOptions = taskSubTab === "active"
-            ? activeFilters
-            : taskSubTab === "cancelled"
-              ? cancelledFilters
-              : completedFilters;
 
           return (
             <div className="bg-white border rounded-3xl p-6 shadow-sm">
@@ -633,18 +637,18 @@ export default function EmployeePage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50/50 w-full sm:w-52 focus:outline-none focus:border-indigo-500"
                   />
-                  {currentFilterOptions.length > 1 && (
+                  {taskSubTab === "active" && (
                     <div className="flex gap-1.5 overflow-x-auto py-1">
-                      {currentFilterOptions.map(st => (
+                      {activeFilterButtons.map(f => (
                         <button
-                          key={st}
-                          onClick={() => setStatusFilter(st)}
-                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition cursor-pointer shrink-0 ${statusFilter === st
+                          key={f.key}
+                          onClick={() => setStatusFilter(f.key)}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition cursor-pointer shrink-0 ${statusFilter === f.key
                               ? "bg-indigo-600 text-white shadow-xs"
                               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                             }`}
                         >
-                          {st}
+                          {f.label}
                         </button>
                       ))}
                     </div>
