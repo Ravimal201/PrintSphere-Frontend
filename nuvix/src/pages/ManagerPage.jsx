@@ -153,7 +153,6 @@ export default function ManagerPage() {
   // Orders tab states & filters
   const [orderTabFilter, setOrderTabFilter] = useState("all"); // "all" | "active" | "delivered" | "cancelled"
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
-  const [orderTabFilter, setOrderTabFilter] = useState("all");
 
   // Order status classification helpers
   const isCancelledOrder = (order) => {
