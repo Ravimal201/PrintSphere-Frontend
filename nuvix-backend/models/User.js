@@ -45,7 +45,13 @@ const UserSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: "CustomizedDesign"
       }
-    ]
+    ],
+    resetPasswordOTP: {
+      type: String
+    },
+    resetPasswordExpire: {
+      type: Date
+    }
   },
   {
     timestamps: true // Adds createdAt and updatedAt automatically

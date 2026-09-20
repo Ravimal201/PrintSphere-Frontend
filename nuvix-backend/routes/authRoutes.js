@@ -3,7 +3,9 @@ const router = express.Router();
 const { 
   registerCustomer, 
   loginUser, 
-  changePassword, 
+  changePassword,
+  forgotPassword,
+  resetPassword, 
   getStoreProducts, 
   getRecommendations, 
   trackUserActivity,
@@ -30,6 +32,8 @@ const {
 
 router.post("/register", registerCustomer);
 router.post("/login", loginUser);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 router.put("/change-password", changePassword);
 router.get("/profile", getUserProfile);
 router.put("/profile", updateUserProfile);
