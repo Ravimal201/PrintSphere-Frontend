@@ -5453,7 +5453,17 @@ export default function ManagerPage() {
       {/* Manager interactive 3D review modal */}
       {selectedSubmissionProduct && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[600px] select-none text-slate-800">
+          <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[600px] select-none text-slate-800 relative">
+            {/* Sticky Top-Right Close Button */}
+            <button
+              onClick={() => setSelectedSubmissionProduct(null)}
+              className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/90 hover:bg-white text-slate-500 hover:text-slate-800 shadow-md backdrop-blur-md border border-slate-200 transition hover:scale-105 cursor-pointer"
+              title="Close Review"
+              aria-label="Close Review"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
             {/* Left 3D Panel */}
             <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-6 border-b md:border-b-0 md:border-r">
               <div className="absolute top-4 left-4 z-10">
@@ -5516,7 +5526,7 @@ export default function ManagerPage() {
             {/* Right Product metadata & actions */}
             <div className="w-full md:w-[400px] flex flex-col justify-between p-6 bg-white overflow-y-auto">
               <div className="space-y-6">
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start pr-8">
                   <div>
                     <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">
                       {selectedSubmissionProduct.category}
@@ -5525,12 +5535,6 @@ export default function ManagerPage() {
                       {selectedSubmissionProduct.title}
                     </h3>
                   </div>
-                  <button
-                    onClick={() => setSelectedSubmissionProduct(null)}
-                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
                 </div>
 
                 <div className="pb-4 border-b">
