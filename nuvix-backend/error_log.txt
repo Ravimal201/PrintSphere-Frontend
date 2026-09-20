@@ -348,3 +348,32 @@ Payload:
   "layers": []
 }
 
+[2026-09-20T15:17:11.025Z] Submit Product Concept Error:
+ValidationError: Product validation failed: sizes.3: `3XL` is not a valid enum value for path `sizes.3`.
+    at Document.invalidate (D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3387:32)
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\document.js:3148:17
+    at D:\Education\Uva Wellassa University\3rd Year\2nd semester\VLE Notes\Project 2\dev\PrintSphere-Frontend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Payload:
+{
+  "title": "vvvv",
+  "description": "vvvv",
+  "category": "Men's T-Shirt",
+  "basePrice": 850,
+  "sizes": [
+    "XL",
+    "XXL",
+    "L",
+    "3XL"
+  ],
+  "colors": [
+    "#1e3a8a"
+  ],
+  "images": [
+    "/images/dumyImage.png"
+  ],
+  "modelPath": "/images/models/male normal t-shirt1.glb",
+  "defaultColor": "#1e3a8a",
+  "layers": []
+}
+
