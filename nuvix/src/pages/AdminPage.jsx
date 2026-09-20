@@ -4,7 +4,8 @@ import {
   Loader2, AlertCircle, CheckCircle, BarChart3, TrendingUp, Inbox, 
   Settings, RefreshCw, Layers, ShoppingCart, Info, HardDrive, Check, Bell, Download, FileText,
   Droplets, Package, Box, Filter, Search, Tag, Plus, X, Menu,
-  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye, AlertTriangle, CreditCard, Printer, CheckCheck, Clock, Activity, Truck, Sparkles, Award
+  Star, MessageSquare, ThumbsUp, ThumbsDown, Smile, ShieldCheck, Eye, AlertTriangle, CreditCard, Printer, CheckCheck, Clock, Activity, Truck, Sparkles, Award,
+  PackageCheck, XCircle, CheckCircle2
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
@@ -51,6 +52,8 @@ export default function AdminPage() {
   // Live System Analytics & Notifications State
   const [notifications, setNotifications] = useState([]);
   const [notificationTypeFilter, setNotificationTypeFilter] = useState("ALL");
+  const [orderNotificationSubFilter, setOrderNotificationSubFilter] = useState("ALL"); // "ALL" | "PLACE" | "COMPLETE" | "CANCEL"
+  const [lowStockNotificationSubFilter, setLowStockNotificationSubFilter] = useState("ALL"); // "ALL" | "TSHIRTS" | "INK" | "PACKAGING"
   const [notificationStatusFilter, setNotificationStatusFilter] = useState("ALL"); // "ALL" | "UNREAD" | "READ"
   const [notificationSearchQuery, setNotificationSearchQuery] = useState("");
   const [analytics, setAnalytics] = useState(null);
@@ -2435,44 +2438,132 @@ export default function AdminPage() {
             { key: "ALL", label: "All Notifications", icon: Bell },
             { key: "Order Update", label: "Order Updates", icon: ShoppingCart },
             { key: "Low Stock", label: "Low Stock Alerts", icon: AlertTriangle },
-            { key: "Payment Success", label: "Payment Confirmations", icon: CreditCard },
-            { key: "New Print Task", label: "Print Tasks", icon: Printer },
           ];
 
-          const getMeta = (type) => {
+          const orderSubFilters = [
+            { key: "ALL", label: "All", icon: ShoppingCart },
+            { key: "PLACE", label: "Place Orders", icon: PackageCheck },
+            { key: "COMPLETE", label: "Complete Orders", icon: CheckCircle2 },
+            { key: "CANCEL", label: "Cancel Orders", icon: XCircle },
+          ];
+
+          const lowStockSubFilters = [
+            { key: "ALL", label: "All", icon: AlertTriangle },
+            { key: "TSHIRTS", label: "T-Shirts", icon: Layers },
+            { key: "INK", label: "Printing Ink", icon: Droplets },
+            { key: "PACKAGING", label: "Packaging Materials", icon: Box },
+          ];
+
+          const getOrderNotificationCategory = (item) => {
+            const title = (item.title || "").toLowerCase();
+            const msg = (item.message || "").toLowerCase();
+            const text = `${title} ${msg}`;
+
+            if (text.includes("cancel")) {
+              return "CANCEL";
+            }
+            if (
+              text.includes("complete") ||
+              text.includes("collected") ||
+              text.includes("delivered") ||
+              text.includes("shipped") ||
+              text.includes("ready for pickup")
+            ) {
+              return "COMPLETE";
+            }
+            return "PLACE";
+          };
+
+          const getLowStockNotificationCategory = (item) => {
+            const title = (item.title || "").toLowerCase();
+            const msg = (item.message || "").toLowerCase();
+            const text = `${title} ${msg}`;
+
+            if (
+              text.includes("ink") ||
+              text.includes("cyan") ||
+              text.includes("magenta") ||
+              text.includes("yellow") ||
+              text.includes("black ink")
+            ) {
+              return "INK";
+            }
+
+            if (
+              text.includes("packaging") ||
+              text.includes("paper") ||
+              text.includes("transfer") ||
+              text.includes("box") ||
+              text.includes("bag") ||
+              text.includes("tape") ||
+              text.includes("consumable") ||
+              text.includes("material")
+            ) {
+              return "PACKAGING";
+            }
+
+            return "TSHIRTS";
+          };
+
+          const getMeta = (item) => {
+            const type = typeof item === "string" ? item : (item?.type || "");
             switch (type) {
-              case "Low Stock":
+              case "Low Stock": {
+                const category = typeof item === "object" ? getLowStockNotificationCategory(item) : "TSHIRTS";
+                if (category === "INK") {
+                  return {
+                    label: "Low Ink Stock",
+                    Icon: Droplets,
+                    badgeClass: "bg-cyan-50 border-cyan-200 text-cyan-700",
+                    iconBg: "bg-cyan-100 text-cyan-600 border-cyan-200",
+                    cardBorder: "border-cyan-100 hover:border-cyan-300"
+                  };
+                }
+                if (category === "PACKAGING") {
+                  return {
+                    label: "Low Packaging Stock",
+                    Icon: Box,
+                    badgeClass: "bg-purple-50 border-purple-200 text-purple-700",
+                    iconBg: "bg-purple-100 text-purple-600 border-purple-200",
+                    cardBorder: "border-purple-100 hover:border-purple-300"
+                  };
+                }
                 return {
-                  label: "Low Stock Alert",
-                  Icon: AlertTriangle,
-                  badgeClass: "bg-rose-50 border-rose-200 text-rose-700",
-                  iconBg: "bg-rose-100 text-rose-600 border-rose-200",
-                  cardBorder: "border-rose-100 hover:border-rose-300"
+                  label: "Low T-Shirt Stock",
+                  Icon: Layers,
+                  badgeClass: "bg-amber-50 border-amber-200 text-amber-700",
+                  iconBg: "bg-amber-100 text-amber-600 border-amber-200",
+                  cardBorder: "border-amber-100 hover:border-amber-300"
                 };
-              case "New Print Task":
+              }
+              case "Order Update": {
+                const category = typeof item === "object" ? getOrderNotificationCategory(item) : "PLACE";
+                if (category === "CANCEL") {
+                  return {
+                    label: "Order Cancelled",
+                    Icon: XCircle,
+                    badgeClass: "bg-rose-50 border-rose-200 text-rose-700",
+                    iconBg: "bg-rose-100 text-rose-600 border-rose-200",
+                    cardBorder: "border-rose-100 hover:border-rose-300"
+                  };
+                }
+                if (category === "COMPLETE") {
+                  return {
+                    label: "Order Completed",
+                    Icon: CheckCircle2,
+                    badgeClass: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                    iconBg: "bg-emerald-100 text-emerald-600 border-emerald-200",
+                    cardBorder: "border-emerald-100 hover:border-emerald-300"
+                  };
+                }
                 return {
-                  label: "Print Task",
-                  Icon: Printer,
-                  badgeClass: "bg-purple-50 border-purple-200 text-purple-700",
-                  iconBg: "bg-purple-100 text-purple-600 border-purple-200",
-                  cardBorder: "border-purple-100 hover:border-purple-300"
-                };
-              case "Payment Success":
-                return {
-                  label: "Payment Confirmation",
-                  Icon: CreditCard,
-                  badgeClass: "bg-emerald-50 border-emerald-200 text-emerald-700",
-                  iconBg: "bg-emerald-100 text-emerald-600 border-emerald-200",
-                  cardBorder: "border-emerald-100 hover:border-emerald-300"
-                };
-              case "Order Update":
-                return {
-                  label: "Order Update",
-                  Icon: ShoppingCart,
+                  label: "Order Placed",
+                  Icon: PackageCheck,
                   badgeClass: "bg-blue-50 border-blue-200 text-blue-700",
                   iconBg: "bg-blue-100 text-blue-600 border-blue-200",
                   cardBorder: "border-blue-100 hover:border-blue-300"
                 };
+              }
               default:
                 return {
                   label: type || "System Alert",
@@ -2488,6 +2579,20 @@ export default function AdminPage() {
             // Type filter
             if (notificationTypeFilter !== "ALL" && item.type !== notificationTypeFilter) {
               return false;
+            }
+            // Order sub-filter when Order Update is active
+            if (notificationTypeFilter === "Order Update" && orderNotificationSubFilter !== "ALL") {
+              const cat = getOrderNotificationCategory(item);
+              if (cat !== orderNotificationSubFilter) {
+                return false;
+              }
+            }
+            // Low Stock sub-filter when Low Stock is active
+            if (notificationTypeFilter === "Low Stock" && lowStockNotificationSubFilter !== "ALL") {
+              const cat = getLowStockNotificationCategory(item);
+              if (cat !== lowStockNotificationSubFilter) {
+                return false;
+              }
             }
             // Status filter
             if (notificationStatusFilter === "UNREAD" && item.isRead) {
@@ -2531,7 +2636,7 @@ export default function AdminPage() {
                       )}
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Monitor real-time updates across customer orders, inventory stock levels, payments, and print tasks.
+                      Monitor real-time updates across customer orders, inventory stock levels, and system activities.
                     </p>
                   </div>
                 </div>
@@ -2555,45 +2660,147 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Notification Type Filters (Pills Bar) */}
-              <div className="flex flex-wrap gap-2 items-center">
-                {notificationTypeFilters.map((tab) => {
-                  const Icon = tab.icon;
-                  const count = tab.key === "ALL" 
-                    ? notifications.length 
-                    : notifications.filter((n) => n.type === tab.key).length;
-                  const unreadCount = tab.key === "ALL"
-                    ? notifications.filter((n) => !n.isRead).length
-                    : notifications.filter((n) => n.type === tab.key && !n.isRead).length;
+              {/* Notification Type Filters & Order Sub-filters Bar */}
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2 items-center">
+                  {notificationTypeFilters.map((tab) => {
+                    const Icon = tab.icon;
+                    const count = tab.key === "ALL" 
+                      ? notifications.length 
+                      : notifications.filter((n) => n.type === tab.key).length;
+                    const unreadCount = tab.key === "ALL"
+                      ? notifications.filter((n) => !n.isRead).length
+                      : notifications.filter((n) => n.type === tab.key && !n.isRead).length;
 
-                  const isActive = notificationTypeFilter === tab.key;
+                    const isActive = notificationTypeFilter === tab.key;
 
-                  return (
-                    <button
-                      key={tab.key}
-                      onClick={() => setNotificationTypeFilter(tab.key)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all select-none cursor-pointer border ${
-                        isActive
-                          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                          : "bg-slate-50/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-slate-200/80"
-                      }`}
-                    >
-                      <Icon className={`h-3.5 w-3.5 ${isActive ? "text-indigo-300" : "text-slate-400"}`} />
-                      <span>{tab.label}</span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                    return (
+                      <button
+                        key={tab.key}
+                        onClick={() => {
+                          setNotificationTypeFilter(tab.key);
+                          if (tab.key !== "Order Update") {
+                            setOrderNotificationSubFilter("ALL");
+                          }
+                          if (tab.key !== "Low Stock") {
+                            setLowStockNotificationSubFilter("ALL");
+                          }
+                        }}
+                        className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all select-none cursor-pointer border ${
                           isActive
-                            ? "bg-slate-800 text-indigo-200"
-                            : unreadCount > 0
-                            ? "bg-rose-100 text-rose-700"
-                            : "bg-slate-200/70 text-slate-600"
+                            ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                            : "bg-slate-50/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-slate-200/80"
                         }`}
                       >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <Icon className={`h-3.5 w-3.5 ${isActive ? "text-indigo-300" : "text-slate-400"}`} />
+                        <span>{tab.label}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                            isActive
+                              ? "bg-slate-800 text-indigo-200"
+                              : unreadCount > 0
+                              ? "bg-rose-100 text-rose-700"
+                              : "bg-slate-200/70 text-slate-600"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Sub-buttons for Order Update Tab */}
+                {notificationTypeFilter === "Order Update" && (
+                  <div className="flex flex-wrap items-center gap-2 p-2.5 bg-indigo-50/40 border border-indigo-100/80 rounded-2xl animate-in fade-in duration-150">
+                    <span className="text-[11px] font-bold text-slate-500 px-2 flex items-center gap-1.5 uppercase tracking-wider">
+                      <Filter className="h-3 w-3 text-indigo-600" />
+                      Order Filter:
+                    </span>
+                    {orderSubFilters.map((sub) => {
+                      const SubIcon = sub.icon;
+                      const isSubActive = orderNotificationSubFilter === sub.key;
+                      const count = sub.key === "ALL"
+                        ? notifications.filter((n) => n.type === "Order Update").length
+                        : notifications.filter((n) => n.type === "Order Update" && getOrderNotificationCategory(n) === sub.key).length;
+                      const unreadCount = sub.key === "ALL"
+                        ? notifications.filter((n) => n.type === "Order Update" && !n.isRead).length
+                        : notifications.filter((n) => n.type === "Order Update" && getOrderNotificationCategory(n) === sub.key && !n.isRead).length;
+
+                      return (
+                        <button
+                          key={sub.key}
+                          onClick={() => setOrderNotificationSubFilter(sub.key)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all select-none cursor-pointer border ${
+                            isSubActive
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                              : "bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-slate-200"
+                          }`}
+                        >
+                          <SubIcon className={`h-3 w-3 ${isSubActive ? "text-indigo-200" : "text-slate-400"}`} />
+                          <span>{sub.label}</span>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                              isSubActive
+                                ? "bg-indigo-700 text-indigo-100"
+                                : unreadCount > 0
+                                ? "bg-rose-100 text-rose-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Sub-buttons for Low Stock Tab */}
+                {notificationTypeFilter === "Low Stock" && (
+                  <div className="flex flex-wrap items-center gap-2 p-2.5 bg-amber-50/40 border border-amber-100/80 rounded-2xl animate-in fade-in duration-150">
+                    <span className="text-[11px] font-bold text-slate-500 px-2 flex items-center gap-1.5 uppercase tracking-wider">
+                      <Filter className="h-3 w-3 text-amber-600" />
+                      Inventory Filter:
+                    </span>
+                    {lowStockSubFilters.map((sub) => {
+                      const SubIcon = sub.icon;
+                      const isSubActive = lowStockNotificationSubFilter === sub.key;
+                      const count = sub.key === "ALL"
+                        ? notifications.filter((n) => n.type === "Low Stock").length
+                        : notifications.filter((n) => n.type === "Low Stock" && getLowStockNotificationCategory(n) === sub.key).length;
+                      const unreadCount = sub.key === "ALL"
+                        ? notifications.filter((n) => !n.isRead).length
+                        : notifications.filter((n) => n.type === "Low Stock" && getLowStockNotificationCategory(n) === sub.key && !n.isRead).length;
+
+                      return (
+                        <button
+                          key={sub.key}
+                          onClick={() => setLowStockNotificationSubFilter(sub.key)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all select-none cursor-pointer border ${
+                            isSubActive
+                              ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                              : "bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-slate-200"
+                          }`}
+                        >
+                          <SubIcon className={`h-3 w-3 ${isSubActive ? "text-amber-200" : "text-slate-400"}`} />
+                          <span>{sub.label}</span>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
+                              isSubActive
+                                ? "bg-amber-700 text-amber-100"
+                                : unreadCount > 0
+                                ? "bg-rose-100 text-rose-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Search & Status Controls Toolbar */}
@@ -2655,11 +2862,19 @@ export default function AdminPage() {
                   <Filter className="h-8 w-8 text-slate-300 mb-2" />
                   <p className="text-sm text-slate-700 font-bold">No notifications found</p>
                   <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                    No notifications match your current filter criteria ({notificationTypeFilter !== "ALL" ? `Type: ${notificationTypeFilter}` : ""} {notificationStatusFilter !== "ALL" ? `Status: ${notificationStatusFilter}` : ""} {notificationSearchQuery ? `Search: "${notificationSearchQuery}"` : ""}).
+                    No notifications match your current filter criteria (
+                    {notificationTypeFilter !== "ALL" ? `Type: ${notificationTypeFilter}` : ""}
+                    {notificationTypeFilter === "Order Update" && orderNotificationSubFilter !== "ALL" ? ` • Order: ${orderNotificationSubFilter}` : ""}
+                    {notificationTypeFilter === "Low Stock" && lowStockNotificationSubFilter !== "ALL" ? ` • Inventory: ${lowStockNotificationSubFilter}` : ""}
+                    {notificationStatusFilter !== "ALL" ? ` • Status: ${notificationStatusFilter}` : ""}
+                    {notificationSearchQuery ? ` • Search: "${notificationSearchQuery}"` : ""}
+                    ).
                   </p>
                   <button
                     onClick={() => {
                       setNotificationTypeFilter("ALL");
+                      setOrderNotificationSubFilter("ALL");
+                      setLowStockNotificationSubFilter("ALL");
                       setNotificationStatusFilter("ALL");
                       setNotificationSearchQuery("");
                     }}
@@ -2671,7 +2886,7 @@ export default function AdminPage() {
               ) : (
                 <div className="space-y-3 max-h-[620px] overflow-y-auto pr-2 custom-scrollbar">
                   {filteredList.map((item) => {
-                    const meta = getMeta(item.type);
+                    const meta = getMeta(item);
                     const Icon = meta.Icon;
 
                     const timeStr = new Date(item.createdAt).toLocaleString(undefined, {
