@@ -151,22 +151,22 @@ export default function ManagerPage() {
   const [approvingProductId, setApprovingProductId] = useState(null);
 
   // Orders tab states & filters
-  const [orderTabFilter, setOrderTabFilter] = useState("all"); // "all" | "active" | "pending_payment" | "delivered" | "cancelled"
-  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [orderTabFilter, setOrderTabFilter] = useState("all");
 
   // Order status classification helpers
-  const isDeliveredOrder = (order) => {
-    return (
-      order.orderStatus === "Collected" ||
-      order.orderStatus === "Delivered" ||
-      Boolean(order.isCollected)
-    );
-  };
-
   const isCancelledOrder = (order) => {
     return (
       order.orderStatus === "Cancelled" ||
       order.orderStatus === "Canceled"
+    );
+  };
+
+  const isDeliveredOrder = (order) => {
+    if (isCancelledOrder(order)) return false;
+    return (
+      order.orderStatus === "Collected" ||
+      order.orderStatus === "Delivered" ||
+      Boolean(order.isCollected)
     );
   };
 
@@ -179,10 +179,34 @@ export default function ManagerPage() {
   };
 
   const isActiveOrder = (order) => {
-    if (isCancelledOrder(order) || isDeliveredOrder(order) || isPendingPaymentOrder(order)) {
-      return false;
-    }
-    return true; // Processing, Printing, Completed, Shipped
+    if (isCancelledOrder(order) || isDeliveredOrder(order)) return false;
+    const hasEmployee = Boolean(
+      order.assignedEmployee &&
+      (typeof order.assignedEmployee === "object"
+        ? order.assignedEmployee._id || order.assignedEmployee.name
+        : order.assignedEmployee)
+    );
+    return !hasEmployee;
+  };
+
+  const isProgressOrder = (order) => {
+    if (isCancelledOrder(order) || isDeliveredOrder(order)) return false;
+    return order.orderStatus === "Processing";
+  };
+
+  const isPrintingOrder = (order) => {
+    if (isCancelledOrder(order) || isDeliveredOrder(order)) return false;
+    return order.orderStatus === "Printing";
+  };
+
+  const isCompletedOrder = (order) => {
+    if (isCancelledOrder(order) || isDeliveredOrder(order)) return false;
+    return order.orderStatus === "Completed";
+  };
+
+  const isShippedOrder = (order) => {
+    if (isCancelledOrder(order) || isDeliveredOrder(order)) return false;
+    return order.orderStatus === "Shipped";
   };
 
   // Order cancellation state
@@ -1565,15 +1589,16 @@ export default function ManagerPage() {
                 <TrendingUp className="h-5 w-5 text-indigo-600" />
                 Live Shop Operations & Active Pipeline
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 py-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-3 py-2">
                 {[
-                  { label: "Pending Payment", filter: (o) => isPendingPaymentOrder(o) },
-                  { label: "Processing", filter: (o) => o.orderStatus === "Processing" && !isDeliveredOrder(o) },
-                  { label: "Printing", filter: (o) => o.orderStatus === "Printing" && !isDeliveredOrder(o) },
-                  { label: "Completed", filter: (o) => o.orderStatus === "Completed" && !isDeliveredOrder(o) },
-                  { label: "Shipped", filter: (o) => o.orderStatus === "Shipped" && !isDeliveredOrder(o) },
+                  { label: "Active (Unassigned)", filter: (o) => isActiveOrder(o) },
+                  { label: "Processing", filter: (o) => isProgressOrder(o) },
+                  { label: "Printing", filter: (o) => isPrintingOrder(o) },
+                  { label: "Completed", filter: (o) => isCompletedOrder(o) },
+                  { label: "Shipped", filter: (o) => isShippedOrder(o) },
                   { label: "Delivered", filter: (o) => isDeliveredOrder(o) },
                   { label: "Cancelled", filter: (o) => isCancelledOrder(o) },
+                  { label: "Pending Payment", filter: (o) => isPendingPaymentOrder(o) },
                 ].map((item, index) => {
                   const count = orders.filter(item.filter).length;
                   return (
@@ -1763,32 +1788,22 @@ export default function ManagerPage() {
           const orderCounts = {
             all: orders.length,
             active: orders.filter(isActiveOrder).length,
-            pending_payment: orders.filter(isPendingPaymentOrder).length,
+            progress: orders.filter(isProgressOrder).length,
+            printing: orders.filter(isPrintingOrder).length,
+            completed: orders.filter(isCompletedOrder).length,
+            shipped: orders.filter(isShippedOrder).length,
             delivered: orders.filter(isDeliveredOrder).length,
             cancelled: orders.filter(isCancelledOrder).length,
           };
 
           const filteredOrders = orders.filter((order) => {
             if (orderTabFilter === "active" && !isActiveOrder(order)) return false;
-            if (orderTabFilter === "pending_payment" && !isPendingPaymentOrder(order)) return false;
+            if (orderTabFilter === "progress" && !isProgressOrder(order)) return false;
+            if (orderTabFilter === "printing" && !isPrintingOrder(order)) return false;
+            if (orderTabFilter === "completed" && !isCompletedOrder(order)) return false;
+            if (orderTabFilter === "shipped" && !isShippedOrder(order)) return false;
             if (orderTabFilter === "delivered" && !isDeliveredOrder(order)) return false;
             if (orderTabFilter === "cancelled" && !isCancelledOrder(order)) return false;
-
-            if (orderSearchQuery.trim()) {
-              const q = orderSearchQuery.toLowerCase().trim();
-              const orderIdMatch = (order._id || "").toLowerCase().includes(q) || (order._id || "").slice(-8).toLowerCase().includes(q);
-              const custName = (order.customerId?.name || "").toLowerCase();
-              const custEmail = ((typeof order.customerId === "object" ? order.customerId?.email : "") || order.guestEmail || "").toLowerCase();
-              const custPhone = (order.shippingAddress?.phone || order.customerId?.phone || "").toLowerCase();
-              const city = (order.shippingAddress?.city || order.shippingAddress?.street || "").toLowerCase();
-              const itemsMatch = (order.items || []).some((it) =>
-                (it.tShirtStyle || "").toLowerCase().includes(q) ||
-                (it.itemType || "").toLowerCase().includes(q) ||
-                (it.selectedColor || it.color || "").toLowerCase().includes(q) ||
-                (it.selectedSize || it.size || "").toLowerCase().includes(q)
-              );
-              return orderIdMatch || custName.includes(q) || custEmail.includes(q) || custPhone.includes(q) || city.includes(q) || itemsMatch;
-            }
 
             return true;
           });
@@ -1803,7 +1818,7 @@ export default function ManagerPage() {
                     Customer Orders & Production Pipeline
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Filter by active, payment pending, delivered, or canceled orders. Assign staff and manage production workflow.
+                    Filter by active (unassigned), progress orders, printing orders, completed orders, shipped orders, delivered orders, or cancelled orders. Assign staff and manage production workflow.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1814,31 +1829,33 @@ export default function ManagerPage() {
                 </div>
               </div>
 
-              {/* Filter Tabs & Search Bar */}
-              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2 border-t border-slate-100">
-                {/* Status Filter Tabs */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+              {/* Status Filter Tabs - Well Aligned Grid */}
+              <div className="pt-2 border-t border-slate-100">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                   {[
                     { id: "all", label: "All Orders", count: orderCounts.all },
-                    { id: "active", label: "Active Orders", count: orderCounts.active },
-                    { id: "pending_payment", label: "Payment Pending", count: orderCounts.pending_payment },
+                    { id: "active", label: "Active", count: orderCounts.active },
+                    { id: "progress", label: "Progress Orders", count: orderCounts.progress },
+                    { id: "printing", label: "Printing Orders", count: orderCounts.printing },
+                    { id: "completed", label: "Completed Orders", count: orderCounts.completed },
+                    { id: "shipped", label: "Shipped Orders", count: orderCounts.shipped },
                     { id: "delivered", label: "Delivered Orders", count: orderCounts.delivered },
-                    { id: "cancelled", label: "Canceled Orders", count: orderCounts.cancelled },
+                    { id: "cancelled", label: "Cancelled Orders", count: orderCounts.cancelled },
                   ].map((tab) => {
                     const isActive = orderTabFilter === tab.id;
                     return (
                       <button
                         key={tab.id}
                         onClick={() => setOrderTabFilter(tab.id)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between gap-1.5 cursor-pointer w-full text-left ${
                           isActive
                             ? "bg-slate-950 text-white shadow-xs"
                             : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70"
                         }`}
                       >
-                        <span>{tab.label}</span>
+                        <span className="truncate">{tab.label}</span>
                         <span
-                          className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-black shrink-0 ${
                             isActive
                               ? "bg-white/20 text-white"
                               : "bg-white text-slate-700 border border-slate-200"
@@ -1849,27 +1866,6 @@ export default function ManagerPage() {
                       </button>
                     );
                   })}
-                </div>
-
-                {/* Search Box */}
-                <div className="relative min-w-[240px] md:w-72">
-                  <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search order #, customer, item..."
-                    value={orderSearchQuery}
-                    onChange={(e) => setOrderSearchQuery(e.target.value)}
-                    className="w-full text-xs pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
-                  />
-                  {orderSearchQuery && (
-                    <button
-                      onClick={() => setOrderSearchQuery("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                      title="Clear search"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -1885,17 +1881,14 @@ export default function ManagerPage() {
                   <div>
                     <p className="text-sm text-slate-700 font-bold">No orders match the selected filter.</p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Try switching filter tabs or clearing your search query.
+                      Try switching to another filter tab.
                     </p>
                   </div>
                   <button
-                    onClick={() => {
-                      setOrderTabFilter("all");
-                      setOrderSearchQuery("");
-                    }}
+                    onClick={() => setOrderTabFilter("all")}
                     className="px-3.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
                   >
-                    Reset Filters
+                    Show All Orders
                   </button>
                 </div>
               ) : (
