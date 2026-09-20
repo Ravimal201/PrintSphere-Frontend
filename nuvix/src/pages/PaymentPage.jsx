@@ -140,6 +140,45 @@ export default function PaymentPage() {
     setCardForm({ ...cardForm, expiryDate: raw });
   };
 
+  // Helper to validate expiry date
+  const validateExpiryDate = (expiryStr) => {
+    if (!expiryStr || typeof expiryStr !== "string") {
+      return { valid: false, message: "Please enter your card expiry date (MM/YY)." };
+    }
+
+    const parts = expiryStr.trim().split("/");
+    if (parts.length !== 2 || parts[0].length !== 2 || parts[1].length !== 2) {
+      return { valid: false, message: "Please enter a valid expiry date format (MM/YY)." };
+    }
+
+    const month = parseInt(parts[0], 10);
+    const year2Digit = parseInt(parts[1], 10);
+
+    if (isNaN(month) || month < 1 || month > 12) {
+      return { valid: false, message: "Invalid expiry month. Month must be between 01 and 12." };
+    }
+
+    if (isNaN(year2Digit)) {
+      return { valid: false, message: "Invalid expiry year format." };
+    }
+
+    const fullYear = 2000 + year2Digit;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+
+    // Check if date has already passed
+    if (fullYear < currentYear || (fullYear === currentYear && month < currentMonth)) {
+      return { valid: false, message: "Card has expired. Please enter a valid future expiry date." };
+    }
+
+    if (fullYear > currentYear + 25) {
+      return { valid: false, message: "Invalid expiry year. Year is too far in the future." };
+    }
+
+    return { valid: true };
+  };
+
   // Card Provider Detect
   const getCardBrand = () => {
     const num = cardForm.cardNumber.replace(/\s/g, "");
@@ -175,11 +214,15 @@ export default function PaymentPage() {
         setProcessingPayment(false);
         return;
       }
-      if (!cardForm.expiryDate || cardForm.expiryDate.length < 5) {
-        setErrorMessage("Please enter a valid expiry date (MM/YY).");
+
+      // Check Expiry Date Validity
+      const expiryCheck = validateExpiryDate(cardForm.expiryDate);
+      if (!expiryCheck.valid) {
+        setErrorMessage(expiryCheck.message);
         setProcessingPayment(false);
         return;
       }
+
       if (!cardForm.cvv || cardForm.cvv.length < 3) {
         setErrorMessage("Please enter a valid 3-digit CVV code.");
         setProcessingPayment(false);
