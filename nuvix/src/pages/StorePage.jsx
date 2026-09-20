@@ -1325,7 +1325,17 @@ export default function StorePage() {
       {/* 3D Product Detail Modal */}
       {selected3DProduct && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[600px] select-none">
+          <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[600px] select-none relative">
+            {/* Sticky Top-Right Close Button */}
+            <button
+              onClick={() => setSelected3DProduct(null)}
+              className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/90 hover:bg-white text-slate-500 hover:text-slate-800 shadow-md backdrop-blur-md border border-slate-200 transition hover:scale-105 cursor-pointer"
+              title="Close"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
             {/* Left 3D Canvas Panel */}
             <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-5 border-b md:border-b-0 md:border-r">
               {/* Top Left info badge */}
@@ -1493,7 +1503,7 @@ export default function StorePage() {
             <div className="w-full md:w-[400px] flex flex-col justify-between p-6 bg-white overflow-y-auto">
               <div className="space-y-6">
                 {/* Header */}
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start pr-8">
                   <div>
                     <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
                       {selected3DProduct.category}
@@ -1528,12 +1538,6 @@ export default function StorePage() {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setSelected3DProduct(null)}
-                    className="p-1 rounded-lg hover:bg-slate-105 text-slate-400 hover:text-slate-700 transition"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
                 </div>
 
                 {/* Dynamic GSM Price & Options Calculations */}
