@@ -414,16 +414,25 @@ export default function DesignerPage() {
 
       await axios.post(endpoint, payload, { headers });
 
+      setShowSubmitModal(false);
+      lastSavedSnapshotRef.current = getDesignSignature();
+
       if (isManager) {
-        setSubmitSuccess("Design published directly to catalog successfully!");
-        setTimeout(() => {
-          window.location.href = "/manager";
-        }, 1500);
+        await alertAction({
+          title: "Published to Store",
+          message: "Design published directly to catalog successfully!",
+          type: "success",
+          confirmText: "OK"
+        });
+        window.location.href = "/manager";
       } else {
-        setSubmitSuccess("Design concept sent to manager successfully!");
-        setTimeout(() => {
-          window.location.href = "/employee";
-        }, 1500);
+        await alertAction({
+          title: "Submission Successful",
+          message: "Successfully submitted to manager review",
+          type: "success",
+          confirmText: "OK"
+        });
+        window.location.href = "/employee";
       }
     } catch (err) {
       console.error("Submit design concept error:", err);
