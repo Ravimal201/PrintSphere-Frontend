@@ -414,8 +414,18 @@ export default function TShirt3DModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[92vh] md:h-[620px] select-none animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-3xl w-full max-w-4xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[92vh] md:h-[620px] select-none animate-in fade-in zoom-in duration-200 relative">
         
+        {/* Sticky Top-Right Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/90 hover:bg-white text-slate-500 hover:text-slate-800 shadow-md backdrop-blur-md border border-slate-200 transition hover:scale-105 cursor-pointer"
+          title="Close 3D View"
+          aria-label="Close 3D View"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
         {/* Left 3D Canvas Panel */}
         <div className="flex-1 bg-slate-50 relative flex flex-col justify-between p-6 border-b md:border-b-0 md:border-r">
           
@@ -555,8 +565,8 @@ export default function TShirt3DModal({
         <div className="w-full md:w-[320px] bg-white flex flex-col p-6 h-full justify-between">
 
           <div className="space-y-6 overflow-y-auto pr-1">
-            {/* Header with Title, Customize button and Close button */}
-            <div className="flex justify-between items-start">
+            {/* Header with Title, Customize button */}
+            <div className="flex justify-between items-start pr-8">
               <div>
                 <h3 className="text-base font-black text-slate-900 leading-tight capitalize">
                   {design.tShirtType || design.title || "Custom T-Shirt"}
@@ -585,12 +595,6 @@ export default function TShirt3DModal({
                     <span>Customize</span>
                   </button>
                 )}
-                <button
-                  onClick={onClose}
-                  className="p-1.5 hover:bg-slate-100 rounded-xl transition text-slate-400 hover:text-slate-700 cursor-pointer"
-                >
-                  <X className="h-5 w-5" />
-                </button>
               </div>
             </div>
 
