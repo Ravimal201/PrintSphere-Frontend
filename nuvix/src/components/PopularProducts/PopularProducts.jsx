@@ -31,6 +31,7 @@ import Store3DCardPreview from "../Store3DCardPreview";
 import Scene from "../../three/Scene";
 import { API_BASE_URL } from "../../config/api";
 import { resolveColorName, formatGsm } from "../../utils/colorHelper";
+import { sortSizesAscending, getSizeFullName, formatSizeList } from "../../utils/sizeHelper";
 import { safeLocalStorage } from "../../utils/imageOptimizer";
 
 const getOrCreateSessionId = () => {
@@ -1136,7 +1137,7 @@ export default function PopularProducts() {
                   {/* Action Button: View Details & 3D */}
                   <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
                     <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 px-1">
-                      <span>Sizes: {(product.sizes || ["S", "M", "L"]).join(", ")}</span>
+                      <span>Sizes: {formatSizeList(product.sizes)}</span>
                       <span className="text-indigo-600">
                         GSM: {(product.gsms || []).join(", ") || product.gsm || "180"}
                       </span>
@@ -1504,12 +1505,13 @@ export default function PopularProducts() {
                     Select Size
                   </span>
                   <div className="flex flex-wrap gap-2">
-                    {(selected3DProduct.sizes || ["S", "M", "L", "XL"]).map((sz) => (
+                    {sortSizesAscending(selected3DProduct.sizes || []).map((sz) => (
                       <button
                         key={sz}
                         type="button"
                         onClick={() => setModalSize(sz)}
-                        className={`w-9 h-9 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
+                        title={getSizeFullName(sz)}
+                        className={`min-w-[36px] h-9 px-2 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
                           modalSize === sz
                             ? "bg-slate-900 border-slate-900 text-white shadow-xs"
                             : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"

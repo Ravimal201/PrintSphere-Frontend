@@ -4,6 +4,7 @@ import Scene from "../three/Scene";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import { sortSizesAscending, getSizeFullName, getSizeInfo, formatSizeList } from "../utils/sizeHelper";
 import { removeImageBackground } from "../utils/backgroundRemoval";
 import { optimizeImageForLayer, createDesignThumbnail, safeLocalStorage } from "../utils/imageOptimizer";
 import { confirmAction, alertAction } from "../context/ConfirmContext";
@@ -377,7 +378,7 @@ export default function DesignerPage() {
       description: submitForm.description,
       category: submitForm.category,
       basePrice: submitForm.basePrice,
-      sizes: (isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize],
+      sizes: sortSizesAscending((isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize]),
       colors: [shirtColor],
       images: [thumb],
       modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
@@ -537,38 +538,31 @@ export default function DesignerPage() {
     { code: "3XL", label: "Triple Extra Large", desc: "Chest: 46-48\"" }
   ];
 
-  const activeModelSizes =
+  const activeModelSizes = sortSizesAscending(
     selectedModel?.sizes && Array.isArray(selectedModel.sizes) && selectedModel.sizes.length > 0
       ? selectedModel.sizes
-      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+      : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]
+  );
 
   const getActiveSizeList = () => {
-    return activeModelSizes.map((code) => {
-      const found = ALL_SHIRT_SIZES.find((s) => s.code.toUpperCase() === code.toUpperCase());
-      return (
-        found || {
-          code: code,
-          label: code,
-          desc: "Custom Sizing",
-        }
-      );
-    });
+    return activeModelSizes.map((code) => getSizeInfo(code));
   };
 
   const [selectedSize, setSelectedSize] = useState(() => initialDraft?.size || "M");
   const [selectedStoreSizes, setSelectedStoreSizes] = useState(() => {
     if (initialDraft?.sizes && Array.isArray(initialDraft.sizes) && initialDraft.sizes.length > 0) {
-      return initialDraft.sizes;
+      return sortSizesAscending(initialDraft.sizes);
     }
     return ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
   });
 
   useEffect(() => {
     if (!selectedModel) return;
-    const modelSizes =
+    const modelSizes = sortSizesAscending(
       selectedModel.sizes && Array.isArray(selectedModel.sizes) && selectedModel.sizes.length > 0
         ? selectedModel.sizes
-        : ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+        : ["XS", "S", "M", "L", "XL", "XXL", "3XL"]
+    );
 
     if (!modelSizes.includes(selectedSize)) {
       setSelectedSize(modelSizes[0] || "M");
@@ -576,7 +570,7 @@ export default function DesignerPage() {
 
     setSelectedStoreSizes((prev) => {
       const valid = prev.filter((s) => modelSizes.includes(s));
-      return valid.length > 0 ? valid : modelSizes;
+      return sortSizesAscending(valid.length > 0 ? valid : modelSizes);
     });
   }, [selectedModel]);
 
@@ -2345,21 +2339,23 @@ export default function DesignerPage() {
                       <>
                         <div className="space-y-2">
                           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Available Sizes</span>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                             {activeModelSizes.map((size) => {
                               const isSelected = selectedSize === size;
+                              const sizeInfo = getSizeInfo(size);
                               return (
                                 <button
                                   key={size}
                                   onClick={() => setSelectedSize(size)}
-                                  className={`py-3 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
+                                  className={`py-2.5 px-2 rounded-2xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${isSelected
                                     ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                                     : "border-slate-200 hover:bg-slate-50 text-slate-700 bg-white"
                                     }`}
+                                  title={`${size} (${sizeInfo.label}) - ${sizeInfo.desc}`}
                                 >
-                                  <span className="text-sm leading-none">{size}</span>
-                                  <span className={`text-[9px] uppercase font-semibold ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
-                                    Regular
+                                  <span className="text-sm leading-none font-black">{size}</span>
+                                  <span className={`text-[9px] uppercase font-bold truncate max-w-full px-0.5 ${isSelected ? "text-indigo-200" : "text-slate-400"}`}>
+                                    {sizeInfo.label}
                                   </span>
                                 </button>
                               );
