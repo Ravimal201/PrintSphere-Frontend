@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, ZoomIn, Download, RefreshCw, Layers, Sparkles, Camera, CheckCircle, Loader2, Edit, FileCode, ShoppingBag } from "lucide-react";
+import { X, ZoomIn, Download, RefreshCw, Layers, Sparkles, Camera, CheckCircle, Loader2, Edit, FileCode, ShoppingBag, Send, Upload } from "lucide-react";
 import { safeLocalStorage, createDesignThumbnail } from "../utils/imageOptimizer";
 
 import Scene from "../three/Scene";
@@ -154,7 +154,21 @@ const getLayersFromDesign = (design) => {
   return [];
 };
 
-export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, onCheckout, allowDownloads = false, showCustomize = true }) {
+export default function TShirt3DModal({
+  isOpen,
+  onClose,
+  design,
+  onCustomize,
+  onCheckout,
+  onAction,
+  actionButtonLabel,
+  actionButtonIcon: ActionIconProp,
+  actionBtnClass,
+  hideAction = false,
+  allowDownloads = false,
+  showCustomize = true,
+  priceLabel
+}) {
   const [activeSide, setActiveSide] = useState("front");
   const [zoomLevel, setZoomLevel] = useState(0.85);
   const [modelRotation, setModelRotation] = useState(0);
@@ -162,6 +176,24 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
   const [captureFeedback, setCaptureFeedback] = useState("");
   const [exportFormat, setExportFormat] = useState("png"); // "png" | "jpg" | "webp"
   const canvasContainerRef = useRef(null);
+
+  let userRole = "";
+  try {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      const userObj = JSON.parse(userStr);
+      userRole = userObj.role || "";
+    }
+  } catch (e) {}
+
+  const isEmployeeUser = userRole === "Employee";
+  const isManagerUser = userRole === "Manager" || userRole === "Admin";
+
+  const resolvedActionLabel = actionButtonLabel || (
+    isEmployeeUser ? "Submit to Manager" : isManagerUser ? "Publish to Store" : "Proceed to Checkout"
+  );
+  const isSubmitAction = resolvedActionLabel.toLowerCase().includes("submit");
+  const isPublishAction = resolvedActionLabel.toLowerCase().includes("publish");
 
   useEffect(() => {
     if (activeSide === "front") setModelRotation(0);
@@ -185,6 +217,18 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
       safeLocalStorage.setItem("load_custom_design", design);
       window.location.href = "/designer";
     }
+  };
+
+  const handleActionClick = () => {
+    if (onAction) {
+      onAction(design);
+      return;
+    }
+    if (onCheckout) {
+      onCheckout(design);
+      return;
+    }
+    handleCheckout();
   };
 
   const handleCheckout = () => {
@@ -618,24 +662,36 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
             </div>
           </div>
 
-          {/* Footer with Checkout Action & Estimated Cost */}
-          <div className="pt-4 border-t border-slate-100 flex flex-col gap-3 select-none">
-            {(design.basePrice || design.estimatedCost || design.price) ? (
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase">Unit Price</span>
-                <span className="text-lg font-black text-slate-900">
-                  Rs. {Number(design.basePrice || design.estimatedCost || design.price || 0).toFixed(2)}
-                </span>
-              </div>
-            ) : null}
-            <button
-              onClick={handleCheckout}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(99,102,241,0.3)] cursor-pointer"
-            >
-              <ShoppingBag className="h-4 w-4" />
-              <span>Proceed to Checkout</span>
-            </button>
-          </div>
+          {/* Footer with Checkout / Submit Action & Price */}
+          {!hideAction && (
+            <div className="pt-4 border-t border-slate-100 flex flex-col gap-3 select-none">
+              {(design.basePrice || design.estimatedCost || design.price) ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400 uppercase">
+                    {priceLabel || (isEmployeeUser ? "Proposed Unit Price" : isManagerUser ? "Estimated Unit Cost" : "Unit Price")}
+                  </span>
+                  <span className="text-lg font-black text-slate-900">
+                    Rs. {Number(design.basePrice || design.estimatedCost || design.price || 0).toFixed(2)}
+                  </span>
+                </div>
+              ) : null}
+              <button
+                onClick={handleActionClick}
+                className={actionBtnClass || "w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(99,102,241,0.3)] cursor-pointer"}
+              >
+                {ActionIconProp ? (
+                  <ActionIconProp className="h-4 w-4" />
+                ) : isSubmitAction ? (
+                  <Send className="h-4 w-4" />
+                ) : isPublishAction ? (
+                  <Upload className="h-4 w-4" />
+                ) : (
+                  <ShoppingBag className="h-4 w-4" />
+                )}
+                <span>{resolvedActionLabel}</span>
+              </button>
+            </div>
+          )}
 
         </div>
 

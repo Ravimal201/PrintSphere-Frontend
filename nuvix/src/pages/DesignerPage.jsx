@@ -55,7 +55,8 @@ import {
   ChevronDown,
   ChevronUp,
   ShoppingCart,
-  Settings
+  Settings,
+  Send
 } from "lucide-react";
 
 const shirtColors = [
@@ -4501,7 +4502,32 @@ export default function DesignerPage() {
           thumbnailUrl: generateDesignThumbnail(layers)
         }}
         onCustomize={() => setIsPreviewModalOpen(false)}
-        onCheckout={isEmployee || isManager ? undefined : handleAddToCartAndCheckout}
+        actionButtonLabel={
+          isEmployee
+            ? "Submit to Manager"
+            : isManager
+              ? "Publish to Store"
+              : "Proceed to Checkout"
+        }
+        actionButtonIcon={
+          isEmployee ? Send : isManager ? Upload : ShoppingBag
+        }
+        onAction={() => {
+          setIsPreviewModalOpen(false);
+          if (isEmployee || isManager) {
+            setSubmitError("");
+            setSubmitSuccess("");
+            setSubmitForm({
+              title: "",
+              description: "",
+              category: selectedModel?.name || "",
+              basePrice: Math.round(unitPrice)
+            });
+            setShowSubmitModal(true);
+          } else {
+            handleAddToCartAndCheckout();
+          }
+        }}
       />
     </div>
   );

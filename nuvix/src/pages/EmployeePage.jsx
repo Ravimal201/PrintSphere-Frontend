@@ -1310,6 +1310,7 @@ export default function EmployeePage() {
         design={selected3DDesign}
         showCustomize={false}
         allowDownloads={true}
+        hideAction={true}
       />
 
       {/* Insufficient Packaging Materials Alert Modal */}
