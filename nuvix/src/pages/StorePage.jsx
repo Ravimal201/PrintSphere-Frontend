@@ -37,7 +37,12 @@ import TShirt2D from "../components/TShirt2D";
 import Store3DCardPreview from "../components/Store3DCardPreview";
 import { API_BASE_URL } from "../config/api";
 import { safeLocalStorage } from "../utils/imageOptimizer";
-import { resolveColorName, formatGsm } from "../utils/colorHelper";
+import {
+  resolveColorName,
+  formatGsm,
+  getGsmOptionsForProduct,
+  getDynamicGsmPrice,
+} from "../utils/colorHelper";
 import { sortSizesAscending, getSizeFullName, formatSizeList } from "../utils/sizeHelper";
 
 const getOrCreateSessionId = () => {
@@ -87,6 +92,7 @@ export default function StorePage() {
 
   // Active pricing rules for volume discounts
   const [pricingRules, setPricingRules] = useState(null);
+  const [tshirtStyles, setTshirtStyles] = useState([]);
 
   // Filters state
   const [searchTerm, setSearchTerm] = useState("");
@@ -139,9 +145,10 @@ export default function StorePage() {
 
   useEffect(() => {
     if (selected3DProduct) {
+      const gsmOpts = getGsmOptionsForProduct(selected3DProduct, tshirtStyles);
       setModalColor(selected3DProduct.colors?.[0] || "#ffffff");
       setModalSize(selected3DProduct.sizes?.[0] || "M");
-      setModalGsm(formatGsm(selected3DProduct.gsms?.[0] || selected3DProduct.gsm || "GSM 180"));
+      setModalGsm(formatGsm(gsmOpts[0] || selected3DProduct.gsm || "GSM 180"));
       setModalQty(1);
       setModalSide("front");
       setModalZoom(0.85);
@@ -172,7 +179,7 @@ export default function StorePage() {
         );
       }
     }
-  }, [selected3DProduct]);
+  }, [selected3DProduct, tshirtStyles]);
 
   const handleProductReviewSubmit = async (e) => {
     e.preventDefault();
@@ -458,10 +465,11 @@ export default function StorePage() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const sessionId = getOrCreateSessionId();
 
-      const [productsRes, recomRes, pricingRes] = await Promise.all([
+      const [productsRes, recomRes, pricingRes, stylesRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/auth/products`),
         axios.get(`${API_BASE_URL}/auth/recommendations?sessionId=${sessionId}`, { headers }),
         axios.get(`${API_BASE_URL}/auth/pricing-rules`),
+        axios.get(`${API_BASE_URL}/auth/tshirt-styles`).catch(() => ({ data: [] })),
       ]);
 
       setProducts(productsRes.data);
@@ -470,6 +478,7 @@ export default function StorePage() {
       setIsLoggedInUser(!!recomRes.data.isLoggedIn || !!token);
       setHasUserActivity(!!recomRes.data.hasUserActivity);
       setPricingRules(pricingRes.data);
+      setTshirtStyles(stylesRes.data || []);
 
       // Calculate max price from products to set default slider
       if (productsRes.data.length > 0) {
@@ -516,6 +525,10 @@ export default function StorePage() {
     );
     const qty = selectedOptions.quantity || 1;
     const styleName = product.category || "Crew Neck";
+    const dynamicUnitPrice =
+      selectedOptions.basePrice !== undefined
+        ? selectedOptions.basePrice
+        : getDynamicGsmPrice(product, defaultGsm, tshirtStyles);
 
     const cartKey = `${product._id}-${defaultSize}-${defaultColor}-${defaultGsm}`;
 
@@ -530,7 +543,7 @@ export default function StorePage() {
         productId: product._id,
         title: product.title,
         tShirtStyle: styleName,
-        basePrice: product.basePrice,
+        basePrice: dynamicUnitPrice,
         discount: product.discount || 0,
         category: product.category,
         size: defaultSize,
@@ -1219,7 +1232,7 @@ export default function StorePage() {
                               </button>
                             </div>
                             <p className="text-[10px] text-slate-500 mt-0.5">
-                              Size: {item.size} / Color: {item.color}
+                              Size: {item.size} / Color: {item.color} {item.gsm ? `• ${formatGsm(item.gsm)}` : ""}
                             </p>
                           </div>
 
@@ -1523,263 +1536,291 @@ export default function StorePage() {
                   </button>
                 </div>
 
-                {/* Price block */}
-                <div className="flex items-baseline gap-2 pb-4 border-b">
-                  {selected3DProduct.discount > 0 ? (
+                {/* Dynamic GSM Price & Options Calculations */}
+                {(() => {
+                  const currentGsmBasePrice = getDynamicGsmPrice(selected3DProduct, modalGsm, tshirtStyles);
+                  const currentDiscountedPrice = selected3DProduct.discount > 0
+                    ? currentGsmBasePrice * (1 - selected3DProduct.discount / 100)
+                    : currentGsmBasePrice;
+                  const modalGsmOptions = getGsmOptionsForProduct(selected3DProduct, tshirtStyles);
+
+                  return (
                     <>
-                      <span className="text-2xl font-black text-slate-950">
-                        Rs.{" "}
-                        {(
-                          selected3DProduct.basePrice *
-                          (1 - selected3DProduct.discount / 100)
-                        ).toFixed(2)}
-                      </span>
-                      <span className="text-sm text-slate-400 line-through">
-                        Rs. {selected3DProduct.basePrice.toFixed(2)}
-                      </span>
-                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase ml-1">
-                        {selected3DProduct.discount}% Off
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-2xl font-black text-slate-950">
-                      Rs. {selected3DProduct.basePrice.toFixed(2)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Description */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Description
-                  </span>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {selected3DProduct.description}
-                  </p>
-                </div>
-
-                {/* Color Selector */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Select Fabric Color
-                  </span>
-                  <div className="flex flex-wrap gap-2.5">
-                    {selected3DProduct.colors?.map((col) => {
-                      const isSelected = modalColor === col;
-                      return (
-                        <button
-                          key={col}
-                          onClick={() => setModalColor(col)}
-                          className={`w-7 h-7 rounded-full border shadow-xs relative transition hover:scale-105 ${
-                            isSelected
-                              ? "ring-2 ring-indigo-650 ring-offset-2 border-transparent"
-                              : "border-slate-300"
-                          }`}
-                          style={{ backgroundColor: col }}
-                          title={col}
-                        >
-                          {isSelected && (
-                            <span className="absolute inset-0 flex items-center justify-center text-white mix-blend-difference">
-                              <Check className="h-3 w-3" />
+                      {/* Price block */}
+                      <div className="flex items-baseline gap-2 pb-4 border-b">
+                        {selected3DProduct.discount > 0 ? (
+                          <>
+                            <span className="text-2xl font-black text-slate-950">
+                              Rs. {currentDiscountedPrice.toFixed(2)}
                             </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Size Selector */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Select Size
-                  </span>
-                  <div className="flex gap-2 flex-wrap">
-                    {sortSizesAscending(selected3DProduct.sizes || []).map((sz) => (
-                      <button
-                        key={sz}
-                        onClick={() => setModalSize(sz)}
-                        title={getSizeFullName(sz)}
-                        className={`min-w-[36px] h-9 px-2 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
-                          modalSize === sz
-                            ? "bg-slate-900 border-slate-900 text-white shadow-xs"
-                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                        }`}
-                      >
-                        {sz}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* GSM Selector */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Select GSM Value
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {(selected3DProduct.gsms && selected3DProduct.gsms.length > 0
-                      ? selected3DProduct.gsms
-                      : ["180GSM"]
-                    ).map((gsmVal) => (
-                      <button
-                        key={gsmVal}
-                        onClick={() => setModalGsm(gsmVal)}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
-                          modalGsm === gsmVal
-                            ? "bg-slate-900 border-slate-900 text-white"
-                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                        }`}
-                      >
-                        {gsmVal}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Quantity */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Quantity
-                  </span>
-                  <div className="flex items-center gap-1.5 bg-slate-50 border rounded-xl w-fit p-1">
-                    <button
-                      onClick={() =>
-                        setModalQty((prev) => Math.max(1, prev - 1))
-                      }
-                      className="p-1.5 hover:text-indigo-600 transition"
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="text-xs font-bold min-w-[2rem] text-center">
-                      {modalQty}
-                    </span>
-                    <button
-                      onClick={() => setModalQty((prev) => prev + 1)}
-                      className="p-1.5 hover:text-indigo-600 transition"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Customer Reviews List */}
-                <div className="space-y-3 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Customer Reviews ({selected3DProduct.ratingsCount || 0})
-                      </span>
-                      <div className="flex items-center gap-1 text-xs">
-                        <Star
-                          className={`h-3.5 w-3.5 ${
-                            selected3DProduct.ratingsCount > 0
-                              ? "fill-amber-400 text-amber-400"
-                              : "text-slate-300"
-                          }`}
-                        />
-                        <span className="font-extrabold text-slate-800">
-                          {selected3DProduct.ratingsCount > 0
-                            ? selected3DProduct.averageRating
-                              ? selected3DProduct.averageRating.toFixed(1)
-                              : "0.0"
-                            : "0 review"}
+                            <span className="text-sm text-slate-400 line-through">
+                              Rs. {currentGsmBasePrice.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase ml-1">
+                              {selected3DProduct.discount}% Off
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-2xl font-black text-slate-950">
+                            Rs. {currentGsmBasePrice.toFixed(2)}
+                          </span>
+                        )}
+                        <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100 ml-auto">
+                          {formatGsm(modalGsm)}
                         </span>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Existing Reviews List */}
-                  {selected3DProduct.reviews && selected3DProduct.reviews.length > 0 ? (
-                    <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                      {selected3DProduct.reviews.map((rev, rIdx) => (
-                        <div
-                          key={rev._id || rIdx}
-                          className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 space-y-1 relative group"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-slate-800">
-                                {rev.userName || "Verified Buyer"}
-                              </span>
-                              {rev.rating <= 2 && (
-                                <span className="text-[9px] bg-red-50 text-red-600 font-bold px-1.5 py-0.5 rounded border border-red-100">
-                                  Low Rating
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex text-amber-400">
-                                {[1, 2, 3, 4, 5].map((s) => (
-                                  <Star
-                                    key={s}
-                                    className={`h-3 w-3 ${
-                                      s <= rev.rating
-                                        ? "fill-amber-400 text-amber-400"
-                                        : "text-slate-200"
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                              {isManagerOrAdmin && rev._id && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteReview(rev._id);
-                                  }}
-                                  disabled={deletingReviewId === rev._id}
-                                  title="Manager Action: Delete this comment"
-                                  className="p-1 rounded-md text-red-500 hover:text-white hover:bg-red-500 transition-colors cursor-pointer disabled:opacity-50"
+                      {/* Description */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Description
+                        </span>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          {selected3DProduct.description}
+                        </p>
+                      </div>
+
+                      {/* Color Selector */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Select Fabric Color
+                        </span>
+                        <div className="flex flex-wrap gap-2.5">
+                          {selected3DProduct.colors?.map((col) => {
+                            const isSelected = modalColor === col;
+                            return (
+                              <button
+                                key={col}
+                                onClick={() => setModalColor(col)}
+                                className={`w-7 h-7 rounded-full border shadow-xs relative transition hover:scale-105 ${
+                                  isSelected
+                                    ? "ring-2 ring-indigo-650 ring-offset-2 border-transparent"
+                                    : "border-slate-300"
+                                }`}
+                                style={{ backgroundColor: col }}
+                                title={col}
+                              >
+                                {isSelected && (
+                                  <span className="absolute inset-0 flex items-center justify-center text-white mix-blend-difference">
+                                    <Check className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Size Selector */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Select Size
+                        </span>
+                        <div className="flex gap-2 flex-wrap">
+                          {sortSizesAscending(selected3DProduct.sizes || []).map((sz) => (
+                            <button
+                              key={sz}
+                              onClick={() => setModalSize(sz)}
+                              title={getSizeFullName(sz)}
+                              className={`min-w-[36px] h-9 px-2 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
+                                modalSize === sz
+                                  ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              {sz}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* GSM Selector */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Select GSM Value
+                          </span>
+                          <span className="text-[11px] font-extrabold text-indigo-600">
+                            {formatGsm(modalGsm)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {modalGsmOptions.map((gsmVal) => {
+                            const formattedGsmVal = formatGsm(gsmVal);
+                            const isSelected = formatGsm(modalGsm) === formattedGsmVal;
+                            const optionBase = getDynamicGsmPrice(selected3DProduct, formattedGsmVal, tshirtStyles);
+                            const optionFinal = selected3DProduct.discount > 0
+                              ? optionBase * (1 - selected3DProduct.discount / 100)
+                              : optionBase;
+
+                            return (
+                              <button
+                                key={gsmVal}
+                                type="button"
+                                onClick={() => setModalGsm(formattedGsmVal)}
+                                className={`px-3 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                                  isSelected
+                                    ? "bg-slate-900 border-slate-900 text-white shadow-xs ring-2 ring-slate-900/20"
+                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                                }`}
+                              >
+                                <span>{formattedGsmVal}</span>
+                                <span
+                                  className={`text-[10px] font-medium ${
+                                    isSelected ? "text-indigo-200" : "text-slate-400"
+                                  }`}
                                 >
-                                  {deletingReviewId === rev._id ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-3 w-3" />
-                                  )}
-                                </button>
-                              )}
+                                  • Rs. {optionFinal.toFixed(2)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Quantity */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Quantity
+                        </span>
+                        <div className="flex items-center gap-1.5 bg-slate-50 border rounded-xl w-fit p-1">
+                          <button
+                            onClick={() =>
+                              setModalQty((prev) => Math.max(1, prev - 1))
+                            }
+                            className="p-1.5 hover:text-indigo-600 transition"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="text-xs font-bold min-w-[2rem] text-center">
+                            {modalQty}
+                          </span>
+                          <button
+                            onClick={() => setModalQty((prev) => prev + 1)}
+                            className="p-1.5 hover:text-indigo-600 transition"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Customer Reviews List */}
+                      <div className="space-y-3 pt-4 border-t">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                              Customer Reviews ({selected3DProduct.ratingsCount || 0})
+                            </span>
+                            <div className="flex items-center gap-1 text-xs">
+                              <Star
+                                className={`h-3.5 w-3.5 ${
+                                  selected3DProduct.ratingsCount > 0
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-slate-300"
+                                }`}
+                              />
+                              <span className="font-extrabold text-slate-800">
+                                {selected3DProduct.ratingsCount > 0
+                                  ? selected3DProduct.averageRating
+                                    ? selected3DProduct.averageRating.toFixed(1)
+                                    : "0.0"
+                                  : "0 review"}
+                              </span>
                             </div>
                           </div>
-                          {rev.comment && (
-                            <p className="text-[11px] text-slate-600 italic leading-snug">
-                              "{rev.comment}"
-                            </p>
-                          )}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-slate-400 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
-                      No customer reviews yet. Be the first to review this product!
-                    </p>
-                  )}
-                </div>
-              </div>
 
-              {/* Actions Footer */}
-              <div className="mt-8 pt-4 border-t flex flex-col gap-2">
-                <button
-                  onClick={() => {
-                    handleAddToCart(selected3DProduct, {
-                      color: modalColor,
-                      size: modalSize,
-                      gsm: modalGsm,
-                      quantity: modalQty,
-                    });
-                    if (!isManagerPreview && !isManagerOrAdmin) {
-                      setSelected3DProduct(null);
-                    }
-                  }}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition cursor-pointer"
-                >
-                  {isManagerPreview || isManagerOrAdmin ? "Add to Cart (Preview)" : "Add to Cart"} — Rs.{" "}
-                  {(
-                    selected3DProduct.basePrice *
-                    (1 - selected3DProduct.discount / 100) *
-                    modalQty
-                  ).toFixed(2)}
-                </button>
+                        {/* Existing Reviews List */}
+                        {selected3DProduct.reviews && selected3DProduct.reviews.length > 0 ? (
+                          <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                            {selected3DProduct.reviews.map((rev, rIdx) => (
+                              <div
+                                key={rev._id || rIdx}
+                                className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 space-y-1 relative group"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-800">
+                                      {rev.userName || "Verified Buyer"}
+                                    </span>
+                                    {rev.rating <= 2 && (
+                                      <span className="text-[9px] bg-red-50 text-red-600 font-bold px-1.5 py-0.5 rounded border border-red-100">
+                                        Low Rating
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex text-amber-400">
+                                      {[1, 2, 3, 4, 5].map((s) => (
+                                        <Star
+                                          key={s}
+                                          className={`h-3 w-3 ${
+                                            s <= rev.rating
+                                              ? "fill-amber-400 text-amber-400"
+                                              : "text-slate-200"
+                                          }`}
+                                        />
+                                      ))}
+                                    </div>
+                                    {isManagerOrAdmin && rev._id && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteReview(rev._id);
+                                        }}
+                                        disabled={deletingReviewId === rev._id}
+                                        title="Manager Action: Delete this comment"
+                                        className="p-1 rounded-md text-red-500 hover:text-white hover:bg-red-500 transition-colors cursor-pointer disabled:opacity-50"
+                                      >
+                                        {deletingReviewId === rev._id ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-3 w-3" />
+                                        )}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                {rev.comment && (
+                                  <p className="text-[11px] text-slate-600 italic leading-snug">
+                                    "{rev.comment}"
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                            No customer reviews yet. Be the first to review this product!
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Actions Footer */}
+                      <div className="mt-8 pt-4 border-t flex flex-col gap-2">
+                        <button
+                          onClick={() => {
+                            handleAddToCart(selected3DProduct, {
+                              color: modalColor,
+                              size: modalSize,
+                              gsm: modalGsm,
+                              quantity: modalQty,
+                              basePrice: currentGsmBasePrice,
+                            });
+                            if (!isManagerPreview && !isManagerOrAdmin) {
+                              setSelected3DProduct(null);
+                            }
+                          }}
+                          className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition cursor-pointer"
+                        >
+                          {isManagerPreview || isManagerOrAdmin ? "Add to Cart (Preview)" : "Add to Cart"} — Rs.{" "}
+                          {(currentDiscountedPrice * modalQty).toFixed(2)}
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

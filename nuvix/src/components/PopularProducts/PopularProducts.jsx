@@ -30,7 +30,12 @@ import axios from "axios";
 import Store3DCardPreview from "../Store3DCardPreview";
 import Scene from "../../three/Scene";
 import { API_BASE_URL } from "../../config/api";
-import { resolveColorName, formatGsm } from "../../utils/colorHelper";
+import {
+  resolveColorName,
+  formatGsm,
+  getGsmOptionsForProduct,
+  getDynamicGsmPrice,
+} from "../../utils/colorHelper";
 import { sortSizesAscending, getSizeFullName, formatSizeList } from "../../utils/sizeHelper";
 import { safeLocalStorage } from "../../utils/imageOptimizer";
 
@@ -199,6 +204,7 @@ export default function PopularProducts() {
 
   // Pricing rules for volume discounts
   const [pricingRules, setPricingRules] = useState(null);
+  const [tshirtStyles, setTshirtStyles] = useState([]);
 
   // Cart state
   const [cart, setCart] = useState([]);
@@ -259,9 +265,10 @@ export default function PopularProducts() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [productsRes, pricingRes] = await Promise.all([
+        const [productsRes, pricingRes, stylesRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/auth/products`).catch(() => ({ data: [] })),
           axios.get(`${API_BASE_URL}/auth/pricing-rules`).catch(() => ({ data: null })),
+          axios.get(`${API_BASE_URL}/auth/tshirt-styles`).catch(() => ({ data: [] })),
         ]);
 
         if (Array.isArray(productsRes.data) && productsRes.data.length > 0) {
@@ -272,6 +279,10 @@ export default function PopularProducts() {
 
         if (pricingRes.data) {
           setPricingRules(pricingRes.data);
+        }
+
+        if (Array.isArray(stylesRes.data)) {
+          setTshirtStyles(stylesRes.data);
         }
       } catch (err) {
         console.error("Error loading popular products data:", err);
@@ -329,15 +340,10 @@ export default function PopularProducts() {
   // Initialize modal fields & log view activity when product is selected
   useEffect(() => {
     if (selected3DProduct) {
+      const gsmOpts = getGsmOptionsForProduct(selected3DProduct, tshirtStyles);
       setModalColor(selected3DProduct.colors?.[0] || "#ffffff");
       setModalSize(selected3DProduct.sizes?.[0] || "M");
-      setModalGsm(
-        formatGsm(
-          selected3DProduct.gsms?.[0] ||
-            selected3DProduct.gsm ||
-            "GSM 180"
-        )
-      );
+      setModalGsm(formatGsm(gsmOpts[0] || selected3DProduct.gsm || "GSM 180"));
       setModalQty(1);
       setModalSide("front");
       setModalZoom(0.85);
@@ -352,7 +358,7 @@ export default function PopularProducts() {
         });
       }
     }
-  }, [selected3DProduct]);
+  }, [selected3DProduct, tshirtStyles]);
 
   // Extract unique filter lists from available products
   const allAvailableProducts = products.length > 0 ? products : fallbackProducts;
@@ -471,6 +477,7 @@ export default function PopularProducts() {
 
     const colorName = resolveColorName(modalColor);
     const formattedGsmVal = formatGsm(modalGsm);
+    const dynamicUnitPrice = getDynamicGsmPrice(selected3DProduct, formattedGsmVal, tshirtStyles);
     const cartKey = `${selected3DProduct._id || selected3DProduct.title}-${modalSize}-${colorName}-${formattedGsmVal}`;
 
     const existingIndex = cart.findIndex((item) => item.cartKey === cartKey);
@@ -484,7 +491,7 @@ export default function PopularProducts() {
         productId: selected3DProduct._id,
         title: selected3DProduct.title || selected3DProduct.name,
         tShirtStyle: selected3DProduct.category || "Crew Neck",
-        basePrice: selected3DProduct.basePrice,
+        basePrice: dynamicUnitPrice,
         discount: selected3DProduct.discount || 0,
         category: selected3DProduct.category,
         size: modalSize,
@@ -506,7 +513,7 @@ export default function PopularProducts() {
     }
 
     showToast(
-      `Added ${modalQty}x "${selected3DProduct.title || selected3DProduct.name}" to cart!`
+      `Added ${modalQty}x "${selected3DProduct.title || selected3DProduct.name}" (${formattedGsmVal}) to cart!`
     );
 
     // Close 3D product modal and open Shopping Cart Drawer
@@ -1424,193 +1431,219 @@ export default function PopularProducts() {
                   </button>
                 </div>
 
-                {/* Price block */}
-                <div className="flex items-baseline gap-2 pb-3.5 border-b border-slate-100">
-                  {selected3DProduct.discount > 0 ? (
+                {/* Dynamic GSM Price & Options Calculations */}
+                {(() => {
+                  const currentGsmBasePrice = getDynamicGsmPrice(selected3DProduct, modalGsm, tshirtStyles);
+                  const currentDiscountedPrice = selected3DProduct.discount > 0
+                    ? currentGsmBasePrice * (1 - selected3DProduct.discount / 100)
+                    : currentGsmBasePrice;
+                  const modalGsmOptions = getGsmOptionsForProduct(selected3DProduct, tshirtStyles);
+
+                  return (
                     <>
-                      <span className="text-2xl font-black text-slate-950">
-                        Rs.{" "}
-                        {(
-                          selected3DProduct.basePrice *
-                          (1 - selected3DProduct.discount / 100)
-                        ).toFixed(2)}
-                      </span>
-                      <span className="text-sm text-slate-400 line-through">
-                        Rs. {selected3DProduct.basePrice.toFixed(2)}
-                      </span>
-                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase ml-1">
-                        {selected3DProduct.discount}% Off
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-2xl font-black text-slate-950">
-                      Rs. {selected3DProduct.basePrice.toFixed(2)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Description */}
-                {selected3DProduct.description && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Description
-                    </span>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      {selected3DProduct.description}
-                    </p>
-                  </div>
-                )}
-
-                {/* Color Selector */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Select Fabric Color
-                    </span>
-                    <span className="text-xs font-bold text-slate-800">
-                      {resolveColorName(modalColor)}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2.5">
-                    {(selected3DProduct.colors || ["#ffffff", "#111827", "#3b82f6"]).map((col) => {
-                      const isSelected = modalColor === col;
-                      return (
-                        <button
-                          key={col}
-                          type="button"
-                          onClick={() => setModalColor(col)}
-                          className={`w-7 h-7 rounded-full border shadow-xs relative transition hover:scale-105 cursor-pointer ${
-                            isSelected
-                              ? "ring-2 ring-indigo-600 ring-offset-2 border-transparent"
-                              : "border-slate-300"
-                          }`}
-                          style={{ backgroundColor: col }}
-                          title={resolveColorName(col)}
-                        >
-                          {isSelected && (
-                            <span className="absolute inset-0 flex items-center justify-center text-white mix-blend-difference">
-                              <Check className="h-3 w-3" />
+                      {/* Price block */}
+                      <div className="flex items-baseline gap-2 pb-3.5 border-b border-slate-100">
+                        {selected3DProduct.discount > 0 ? (
+                          <>
+                            <span className="text-2xl font-black text-slate-950">
+                              Rs. {currentDiscountedPrice.toFixed(2)}
                             </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                            <span className="text-sm text-slate-400 line-through">
+                              Rs. {currentGsmBasePrice.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase ml-1">
+                              {selected3DProduct.discount}% Off
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-2xl font-black text-slate-950">
+                            Rs. {currentGsmBasePrice.toFixed(2)}
+                          </span>
+                        )}
+                        <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100 ml-auto">
+                          {formatGsm(modalGsm)}
+                        </span>
+                      </div>
 
-                {/* Size Selector */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Select Size
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {sortSizesAscending(selected3DProduct.sizes || []).map((sz) => (
-                      <button
-                        key={sz}
-                        type="button"
-                        onClick={() => setModalSize(sz)}
-                        title={getSizeFullName(sz)}
-                        className={`min-w-[36px] h-9 px-2 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
-                          modalSize === sz
-                            ? "bg-slate-900 border-slate-900 text-white shadow-xs"
-                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                        }`}
-                      >
-                        {sz}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                      {/* Description */}
+                      {selected3DProduct.description && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Description
+                          </span>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {selected3DProduct.description}
+                          </p>
+                        </div>
+                      )}
 
-                {/* GSM Selector */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Select Fabric GSM
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {(selected3DProduct.gsms && selected3DProduct.gsms.length > 0
-                      ? selected3DProduct.gsms
-                      : [selected3DProduct.gsm || "180"]
-                    ).map((gsmVal) => {
-                      const formatted = formatGsm(gsmVal);
-                      const isSelected = modalGsm === formatted;
-                      return (
+                      {/* Color Selector */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Select Fabric Color
+                          </span>
+                          <span className="text-xs font-bold text-slate-800">
+                            {resolveColorName(modalColor)}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2.5">
+                          {(selected3DProduct.colors || ["#ffffff", "#111827", "#3b82f6"]).map((col) => {
+                            const isSelected = modalColor === col;
+                            return (
+                              <button
+                                key={col}
+                                type="button"
+                                onClick={() => setModalColor(col)}
+                                className={`w-7 h-7 rounded-full border shadow-xs relative transition hover:scale-105 cursor-pointer ${
+                                  isSelected
+                                    ? "ring-2 ring-indigo-600 ring-offset-2 border-transparent"
+                                    : "border-slate-300"
+                                }`}
+                                style={{ backgroundColor: col }}
+                                title={resolveColorName(col)}
+                              >
+                                {isSelected && (
+                                  <span className="absolute inset-0 flex items-center justify-center text-white mix-blend-difference">
+                                    <Check className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Size Selector */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Select Size
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {sortSizesAscending(selected3DProduct.sizes || []).map((sz) => (
+                            <button
+                              key={sz}
+                              type="button"
+                              onClick={() => setModalSize(sz)}
+                              title={getSizeFullName(sz)}
+                              className={`min-w-[36px] h-9 px-2 text-xs font-bold rounded-xl border flex items-center justify-center transition cursor-pointer ${
+                                modalSize === sz
+                                  ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              {sz}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* GSM Selector */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Select Fabric GSM
+                          </span>
+                          <span className="text-[11px] font-extrabold text-indigo-600">
+                            {formatGsm(modalGsm)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {modalGsmOptions.map((gsmVal) => {
+                            const formatted = formatGsm(gsmVal);
+                            const isSelected = formatGsm(modalGsm) === formatted;
+                            const optionBase = getDynamicGsmPrice(selected3DProduct, formatted, tshirtStyles);
+                            const optionFinal = selected3DProduct.discount > 0
+                              ? optionBase * (1 - selected3DProduct.discount / 100)
+                              : optionBase;
+
+                            return (
+                              <button
+                                key={gsmVal}
+                                type="button"
+                                onClick={() => setModalGsm(formatted)}
+                                className={`px-3 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                                  isSelected
+                                    ? "bg-indigo-600 border-indigo-700 text-white shadow-xs"
+                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                                }`}
+                              >
+                                <span>{formatted}</span>
+                                <span
+                                  className={`text-[10px] font-medium ${
+                                    isSelected ? "text-indigo-100" : "text-slate-400"
+                                  }`}
+                                >
+                                  • Rs. {optionFinal.toFixed(2)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Quantity Stepper */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Quantity
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center border border-slate-200 rounded-xl bg-white p-1">
+                            <button
+                              type="button"
+                              onClick={() => setModalQty((q) => Math.max(1, q - 1))}
+                              className="px-2.5 py-1 text-slate-600 hover:text-indigo-600 font-bold transition"
+                            >
+                              -
+                            </button>
+                            <span className="px-3 text-xs font-black text-slate-900 min-w-[2rem] text-center">
+                              {modalQty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setModalQty((q) => q + 1)}
+                              className="px-2.5 py-1 text-slate-600 hover:text-indigo-600 font-bold transition"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="pt-5 border-t border-slate-100 flex flex-col gap-2.5 select-none">
                         <button
-                          key={gsmVal}
                           type="button"
-                          onClick={() => setModalGsm(formatted)}
-                          className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
-                            isSelected
-                              ? "bg-indigo-600 border-indigo-700 text-white shadow-xs"
-                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                          }`}
+                          onClick={handleAddToCart}
+                          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                         >
-                          {formatted}
+                          <ShoppingCart className="h-4 w-4" />
+                          <span>Add to Cart — Rs. {(currentDiscountedPrice * modalQty).toFixed(2)}</span>
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
-                {/* Quantity Stepper */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Quantity
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center border border-slate-200 rounded-xl bg-white p-1">
-                      <button
-                        type="button"
-                        onClick={() => setModalQty((q) => Math.max(1, q - 1))}
-                        className="px-2.5 py-1 text-slate-600 hover:text-indigo-600 font-bold transition"
-                      >
-                        -
-                      </button>
-                      <span className="px-3 text-xs font-black text-slate-900 min-w-[2rem] text-center">
-                        {modalQty}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setModalQty((q) => q + 1)}
-                        className="px-2.5 py-1 text-slate-600 hover:text-indigo-600 font-bold transition"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCustomizeDesign}
+                            className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Edit className="h-3.5 w-3.5 text-indigo-600" />
+                            <span>Customize</span>
+                          </button>
 
-              {/* Action Buttons */}
-              <div className="pt-5 border-t border-slate-100 flex flex-col gap-2.5 select-none">
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                  <span>Add to Cart</span>
-                </button>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCustomizeDesign}
-                    className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Edit className="h-3.5 w-3.5 text-indigo-600" />
-                    <span>Customize</span>
-                  </button>
-
-                  <a
-                    href="/store"
-                    className="py-2.5 bg-slate-900 hover:bg-slate-950 text-white rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer text-center"
-                  >
-                    <span>Store Page</span>
-                    <ArrowRight className="h-3.5 w-3.5 text-slate-300" />
-                  </a>
-                </div>
+                          <a
+                            href="/store"
+                            className="py-2.5 bg-slate-900 hover:bg-slate-950 text-white rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                          >
+                            <span>Store Page</span>
+                            <ArrowRight className="h-3.5 w-3.5 text-slate-300" />
+                          </a>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -1700,7 +1733,7 @@ export default function PopularProducts() {
                               </button>
                             </div>
                             <p className="text-[10px] text-slate-500 mt-0.5">
-                              Size: {item.size} / Color: {item.color}
+                              Size: {item.size} / Color: {item.color} {item.gsm ? `• ${formatGsm(item.gsm)}` : ""}
                             </p>
                           </div>
 

@@ -129,3 +129,105 @@ export function formatGsm(val) {
   return str;
 }
 
+/**
+ * Returns the list of GSM options for a given product, falling back to matched T-Shirt style or defaults.
+ */
+export function getGsmOptionsForProduct(product, tshirtStyles = []) {
+  if (!product) return ["GSM 180", "GSM 220", "GSM 280", "GSM 320"];
+
+  if (product.gsmPrices && Array.isArray(product.gsmPrices) && product.gsmPrices.length > 0) {
+    return product.gsmPrices.map((gp) => formatGsm(gp.gsm));
+  }
+
+  if (product.gsms && Array.isArray(product.gsms) && product.gsms.length > 0) {
+    return product.gsms.map(formatGsm);
+  }
+
+  const matchedStyle = (tshirtStyles || []).find(
+    (s) =>
+      (s.path && product.modelPath && s.path === product.modelPath) ||
+      (s.type && product.category && s.type.toLowerCase() === product.category.toLowerCase()) ||
+      (s.name && product.title && (product.title.toLowerCase().includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(product.title.toLowerCase()))) ||
+      (s.name && product.category && s.name.toLowerCase() === product.category.toLowerCase())
+  );
+
+  if (matchedStyle) {
+    if (matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+      return matchedStyle.gsmPrices.map((gp) => formatGsm(gp.gsm));
+    }
+    if (matchedStyle.gsms && matchedStyle.gsms.length > 0) {
+      return matchedStyle.gsms.map(formatGsm);
+    }
+  }
+
+  if (product.gsm) {
+    const mainGsm = formatGsm(product.gsm);
+    return [mainGsm, "GSM 220", "GSM 280", "GSM 320"].filter((v, i, a) => a.indexOf(v) === i);
+  }
+
+  return ["GSM 180", "GSM 220", "GSM 280", "GSM 320"];
+}
+
+/**
+ * Dynamically calculates the product base price according to the selected GSM value.
+ */
+export function getDynamicGsmPrice(product, selectedGsm, tshirtStyles = []) {
+  if (!product) return 0;
+  const targetGsm = formatGsm(selectedGsm || product.gsm || "GSM 180");
+  const targetDigits = parseInt(targetGsm.replace(/[^0-9]/g, "") || "180", 10);
+  const basePrice = Number(product.basePrice) || 0;
+
+  // 1. Direct product.gsmPrices match
+  if (product.gsmPrices && Array.isArray(product.gsmPrices) && product.gsmPrices.length > 0) {
+    const match = product.gsmPrices.find(
+      (gp) => formatGsm(gp.gsm) === targetGsm
+    );
+    if (match && typeof match.price === "number") {
+      return match.price;
+    }
+  }
+
+  // 2. Matched T-Shirt style from DB
+  const matchedStyle = (tshirtStyles || []).find(
+    (s) =>
+      (s.path && product.modelPath && s.path === product.modelPath) ||
+      (s.type && product.category && s.type.toLowerCase() === product.category.toLowerCase()) ||
+      (s.name && product.title && (product.title.toLowerCase().includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(product.title.toLowerCase()))) ||
+      (s.name && product.category && s.name.toLowerCase() === product.category.toLowerCase())
+  );
+
+  if (matchedStyle && matchedStyle.gsmPrices && matchedStyle.gsmPrices.length > 0) {
+    const styleMatch = matchedStyle.gsmPrices.find(
+      (gp) => formatGsm(gp.gsm) === targetGsm
+    );
+    if (styleMatch && typeof styleMatch.price === "number") {
+      const baseStylePrice = matchedStyle.gsmPrices[0]?.price ?? matchedStyle.price ?? 1200;
+      const gsmDelta = styleMatch.price - baseStylePrice;
+      if (basePrice > 0) {
+        return Math.max(0, basePrice + gsmDelta);
+      }
+      return styleMatch.price;
+    }
+  }
+
+  // 3. Fallback standard GSM tier offsets
+  if (targetDigits !== 180) {
+    const tierOffsets = {
+      180: 0,
+      200: 150,
+      220: 300,
+      240: 450,
+      280: 600,
+      320: 800,
+    };
+    const offset =
+      tierOffsets[targetDigits] !== undefined
+        ? tierOffsets[targetDigits]
+        : Math.round(((targetDigits - 180) / 40) * 300);
+    return Math.max(0, basePrice + offset);
+  }
+
+  return basePrice;
+}
+
+

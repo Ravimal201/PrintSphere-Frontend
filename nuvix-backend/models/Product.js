@@ -82,6 +82,12 @@ const ProductSchema = new mongoose.Schema(
         type: String
       }
     ],
+    gsmPrices: [
+      {
+        gsm: { type: String },
+        price: { type: Number }
+      }
+    ],
     colors: [String],
     images: [String],
     status: {
