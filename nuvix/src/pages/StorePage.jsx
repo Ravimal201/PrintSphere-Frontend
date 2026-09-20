@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { confirmAction, alertAction } from "../context/ConfirmContext";
 import {
   ShoppingCart,
   Filter,
@@ -255,7 +256,13 @@ export default function StorePage() {
 
   const handleDeleteReview = async (reviewId) => {
     if (!reviewId) return;
-    if (!window.confirm("Are you sure you want to delete this comment? This will remove the bad review and update product ratings.")) {
+    const isConfirmed = await confirmAction({
+      title: "Delete Customer Review",
+      message: "Are you sure you want to delete this comment? This will remove the review and update product ratings.",
+      confirmText: "Delete Review",
+      type: "danger"
+    });
+    if (!isConfirmed) {
       return;
     }
     try {

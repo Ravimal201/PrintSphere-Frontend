@@ -8,6 +8,7 @@ import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { processCardPayment } from "../services/paymentService";
 import { safeLocalStorage } from "../utils/imageOptimizer";
+import { confirmAction, alertAction } from "../context/ConfirmContext";
 
 export default function PaymentPage() {
   const [order, setOrder] = useState(null);
@@ -180,7 +181,13 @@ export default function PaymentPage() {
       return;
     }
 
-    const confirmCancel = window.confirm("Are you sure you want to cancel the checkout? This will restore your items back to the cart.");
+    const confirmCancel = await confirmAction({
+      title: "Cancel Checkout",
+      message: "Are you sure you want to cancel checkout? This will cancel the pending order and restore your items back to your cart.",
+      confirmText: "Yes, Cancel Order",
+      cancelText: "Continue Checkout",
+      type: "warning"
+    });
     if (!confirmCancel) return;
 
     setProcessingPayment(true);

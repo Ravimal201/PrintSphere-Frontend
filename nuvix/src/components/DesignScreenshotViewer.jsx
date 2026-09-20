@@ -9,6 +9,7 @@ import {
   download3DSnapshotWithFormat
 } from "../utils/tshirtPreviewExporter";
 import { render3DDesignToDataUrl } from "../utils/tshirt3DExporter";
+import { alertAction } from "../context/ConfirmContext";
 
 export default function DesignScreenshotViewer({
   item,
@@ -125,7 +126,11 @@ export default function DesignScreenshotViewer({
       setTimeout(() => setDownloadSuccessMsg(""), 3000);
     } catch (err) {
       console.error("3D views download error:", err);
-      alert("Error downloading 3D views. Please try again.");
+      alertAction({
+        title: "Download Failed",
+        message: "Error downloading 3D views. Please try again.",
+        type: "danger"
+      });
     } finally {
       setIsDownloading(false);
       setDownloadProgress("");

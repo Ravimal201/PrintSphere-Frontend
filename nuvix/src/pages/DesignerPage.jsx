@@ -6,6 +6,8 @@ import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
 import { removeImageBackground } from "../utils/backgroundRemoval";
 import { optimizeImageForLayer, createDesignThumbnail, safeLocalStorage } from "../utils/imageOptimizer";
+import { confirmAction, alertAction } from "../context/ConfirmContext";
+
 import TShirt3DModal from "../components/TShirt3DModal";
 import {
   Layers,
@@ -1199,8 +1201,14 @@ export default function DesignerPage() {
     });
   };
 
-  const handleClearAllUserImages = () => {
-    if (window.confirm("Are you sure you want to clear all uploaded images from your library?")) {
+  const handleClearAllUserImages = async () => {
+    const isConfirmed = await confirmAction({
+      title: "Clear Image Library",
+      message: "Are you sure you want to clear all uploaded images from your library?",
+      confirmText: "Clear All",
+      type: "danger"
+    });
+    if (isConfirmed) {
       setUserImages([]);
       const userId = currentUser?.id || currentUser?._id || "guest";
       const storageKey = `printsphere_user_images_${userId}`;

@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import {
   ShoppingCart, Layers, Settings, LogOut, Loader2, AlertCircle,
   CheckCircle, Plus, Edit2, Check, X, FileText, Download, User, Sparkles,
-  Clock, Ban, Play, Printer, Truck, ArrowRight, Palette
+  Clock, Ban, Play, Printer, Truck, ArrowRight, Palette, RotateCcw
 } from "lucide-react";
 import axios from "axios";
+import { confirmAction, alertAction } from "../context/ConfirmContext";
 import TShirt3DModal from "../components/TShirt3DModal";
 import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
 
@@ -51,6 +52,35 @@ const getNextPipelineAction = (currentStatus) => {
         btnClass: "bg-blue-600 hover:bg-blue-700 text-white shadow-xs",
         desc: "Add order to processing"
       };
+  }
+};
+
+// Helper to determine the previous reversible status in the pipeline
+const getPreviousPipelineAction = (currentStatus) => {
+  switch (currentStatus) {
+    case "Printing":
+      return {
+        prevStatus: "Processing",
+        label: "Back to Processing",
+        icon: RotateCcw,
+        desc: "Revert order status back to Processing stage"
+      };
+    case "Completed":
+      return {
+        prevStatus: "Printing",
+        label: "Back to Printing",
+        icon: RotateCcw,
+        desc: "Revert order status back to Printing stage"
+      };
+    case "Shipped":
+      return {
+        prevStatus: "Completed",
+        label: "Back to Completed",
+        icon: RotateCcw,
+        desc: "Revert order status back to Completed stage"
+      };
+    default:
+      return null;
   }
 };
 
@@ -191,10 +221,58 @@ export default function EmployeePage() {
 
   // ================= TASK WORKFLOW STATUS UPDATES =================
 
-  const handleUpdateStatus = async (orderId, status) => {
+  const handleUpdateStatus = async (orderId, status, isRevert = false) => {
+    let cfg;
+    if (isRevert) {
+      cfg = {
+        title: `Revert to ${status}`,
+        message: `Are you sure you want to revert Order #${orderId.slice(-8)} back to "${status}" stage?`,
+        confirmText: `Back to ${status}`,
+        cancelText: "Cancel",
+        type: "warning"
+      };
+    } else {
+      const actionConfig = {
+        Processing: {
+          title: "Start Processing Order",
+          message: `Are you sure you want to mark Order #${orderId.slice(-8)} as Processing and begin production preparation?`,
+          confirmText: "Start Processing",
+          type: "info"
+        },
+        Printing: {
+          title: "Start Printing Order",
+          message: `Are you sure you want to advance Order #${orderId.slice(-8)} to the Printing stage?`,
+          confirmText: "Start Printing",
+          type: "info"
+        },
+        Completed: {
+          title: "Complete Printing Stage",
+          message: `Are you sure you want to mark printing as Completed for Order #${orderId.slice(-8)}?`,
+          confirmText: "Complete Printing",
+          type: "success"
+        },
+        Shipped: {
+          title: "Ship Order",
+          message: `Are you sure you want to dispatch and mark Order #${orderId.slice(-8)} as Shipped?`,
+          confirmText: "Ship Order",
+          type: "info"
+        }
+      };
+
+      cfg = actionConfig[status] || {
+        title: "Update Order Status",
+        message: `Are you sure you want to update Order #${orderId.slice(-8)} status to "${status}"?`,
+        confirmText: "Update Status",
+        type: "info"
+      };
+    }
+
+    const isConfirmed = await confirmAction(cfg);
+    if (!isConfirmed) return;
+
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
-    const note = orderNotes[orderId] || `Status updated to ${status} by operator`;
+    const note = orderNotes[orderId] || `${isRevert ? "Reverted back" : "Status updated"} to ${status} by operator`;
 
     try {
       setActionLoading(prev => ({ ...prev, [orderId]: true }));
@@ -206,7 +284,11 @@ export default function EmployeePage() {
 
       setAssignedOrders(prev => prev.map(o => o._id === orderId ? response.data.order : o));
       setOrderNotes(prev => ({ ...prev, [orderId]: "" }));
-      alert(`Order status updated to "${status}" successfully!`);
+      await alertAction({
+        title: isRevert ? "Status Reverted" : "Status Updated",
+        message: `Order #${orderId.slice(-8)} status successfully ${isRevert ? "reverted" : "updated"} to "${status}"!`,
+        type: "success"
+      });
     } catch (err) {
       console.error("Update status error:", err);
       const errMsg = err.response?.data?.message || "Failed to update status";
@@ -222,7 +304,11 @@ export default function EmployeePage() {
           missingItems: missingMaterials
         });
       } else {
-        alert(errMsg);
+        await alertAction({
+          title: isRevert ? "Revert Failed" : "Update Failed",
+          message: errMsg,
+          type: "danger"
+        });
       }
     } finally {
       setActionLoading(prev => ({ ...prev, [orderId]: false }));
@@ -598,6 +684,7 @@ export default function EmployeePage() {
                     const pipelineStages = ["Processing", "Printing", "Completed", "Shipped"];
                     const currentStageIdx = pipelineStages.indexOf(order.orderStatus);
                     const nextAction = getNextPipelineAction(order.orderStatus);
+                    const prevAction = getPreviousPipelineAction(order.orderStatus);
                     const isCancelled = order.orderStatus === "Cancelled";
                     const isCollected = order.orderStatus === "Collected" || order.orderStatus === "Delivered";
                     const latestTimeline = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1] : null;
@@ -817,10 +904,10 @@ export default function EmployeePage() {
                             </div>
                           )}
 
-                          {/* Interactive Flow Updates (Sequential next step button) */}
+                          {/* Interactive Flow Updates (Sequential next step button & Revert back button) */}
                           {!isCancelled ? (
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                              {nextAction ? (
+                              {nextAction || prevAction ? (
                                 <>
                                   <div className="flex-1">
                                     <input
@@ -831,21 +918,39 @@ export default function EmployeePage() {
                                       className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-indigo-500"
                                     />
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      disabled={actionLoading[order._id]}
-                                      onClick={() => handleUpdateStatus(order._id, nextAction.nextStatus)}
-                                      className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 ${nextAction.btnClass}`}
-                                      title={nextAction.desc}
-                                    >
-                                      {actionLoading[order._id] ? (
-                                        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                                      ) : (
-                                        <nextAction.icon className="h-4 w-4 shrink-0" />
-                                      )}
-                                      <span>{nextAction.label}</span>
-                                      <ArrowRight className="h-3.5 w-3.5 opacity-80 shrink-0" />
-                                    </button>
+                                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+                                    {prevAction && (
+                                      <button
+                                        disabled={actionLoading[order._id]}
+                                        onClick={() => handleUpdateStatus(order._id, prevAction.prevStatus, true)}
+                                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs hover:border-slate-300 active:scale-[0.98]"
+                                        title={prevAction.desc}
+                                      >
+                                        {actionLoading[order._id] ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-slate-500" />
+                                        ) : (
+                                          <prevAction.icon className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                                        )}
+                                        <span>{prevAction.label}</span>
+                                      </button>
+                                    )}
+
+                                    {nextAction && (
+                                      <button
+                                        disabled={actionLoading[order._id]}
+                                        onClick={() => handleUpdateStatus(order._id, nextAction.nextStatus, false)}
+                                        className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 active:scale-[0.98] ${nextAction.btnClass}`}
+                                        title={nextAction.desc}
+                                      >
+                                        {actionLoading[order._id] ? (
+                                          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                                        ) : (
+                                          <nextAction.icon className="h-4 w-4 shrink-0" />
+                                        )}
+                                        <span>{nextAction.label}</span>
+                                        <ArrowRight className="h-3.5 w-3.5 opacity-80 shrink-0" />
+                                      </button>
+                                    )}
                                   </div>
                                 </>
                               ) : (
