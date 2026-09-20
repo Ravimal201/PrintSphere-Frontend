@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar/RNavbar";
 import Sidebar from "../components/Sidebar/Sidebar";
 import Footer from "../components/Footer/Footer";
 import TShirt2D from "../components/TShirt2D";
-import Store3DCardPreview from "../components/Store3DCardPreview";
+import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
 import TShirt3DModal from "../components/TShirt3DModal";
 import PaymentButton from "../components/PaymentButton";
 import { 
@@ -554,46 +554,47 @@ export default function MyOrdersPage() {
                                     });
 
                             return (
-                              <div key={idx} className="flex gap-4 py-3.5 first:pt-0 last:pb-0 items-center justify-between">
-                                <div className="flex gap-4 items-center">
-                                  <div className="h-20 w-20 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-center p-1 shrink-0 overflow-hidden relative shadow-2xs">
-                                    <Store3DCardPreview
-                                      product={productData}
-                                      activeColor={color}
-                                      showControls={false}
-                                      hideBadge={true}
-                                      fixedView="front"
-                                      className="h-full w-full !p-0.5 bg-transparent !border-0 !shadow-none cursor-default"
-                                    />
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    <h5 className="font-extrabold text-slate-900 text-sm capitalize">{name}</h5>
-                                    <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400 font-semibold uppercase">
-                                       <span>Style: {item.tShirtStyle || item.designId?.tShirtType || "Crew Neck"}</span>
-                                       <span>•</span>
-                                       <span>Size: {item.selectedSize || item.size}</span>
-                                       <span>•</span>
-                                       <span>Color: {resolveColorName(item.selectedColor || color)}</span>
-                                       <span>•</span>
-                                       <span>GSM: {formatGsm(item.gsm || material || "180GSM")}</span>
-                                       <span>•</span>
-                                       <span>Qty: {item.quantity}</span>
-                                    </div>
-                                    {isCustom && item.designId && (
-                                      <button
-                                        onClick={() => {
-                                          setSelected3DDesign(item.designId);
-                                          setIs3DModalOpen(true);
+                              <div key={idx} className="py-3.5 first:pt-0 last:pb-0 space-y-3">
+                                <div className="flex gap-4 items-center justify-between">
+                                  <div className="flex gap-4 items-center">
+                                    <div className="h-20 w-20 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-center p-1 shrink-0 overflow-hidden relative shadow-2xs">
+                                      <img
+                                        src={image}
+                                        alt={name}
+                                        className="h-full w-full object-contain p-1"
+                                        onError={(e) => {
+                                          e.currentTarget.src = "/images/dumyImage.png";
                                         }}
-                                        className="mt-1 flex items-center gap-1 text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-150 px-1.5 py-0.5 rounded-lg transition hover:bg-indigo-100 cursor-pointer"
-                                      >
-                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-650 animate-pulse" />
-                                        View 3D Design
-                                      </button>
-                                    )}
+                                      />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                      <h5 className="font-extrabold text-slate-900 text-sm capitalize">{name}</h5>
+                                      <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400 font-semibold uppercase">
+                                         <span>Style: {item.tShirtStyle || item.designId?.tShirtType || "Crew Neck"}</span>
+                                         <span>•</span>
+                                         <span>Size: {item.selectedSize || item.size}</span>
+                                         <span>•</span>
+                                         <span>Color: {resolveColorName(item.selectedColor || color)}</span>
+                                         <span>•</span>
+                                         <span>GSM: {formatGsm(item.gsm || material || "180GSM")}</span>
+                                         <span>•</span>
+                                         <span>Qty: {item.quantity}</span>
+                                      </div>
+                                    </div>
                                   </div>
+                                  <span className="font-extrabold text-slate-800 text-sm">Rs. {(item.price * item.quantity).toFixed(2)}</span>
                                 </div>
-                                <span className="font-extrabold text-slate-800 text-sm">Rs. {(item.price * item.quantity).toFixed(2)}</span>
+
+                                {isCustom && (
+                                  <DesignScreenshotViewer
+                                    item={item}
+                                    orderId={order._id}
+                                    onOpen3DModal={(designToOpen) => {
+                                      setSelected3DDesign(designToOpen);
+                                      setIs3DModalOpen(true);
+                                    }}
+                                  />
+                                )}
                               </div>
                             );
                           })}
@@ -1020,6 +1021,7 @@ export default function MyOrdersPage() {
         }}
         design={selected3DDesign}
         showCustomize={false}
+        allowDownloads={true}
       />
     </div>
   );
