@@ -650,7 +650,7 @@ exports.createProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { title, description, category, basePrice, sizes, gsms, colors, images, status, discount, modelPath, defaultColor, layers } = req.body;
+    const { title, description, category, basePrice, sizes, gsms, gsmPrices, colors, images, status, discount, modelPath, defaultColor, layers } = req.body;
 
     if (!title || !description || !category || basePrice === undefined) {
       return res.status(400).json({ message: "Please provide all required product fields" });
@@ -672,6 +672,7 @@ exports.createProduct = async (req, res) => {
       sizes: sizes && sizes.length > 0 ? sizes : ["S", "M", "L"],
       gsm: gsmsArray[0] || "GSM 180",
       gsms: gsmsArray,
+      gsmPrices: Array.isArray(gsmPrices) ? gsmPrices.map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) })) : [],
       colors: colors && colors.length > 0 ? colors : ["#ffffff"],
       images: images && images.length > 0 ? images : ["/images/dumyImage.png"],
       status: status || "Active",
