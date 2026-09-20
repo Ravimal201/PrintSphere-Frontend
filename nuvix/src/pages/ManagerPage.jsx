@@ -3289,16 +3289,16 @@ export default function ManagerPage() {
 
         {/* ================= TAB 4: PRICING RULES ================= */}
         {activeTab === "pricing" && (
-          <div className="bg-white border rounded-3xl p-6 sm:p-8 shadow-sm max-w-3xl space-y-6">
+          <div className="bg-white border rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 w-full">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-5">
               <div>
                 <h3 className="text-xl font-black text-slate-900 flex items-center gap-2.5">
                   <Sparkles className="h-5 w-5 text-indigo-600" />
                   Configure Cost Parameters & Estimation Rules
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Set printing cost per unit area and volume discounts for customer price estimations.
+                  Set printing cost per unit area, complexity fees, and bulk volume discounts for customer price estimations.
                 </p>
               </div>
               <span className="self-start sm:self-auto text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full">
@@ -3307,258 +3307,272 @@ export default function ManagerPage() {
             </div>
 
             {pricingSuccess && (
-              <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+              <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
                 <CheckCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
                 <span>Pricing parameters updated successfully!</span>
               </div>
             )}
             {pricingError && (
-              <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+              <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
                 <AlertCircle className="h-4.5 w-4.5 text-rose-600 shrink-0" />
                 <span>{pricingError}</span>
               </div>
             )}
 
             <form onSubmit={handleSavePricingRules} className="space-y-6">
-              {/* Field 1: Printing Cost per Sq. Inch */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    1. Printing Cost per Square Inch
-                  </label>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Unit: <strong>Rs. / sq. inch</strong>
-                  </span>
-                </div>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-bold text-xs">
-                    Rs.
-                  </span>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    className="w-full pl-10 pr-24 py-2.5 border rounded-xl text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    value={pricingForm.costPerSqIn}
-                    onChange={(e) =>
-                      setPricingForm((prev) => ({
-                        ...prev,
-                        costPerSqIn: parseFloat(e.target.value) || 0,
-                      }))
-                    }
-                  />
-                  <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-medium text-xs">
-                    / sq. inch
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
-                  💡 <strong>How it works:</strong> A standard 8" × 10" graphic is 80 sq. inches. At Rs. {(Number(pricingForm.costPerSqIn) || 0).toFixed(3)}/sq.in, it adds <strong>Rs. {(80 * (Number(pricingForm.costPerSqIn) || 0)).toFixed(2)}</strong> for printing.
-                </p>
-              </div>
-
-              {/* Field 2: Design Complexity Fee */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    2. Complexity Fee per Extra Layer
-                  </label>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Unit: <strong>Rs. / layer</strong>
-                  </span>
-                </div>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-bold text-xs">
-                    Rs.
-                  </span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    className="w-full pl-10 pr-28 py-2.5 border rounded-xl text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    value={pricingForm.complexityFeePerLayer}
-                    onChange={(e) =>
-                      setPricingForm((prev) => ({
-                        ...prev,
-                        complexityFeePerLayer: parseFloat(e.target.value) || 0,
-                      }))
-                    }
-                  />
-                  <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-medium text-xs">
-                    / extra layer
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  The 1st base artwork layer is free. This fee applies to additional graphic/text layers.
-                </p>
-              </div>
-
-              {/* Field 3: Bulk Order Volume Discount */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                  3. Bulk Order Volume Discount
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">
-                      Minimum Pieces Threshold
-                    </span>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Column: Form Parameters */}
+                <div className="lg:col-span-7 space-y-5">
+                  {/* Field 1: Printing Cost per Sq. Inch */}
+                  <div className="space-y-2 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                        <Tag className="h-3.5 w-3.5 text-indigo-600" />
+                        1. Printing Cost per Square Inch
+                      </label>
+                      <span className="text-[11px] text-slate-500 font-semibold">
+                        Rs. / sq. inch
+                      </span>
+                    </div>
                     <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-bold text-xs">
+                        Rs.
+                      </span>
                       <input
                         type="number"
-                        min="1"
-                        className="w-full px-3.5 py-2.5 border rounded-xl text-sm font-bold text-slate-900 pr-16 focus:border-indigo-500"
-                        value={pricingForm.volumeDiscount?.thresholdQty}
+                        step="0.001"
+                        min="0"
+                        className="w-full pl-10 pr-24 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                        value={pricingForm.costPerSqIn}
                         onChange={(e) =>
                           setPricingForm((prev) => ({
                             ...prev,
-                            volumeDiscount: {
-                              ...prev.volumeDiscount,
-                              thresholdQty: parseInt(e.target.value) || 0,
-                            },
+                            costPerSqIn: parseFloat(e.target.value) || 0,
                           }))
                         }
                       />
                       <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-medium text-xs">
-                        Pieces
+                        / sq. inch
                       </span>
                     </div>
+                    <p className="text-[11px] text-slate-500 bg-white border border-slate-100 rounded-xl px-3 py-2">
+                      💡 <strong>Formula:</strong> A standard 8" × 10" graphic is 80 sq. in. At Rs. {(Number(pricingForm.costPerSqIn) || 0).toFixed(3)}/sq.in, it adds <strong>Rs. {(80 * (Number(pricingForm.costPerSqIn) || 0)).toFixed(2)}</strong> for printing.
+                    </p>
                   </div>
 
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">
-                      Discount Percentage
-                    </span>
+                  {/* Field 2: Design Complexity Fee */}
+                  <div className="space-y-2 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-indigo-600" />
+                        2. Complexity Fee per Extra Layer
+                      </label>
+                      <span className="text-[11px] text-slate-500 font-semibold">
+                        Rs. / layer
+                      </span>
+                    </div>
                     <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-bold text-xs">
+                        Rs.
+                      </span>
                       <input
                         type="number"
+                        step="0.1"
                         min="0"
-                        max="100"
-                        className="w-full px-3.5 py-2.5 border rounded-xl text-sm font-bold text-slate-900 pr-10 focus:border-indigo-500"
-                        value={pricingForm.volumeDiscount?.discountPercentage}
+                        className="w-full pl-10 pr-28 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                        value={pricingForm.complexityFeePerLayer}
                         onChange={(e) =>
                           setPricingForm((prev) => ({
                             ...prev,
-                            volumeDiscount: {
-                              ...prev.volumeDiscount,
-                              discountPercentage: parseInt(e.target.value) || 0,
-                            },
+                            complexityFeePerLayer: parseFloat(e.target.value) || 0,
                           }))
                         }
                       />
-                      <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-bold text-xs">
-                        %
+                      <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-medium text-xs">
+                        / extra layer
                       </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      The 1st base artwork layer is free. This fee applies only to additional custom graphic/text layers.
+                    </p>
+                  </div>
+
+                  {/* Field 3: Bulk Order Volume Discount */}
+                  <div className="space-y-2 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block flex items-center gap-1.5">
+                      <Percent className="h-3.5 w-3.5 text-indigo-600" />
+                      3. Bulk Order Volume Discount
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          Minimum Pieces Threshold
+                        </span>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="1"
+                            className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 pr-16 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            value={pricingForm.volumeDiscount?.thresholdQty}
+                            onChange={(e) =>
+                              setPricingForm((prev) => ({
+                                ...prev,
+                                volumeDiscount: {
+                                  ...prev.volumeDiscount,
+                                  thresholdQty: parseInt(e.target.value) || 0,
+                                },
+                              }))
+                            }
+                          />
+                          <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-medium text-xs">
+                            Pieces
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          Discount Percentage
+                        </span>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 pr-10 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            value={pricingForm.volumeDiscount?.discountPercentage}
+                            onChange={(e) =>
+                              setPricingForm((prev) => ({
+                                ...prev,
+                                volumeDiscount: {
+                                  ...prev.volumeDiscount,
+                                  discountPercentage: parseInt(e.target.value) || 0,
+                                },
+                              }))
+                            }
+                          />
+                          <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-bold text-xs">
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 bg-white border border-slate-100 rounded-xl px-3 py-2">
+                      💡 Orders of <strong>{pricingForm.volumeDiscount?.thresholdQty || 5} or more pieces</strong> will automatically receive a <strong>{pricingForm.volumeDiscount?.discountPercentage || 0}% discount</strong> on their total order.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Column: Interactive Quick Price Calculation Example */}
+                <div className="lg:col-span-5 flex flex-col">
+                  <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-white border border-indigo-100 rounded-2xl p-5 space-y-4 shadow-sm flex-1 flex flex-col justify-between">
+                    <div className="space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-indigo-950 uppercase tracking-wide flex items-center gap-1.5">
+                          <Calculator className="h-4 w-4 text-indigo-600" />
+                          Live Estimation Simulator
+                        </h4>
+                        <span className="text-[10px] font-bold text-indigo-600 bg-white border border-indigo-200 px-2 py-0.5 rounded-md">
+                          Area & Complexity
+                        </span>
+                      </div>
+
+                      {/* Interactive Inputs */}
+                      <div className="space-y-3 bg-white p-3.5 rounded-xl border border-indigo-100/70">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                              Print Width (Inches)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="1"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 bg-slate-50/50 focus:bg-white focus:border-indigo-500"
+                              value={calcWidth}
+                              onChange={(e) => setCalcWidth(parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                              Print Height (Inches)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="1"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 bg-slate-50/50 focus:bg-white focus:border-indigo-500"
+                              value={calcHeight}
+                              onChange={(e) => setCalcHeight(parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">
+                            Complexity (Extra Layers)
+                          </label>
+                          <select
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 bg-slate-50/50 focus:bg-white focus:border-indigo-500"
+                            value={calcExtraLayers}
+                            onChange={(e) => setCalcExtraLayers(parseInt(e.target.value) || 0)}
+                          >
+                            <option value={0}>0 Extra (1 Base Layer)</option>
+                            <option value={1}>1 Extra Layer</option>
+                            <option value={2}>2 Extra Layers</option>
+                            <option value={3}>3 Extra Layers</option>
+                            <option value={4}>4 Extra Layers</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Calculation Breakdown Result */}
+                      <div className="text-xs text-slate-700 space-y-2 pt-2 border-t border-indigo-100 bg-white rounded-xl p-3.5 border">
+                        <div className="flex justify-between items-center text-slate-600">
+                          <span>
+                            • Print Area ({calcWidth}" × {calcHeight}" = {(Number(calcWidth) * Number(calcHeight)).toFixed(1)} sq.in):
+                          </span>
+                          <span className="font-semibold text-slate-900">
+                            Rs. {((Number(calcWidth) * Number(calcHeight)) * (Number(pricingForm.costPerSqIn) || 0)).toFixed(2)}
+                          </span>
+                        </div>
+
+                        {Number(calcExtraLayers) > 0 && (
+                          <div className="flex justify-between items-center text-purple-700">
+                            <span>
+                              • Complexity ({calcExtraLayers} layer{calcExtraLayers > 1 ? "s" : ""}):
+                            </span>
+                            <span className="font-semibold">
+                              + Rs. {(Number(calcExtraLayers) * (Number(pricingForm.complexityFeePerLayer) || 0)).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center pt-2 border-t border-slate-200 font-bold text-slate-900">
+                          <span>Total Calculated Cost:</span>
+                          <span className="text-indigo-600 font-black text-base">
+                            Rs. {(
+                              (Number(calcWidth) * Number(calcHeight) * (Number(pricingForm.costPerSqIn) || 0)) +
+                              (Number(calcExtraLayers) * (Number(pricingForm.complexityFeePerLayer) || 0))
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save Button inside card */}
+                    <div className="pt-4 border-t border-indigo-100 flex justify-end">
+                      <button
+                        type="submit"
+                        className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Save Pricing Rules</span>
+                      </button>
                     </div>
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
-                  💡 Orders of <strong>{pricingForm.volumeDiscount?.thresholdQty || 5} or more pieces</strong> will automatically receive a <strong>{pricingForm.volumeDiscount?.discountPercentage || 0}% discount</strong> on their total order.
-                </p>
-              </div>
-
-              {/* Interactive Quick Price Calculation Example */}
-              <div className="bg-gradient-to-r from-indigo-50/90 to-slate-50 border border-indigo-100 rounded-2xl p-4.5 space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-indigo-950 uppercase tracking-wide flex items-center gap-1.5">
-                    <Calculator className="h-4 w-4 text-indigo-600" />
-                    Quick Price Calculation Example
-                  </h4>
-                  <span className="text-[10px] font-bold text-indigo-600 bg-white border border-indigo-200 px-2 py-0.5 rounded-md">
-                    Print Area & Complexity Cost Only
-                  </span>
-                </div>
-
-                {/* Interactive Inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">
-                      Print Width (Inches)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="1"
-                      className="w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-900 bg-white focus:border-indigo-500"
-                      value={calcWidth}
-                      onChange={(e) => setCalcWidth(parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">
-                      Print Height (Inches)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="1"
-                      className="w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-900 bg-white focus:border-indigo-500"
-                      value={calcHeight}
-                      onChange={(e) => setCalcHeight(parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">
-                      Complexity (Extra Layers)
-                    </label>
-                    <select
-                      className="w-full px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-900 bg-white focus:border-indigo-500"
-                      value={calcExtraLayers}
-                      onChange={(e) => setCalcExtraLayers(parseInt(e.target.value) || 0)}
-                    >
-                      <option value={0}>0 Extra (1 Base Layer)</option>
-                      <option value={1}>1 Extra Layer</option>
-                      <option value={2}>2 Extra Layers</option>
-                      <option value={3}>3 Extra Layers</option>
-                      <option value={4}>4 Extra Layers</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Calculation Breakdown Result */}
-                <div className="text-xs text-slate-700 space-y-1.5 pt-2 border-t border-indigo-100 bg-white/70 rounded-xl p-3">
-                  <div className="flex justify-between items-center">
-                    <span>
-                      • Print Area ({calcWidth}" × {calcHeight}" = {(Number(calcWidth) * Number(calcHeight)).toFixed(1)} sq.in @ Rs. {(Number(pricingForm.costPerSqIn) || 0).toFixed(3)}/sq.in):
-                    </span>
-                    <span className="font-semibold text-slate-900">
-                      Rs. {((Number(calcWidth) * Number(calcHeight)) * (Number(pricingForm.costPerSqIn) || 0)).toFixed(2)}
-                    </span>
-                  </div>
-
-                  {Number(calcExtraLayers) > 0 && (
-                    <div className="flex justify-between items-center text-purple-700">
-                      <span>
-                        • Complexity Fee ({calcExtraLayers} extra layer{calcExtraLayers > 1 ? "s" : ""} @ Rs. {(Number(pricingForm.complexityFeePerLayer) || 0).toFixed(2)}/layer):
-                      </span>
-                      <span className="font-semibold">
-                        + Rs. {(Number(calcExtraLayers) * (Number(pricingForm.complexityFeePerLayer) || 0)).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-center pt-1.5 border-t border-slate-200 font-bold text-slate-900">
-                    <span>Total Printing & Complexity Cost:</span>
-                    <span className="text-indigo-600 font-black text-sm">
-                      Rs. {(
-                        (Number(calcWidth) * Number(calcHeight) * (Number(pricingForm.costPerSqIn) || 0)) +
-                        (Number(calcExtraLayers) * (Number(pricingForm.complexityFeePerLayer) || 0))
-                      ).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-2 cursor-pointer"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  <span>Save Pricing Rules</span>
-                </button>
               </div>
             </form>
           </div>
