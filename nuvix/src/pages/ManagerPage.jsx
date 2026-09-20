@@ -6054,6 +6054,7 @@ export default function ManagerPage() {
           setSelected3DDesign(null);
         }}
         design={selected3DDesign}
+        showCustomize={false}
       />
       </div>
     </div>

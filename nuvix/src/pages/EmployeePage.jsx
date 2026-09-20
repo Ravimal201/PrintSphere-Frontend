@@ -1308,6 +1308,7 @@ export default function EmployeePage() {
           setSelected3DDesign(null);
         }}
         design={selected3DDesign}
+        showCustomize={false}
       />
 
       {/* Insufficient Packaging Materials Alert Modal */}

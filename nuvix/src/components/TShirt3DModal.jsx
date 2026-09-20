@@ -154,7 +154,7 @@ const getLayersFromDesign = (design) => {
   return [];
 };
 
-export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, onCheckout, allowDownloads = false }) {
+export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, onCheckout, allowDownloads = false, showCustomize = true }) {
   const [activeSide, setActiveSide] = useState("front");
   const [zoomLevel, setZoomLevel] = useState(0.85);
   const [modelRotation, setModelRotation] = useState(0);
@@ -531,14 +531,16 @@ export default function TShirt3DModal({ isOpen, onClose, design, onCustomize, on
                     <FileCode className="h-4 w-4" />
                   </button>
                 )}
-                <button
-                  onClick={handleCustomize}
-                  className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                  title="Open in 3D Customizer"
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                  <span>Customize</span>
-                </button>
+                {showCustomize && (
+                  <button
+                    onClick={handleCustomize}
+                    className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                    title="Open in 3D Customizer"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    <span>Customize</span>
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   className="p-1.5 hover:bg-slate-100 rounded-xl transition text-slate-400 hover:text-slate-700 cursor-pointer"

@@ -1019,6 +1019,7 @@ export default function MyOrdersPage() {
           setSelected3DDesign(null);
         }}
         design={selected3DDesign}
+        showCustomize={false}
       />
     </div>
   );
