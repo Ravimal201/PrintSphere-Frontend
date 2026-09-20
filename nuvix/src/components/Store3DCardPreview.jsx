@@ -21,6 +21,12 @@ export const get3DModelPath = (product) => {
   if (product.modelUrl && typeof product.modelUrl === "string" && (product.modelUrl.toLowerCase().endsWith(".glb") || product.modelUrl.toLowerCase().endsWith(".gltf") || product.modelUrl.toLowerCase().endsWith(".fbx"))) {
     return product.modelUrl;
   }
+  if (product.layers && Array.isArray(product.layers)) {
+    const layerWithModel = product.layers.find((l) => l && l.projectedForModel);
+    if (layerWithModel?.projectedForModel) {
+      return layerWithModel.projectedForModel;
+    }
+  }
   const textStr = (
     product.tShirtType ||
     product.shirtType ||
@@ -52,6 +58,7 @@ export const get3DModelPath = (product) => {
 
 export const get3DLayers = (product) => {
   if (!product) return [];
+  const defaultModel = get3DModelPath(product);
   if (product.layers && Array.isArray(product.layers) && product.layers.length > 0) {
     return product.layers.map((l, idx) => ({
       id: l.id || `layer-${idx}`,
@@ -70,7 +77,8 @@ export const get3DLayers = (product) => {
       position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
       rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
       scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
-      projectedForModel: l.projectedForModel || null,
+      aspectRatio: l.aspectRatio || (Array.isArray(l.scale) && l.scale[1] ? l.scale[0] / l.scale[1] : 1),
+      projectedForModel: l.projectedForModel || defaultModel,
       targetMeshName: l.targetMeshName || null
     }));
   }
@@ -86,6 +94,9 @@ export const get3DLayers = (product) => {
         position: [0, 0.1, 0.15],
         rotation: [0, 0, 0],
         scale: [0.35, 0.35, 0.35],
+        aspectRatio: 1,
+        projectedForModel: defaultModel,
+        targetMeshName: null
       },
     ];
   }

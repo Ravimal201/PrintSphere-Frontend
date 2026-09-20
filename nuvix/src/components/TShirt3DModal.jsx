@@ -111,6 +111,7 @@ const getModelPath = (design) => {
 
 const getLayersFromDesign = (design) => {
   if (!design) return [];
+  const defaultModel = getModelPath(design);
   if (design.layers && Array.isArray(design.layers) && design.layers.length > 0) {
     return design.layers.map((l, idx) => ({
       id: l.id || `layer-${idx}`,
@@ -129,7 +130,8 @@ const getLayersFromDesign = (design) => {
       position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
       rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
       scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
-      projectedForModel: l.projectedForModel || null,
+      aspectRatio: l.aspectRatio || (Array.isArray(l.scale) && l.scale[1] ? l.scale[0] / l.scale[1] : 1),
+      projectedForModel: l.projectedForModel || defaultModel,
       targetMeshName: l.targetMeshName || null
     }));
   }
@@ -148,6 +150,9 @@ const getLayersFromDesign = (design) => {
         position: [0, 0.1, 0.15],
         rotation: [0, 0, 0],
         scale: [0.35, 0.35, 0.35],
+        aspectRatio: 1,
+        projectedForModel: defaultModel,
+        targetMeshName: null
       },
     ];
   }

@@ -373,6 +373,28 @@ export default function DesignerPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     const thumb = generateDesignThumbnail(layers);
+    const activeModelPath = selectedModel?.path || "/images/models/male normal t-shirt1.glb";
+    const normalizedLayers = (layers || []).map((l, idx) => ({
+      id: l.id || `layer-${idx}`,
+      type: l.type || "image",
+      name: l.name || (l.type === "text" ? "Custom Text" : "Custom Logo"),
+      text: l.text || "",
+      fontFamily: l.fontFamily || "Outfit",
+      color: l.color || "#1e293b",
+      bold: Boolean(l.bold),
+      italic: Boolean(l.italic),
+      url: l.url || l.image || l.src || "",
+      visible: l.visible !== undefined ? Boolean(l.visible) : true,
+      locked: l.locked !== undefined ? Boolean(l.locked) : false,
+      flipX: Boolean(l.flipX),
+      flipY: Boolean(l.flipY),
+      position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
+      rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
+      scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
+      aspectRatio: l.aspectRatio || (Array.isArray(l.scale) && l.scale[1] ? l.scale[0] / l.scale[1] : 1),
+      projectedForModel: l.projectedForModel || activeModelPath,
+      targetMeshName: l.targetMeshName || null
+    }));
 
     const payload = {
       title: submitForm.title,
@@ -382,9 +404,9 @@ export default function DesignerPage() {
       sizes: sortSizesAscending((isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize]),
       colors: [shirtColor],
       images: [thumb],
-      modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
+      modelPath: activeModelPath,
       defaultColor: shirtColor,
-      layers: layers
+      layers: normalizedLayers
     };
 
     if (isManager) {
@@ -420,13 +442,35 @@ export default function DesignerPage() {
 
   const getDesignPayload = () => {
     const thumbnailUrl = generateDesignThumbnail(layers);
+    const activeModelPath = selectedModel?.path || "/images/models/male normal t-shirt1.glb";
+    const normalizedLayers = (layers || []).map((l, idx) => ({
+      id: l.id || `layer-${idx}`,
+      type: l.type || "image",
+      name: l.name || (l.type === "text" ? "Custom Text" : "Custom Logo"),
+      text: l.text || "",
+      fontFamily: l.fontFamily || "Outfit",
+      color: l.color || "#1e293b",
+      bold: Boolean(l.bold),
+      italic: Boolean(l.italic),
+      url: l.url || l.image || l.src || "",
+      visible: l.visible !== undefined ? Boolean(l.visible) : true,
+      locked: l.locked !== undefined ? Boolean(l.locked) : false,
+      flipX: Boolean(l.flipX),
+      flipY: Boolean(l.flipY),
+      position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
+      rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
+      scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
+      aspectRatio: l.aspectRatio || (Array.isArray(l.scale) && l.scale[1] ? l.scale[0] / l.scale[1] : 1),
+      projectedForModel: l.projectedForModel || activeModelPath,
+      targetMeshName: l.targetMeshName || null
+    }));
     return {
       tShirtType: selectedModel?.name || "Crew Neck T-Shirt",
-      modelPath: selectedModel?.path || "/images/models/male normal t-shirt1.glb",
+      modelPath: activeModelPath,
       fabricColor: shirtColor,
       material: shirtMaterial,
       size: selectedSize,
-      layers: layers,
+      layers: normalizedLayers,
       estimatedCost: unitPrice,
       thumbnailUrl: thumbnailUrl
     };
