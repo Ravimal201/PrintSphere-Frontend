@@ -96,6 +96,96 @@ const sendContactInquiryEmail = async ({ name, email, subject, message, source }
   }
 };
 
+/**
+ * Send a 6-digit OTP verification code for password reset.
+ *
+ * @param {Object} data
+ * @param {string} data.email - Recipient email address
+ * @param {string} data.otp - 6-digit verification code
+ * @param {string} [data.name] - User name
+ */
+const sendPasswordResetOTPEmail = async ({ email, otp, name }) => {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+
+  console.log(`[EmailService] Preparing password reset OTP email for <${email}>`);
+
+  if (!user || !pass) {
+    console.warn(
+      `[EmailService] EMAIL_USER or EMAIL_PASS not configured in .env. Reset OTP for ${email} is: [ ${otp} ]`
+    );
+    return {
+      sent: false,
+      reason: "Email credentials not configured in backend .env",
+      devOtp: otp
+    };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: user,
+        pass: pass,
+      },
+    });
+
+    const mailOptions = {
+      from: `"PrintSphere Support" <${user}>`,
+      to: email,
+      subject: `[PrintSphere] Your Password Reset Verification Code: ${otp}`,
+      text: `Hello ${name || "there"},\n\n` +
+            `You requested to reset your PrintSphere account password.\n\n` +
+            `Your 6-digit verification code is: ${otp}\n\n` +
+            `This code will expire in 10 minutes.\n\n` +
+            `If you did not request this password reset, please ignore this email or contact support.\n\n` +
+            `Best regards,\nPrintSphere Security Team`,
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <div style="text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 24px;">
+            <h1 style="color: #4f46e5; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">PrintSphere</h1>
+            <p style="color: #64748b; font-size: 13px; margin: 6px 0 0 0;">Password Reset Request</p>
+          </div>
+
+          <p style="color: #334155; font-size: 15px; line-height: 1.5; margin-bottom: 20px;">
+            Hello <strong>${name || "there"}</strong>,
+          </p>
+          <p style="color: #475569; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
+            We received a request to reset the password associated with your PrintSphere account. Use the 6-digit verification code below to complete the reset:
+          </p>
+
+          <div style="background: linear-gradient(135deg, #f8fafc, #eef2ff); border: 1.5px dashed #c7d2fe; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+            <div style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #4338ca; font-family: monospace;">
+              ${otp}
+            </div>
+            <p style="color: #6366f1; font-size: 12px; font-weight: 600; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 0.05em;">
+              ⏳ Valid for 10 minutes
+            </p>
+          </div>
+
+          <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; margin-bottom: 24px;">
+            <p style="color: #92400e; font-size: 12.5px; margin: 0; line-height: 1.5;">
+              <strong>Security Notice:</strong> Never share this code with anyone. PrintSphere staff will never ask for your verification code.
+            </p>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+            If you did not request a password reset, you can safely ignore this email. Your password will remain unchanged.
+          </p>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("[EmailService] Password reset OTP sent successfully:", info.messageId);
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("[EmailService] Error sending password reset email:", error.message);
+    return { sent: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendContactInquiryEmail,
+  sendPasswordResetOTPEmail,
 };

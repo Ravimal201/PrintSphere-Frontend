@@ -11,6 +11,7 @@ const UserActivity = require("../models/UserActivity");
 const Review = require("../models/Review");
 const { createNotification } = require("../utils/notificationHelper");
 const { resolveColorName, formatGsm } = require("../utils/colorHelper");
+const { sendPasswordResetOTPEmail } = require("../services/emailService");
 
 // JWT Secret Key fallback
 const JWT_SECRET = process.env.JWT_SECRET || "printsphere_jwt_secret_key_99";
@@ -163,6 +164,112 @@ exports.changePassword = async (req, res) => {
   } catch (error) {
     console.error("Change password error:", error);
     res.status(500).json({ message: "Server error during password change" });
+  }
+};
+
+// @desc    Send OTP to email for password reset
+// @route   POST /api/auth/forgot-password
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Please provide your email address" });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: cleanEmail });
+
+    if (!user) {
+      // Return 404 with clear message
+      return res.status(404).json({ message: "No account found with this email address." });
+    }
+
+    // Generate a secure 6-digit numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expireTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    user.resetPasswordOTP = otp;
+    user.resetPasswordExpire = expireTime;
+    await user.save();
+
+    // Send email with OTP
+    const emailResult = await sendPasswordResetOTPEmail({
+      email: user.email,
+      otp,
+      name: user.name,
+    });
+
+    console.log(`[Auth] Password reset OTP generated for ${user.email}: [${otp}]`);
+
+    return res.status(200).json({
+      success: true,
+      message: "A 6-digit verification code has been sent to your email.",
+      emailSent: emailResult?.sent || false,
+      devOtp: !emailResult?.sent ? otp : undefined
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({ message: "Server error generating password reset code." });
+  }
+};
+
+// @desc    Verify OTP and reset password
+// @route   POST /api/auth/reset-password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Please provide email, verification code, and new password" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanOtp = String(otp).trim();
+
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email address." });
+    }
+
+    if (!user.resetPasswordOTP || !user.resetPasswordExpire) {
+      return res.status(400).json({ message: "No password reset requested or code has expired. Please request a new code." });
+    }
+
+    // Check if expired
+    if (new Date() > new Date(user.resetPasswordExpire)) {
+      user.resetPasswordOTP = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+      return res.status(400).json({ message: "Verification code has expired. Please request a new one." });
+    }
+
+    // Verify OTP
+    if (user.resetPasswordOTP !== cleanOtp) {
+      return res.status(400).json({ message: "Invalid verification code. Please check your email and try again." });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(newPassword, salt);
+
+    // Clear reset token and expiration
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    console.log(`[Auth] Password successfully reset for user ${user.email}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Your password has been successfully reset! You can now log in."
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return res.status(500).json({ message: "Server error resetting password." });
   }
 };
 
