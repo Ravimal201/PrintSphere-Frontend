@@ -6,6 +6,7 @@ import { DecalGeometry } from "three-stdlib";
 import { createTextTexture } from "./TextureCanvas";
 import ThreeErrorBoundary from "../components/ThreeErrorBoundary";
 import { Maximize2, RotateCw, Trash2, Lock, Unlock } from "lucide-react";
+import { confirmAction } from "../context/ConfirmContext";
 
 // Helper to convert vectors/eulers to arrays
 function vecToArray(vec = [0, 0, 0]) {
@@ -710,9 +711,15 @@ function DecalItem({
     }
   };
 
-  const handleDeleteClick = (e) => {
+  const handleDeleteClick = async (e) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to delete this layer?")) {
+    const isConfirmed = await confirmAction({
+      title: "Delete Design Layer",
+      message: "Are you sure you want to delete this layer from your 3D design?",
+      confirmText: "Delete",
+      type: "danger"
+    });
+    if (isConfirmed) {
       if (onDeleteLayer) {
         onDeleteLayer(layer.id);
       } else if (onUpdateLayers) {

@@ -27,9 +27,13 @@ console.error = function (...args) {
   originalError.apply(console, args);
 };
 
+import { ConfirmProvider } from './context/ConfirmContext.jsx'
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <ConfirmProvider>
+      <App />
+    </ConfirmProvider>
   </StrictMode>,
 )
 

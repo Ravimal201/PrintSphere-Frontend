@@ -8,6 +8,7 @@ import { Palette, Edit, AlertCircle, Trash2 } from "lucide-react";
 import axios from "axios";
 
 import { API_BASE_URL } from "../config/api";
+import { confirmAction, alertAction } from "../context/ConfirmContext";
 
 export default function MyDesignsPage() {
   const [designs, setDesigns] = useState([]);
@@ -45,7 +46,13 @@ export default function MyDesignsPage() {
   };
 
   const handleDeleteDesign = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this design?")) {
+    const isConfirmed = await confirmAction({
+      title: "Delete Custom Design",
+      message: "Are you sure you want to delete this custom design? This cannot be undone.",
+      confirmText: "Delete Design",
+      type: "danger"
+    });
+    if (!isConfirmed) {
       return;
     }
     const token = localStorage.getItem("token");
@@ -57,7 +64,11 @@ export default function MyDesignsPage() {
       setDesigns(prev => prev.filter(d => d._id !== id));
     } catch (err) {
       console.error("Delete custom design error:", err);
-      alert(err.response?.data?.message || "Failed to delete design. Please try again.");
+      alertAction({
+        title: "Delete Failed",
+        message: err.response?.data?.message || "Failed to delete design. Please try again.",
+        type: "danger"
+      });
     }
   };
 
