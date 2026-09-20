@@ -141,17 +141,10 @@ const getInitialCustomDesign = () => {
 export default function DesignerPage() {
   const initialDraft = useRef(getInitialCustomDesign()).current;
 
-  const [activeMenu, setActiveMenu] = useState("3d-designer");
-  const [loadedDesignId, setLoadedDesignId] = useState(() => initialDraft?._id || initialDraft?.id || sessionStorage.getItem("active_editing_design_id") || null);
+  const [loadedDesignId, setLoadedDesignId] = useState(() => initialDraft?._id || initialDraft?.id || null);
   const [showSaveChoiceModal, setShowSaveChoiceModal] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-
-  useEffect(() => {
-    if (loadedDesignId) {
-      sessionStorage.setItem("active_editing_design_id", loadedDesignId);
-    }
-  }, [loadedDesignId]);
 
   const [isEmployee, setIsEmployee] = useState(false);
   const [isManager, setIsManager] = useState(false);
@@ -476,7 +469,7 @@ export default function DesignerPage() {
     };
   };
 
-  const handleSaveBtnClick = () => {
+  const handleSaveBtnClick = async () => {
     if (isEmployee || isManager) {
       setSubmitError("");
       setSubmitSuccess("");
@@ -492,7 +485,13 @@ export default function DesignerPage() {
 
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to save your design to your account.");
+      await alertAction({
+        title: "Login Required",
+        message: "Please log in to your PrintSphere account to save your personalized custom designs.",
+        type: "warning",
+        confirmText: "Log In Now"
+      });
+      window.location.href = "/login?redirect=/designer";
       return;
     }
 
@@ -508,7 +507,13 @@ export default function DesignerPage() {
   const handleSaveNewDesign = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to save your design to your account.");
+      await alertAction({
+        title: "Login Required",
+        message: "Please log in to your PrintSphere account to save your custom design.",
+        type: "warning",
+        confirmText: "Log In Now"
+      });
+      window.location.href = "/login?redirect=/designer";
       return;
     }
     setSaveLoading(true);
@@ -517,15 +522,27 @@ export default function DesignerPage() {
 
     try {
       const res = await axios.post(`${API_BASE_URL}/auth/designs`, payload, { headers });
-      if (res.data?.design?._id) {
-        setLoadedDesignId(res.data.design._id);
-        sessionStorage.setItem("active_editing_design_id", res.data.design._id);
+      const newDesignId = res.data?.design?._id || res.data?._id;
+      if (newDesignId) {
+        setLoadedDesignId(newDesignId);
       }
+      // Record clean saved state so navigating away doesn't trigger unsaved changes warning
+      lastSavedSnapshotRef.current = getDesignSignature();
       setShowSaveChoiceModal(false);
-      alert("Design saved as a new copy successfully!");
+      await alertAction({
+        title: "Design Successfully Saved!",
+        message: "Your personalized 3D T-shirt design has been saved to your account.\nYou can access or re-order it anytime from 'My Designs'.",
+        type: "success",
+        confirmText: "OK"
+      });
     } catch (err) {
       console.error("Save new design error:", err);
-      alert(err.response?.data?.message || err.message || "Failed to save design. Please try again.");
+      await alertAction({
+        title: "Unable to Save Design",
+        message: err.response?.data?.message || err.message || "Failed to save design. Please try again.",
+        type: "danger",
+        confirmText: "OK"
+      });
     } finally {
       setSaveLoading(false);
     }
@@ -533,11 +550,17 @@ export default function DesignerPage() {
 
   // 2. Overwrite / Save On Existing Design
   const handleOverwriteExistingDesign = async () => {
-    const currentId = loadedDesignId || sessionStorage.getItem("active_editing_design_id");
+    const currentId = loadedDesignId;
     if (!currentId) return handleSaveNewDesign();
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to save your design to your account.");
+      await alertAction({
+        title: "Login Required",
+        message: "Please log in to your PrintSphere account to update your custom design.",
+        type: "warning",
+        confirmText: "Log In Now"
+      });
+      window.location.href = "/login?redirect=/designer";
       return;
     }
     setSaveLoading(true);
@@ -559,11 +582,27 @@ export default function DesignerPage() {
           throw putErr;
         }
       }
+      const updatedId = res.data?.design?._id || currentId;
+      if (updatedId) {
+        setLoadedDesignId(updatedId);
+      }
+      // Record clean saved state so navigating away doesn't trigger unsaved changes warning
+      lastSavedSnapshotRef.current = getDesignSignature();
       setShowSaveChoiceModal(false);
-      alert(res.data?.message || "Design updated successfully!");
+      await alertAction({
+        title: "Design Successfully Updated!",
+        message: "Your existing design has been updated with the latest 3D custom modifications.",
+        type: "success",
+        confirmText: "OK"
+      });
     } catch (err) {
       console.error("Overwrite design error:", err);
-      alert(err.response?.data?.message || err.message || "Failed to update design. Please try again.");
+      await alertAction({
+        title: "Update Failed",
+        message: err.response?.data?.message || err.message || "Failed to update design. Please try again.",
+        type: "danger",
+        confirmText: "OK"
+      });
     } finally {
       setSaveLoading(false);
     }
@@ -676,6 +715,54 @@ export default function DesignerPage() {
   });
 
   const isCheckingOutRef = useRef(false);
+  const lastSavedSnapshotRef = useRef(null);
+
+  // Helper to get a stringified signature of current design configuration
+  const getDesignSignature = () => {
+    try {
+      return JSON.stringify({
+        layers: (layers || []).map(l => ({
+          id: l.id,
+          type: l.type,
+          text: l.text || "",
+          url: l.url || "",
+          position: l.position,
+          rotation: l.rotation,
+          scale: l.scale,
+          color: l.color,
+          fontFamily: l.fontFamily,
+          bold: l.bold,
+          italic: l.italic,
+          flipX: l.flipX,
+          flipY: l.flipY,
+          side: l.side
+        })),
+        shirtColor,
+        modelPath: selectedModel?.path || shirtType,
+        shirtMaterial,
+        selectedSize
+      });
+    } catch (e) {
+      return "";
+    }
+  };
+
+  // Check if design has unsaved changes compared to the last save/load point
+  const hasUnsavedChanges = () => {
+    if (!layers || layers.length === 0) return false;
+    // If the design was saved and no subsequent modifications have occurred
+    if (lastSavedSnapshotRef.current && lastSavedSnapshotRef.current === getDesignSignature()) {
+      return false;
+    }
+    return true;
+  };
+
+  // Initialize saved snapshot once initial model / layers are ready
+  useEffect(() => {
+    if (initialDraft && initialDraft._id) {
+      lastSavedSnapshotRef.current = getDesignSignature();
+    }
+  }, []);
 
   const executePendingNavigation = (target = pendingNavigationTarget) => {
     if (!target) return;
@@ -690,7 +777,7 @@ export default function DesignerPage() {
   };
 
   const safeNavigate = (target) => {
-    if (layers && layers.length > 0) {
+    if (hasUnsavedChanges()) {
       setPendingNavigationTarget(typeof target === "string" ? target : { callback: target });
       setShowLeaveWarningModal(true);
     } else {
@@ -704,11 +791,11 @@ export default function DesignerPage() {
     executePendingNavigation();
   };
 
-  // Browser-level reload/close warning when design is in progress
+  // Browser-level reload/close warning only when unsaved changes exist
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (isCheckingOutRef.current) return;
-      if (layers && layers.length > 0) {
+      if (hasUnsavedChanges()) {
         e.preventDefault();
         e.returnValue = "Save your work! Unsaved design changes will be lost.";
         return "Save your work! Unsaved design changes will be lost.";
@@ -716,7 +803,7 @@ export default function DesignerPage() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [layers]);
+  }, [layers, shirtColor, selectedModel?.path, shirtMaterial, selectedSize]);
 
   const getUserImagesStorageKey = (user = currentUser) => {
     const userId = user?.id || user?._id || (typeof window !== "undefined" && localStorage.getItem("user") ? (JSON.parse(localStorage.getItem("user") || "{}").id || JSON.parse(localStorage.getItem("user") || "{}")._id) : null) || "guest";
