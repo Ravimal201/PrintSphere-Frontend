@@ -9,6 +9,7 @@ import {
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 import { formatGsm } from "../utils/colorHelper";
+import { confirmAction, alertAction } from "../context/ConfirmContext";
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -345,17 +346,31 @@ export default function AdminPage() {
   };
 
   const handleDeleteInventory = async (itemId) => {
-    if (!window.confirm("Are you sure you want to delete this inventory item?")) return;
+    const isConfirmed = await confirmAction({
+      title: "Delete Inventory Item",
+      message: "Are you sure you want to delete this inventory item? This action cannot be undone.",
+      confirmText: "Delete",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
     try {
       await axios.delete(`${API_BASE_URL}/manager/inventory/${itemId}`, { headers });
       setInventory((prev) => prev.filter((i) => i._id !== itemId));
-      alert("Inventory item deleted successfully!");
+      alertAction({
+        title: "Item Deleted",
+        message: "Inventory item deleted successfully!",
+        type: "success"
+      });
       fetchAnalytics();
     } catch (err) {
       console.error("Delete inventory error:", err);
-      alert(err.response?.data?.message || "Failed to delete inventory item");
+      alertAction({
+        title: "Delete Failed",
+        message: err.response?.data?.message || "Failed to delete inventory item",
+        type: "danger"
+      });
     }
   };
 
@@ -527,7 +542,13 @@ export default function AdminPage() {
   };
 
   const handleDeleteStaff = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this staff member?")) return;
+    const isConfirmed = await confirmAction({
+      title: "Delete Staff Member",
+      message: "Are you sure you want to delete this staff member? Their access will be revoked immediately.",
+      confirmText: "Delete Staff",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
     const token = localStorage.getItem("token");
 
     try {
@@ -537,7 +558,11 @@ export default function AdminPage() {
       fetchStaff();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || "Failed to delete staff account.");
+      alertAction({
+        title: "Delete Failed",
+        message: err.response?.data?.message || "Failed to delete staff account.",
+        type: "danger"
+      });
     }
   };
 
@@ -611,7 +636,13 @@ export default function AdminPage() {
   };
 
   const handleDeleteInquiry = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this customer inquiry?")) return;
+    const isConfirmed = await confirmAction({
+      title: "Delete Customer Inquiry",
+      message: "Are you sure you want to delete this customer inquiry? This action cannot be undone.",
+      confirmText: "Delete",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
     setInquiryActionLoading((prev) => ({ ...prev, [id]: true }));
     try {
       await axios.delete(`${API_BASE_URL}/contact/inquiries/${id}`);
@@ -619,7 +650,11 @@ export default function AdminPage() {
       fetchInquiries();
     } catch (err) {
       console.error("Error deleting inquiry:", err);
-      alert(err.response?.data?.message || "Failed to delete inquiry");
+      alertAction({
+        title: "Delete Failed",
+        message: err.response?.data?.message || "Failed to delete inquiry",
+        type: "danger"
+      });
     } finally {
       setInquiryActionLoading((prev) => ({ ...prev, [id]: false }));
     }

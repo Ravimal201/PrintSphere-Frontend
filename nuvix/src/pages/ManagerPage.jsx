@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { confirmAction, alertAction } from "../context/ConfirmContext";
 import {
   BarChart3,
   ShoppingCart,
@@ -415,7 +416,13 @@ export default function ManagerPage() {
   };
 
   const handleDeleteInquiry = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this customer inquiry?")) return;
+    const isConfirmed = await confirmAction({
+      title: "Delete Customer Inquiry",
+      message: "Are you sure you want to delete this customer inquiry? This action cannot be undone.",
+      confirmText: "Delete",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
     setInquiryActionLoading((prev) => ({ ...prev, [id]: true }));
     try {
       await axios.delete(`${API_BASE_URL}/contact/inquiries/${id}`);
@@ -423,7 +430,11 @@ export default function ManagerPage() {
       fetchInquiries();
     } catch (err) {
       console.error("Error deleting inquiry:", err);
-      alert(err.response?.data?.message || "Failed to delete inquiry");
+      alertAction({
+        title: "Delete Failed",
+        message: err.response?.data?.message || "Failed to delete inquiry",
+        type: "danger"
+      });
     } finally {
       setInquiryActionLoading((prev) => ({ ...prev, [id]: false }));
     }
@@ -619,8 +630,13 @@ export default function ManagerPage() {
   };
 
   const handleDeleteProduct = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?"))
-      return;
+    const isConfirmed = await confirmAction({
+      title: "Delete Store Product",
+      message: "Are you sure you want to delete this product from the store?",
+      confirmText: "Delete",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -629,7 +645,11 @@ export default function ManagerPage() {
       setProducts((prev) => prev.filter((p) => p._id !== id));
     } catch (err) {
       console.error("Delete product error:", err);
-      alert("Failed to delete product");
+      alertAction({
+        title: "Delete Failed",
+        message: "Failed to delete product",
+        type: "danger"
+      });
     }
   };
 
@@ -914,7 +934,13 @@ export default function ManagerPage() {
   };
 
   const handleDeleteStyle = async (styleId) => {
-    if (!confirm("Are you sure you want to delete this style?")) return;
+    const isConfirmed = await confirmAction({
+      title: "Delete T-Shirt Style",
+      message: "Are you sure you want to delete this 3D style template?",
+      confirmText: "Delete",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
     try {
@@ -928,7 +954,11 @@ export default function ManagerPage() {
       setStyles(stylesRes.data);
     } catch (err) {
       console.error("Delete style error:", err);
-      alert("Failed to delete style.");
+      alertAction({
+        title: "Delete Failed",
+        message: "Failed to delete style.",
+        type: "danger"
+      });
     }
   };
 
@@ -1000,7 +1030,13 @@ export default function ManagerPage() {
   };
 
   const handleDeleteInventory = async (id) => {
-    if (!confirm("Are you sure you want to delete this inventory item?")) return;
+    const isConfirmed = await confirmAction({
+      title: "Delete Inventory Item",
+      message: "Are you sure you want to delete this inventory item? This action cannot be undone.",
+      confirmText: "Delete",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
     const token = localStorage.getItem("token");
     const headers = { Authorization: `Bearer ${token}` };
     try {
@@ -1009,7 +1045,11 @@ export default function ManagerPage() {
       setInventory(invRes.data);
     } catch (err) {
       console.error("Delete inventory item error:", err);
-      alert(err.response?.data?.message || "Failed to delete inventory item.");
+      alertAction({
+        title: "Delete Failed",
+        message: err.response?.data?.message || "Failed to delete inventory item.",
+        type: "danger"
+      });
     }
   };
 
