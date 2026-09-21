@@ -251,7 +251,7 @@ exports.submitProductConcept = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Employee role required." });
     }
 
-    const { title, description, category, basePrice, sizes, gsms, gsmPrices, colors, images, modelPath, defaultColor, layers } = req.body;
+    const { title, description, category, basePrice, sizes, gsms, gsmPrices, fabricColor, colors, images, modelPath, layers } = req.body;
 
     if (!title || !description || !category || basePrice === undefined) {
       return res.status(400).json({ message: "Please provide all required product fields" });
@@ -262,6 +262,10 @@ exports.submitProductConcept = async (req, res) => {
       : (typeof gsms === "string" && gsms.trim() ? [gsms.trim()] : ["GSM 180", "GSM 200", "GSM 220", "GSM 240"]);
     const gsmsArray = rawGsms.map(formatGsm);
 
+    const dynamicFabricColor = (Array.isArray(colors) && colors.length > 0)
+      ? colors[0]
+      : (fabricColor || "#ffffff");
+
     const product = await Product.create({
       title,
       description,
@@ -271,13 +275,13 @@ exports.submitProductConcept = async (req, res) => {
       gsms: gsmsArray,
       gsm: gsmsArray[0] || "GSM 180",
       gsmPrices: Array.isArray(gsmPrices) ? gsmPrices.map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) })) : [],
-      colors: colors || ["White"],
+      fabricColor: dynamicFabricColor,
+      colors: Array.isArray(colors) && colors.length > 0 ? colors : [dynamicFabricColor],
       images: images && images.length > 0 ? images : ["/images/dumyImage.png"],
       status: "Draft",
       isApproved: false,
       createdBy: decoded.id,
       modelPath: modelPath || "/images/models/male normal t-shirt1.glb",
-      defaultColor: defaultColor || "#ffffff",
       layers: layers || []
     });
 

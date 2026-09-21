@@ -109,6 +109,10 @@ const ProductSchema = new mongoose.Schema(
         price: { type: Number }
       }
     ],
+    fabricColor: {
+      type: String,
+      default: "#ffffff"
+    },
     colors: [String],
     images: [String],
     status: {
@@ -127,10 +131,6 @@ const ProductSchema = new mongoose.Schema(
     modelPath: {
       type: String,
       default: "/images/models/male normal t-shirt1.glb"
-    },
-    defaultColor: {
-      type: String,
-      default: "#ffffff"
     },
     averageRating: {
       type: Number,

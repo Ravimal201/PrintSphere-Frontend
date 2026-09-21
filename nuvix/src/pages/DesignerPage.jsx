@@ -283,6 +283,12 @@ export default function DesignerPage() {
             if (!initialDraft?.sizes) {
               setSelectedStoreSizes(modelSizes);
             }
+            const modelColors = chosen?.colors && Array.isArray(chosen.colors) && chosen.colors.length > 0
+              ? chosen.colors.map(c => c.value)
+              : shirtColors.map(c => c.value);
+            if (!initialDraft?.colors) {
+              setSelectedStoreColors(modelColors);
+            }
           } else {
             setSelectedModel(null);
           }
@@ -327,7 +333,18 @@ export default function DesignerPage() {
             setLayers(normalizedLayers);
             autoSaveImagesFromLayers(normalizedLayers);
           }
-          if (design.fabricColor) setShirtColor(design.fabricColor);
+          const activeColor = (design.colors && Array.isArray(design.colors) && design.colors.length > 0)
+            ? design.colors[0]
+            : (design.fabricColor || design.color || "#ffffff");
+          setShirtColor(activeColor);
+          if (design.colors && Array.isArray(design.colors) && design.colors.length > 0) {
+            setSelectedStoreColors(design.colors);
+          } else {
+            setSelectedStoreColors([activeColor]);
+          }
+          if (design.sizes && Array.isArray(design.sizes) && design.sizes.length > 0) {
+            setSelectedStoreSizes(sortSizesAscending(design.sizes));
+          }
 
           const model = findMatchingModel(design, stylesList);
           if (model) {
@@ -389,16 +406,21 @@ export default function DesignerPage() {
       targetMeshName: l.targetMeshName || null
     }));
 
+    const orderedColors = [
+      shirtColor,
+      ...(selectedStoreColors || []).filter((c) => c.toLowerCase() !== shirtColor.toLowerCase())
+    ];
+
     const payload = {
       title: submitForm.title,
       description: submitForm.description,
       category: submitForm.category,
       basePrice: submitForm.basePrice,
+      fabricColor: shirtColor,
       sizes: sortSizesAscending((isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize]),
-      colors: [shirtColor],
+      colors: (isEmployee || isManager) && orderedColors.length > 0 ? orderedColors : [shirtColor],
       images: [thumb],
       modelPath: activeModelPath,
-      defaultColor: shirtColor,
       layers: normalizedLayers
     };
 
@@ -466,12 +488,18 @@ export default function DesignerPage() {
       projectedForModel: l.projectedForModel || activeModelPath,
       targetMeshName: l.targetMeshName || null
     }));
+    const orderedColors = [
+      shirtColor,
+      ...(selectedStoreColors || []).filter((c) => c.toLowerCase() !== shirtColor.toLowerCase())
+    ];
     return {
       tShirtType: selectedModel?.name || "Crew Neck T-Shirt",
       modelPath: activeModelPath,
       fabricColor: shirtColor,
+      colors: (isEmployee || isManager) && orderedColors.length > 0 ? orderedColors : [shirtColor],
       material: shirtMaterial,
       size: selectedSize,
+      sizes: (isEmployee || isManager) && selectedStoreSizes && selectedStoreSizes.length > 0 ? selectedStoreSizes : [selectedSize],
       layers: normalizedLayers,
       estimatedCost: unitPrice,
       thumbnailUrl: thumbnailUrl
@@ -610,6 +638,37 @@ export default function DesignerPage() {
   const [rightTab, setRightTab] = useState("layers");
   const [shirtColor, setShirtColor] = useState(() => initialDraft?.fabricColor || initialDraft?.color || "#ffffff");
   const [selectedModel, setSelectedModel] = useState(null);
+
+  const activeModelColors = (
+    selectedModel?.colors && Array.isArray(selectedModel.colors) && selectedModel.colors.length > 0
+      ? selectedModel.colors
+      : shirtColors
+  );
+
+  const [selectedStoreColors, setSelectedStoreColors] = useState(() => {
+    if (initialDraft?.colors && Array.isArray(initialDraft.colors) && initialDraft.colors.length > 0) {
+      return initialDraft.colors;
+    }
+    const defaultCol = initialDraft?.fabricColor || initialDraft?.color || "#ffffff";
+    return [defaultCol];
+  });
+
+  const toggleStoreColor = (colorValue) => {
+    setSelectedStoreColors((prev) => {
+      const exists = prev.some((c) => c.toLowerCase() === colorValue.toLowerCase());
+      if (exists) {
+        if (prev.length === 1) return prev; // Keep at least one color selected
+        const updated = prev.filter((c) => c.toLowerCase() !== colorValue.toLowerCase());
+        if (shirtColor.toLowerCase() === colorValue.toLowerCase() && updated.length > 0) {
+          setShirtColor(updated[0]);
+        }
+        return updated;
+      } else {
+        return [...prev, colorValue];
+      }
+    });
+  };
+
   const ALL_SHIRT_SIZES = [
     { code: "XS", label: "Extra Small", desc: "Chest: 34-36\"" },
     { code: "S", label: "Small", desc: "Chest: 36-38\"" },
@@ -653,6 +712,23 @@ export default function DesignerPage() {
     setSelectedStoreSizes((prev) => {
       const valid = prev.filter((s) => modelSizes.includes(s));
       return sortSizesAscending(valid.length > 0 ? valid : modelSizes);
+    });
+
+    const modelColors = (
+      selectedModel.colors && Array.isArray(selectedModel.colors) && selectedModel.colors.length > 0
+        ? selectedModel.colors
+        : shirtColors
+    ).map((c) => c.value);
+
+    if (!modelColors.some((val) => val.toLowerCase() === shirtColor.toLowerCase())) {
+      if (modelColors[0]) setShirtColor(modelColors[0]);
+    }
+
+    setSelectedStoreColors((prev) => {
+      const valid = (prev || []).filter((c) =>
+        modelColors.some((mc) => mc.toLowerCase() === c.toLowerCase())
+      );
+      return valid.length > 0 ? valid : modelColors;
     });
   }, [selectedModel]);
 
@@ -736,9 +812,11 @@ export default function DesignerPage() {
           side: l.side
         })),
         shirtColor,
+        selectedStoreColors,
         modelPath: selectedModel?.path || shirtType,
         shirtMaterial,
-        selectedSize
+        selectedSize,
+        selectedStoreSizes
       });
     } catch (e) {
       return "";
@@ -1784,6 +1862,19 @@ export default function DesignerPage() {
       const valid = prev.filter(s => modelSizes.includes(s));
       return valid.length > 0 ? valid : modelSizes;
     });
+
+    const modelColors = (
+      model.colors && Array.isArray(model.colors) && model.colors.length > 0
+        ? model.colors
+        : shirtColors
+    ).map((c) => c.value);
+    setSelectedStoreColors((prev) => {
+      const valid = (prev || []).filter((c) =>
+        modelColors.some((mc) => mc.toLowerCase() === c.toLowerCase())
+      );
+      return valid.length > 0 ? valid : modelColors;
+    });
+
     setPendingStyleChange(null);
     setShowStyleChangeWarningModal(false);
   };
@@ -2216,52 +2307,210 @@ export default function DesignerPage() {
                 {/* 3. Colors */}
                 {activeLeftPanel === "colors" && (
                   <div className="space-y-4">
-                    {/* Active Selected Color Pill */}
-                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="h-9 w-9 rounded-xl border-2 border-slate-300 shadow-xs"
-                          style={{ backgroundColor: shirtColor }}
-                        />
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">
-                            {resolveColorName(shirtColor)}
+                    {isEmployee || isManager ? (
+                      <div className="space-y-3.5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                              Available Colors
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Select colors available for this design
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-2xs">
+                            {selectedStoreColors.length} of {activeModelColors.length} Active
+                          </span>
+                        </div>
+
+                        {/* Active 3D Preview Color Indicator */}
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="h-8 w-8 rounded-xl border-2 border-slate-300 shadow-xs shrink-0"
+                              style={{ backgroundColor: shirtColor }}
+                            />
+                            <div>
+                              <p className="text-xs font-bold text-slate-800">
+                                {resolveColorName(shirtColor)}
+                              </p>
+                              <span className="text-[10px] text-slate-400 font-mono uppercase">{shirtColor}</span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 uppercase">
+                            3D Previewing
+                          </span>
+                        </div>
+
+                        {/* Quick Presets */}
+                        <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStoreColors(activeModelColors.map((c) => c.value))}
+                            className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const core = ["#ffffff", "#111827", "#1e3a8a", "#dc2626", "#4b5563"];
+                              const filtered = activeModelColors.map(c => c.value).filter(v => core.some(cv => cv.toLowerCase() === v.toLowerCase()));
+                              setSelectedStoreColors(filtered.length > 0 ? filtered : [shirtColor]);
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                          >
+                            Core Colors
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStoreColors([shirtColor])}
+                            className="px-2.5 py-1 text-[11px] font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                          >
+                            Only Current
+                          </button>
+                        </div>
+
+                        {/* Checkbox List of Colors */}
+                        <div className="space-y-2 pt-1 max-h-[380px] overflow-y-auto pr-1">
+                          {activeModelColors.map((colorObj) => {
+                            const isChecked = selectedStoreColors.some(
+                              (c) => c.toLowerCase() === colorObj.value.toLowerCase()
+                            );
+                            const isCurrentlyPreviewed = shirtColor.toLowerCase() === colorObj.value.toLowerCase();
+                            return (
+                              <div
+                                key={colorObj.name + colorObj.value}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  toggleStoreColor(colorObj.value);
+                                }}
+                                className={`w-full flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-200 cursor-pointer select-none ${isChecked
+                                    ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500/20"
+                                    : "border-slate-200/80 bg-white hover:bg-slate-50 opacity-60"
+                                  }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  {/* Custom Checkbox */}
+                                  <div
+                                    className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${isChecked
+                                        ? "bg-indigo-600 border-indigo-600 text-white shadow-2xs"
+                                        : "border-slate-300 bg-white"
+                                      }`}
+                                  >
+                                    {isChecked && (
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </div>
+
+                                  {/* Color Swatch */}
+                                  <div
+                                    className="h-7 w-7 rounded-full border-2 border-slate-200 shadow-2xs shrink-0"
+                                    style={{ backgroundColor: colorObj.value }}
+                                  />
+
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-black text-slate-900">{colorObj.name}</span>
+                                      {isCurrentlyPreviewed && (
+                                        <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md bg-indigo-600 text-white">
+                                          3D
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono uppercase block">{colorObj.value}</span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShirtColor(colorObj.value);
+                                    }}
+                                    className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold border transition cursor-pointer ${isCurrentlyPreviewed
+                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-indigo-600"
+                                      }`}
+                                    title="Preview this color on 3D Model"
+                                  >
+                                    {isCurrentlyPreviewed ? "3D Active" : "Preview 3D"}
+                                  </button>
+                                  <span
+                                    className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isChecked ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400"
+                                      }`}
+                                  >
+                                    {isChecked ? "Available" : "Disabled"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-indigo-50/40 border border-indigo-100 space-y-1 mt-2">
+                          <div className="flex items-center gap-1.5 text-indigo-950 font-bold text-xs">
+                            <Palette className="h-3.5 w-3.5 text-indigo-600" />
+                            <span>Catalog Color Variations</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 leading-relaxed">
+                            Checked colors will be published to the customer store catalog as selectable color options. Use "Preview 3D" to view your graphics against each shade.
                           </p>
-                          <span className="text-[10px] text-slate-400 font-mono uppercase">{shirtColor}</span>
                         </div>
                       </div>
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 uppercase">
-                        Current
-                      </span>
-                    </div>
+                    ) : (
+                      <>
+                        {/* Active Selected Color Pill */}
+                        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="h-9 w-9 rounded-xl border-2 border-slate-300 shadow-xs"
+                              style={{ backgroundColor: shirtColor }}
+                            />
+                            <div>
+                              <p className="text-xs font-bold text-slate-800">
+                                {resolveColorName(shirtColor)}
+                              </p>
+                              <span className="text-[10px] text-slate-400 font-mono uppercase">{shirtColor}</span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 uppercase">
+                            Current
+                          </span>
+                        </div>
 
-                    <div className="space-y-2">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Palette Presets</span>
-                      <div className="grid grid-cols-4 gap-2.5">
-                        {(selectedModel?.colors && selectedModel.colors.length > 0 ? selectedModel.colors : shirtColors).map((color) => {
-                          const isSelected = shirtColor.toLowerCase() === color.value.toLowerCase();
-                          return (
-                            <button
-                              key={color.name}
-                              onClick={() => setShirtColor(color.value)}
-                              className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer ${isSelected
-                                ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500"
-                                : "border-slate-200/70 hover:bg-slate-50 hover:border-slate-300"
-                                }`}
-                              title={color.name}
-                            >
-                              <div
-                                className="h-7 w-7 rounded-full border shadow-xs transition-transform"
-                                style={{ backgroundColor: color.value }}
-                              />
-                              <span className="text-[9px] font-bold text-slate-700 truncate w-full text-center">
-                                {color.name}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                        <div className="space-y-2">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Palette Presets</span>
+                          <div className="grid grid-cols-4 gap-2.5">
+                            {activeModelColors.map((color) => {
+                              const isSelected = shirtColor.toLowerCase() === color.value.toLowerCase();
+                              return (
+                                <button
+                                  key={color.name}
+                                  onClick={() => setShirtColor(color.value)}
+                                  className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer ${isSelected
+                                      ? "border-indigo-600 bg-indigo-50/50 shadow-xs ring-1 ring-indigo-500"
+                                      : "border-slate-200/70 hover:bg-slate-50 hover:border-slate-300"
+                                    }`}
+                                  title={color.name}
+                                >
+                                  <div
+                                    className="h-7 w-7 rounded-full border shadow-xs transition-transform"
+                                    style={{ backgroundColor: color.value }}
+                                  />
+                                  <span className="text-[9px] font-bold text-slate-700 truncate w-full text-center">
+                                    {color.name}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -4079,6 +4328,44 @@ export default function DesignerPage() {
                   onChange={(e) => setSubmitForm(prev => ({ ...prev, basePrice: parseFloat(e.target.value) || 0 }))}
                   className="w-full px-3 py-2 border rounded-xl text-sm"
                 />
+              </div>
+
+              {/* Product Specifications Summary (Colors & Sizes) */}
+              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 select-none">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-slate-500">Selected Colors:</span>
+                  <span className="font-extrabold text-indigo-600">
+                    {selectedStoreColors.length} {selectedStoreColors.length === 1 ? "color" : "colors"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {selectedStoreColors.map((hex, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-slate-200 shadow-2xs text-[10px] font-semibold text-slate-700"
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block"
+                        style={{ backgroundColor: hex }}
+                      />
+                      <span>{resolveColorName(hex)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/60">
+                  <span className="font-bold text-slate-500">Selected Sizes:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {sortSizesAscending(selectedStoreSizes).map((sz) => (
+                      <span
+                        key={sz}
+                        className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-bold text-slate-800"
+                      >
+                        {sz}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t">
