@@ -3079,6 +3079,7 @@ export default function ManagerPage() {
                               category: matchedStyle ? (matchedStyle.name || matchedStyle.type || prev.category) : prev.category,
                               gsms: styleGsms,
                               colors: styleColors,
+                              fabricColor: styleColors[0] || "#ffffff",
                               defaultColor: styleColors[0] || "#ffffff",
                             }));
                           }}
@@ -3256,10 +3257,18 @@ export default function ManagerPage() {
                                     } else {
                                       updatedColors = [...currentColors, hexVal];
                                     }
+
+                                    const currentActive = prev.fabricColor || prev.defaultColor || "";
+                                    const stillValid = updatedColors.some(
+                                      (c) => c.toLowerCase() === currentActive.toLowerCase()
+                                    );
+                                    const nextActive = stillValid ? currentActive : (updatedColors[0] || "#ffffff");
+
                                     return {
                                       ...prev,
                                       colors: updatedColors,
-                                      defaultColor: updatedColors[0] || "#ffffff",
+                                      fabricColor: nextActive,
+                                      defaultColor: nextActive,
                                     };
                                   });
                                 }}
@@ -3280,37 +3289,36 @@ export default function ManagerPage() {
                       </div>
                     </div>
 
+                    {/* Default Color Selector - ONLY among available product colors */}
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                          Default Color
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                          <span>Default 3D Active Color</span>
+                          <span className="text-[9px] font-extrabold text-indigo-600">
+                            {resolveColorName(productForm.fabricColor || productForm.defaultColor || productForm.colors?.[0] || "#ffffff")}
+                          </span>
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={productForm.defaultColor}
-                            onChange={(e) =>
-                              setProductForm((prev) => ({
-                                ...prev,
-                                defaultColor: e.target.value,
-                                colors: [e.target.value],
-                              }))
-                            }
-                            className="h-8 w-10 border rounded-lg p-0 bg-transparent cursor-pointer shrink-0"
-                          />
-                          <input
-                            type="text"
-                            value={productForm.defaultColor}
-                            onChange={(e) =>
-                              setProductForm((prev) => ({
-                                ...prev,
-                                defaultColor: e.target.value,
-                                colors: [e.target.value],
-                              }))
-                            }
-                            className="w-full px-3 py-1.5 border rounded-xl text-xs"
-                          />
-                        </div>
+                        <select
+                          value={productForm.fabricColor || productForm.defaultColor || productForm.colors?.[0] || "#ffffff"}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setProductForm((prev) => ({
+                              ...prev,
+                              fabricColor: val,
+                              defaultColor: val,
+                            }));
+                          }}
+                          className="w-full px-3 py-2 border rounded-xl text-xs font-bold bg-white focus:outline-indigo-500 cursor-pointer"
+                        >
+                          {(productForm.colors && productForm.colors.length > 0
+                            ? productForm.colors
+                            : ["#ffffff"]
+                          ).map((cHex) => (
+                            <option key={cHex} value={cHex}>
+                              {resolveColorName(cHex)} ({cHex})
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       <div className="space-y-1">
@@ -3325,6 +3333,49 @@ export default function ManagerPage() {
                         />
                       </div>
                     </div>
+
+                    {/* Quick Swatches for selecting Default Color among available colors */}
+                    {(productForm.colors || []).length > 1 && (
+                      <div className="space-y-1.5 -mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200/70">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">
+                          Select Default from Available Colors:
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {(productForm.colors || []).map((cHex) => {
+                            const isCurrentDefault =
+                              (productForm.fabricColor || productForm.defaultColor || productForm.colors?.[0] || "#ffffff").toLowerCase() === cHex.toLowerCase();
+                            return (
+                              <button
+                                key={cHex}
+                                type="button"
+                                onClick={() =>
+                                  setProductForm((prev) => ({
+                                    ...prev,
+                                    fabricColor: cHex,
+                                    defaultColor: cHex,
+                                  }))
+                                }
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition cursor-pointer ${
+                                  isCurrentDefault
+                                    ? "bg-indigo-600 border-indigo-600 text-white shadow-xs"
+                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                                }`}
+                                title={`Set ${resolveColorName(cHex)} as Default`}
+                              >
+                                <span
+                                  className="w-3 h-3 rounded-full border border-slate-300 shrink-0"
+                                  style={{ backgroundColor: cHex }}
+                                />
+                                <span>{resolveColorName(cHex)}</span>
+                                {isCurrentDefault && (
+                                  <Check className="h-3 w-3 stroke-[3]" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
