@@ -502,11 +502,11 @@ exports.getPlatformStats = async (req, res) => {
       customerRating: reviewCount > 0 ? `${avgRating}/5` : "0.0/5",
       averageRating: parseFloat(avgRating),
       reviewCount: reviewCount,
-      ratingSubtitle: reviewCount === 0 
-        ? "No reviews yet" 
-        : reviewCount === 1 
-        ? "Based on 1 review" 
-        : `Based on ${reviewCount} reviews`
+      ratingSubtitle: reviewCount === 0
+        ? "No reviews yet"
+        : reviewCount === 1
+          ? "Based on 1 review"
+          : `Based on ${reviewCount} reviews`
     });
   } catch (error) {
     console.error("Fetch platform stats error:", error);
@@ -643,7 +643,7 @@ exports.getRecommendations = async (req, res) => {
 
       allActivities.forEach(act => {
         const isTargetUser = (currentUserId && act.userId && act.userId.toString() === currentUserId) ||
-                             (currentSessionId && act.sessionId && act.sessionId === currentSessionId);
+          (currentSessionId && act.sessionId && act.sessionId === currentSessionId);
 
         if (isTargetUser) {
           totalUserActivityCount++;
@@ -840,11 +840,11 @@ exports.createOrder = async (req, res) => {
       const color = resolveColorName(item.color || item.selectedColor || "White");
       const gsm = formatGsm(item.gsm || item.material || "GSM 180");
       const tShirtStyle = item.tShirtStyle || item.tShirtType || (item.designId?.tShirtType) || "Crew Neck";
-      const quantity = typeof item.quantity !== "undefined" && !isNaN(Number(item.quantity)) && Number(item.quantity) > 0 
-        ? Number(item.quantity) 
+      const quantity = typeof item.quantity !== "undefined" && !isNaN(Number(item.quantity)) && Number(item.quantity) > 0
+        ? Number(item.quantity)
         : 1;
-      const price = typeof item.price !== "undefined" && !isNaN(Number(item.price)) 
-        ? Number(item.price) 
+      const price = typeof item.price !== "undefined" && !isNaN(Number(item.price))
+        ? Number(item.price)
         : (item.basePrice || 0);
       const itemType = item.itemType || (item.designId ? "Customized" : "Ready-made");
 
@@ -978,7 +978,7 @@ exports.saveCustomerDesign = async (req, res) => {
       return res.status(401).json({ message: "Authorization denied. Please log in." });
     }
 
-    const { designId, _id, tShirtType, modelPath, fabricColor, material, size, layers, estimatedCost, thumbnailUrl } = req.body;
+    const { designId, _id, tShirtType, modelPath, fabricColor, colors, material, size, sizes, layers, estimatedCost, thumbnailUrl } = req.body;
     const targetId = designId || _id;
 
     if (targetId) {
@@ -990,8 +990,10 @@ exports.saveCustomerDesign = async (req, res) => {
         if (tShirtType) existing.tShirtType = tShirtType;
         if (modelPath) existing.modelPath = modelPath;
         if (fabricColor) existing.fabricColor = fabricColor;
+        if (Array.isArray(colors) && colors.length > 0) existing.colors = colors;
         if (material) existing.material = material;
         if (size) existing.size = size;
+        if (Array.isArray(sizes) && sizes.length > 0) existing.sizes = sizes;
         if (layers) existing.layers = sanitizeLayers(layers);
         if (typeof estimatedCost !== "undefined") existing.estimatedCost = Number(estimatedCost) || 0;
         if (thumbnailUrl) existing.thumbnailUrl = thumbnailUrl;
@@ -1006,8 +1008,10 @@ exports.saveCustomerDesign = async (req, res) => {
       tShirtType: tShirtType || "Crew Neck",
       modelPath: modelPath || "/images/models/male normal t-shirt1.glb",
       fabricColor: fabricColor || "#ffffff",
+      colors: Array.isArray(colors) && colors.length > 0 ? colors : [fabricColor || "#ffffff"],
       material: material || "GSM 180",
       size: size || "M",
+      sizes: Array.isArray(sizes) && sizes.length > 0 ? sizes : [size || "M"],
       layers: sanitizeLayers(layers),
       estimatedCost: Number(estimatedCost) || 0,
       thumbnailUrl: thumbnailUrl || ""
@@ -1034,7 +1038,7 @@ exports.updateCustomerDesign = async (req, res) => {
     }
 
     const designId = req.params.id;
-    const { tShirtType, modelPath, fabricColor, material, size, layers, estimatedCost, thumbnailUrl } = req.body;
+    const { tShirtType, modelPath, fabricColor, colors, material, size, sizes, layers, estimatedCost, thumbnailUrl } = req.body;
 
     let design = await CustomizedDesign.findOne({ _id: designId, userId: decoded.id });
     if (!design) {
@@ -1047,8 +1051,10 @@ exports.updateCustomerDesign = async (req, res) => {
     if (tShirtType) design.tShirtType = tShirtType;
     if (modelPath) design.modelPath = modelPath;
     if (fabricColor) design.fabricColor = fabricColor;
+    if (Array.isArray(colors) && colors.length > 0) design.colors = colors;
     if (material) design.material = material;
     if (size) design.size = size;
+    if (Array.isArray(sizes) && sizes.length > 0) design.sizes = sizes;
     if (layers) design.layers = sanitizeLayers(layers);
     if (typeof estimatedCost !== "undefined") design.estimatedCost = Number(estimatedCost) || 0;
     if (thumbnailUrl) design.thumbnailUrl = thumbnailUrl;

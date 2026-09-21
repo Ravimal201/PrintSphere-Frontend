@@ -650,7 +650,7 @@ exports.createProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { title, description, category, basePrice, sizes, gsms, gsmPrices, colors, images, status, discount, modelPath, defaultColor, layers } = req.body;
+    const { title, description, category, basePrice, sizes, gsms, gsmPrices, fabricColor, colors, images, status, discount, modelPath, layers } = req.body;
 
     if (!title || !description || !category || basePrice === undefined) {
       return res.status(400).json({ message: "Please provide all required product fields" });
@@ -664,6 +664,10 @@ exports.createProduct = async (req, res) => {
       : (typeof gsms === "string" && gsms.trim() ? [gsms.trim()] : ["GSM 180"]);
     const gsmsArray = rawGsms.map(formatGsm);
 
+    const dynamicFabricColor = (Array.isArray(colors) && colors.length > 0)
+      ? colors[0]
+      : (fabricColor || "#ffffff");
+
     const product = await Product.create({
       title,
       description,
@@ -673,14 +677,14 @@ exports.createProduct = async (req, res) => {
       gsm: gsmsArray[0] || "GSM 180",
       gsms: gsmsArray,
       gsmPrices: Array.isArray(gsmPrices) ? gsmPrices.map(gp => ({ ...gp, gsm: formatGsm(gp.gsm) })) : [],
-      colors: colors && colors.length > 0 ? colors : ["#ffffff"],
+      fabricColor: dynamicFabricColor,
+      colors: colors && colors.length > 0 ? colors : [dynamicFabricColor],
       images: images && images.length > 0 ? images : ["/images/dumyImage.png"],
       status: status || "Active",
       isApproved: true,
       createdBy: decoded.id,
       discount: discount || 0,
       modelPath: modelPath || "/images/models/male normal t-shirt1.glb",
-      defaultColor: defaultColor || "#ffffff",
       layers: layers || []
     });
 
@@ -707,7 +711,7 @@ exports.updateProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied. Manager role required." });
     }
 
-    const { title, description, category, basePrice, sizes, gsms, colors, images, status, isApproved, discount, modelPath, defaultColor, layers } = req.body;
+    const { title, description, category, basePrice, sizes, gsms, fabricColor, colors, images, status, isApproved, discount, modelPath, layers } = req.body;
 
     const gsmsArray = Array.isArray(gsms) && gsms.length > 0 
       ? gsms 
@@ -725,9 +729,14 @@ exports.updateProduct = async (req, res) => {
       isApproved,
       discount,
       modelPath,
-      defaultColor,
       layers
     };
+
+    if (Array.isArray(colors) && colors.length > 0) {
+      updatePayload.fabricColor = colors[0];
+    } else if (fabricColor) {
+      updatePayload.fabricColor = fabricColor;
+    }
 
     if (gsmsArray) {
       updatePayload.gsms = gsmsArray;

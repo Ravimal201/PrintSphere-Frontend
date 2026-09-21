@@ -1205,6 +1205,7 @@ export default function EmployeePage() {
                         <th className="pb-3">Title</th>
                         <th className="pb-3">Category</th>
                         <th className="pb-3">Proposed Base Price</th>
+                        <th className="pb-3">Colors</th>
                         <th className="pb-3">Sizes</th>
                         <th className="pb-3">Approval Status</th>
                         <th className="pb-3">Publish State</th>
@@ -1217,6 +1218,18 @@ export default function EmployeePage() {
                           <td className="py-4 font-bold text-slate-900">{p.title}</td>
                           <td className="py-4 text-xs text-slate-600">{p.category}</td>
                           <td className="py-4 text-xs font-bold text-slate-950">Rs. {p.basePrice.toFixed(2)}</td>
+                          <td className="py-4 text-xs text-slate-700">
+                            <div className="flex flex-wrap items-center gap-1.5 max-w-[160px]">
+                              {(p.colors && p.colors.length > 0 ? p.colors : ["#ffffff"]).map((col, cIdx) => (
+                                <span
+                                  key={cIdx}
+                                  className="w-4 h-4 rounded-full border border-slate-300 shadow-2xs inline-block"
+                                  style={{ backgroundColor: col }}
+                                  title={resolveColorName(col)}
+                                />
+                              ))}
+                            </div>
+                          </td>
                           <td className="py-4 text-xs text-slate-700">
                             <div className="flex flex-wrap gap-1 max-w-[200px]">
                               {sortSizesAscending(p.sizes).length > 0 ? (
@@ -1329,7 +1342,7 @@ export default function EmployeePage() {
                       <div className="relative">
                         <Store3DCardPreview
                           product={design}
-                          activeColor={design.fabricColor || design.color}
+                          activeColor={design.colors?.[0] || design.fabricColor || design.color || "#ffffff"}
                           onClick={() => {
                             setSelected3DDesign(design);
                             setIs3DModalOpen(true);
@@ -1357,7 +1370,30 @@ export default function EmployeePage() {
                             Rs. {(design.estimatedCost || 0).toFixed(2)}
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          {design.colors && Array.isArray(design.colors) && design.colors.length > 0 ? (
+                            <div className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full">
+                              {design.colors.map((c, i) => (
+                                <span
+                                  key={i}
+                                  className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block shadow-2xs"
+                                  style={{ backgroundColor: c }}
+                                  title={resolveColorName(c)}
+                                />
+                              ))}
+                              <span className="text-[9px] text-slate-600 font-bold ml-0.5">
+                                {design.colors.length} {design.colors.length === 1 ? "Color" : "Colors"}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="bg-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block"
+                                style={{ backgroundColor: design.fabricColor || design.color || "#ffffff" }}
+                              />
+                              {resolveColorName(design.fabricColor || design.color || "#ffffff")}
+                            </span>
+                          )}
                           {design.material && (
                             <span className="bg-slate-100 px-2 py-0.5 rounded-full">{design.material}</span>
                           )}

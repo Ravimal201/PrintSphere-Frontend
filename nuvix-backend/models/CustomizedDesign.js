@@ -91,6 +91,8 @@ const CustomizedDesignSchema = new mongoose.Schema(
       type: String,
       default: "M"
     },
+    sizes: [String],
+    colors: [String],
     layers: [LayerSchema], // List of 3D decals projected
     estimatedCost: {
       type: Number,
