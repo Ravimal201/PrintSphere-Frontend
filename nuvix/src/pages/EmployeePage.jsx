@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import {
   ShoppingCart, Layers, Settings, LogOut, Loader2, AlertCircle,
   CheckCircle, Plus, Edit2, Check, X, FileText, Download, User, Sparkles,
-  Clock, Ban, Play, Printer, Truck, ArrowRight, Palette, RotateCcw
+  Clock, Ban, Play, Printer, Truck, ArrowRight, Palette, RotateCcw, Trash2
 } from "lucide-react";
 import axios from "axios";
 import { confirmAction, alertAction } from "../context/ConfirmContext";
 import TShirt3DModal from "../components/TShirt3DModal";
 import DesignScreenshotViewer from "../components/DesignScreenshotViewer";
+import Store3DCardPreview from "../components/Store3DCardPreview";
+import { safeLocalStorage } from "../utils/imageOptimizer";
 
 import { API_BASE_URL } from "../config/api";
 import { resolveColorName, formatGsm } from "../utils/colorHelper";
@@ -159,11 +161,21 @@ const resolveCustomerInfo = (order) => {
 export default function EmployeePage() {
   const [isEmployee, setIsEmployee] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("tasks"); // "tasks" | "submissions" | "settings"
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "designs" || tabParam === "submissions" || tabParam === "settings" || tabParam === "tasks") {
+        return tabParam;
+      }
+    } catch (e) {}
+    return "tasks";
+  }); // "tasks" | "submissions" | "designs" | "settings"
 
   // Data states
   const [assignedOrders, setAssignedOrders] = useState([]);
   const [mySubmissions, setMySubmissions] = useState([]);
+  const [mySavedDesigns, setMySavedDesigns] = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
 
   // Status transition notes & loaders
@@ -272,17 +284,55 @@ export default function EmployeePage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      const [ordersRes, productsRes] = await Promise.all([
+      const [ordersRes, productsRes, designsRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/employee/orders`, { headers }),
-        axios.get(`${API_BASE_URL}/employee/products`, { headers })
+        axios.get(`${API_BASE_URL}/employee/products`, { headers }),
+        axios.get(`${API_BASE_URL}/auth/designs`, { headers }).catch(() => ({ data: [] }))
       ]);
 
-      setAssignedOrders(ordersRes.data);
-      setMySubmissions(productsRes.data);
+      setAssignedOrders(ordersRes.data || []);
+      setMySubmissions(productsRes.data || []);
+      setMySavedDesigns(designsRes.data || []);
     } catch (err) {
       console.error("Fetch employee dashboard error:", err);
     } finally {
       setDataLoading(false);
+    }
+  };
+
+  const handleLoadSavedDesign = (design) => {
+    safeLocalStorage.setItem("load_custom_design", design);
+    window.location.href = "/designer";
+  };
+
+  const handleDeleteSavedDesign = async (id) => {
+    const isConfirmed = await confirmAction({
+      title: "Delete Saved Design",
+      message: "Are you sure you want to delete this saved 3D design concept? This cannot be undone.",
+      confirmText: "Delete Design",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      await axios.delete(`${API_BASE_URL}/auth/designs/${id}`, { headers });
+      setMySavedDesigns((prev) => prev.filter((d) => d._id !== id));
+      alertAction({
+        title: "Design Deleted",
+        message: "Your saved design draft has been deleted.",
+        type: "info"
+      });
+    } catch (err) {
+      console.error("Delete custom design error:", err);
+      alertAction({
+        title: "Delete Failed",
+        message: err.response?.data?.message || "Failed to delete design. Please try again.",
+        type: "danger"
+      });
     }
   };
 
@@ -501,7 +551,7 @@ export default function EmployeePage() {
             >
               <span className="flex items-center gap-3.5">
                 <Layers className="h-4.5 w-4.5" />
-                My Concept Designs
+                Submitted Concepts
               </span>
               {mySubmissions.filter(p => !p.isApproved).length > 0 && (
                 <span className="px-2 py-0.5 text-[10px] font-black bg-purple-500 text-white rounded-full">
@@ -509,11 +559,30 @@ export default function EmployeePage() {
                 </span>
               )}
             </button>
+
+            <button
+              onClick={() => setActiveTab("designs")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "designs"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "hover:bg-slate-800 hover:text-slate-200"
+                }`}
+            >
+              <span className="flex items-center gap-3.5">
+                <Palette className="h-4.5 w-4.5" />
+                My Saved Designs
+              </span>
+              {mySavedDesigns.length > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-black bg-indigo-500 text-white rounded-full">
+                  {mySavedDesigns.length}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => window.location.href = "/designer"}
               className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition hover:bg-slate-800 hover:text-slate-200 cursor-pointer"
             >
-              <Palette className="h-4.5 w-4.5 text-slate-400" />
+              <Sparkles className="h-4.5 w-4.5 text-slate-400" />
               <span>3D Designer</span>
             </button>
             <button
@@ -548,7 +617,7 @@ export default function EmployeePage() {
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8">
 
         {/* Statistics Widgets */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 select-none">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 select-none">
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Assigned Tasks</span>
             <div className="flex items-baseline gap-2 mt-1">
@@ -556,32 +625,43 @@ export default function EmployeePage() {
                 {assignedOrders.filter(o => o.orderStatus !== "Shipped" && o.orderStatus !== "Delivered" && o.orderStatus !== "Collected" && o.orderStatus !== "Cancelled").length}
               </p>
               <span className="text-xs font-semibold text-slate-500">
-                active ({assignedOrders.filter(o => o.orderStatus === "Shipped" || o.orderStatus === "Delivered" || o.orderStatus === "Collected").length} completed, {assignedOrders.filter(o => o.orderStatus === "Cancelled").length} cancelled)
+                active
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-indigo-600 mt-2 font-bold">
-              <ShoppingCart className="h-3.5 w-3.5" />
-              <span>
+            <div className="flex items-center gap-1.5 text-xs text-indigo-600 mt-2 font-bold truncate">
+              <ShoppingCart className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
                 {assignedOrders.filter(o => o.orderStatus !== "Shipped" && o.orderStatus !== "Delivered" && o.orderStatus !== "Collected" && o.orderStatus !== "Cancelled").length > 0
                   ? "Production in progress"
-                  : "All active orders shipped"}
+                  : "All orders shipped"}
               </span>
             </div>
           </div>
+
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">My Submissions</span>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Submitted Concepts</span>
             <p className="text-2xl font-black text-slate-900 mt-1">{mySubmissions.length} designs</p>
-            <div className="flex items-center gap-1.5 text-xs text-purple-600 mt-2 font-bold">
-              <Layers className="h-3.5 w-3.5" />
-              <span>{mySubmissions.filter(s => s.isApproved).length} approved & published</span>
+            <div className="flex items-center gap-1.5 text-xs text-purple-600 mt-2 font-bold truncate">
+              <Layers className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{mySubmissions.filter(s => s.isApproved).length} approved</span>
             </div>
           </div>
+
+          <div className="bg-white border rounded-3xl p-6 shadow-sm">
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">Saved 3D Drafts</span>
+            <p className="text-2xl font-black text-indigo-600 mt-1">{mySavedDesigns.length} drafts</p>
+            <div className="flex items-center gap-1.5 text-xs text-indigo-600 mt-2 font-bold truncate">
+              <Palette className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Saved works in progress</span>
+            </div>
+          </div>
+
           <div className="bg-white border rounded-3xl p-6 shadow-sm">
             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">System Status</span>
             <p className="text-2xl font-black text-emerald-600 mt-1">Online</p>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold">
-              <Check className="h-3.5 w-3.5" />
-              <span>Operator console synchronised</span>
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-2 font-bold truncate">
+              <Check className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Operator console active</span>
             </div>
           </div>
         </div>
@@ -1182,6 +1262,144 @@ export default function EmployeePage() {
             </div>
 
 
+          </div>
+        )}
+
+        {/* ================= TAB: MY SAVED DESIGNS ================= */}
+        {activeTab === "designs" && (
+          <div className="space-y-8">
+            <div className="bg-white border rounded-3xl p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                    <Palette className="h-5 w-5 text-indigo-600" />
+                    My Saved 3D Designs & Drafts
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Your personal works-in-progress and design drafts saved from the 3D Designer
+                  </p>
+                </div>
+                <button
+                  onClick={() => window.location.href = "/designer"}
+                  className="inline-flex items-center gap-2.5 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-2xl text-sm font-extrabold transition-all shadow-md hover:shadow-indigo-200 cursor-pointer"
+                >
+                  <Plus className="h-5 w-5 stroke-[2.5]" />
+                  Open 3D Designer
+                </button>
+              </div>
+
+              {/* Informational Banner */}
+              <div className="mb-6 p-4 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-start gap-3 text-xs text-indigo-700 select-none">
+                <Sparkles className="h-4.5 w-4.5 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-extrabold text-slate-900">Work-in-Progress Design Drafts</p>
+                  <p className="text-slate-500 mt-1">
+                    When working in the 3D Designer, click the <strong>Save Design</strong> button to save your current layers and customization progress here. You can resume editing anytime or submit the finished concept for manager approval.
+                  </p>
+                </div>
+              </div>
+
+              {mySavedDesigns.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-3xl p-12 text-center space-y-4">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600">
+                    <Palette className="h-8 w-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-base font-bold text-slate-900">No Saved Designs Yet</h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      Launch the 3D Designer to create and save shirt graphics, logos, and custom color arrangements.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => window.location.href = "/designer"}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create New Design
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {mySavedDesigns.map((design) => (
+                    <div
+                      key={design._id}
+                      className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
+                    >
+                      {/* 3D T-Shirt Card Preview with hover controls */}
+                      <div className="relative">
+                        <Store3DCardPreview
+                          product={design}
+                          activeColor={design.fabricColor || design.color}
+                          onClick={() => {
+                            setSelected3DDesign(design);
+                            setIs3DModalOpen(true);
+                          }}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSavedDesign(design._id);
+                          }}
+                          className="absolute top-2.5 right-2.5 z-40 p-2 bg-white/90 hover:bg-rose-600 text-slate-500 hover:text-white rounded-xl shadow-xs border border-slate-100 transition-all duration-200 cursor-pointer active:scale-95 hover:shadow-md"
+                          title="Delete Saved Design"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {/* Details */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-extrabold text-slate-900 text-sm capitalize">
+                            {design.tShirtType || "Custom T-Shirt"}
+                          </h4>
+                          <span className="text-indigo-600 font-extrabold text-sm">
+                            Rs. {(design.estimatedCost || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          {design.material && (
+                            <span className="bg-slate-100 px-2 py-0.5 rounded-full">{design.material}</span>
+                          )}
+                          {design.size && (
+                            <span className="bg-slate-100 px-2 py-0.5 rounded-full">Size {design.size}</span>
+                          )}
+                          <span className="bg-slate-100 px-2 py-0.5 rounded-full">
+                            {design.layers?.length || 0} Layers
+                          </span>
+                          {design.updatedAt && (
+                            <span className="bg-slate-50 text-slate-400 px-2 py-0.5 rounded-full">
+                              {new Date(design.updatedAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2.5 pt-2 border-t border-slate-100">
+                        <button
+                          onClick={() => handleLoadSavedDesign(design)}
+                          className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                          Open in Designer
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelected3DDesign(design);
+                            setIs3DModalOpen(true);
+                          }}
+                          className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Palette className="h-3.5 w-3.5 text-indigo-600" />
+                          View 3D
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

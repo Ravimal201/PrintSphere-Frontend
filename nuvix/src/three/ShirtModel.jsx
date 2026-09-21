@@ -990,16 +990,16 @@ export default function ShirtModel({
         const mesh = isTargetValid ? targetMeshCheck : bodyMeshRef.current;
         if (!mesh) return layer;
 
-        // Project position from scene group-space onto the new mesh using a raycast from the outside towards the center
         const groupPos = new THREE.Vector3().fromArray(layer.position || [0, 0, 0]);
-        
-        // Target Y for raycasting: if layer position Y is near 0 or unprojected for current model, use chestY
-        const targetY = (Math.abs(groupPos.y) < 0.01 || layer.projectedForModel !== modelPath) ? chestY : groupPos.y;
+
+        // Project position from scene group-space onto the new mesh using a raycast from the outside towards the center
+        // Target Y for raycasting: only use chestY if layer position Y is truly uninitialized (near 0)
+        const targetY = Math.abs(groupPos.y) >= 0.01 ? groupPos.y : chestY;
         const targetX = groupPos.x !== 0 ? groupPos.x : center.x;
 
         const zSign = groupPos.z >= 0 ? 1 : -1;
         const rayOriginScene = new THREE.Vector3(targetX, targetY, center.z + zSign * 2.5);
-        const rayTargetScene = new THREE.Vector3(center.x, targetY, center.z);
+        const rayTargetScene = new THREE.Vector3(targetX, targetY, center.z);
         const rayDirScene = new THREE.Vector3().subVectors(rayTargetScene, rayOriginScene).normalize();
 
         const worldOrigin = rayOriginScene.clone().applyMatrix4(scene.matrixWorld);

@@ -1199,33 +1199,23 @@ export default function ManagerPage() {
     .filter((o) => o.paymentStatus === "Paid")
     .reduce((sum, o) => sum + (o.totalCost || 0), 0);
 
-  const getSubmissionLayers = () => {
-    if (!selectedSubmissionProduct) return [];
-    if (
-      selectedSubmissionProduct.layers &&
-      selectedSubmissionProduct.layers.length > 0
-    ) {
-      return selectedSubmissionProduct.layers;
-    }
-    return [
-      {
-        id: "logo-layer",
-        type: "image",
-        url: selectedSubmissionProduct.images?.[0] || "/images/dumyImage.png",
-        visible: true,
-        locked: true,
-        position: [0, 0.1, 0.15],
-        rotation: [0, 0, 0],
-        scale: [0.35, 0.35, 0.35],
-      },
-    ];
-  };
-
   const getSubmissionModelPath = () => {
     if (!selectedSubmissionProduct)
       return "/images/models/male normal t-shirt1.glb";
     if (selectedSubmissionProduct.modelPath && typeof selectedSubmissionProduct.modelPath === "string" && (selectedSubmissionProduct.modelPath.toLowerCase().endsWith(".glb") || selectedSubmissionProduct.modelPath.toLowerCase().endsWith(".gltf") || selectedSubmissionProduct.modelPath.toLowerCase().endsWith(".fbx"))) {
       return selectedSubmissionProduct.modelPath;
+    }
+    if (selectedSubmissionProduct.path && typeof selectedSubmissionProduct.path === "string" && (selectedSubmissionProduct.path.toLowerCase().endsWith(".glb") || selectedSubmissionProduct.path.toLowerCase().endsWith(".gltf") || selectedSubmissionProduct.path.toLowerCase().endsWith(".fbx"))) {
+      return selectedSubmissionProduct.path;
+    }
+    if (selectedSubmissionProduct.modelUrl && typeof selectedSubmissionProduct.modelUrl === "string" && (selectedSubmissionProduct.modelUrl.toLowerCase().endsWith(".glb") || selectedSubmissionProduct.modelUrl.toLowerCase().endsWith(".gltf") || selectedSubmissionProduct.modelUrl.toLowerCase().endsWith(".fbx"))) {
+      return selectedSubmissionProduct.modelUrl;
+    }
+    if (selectedSubmissionProduct.layers && Array.isArray(selectedSubmissionProduct.layers)) {
+      const layerWithModel = selectedSubmissionProduct.layers.find((l) => l && l.projectedForModel);
+      if (layerWithModel?.projectedForModel) {
+        return layerWithModel.projectedForModel;
+      }
     }
     const title = (selectedSubmissionProduct.title || "").toLowerCase();
     const category = (selectedSubmissionProduct.category || "").toLowerCase();
@@ -1248,6 +1238,57 @@ export default function ManagerPage() {
       return "/images/models/t_shirt_hoodie.glb";
     }
     return "/images/models/male normal t-shirt1.glb";
+  };
+
+  const getSubmissionLayers = () => {
+    if (!selectedSubmissionProduct) return [];
+    const model = getSubmissionModelPath();
+    if (
+      selectedSubmissionProduct.layers &&
+      selectedSubmissionProduct.layers.length > 0
+    ) {
+      return selectedSubmissionProduct.layers.map((l, idx) => ({
+        id: l.id || `layer-${idx}`,
+        type: l.type || "image",
+        name: l.name || (l.type === "text" ? "Custom Text" : "Custom Logo"),
+        text: l.text || "",
+        fontFamily: l.fontFamily || "Outfit",
+        color: l.color || "#1e293b",
+        bold: Boolean(l.bold),
+        italic: Boolean(l.italic),
+        url: l.url || l.image || l.src || "",
+        visible: l.visible !== undefined ? Boolean(l.visible) : true,
+        locked: l.locked !== undefined ? Boolean(l.locked) : false,
+        flipX: Boolean(l.flipX),
+        flipY: Boolean(l.flipY),
+        position: Array.isArray(l.position) && l.position.length === 3 ? l.position : [0, 0, 0],
+        rotation: Array.isArray(l.rotation) && l.rotation.length === 3 ? l.rotation : [0, 0, 0],
+        scale: Array.isArray(l.scale) && l.scale.length === 3 ? l.scale : [0.3, 0.3, 0.25],
+        aspectRatio: l.aspectRatio || (Array.isArray(l.scale) && l.scale[1] ? l.scale[0] / l.scale[1] : 1),
+        projectedForModel: l.projectedForModel || model,
+        targetMeshName: l.targetMeshName || null
+      }));
+    }
+    const designImg = selectedSubmissionProduct.images?.[0] || selectedSubmissionProduct.thumbnailUrl || selectedSubmissionProduct.designUrl;
+    if (designImg && designImg !== "/images/dumyImage.png") {
+      return [
+        {
+          id: "logo-layer",
+          type: "image",
+          name: "Design Graphic",
+          url: designImg,
+          visible: true,
+          locked: false,
+          position: [0, 0.1, 0.15],
+          rotation: [0, 0, 0],
+          scale: [0.35, 0.35, 0.35],
+          aspectRatio: 1,
+          projectedForModel: model,
+          targetMeshName: null
+        },
+      ];
+    }
+    return [];
   };
 
   if (loading) {

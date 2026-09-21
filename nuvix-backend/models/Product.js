@@ -7,13 +7,13 @@ const LayerSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["text", "image", "logo", "shape"],
-    required: true
+    default: "image"
   },
   name: {
     type: String,
-    required: true
+    default: "Layer"
   },
+  // Text specific parameters
   text: String,
   fontFamily: String,
   color: String,
@@ -25,24 +25,45 @@ const LayerSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Image URL
   url: String,
+  // Layer visibility & lock state
+  visible: {
+    type: Boolean,
+    default: true
+  },
+  locked: {
+    type: Boolean,
+    default: false
+  },
+  flipX: {
+    type: Boolean,
+    default: false
+  },
+  flipY: {
+    type: Boolean,
+    default: false
+  },
+  targetMeshName: String,
+  projectedForModel: String,
+  // 3D transform metrics (X, Y, Z coordinates and factors)
   position: {
     type: [Number],
-    required: true
+    default: [0, 0, 0]
   },
   rotation: {
     type: [Number],
-    required: true
+    default: [0, 0, 0]
   },
   scale: {
     type: [Number],
-    required: true
+    default: [0.3, 0.3, 0.25]
   },
   aspectRatio: {
     type: Number,
     default: 1
   }
-});
+}, { _id: false });
 
 const ProductSchema = new mongoose.Schema(
   {
