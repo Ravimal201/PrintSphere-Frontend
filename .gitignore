@@ -160,3 +160,5 @@ dist/
 # Temporary files
 tmp/
 temp/
+# Local Netlify folder
+.netlify
